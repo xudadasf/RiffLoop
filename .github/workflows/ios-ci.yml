@@ -1,0 +1,45 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Show tool versions
+        run: |
+          xcodebuild -version
+          xcodegen --version
+
+      - name: Build and run unit tests
+        run: >-
+          xcodebuild test
+          -project RiffLoop.xcodeproj
+          -scheme RiffLoop
+          -sdk iphonesimulator
+          -destination 'platform=iOS Simulator,OS=18.5,name=iPad Pro 13-inch (M4)'
+          -derivedDataPath DerivedData
+          CODE_SIGNING_ALLOWED=NO
+
