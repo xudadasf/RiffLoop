@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
@@ -42,4 +42,3 @@ jobs:
           -destination 'platform=iOS Simulator,OS=18.5,name=iPad Pro 13-inch (M4)'
           -derivedDataPath DerivedData
           CODE_SIGNING_ALLOWED=NO
-

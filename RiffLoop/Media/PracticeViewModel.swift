@@ -34,14 +34,16 @@ final class PracticeViewModel: ObservableObject {
     }
 
     deinit {
-        if let periodicTimeObserver {
-            player.removeTimeObserver(periodicTimeObserver)
-        }
-        if let loopBoundaryObserver {
-            player.removeTimeObserver(loopBoundaryObserver)
-        }
-        if let endObserver {
-            NotificationCenter.default.removeObserver(endObserver)
+        MainActor.assumeIsolated {
+            if let periodicTimeObserver {
+                player.removeTimeObserver(periodicTimeObserver)
+            }
+            if let loopBoundaryObserver {
+                player.removeTimeObserver(loopBoundaryObserver)
+            }
+            if let endObserver {
+                NotificationCenter.default.removeObserver(endObserver)
+            }
         }
     }
 
@@ -175,7 +177,7 @@ final class PracticeViewModel: ObservableObject {
         } ?? mediaTime
 
         do {
-            if metronomeEnabled, let beatOffset {
+            if metronomeEnabled, beatOffset != nil {
                 try metronome.prepare()
             }
 
