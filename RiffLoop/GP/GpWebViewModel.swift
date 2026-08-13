@@ -34,6 +34,7 @@ final class GpWebViewModel: ObservableObject {
 
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
+    private var didSendSoundFont = false
     private var loopSelection = GpLoopSelectionStateMachine()
     private let settingsStore = FilePracticeSettingsStore()
     private var currentFileName: String?
@@ -175,6 +176,7 @@ final class GpWebViewModel: ObservableObject {
         switch event {
         case .ready:
             rendererReady = true
+            guard sendBundledSoundFont() else { return }
             if let pendingScoreData {
                 self.pendingScoreData = nil
                 sendScore(pendingScoreData)
@@ -213,6 +215,26 @@ final class GpWebViewModel: ObservableObject {
 
     private func sendScore(_ data: Data) {
         call("loadScore", arguments: [data.base64EncodedString()])
+    }
+
+    @discardableResult
+    private func sendBundledSoundFont() -> Bool {
+        guard !didSendSoundFont else { return true }
+        guard
+            let url = Bundle.main.url(
+                forResource: "sonivox",
+                withExtension: "sf3",
+                subdirectory: "GpWeb/soundfont"
+            ),
+            let data = try? Data(contentsOf: url)
+        else {
+            errorMessage = "GP 音色资源缺失，请重新安装应用。"
+            return false
+        }
+
+        didSendSoundFont = true
+        call("loadSoundFont", arguments: [data.base64EncodedString()])
+        return true
     }
 
     private func handle(_ action: GpLoopSelectionAction) {

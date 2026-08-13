@@ -26,7 +26,7 @@
         },
         player: {
             playerMode: alphaTab.PlayerMode.EnabledAutomatic,
-            soundFont: "./soundfont/sonivox.sf3",
+            soundFont: null,
             scrollElement: "#viewport",
             enableCursor: true,
             enableUserInteraction: true
@@ -41,22 +41,30 @@
         display: { scale: 0.1 },
         player: {
             playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
-            soundFont: "./soundfont/sonivox.sf3",
+            soundFont: null,
             enableCursor: false,
             enableUserInteraction: false
         }
     });
     let synthEnabled = true;
     let backingEnabled = true;
+    let backingVolume = 0.75;
     let startingBoth = false;
+    let soundFontBytes = null;
     const canUseBacking = () => Boolean(api.score?.backingTrack);
     const playPauseBoth = () => {
         if (startingBoth) return;
         startingBoth = true;
-        const shouldPlay = !api.isPlaying;
+        const shouldPlay = canUseBacking()
+            ? !(api.isPlaying || synthApi.isPlaying)
+            : !api.isPlaying;
         if (shouldPlay) {
-            if (backingEnabled && canUseBacking()) api.play();
-            if (synthEnabled) synthApi.play();
+            if (canUseBacking()) {
+                if (backingEnabled || synthEnabled) api.play();
+                if (synthEnabled) synthApi.play();
+            } else if (synthEnabled) {
+                api.play();
+            }
         } else {
             api.pause();
             synthApi.pause();
@@ -86,13 +94,21 @@
     };
 
     api.error.on((error) => post("error", { message: errorMessage(error) }));
-    api.scoreLoaded.on((score) => post("scoreLoaded", {
-        title: score.title || "未命名乐谱",
-        artist: score.artist || "",
-        bars: score.masterBars.length,
-        hasBackingTrack: Boolean(score.backingTrack),
-        tracks: score.tracks.map(trackPayload)
+    synthApi.error.on((error) => post("error", {
+        message: `合成音色加载失败：${errorMessage(error)}`
     }));
+    api.scoreLoaded.on((score) => {
+        if (soundFontBytes && !score.backingTrack) {
+            api.loadSoundFont(soundFontBytes.slice(), false);
+        }
+        post("scoreLoaded", {
+            title: score.title || "未命名乐谱",
+            artist: score.artist || "",
+            bars: score.masterBars.length,
+            hasBackingTrack: Boolean(score.backingTrack),
+            tracks: score.tracks.map(trackPayload)
+        });
+    });
     const drawTiedTabDestinations = () => {
         let layer = document.getElementById("tie-labels");
         if (!layer) {
@@ -145,7 +161,7 @@
         if (!canUseBacking()) post("playerReady");
     });
     synthApi.playerReady.on(() => {
-        post("playerReady");
+        if (canUseBacking()) post("playerReady");
     });
     api.playerPositionChanged.on((position) => post("positionChanged", {
         currentTime: position.currentTime,
@@ -319,6 +335,17 @@
     };
 
     window.riffloop = {
+        loadSoundFont(base64) {
+            try {
+                soundFontBytes = decodeBase64(base64);
+                synthApi.loadSoundFont(soundFontBytes.slice(), false);
+                if (api.score && !canUseBacking()) {
+                    api.loadSoundFont(soundFontBytes.slice(), false);
+                }
+            } catch (error) {
+                post("error", { message: `音色加载失败：${errorMessage(error)}` });
+            }
+        },
         loadScore(base64) {
             try {
                 window.riffloopCommittedBars = null;
@@ -334,12 +361,39 @@
         stop() { api.stop(); synthApi.stop(); },
         seekTick(tick) { api.tickPosition = Number(tick); synthApi.tickPosition = Number(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
-        setMasterVolume(volume) { synthApi.masterVolume = Number(volume); },
-        setBackingVolume(volume) { api.masterVolume = Number(volume); },
-        setSynthEnabled(enabled) { synthEnabled = Boolean(enabled); if (!synthEnabled) synthApi.pause(); },
-        setBackingEnabled(enabled) { backingEnabled = Boolean(enabled); if (!backingEnabled) api.pause(); },
-        setMetronomeVolume(volume) { synthApi.metronomeVolume = Number(volume); },
-        setCountInVolume(volume) { synthApi.countInVolume = Number(volume); },
+        setMasterVolume(volume) {
+            const value = Number(volume);
+            synthApi.masterVolume = value;
+            if (!canUseBacking()) api.masterVolume = value;
+        },
+        setBackingVolume(volume) {
+            backingVolume = Number(volume);
+            if (canUseBacking()) api.masterVolume = backingEnabled ? backingVolume : 0;
+        },
+        setSynthEnabled(enabled) {
+            synthEnabled = Boolean(enabled);
+            if (!synthEnabled) {
+                if (canUseBacking()) synthApi.pause();
+                else api.pause();
+            }
+        },
+        setBackingEnabled(enabled) {
+            backingEnabled = Boolean(enabled);
+            if (canUseBacking()) {
+                api.masterVolume = backingEnabled ? backingVolume : 0;
+                if (!backingEnabled && !synthEnabled) api.pause();
+            }
+        },
+        setMetronomeVolume(volume) {
+            const value = Number(volume);
+            synthApi.metronomeVolume = value;
+            if (!canUseBacking()) api.metronomeVolume = value;
+        },
+        setCountInVolume(volume) {
+            const value = Number(volume);
+            synthApi.countInVolume = value;
+            if (!canUseBacking()) api.countInVolume = value;
+        },
         showTracks(indices) {
             if (!api.score) return;
             const tracks = indices
