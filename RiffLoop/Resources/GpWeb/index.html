@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #111216; }
+        #viewport {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            background: #f5f2e9;
+            touch-action: pan-x pan-y;
+        }
+        #score { min-width: 100%; min-height: 100%; color: #171717; }
+        .at-cursor-bar { background: rgba(255, 149, 0, 0.22) !important; }
+        .at-cursor-beat { background: #ff7a00 !important; width: 3px !important; }
+        .at-selection div { background: rgba(255, 184, 71, 0.25) !important; }
+    </style>
+</head>
+<body>
+    <main id="viewport"><div id="score"></div></main>
+    <script src="alphaTab.min.js"></script>
+    <script src="riffloop-gp.js"></script>
+</body>
+</html>

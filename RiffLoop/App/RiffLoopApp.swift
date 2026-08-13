@@ -4,9 +4,8 @@ import SwiftUI
 struct RiffLoopApp: App {
     var body: some Scene {
         WindowGroup {
-            PracticeView()
+            HomeView()
                 .preferredColorScheme(.dark)
         }
     }
 }
-

@@ -18,6 +18,11 @@ targets:
     platform: iOS
     sources:
       - path: RiffLoop
+        excludes:
+          - Resources
+      - path: RiffLoop/Resources/GpWeb
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.prototype
