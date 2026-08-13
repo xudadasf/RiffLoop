@@ -15,6 +15,26 @@ struct GpScoreMetadata: Codable, Equatable, Sendable {
     let bars: Int
     let hasBackingTrack: Bool
     let tracks: [GpTrackMetadata]
+    let beatsPerMeasure: Int?
+    let beatUnit: Int?
+
+    init(
+        title: String,
+        artist: String,
+        bars: Int,
+        hasBackingTrack: Bool,
+        tracks: [GpTrackMetadata],
+        beatsPerMeasure: Int? = nil,
+        beatUnit: Int? = nil
+    ) {
+        self.title = title
+        self.artist = artist
+        self.bars = bars
+        self.hasBackingTrack = hasBackingTrack
+        self.tracks = tracks
+        self.beatsPerMeasure = beatsPerMeasure
+        self.beatUnit = beatUnit
+    }
 }
 
 struct GpRenderMetrics: Codable, Equatable, Sendable {

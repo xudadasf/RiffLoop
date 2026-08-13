@@ -312,6 +312,32 @@ struct GpPracticeView: View {
                 get: { viewModel.metronomeEnabled },
                 set: { viewModel.setMetronomeEnabled($0) }
             ))
+            Text("节拍细分（跟随谱面拍号）")
+                .font(.subheadline.bold())
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach([1, 2, 4, 8], id: \.self) { factor in
+                        Button(subdivisionLabel(factor: factor)) {
+                            viewModel.setMetronomeSubdivisionFactor(factor)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(viewModel.metronomeSubdivisionFactor == factor ? .orange : .secondary)
+                    }
+                }
+            }
+            Text("每拍强度 · 点击循环切换")
+                .font(.subheadline.bold())
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(viewModel.beatAccents.indices, id: \.self) { index in
+                        Button("\(index + 1) \(viewModel.beatAccents[index].label)") {
+                            viewModel.cycleBeatAccent(at: index)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(viewModel.beatAccents[index] == .normal ? .secondary : .orange)
+                    }
+                }
+            }
             if viewModel.metronomeEnabled {
                 Slider(
                     value: Binding(
@@ -398,5 +424,15 @@ struct GpPracticeView: View {
     private func formatDuration(_ milliseconds: Int64) -> String {
         let totalMinutes = Int(max(0, milliseconds / 60_000))
         return String(format: "%02d:%02d", totalMinutes / 60, totalMinutes % 60)
+    }
+
+    private func subdivisionLabel(factor: Int) -> String {
+        let subdivision: Subdivision = switch factor {
+        case 2: .eighth
+        case 4: .sixteenth
+        case 8: .thirtySecond
+        default: .quarter
+        }
+        return subdivision.label(forBeatUnit: viewModel.score?.beatUnit ?? 4)
     }
 }

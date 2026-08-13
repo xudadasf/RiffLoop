@@ -221,6 +221,35 @@ final class PracticeViewModel: ObservableObject {
         restartAfterTimingChange()
     }
 
+    func setLoopCountInEnabled(_ enabled: Bool) {
+        loopCountInEnabled = enabled
+        saveProfile()
+    }
+
+    func setSpeedLadderEnabled(_ enabled: Bool) {
+        speedLadderEnabled = enabled
+        completedLoops = 0
+        saveProfile()
+    }
+
+    func setSpeedLadderTarget(_ target: Float) {
+        speedLadderTarget = min(max(target, 0.25), 1.5)
+        completedLoops = 0
+        saveProfile()
+    }
+
+    func setLoopsPerSpeedStep(_ loops: Int) {
+        loopsPerSpeedStep = min(max(loops, 1), 10)
+        completedLoops = 0
+        saveProfile()
+    }
+
+    func setSpeedLadderStep(_ step: Float) {
+        speedLadderStep = min(max(step, 0.01), 0.25)
+        completedLoops = 0
+        saveProfile()
+    }
+
     func adjustSynchronization(by seconds: TimeInterval) {
         synchronizationOffset = min(max(synchronizationOffset + seconds, -0.5), 0.5)
         applyTimingSettings()

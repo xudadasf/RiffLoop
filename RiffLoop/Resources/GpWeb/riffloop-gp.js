@@ -54,6 +54,48 @@
     let committedRange = null;
     let rangeLoopingEnabled = false;
     let wholeSongLoopingEnabled = false;
+    let loadedScoreBytes = null;
+    let metronomeSubdivisionFactor = 1;
+    let metronomeMasterVolume = 0;
+    let beatAccents = ["strong", "normal", "normal", "normal"];
+    const metronomeGain = (pulse) => {
+        const factor = Math.max(1, metronomeSubdivisionFactor);
+        if (pulse % factor !== 0) return 0.20;
+        const accent = beatAccents[Math.floor(pulse / factor)]
+            || (pulse === 0 ? "strong" : "normal");
+        if (accent === "strong") return 1;
+        if (accent === "subAccent") return 0.62;
+        if (accent === "muted") return 0;
+        return 0.34;
+    };
+    const applyMetronomePulse = (pulse) => {
+        const volume = metronomeMasterVolume * metronomeGain(pulse);
+        api.metronomeVolume = volume;
+        synthApi.metronomeVolume = volume;
+    };
+    const configureMetronomeEvents = (playerApi) => {
+        playerApi.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
+        playerApi.midiLoad.on((midiFile) => {
+            if (metronomeSubdivisionFactor === 1) return;
+            const denominatorOffset = Math.log2(metronomeSubdivisionFactor);
+            for (const event of midiFile.events) {
+                if (event instanceof alphaTab.midi.TimeSignatureEvent) {
+                    event.numerator *= metronomeSubdivisionFactor;
+                    event.denominatorIndex += denominatorOffset;
+                }
+            }
+        });
+        playerApi.midiEventsPlayed.on((event) => {
+            const metronomeEvents = Array.from(event.events)
+                .filter((item) => item instanceof alphaTab.midi.AlphaTabMetronomeEvent);
+            const current = metronomeEvents[metronomeEvents.length - 1];
+            if (!current) return;
+            const pulseCount = Math.max(1, beatAccents.length * metronomeSubdivisionFactor);
+            applyMetronomePulse((Number(current.metronomeNumerator) + 1) % pulseCount);
+        });
+    };
+    configureMetronomeEvents(api);
+    configureMetronomeEvents(synthApi);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
     const applyLoopMode = () => {
         const useRange = rangeLoopingEnabled && committedRange;
@@ -120,7 +162,9 @@
             artist: score.artist || "",
             bars: score.masterBars.length,
             hasBackingTrack: Boolean(score.backingTrack),
-            tracks: score.tracks.map(trackPayload)
+            tracks: score.tracks.map(trackPayload),
+            beatsPerMeasure: score.masterBars[0]?.timeSignatureNumerator || 4,
+            beatUnit: score.masterBars[0]?.timeSignatureDenominator || 4
         });
     });
     const drawTiedTabDestinations = () => {
@@ -368,9 +412,9 @@
                 committedRange = null;
                 rangeLoopingEnabled = false;
                 wholeSongLoopingEnabled = false;
-                const bytes = decodeBase64(base64);
-                api.load(bytes);
-                synthApi.load(bytes);
+                loadedScoreBytes = decodeBase64(base64);
+                api.load(loadedScoreBytes.slice());
+                synthApi.load(loadedScoreBytes.slice());
             } catch (error) {
                 post("error", { message: `乐谱加载失败：${errorMessage(error)}` });
             }
@@ -404,9 +448,26 @@
             }
         },
         setMetronomeVolume(volume) {
-            const value = Number(volume);
-            synthApi.metronomeVolume = value;
-            if (!canUseBacking()) api.metronomeVolume = value;
+            metronomeMasterVolume = Number(volume);
+            applyMetronomePulse(0);
+        },
+        setMetronomeSubdivision(factor) {
+            const value = Number(factor);
+            if (![1, 2, 4, 8].includes(value) || value === metronomeSubdivisionFactor) return;
+            metronomeSubdivisionFactor = value;
+            applyMetronomePulse(0);
+            if (loadedScoreBytes) {
+                api.pause();
+                synthApi.pause();
+                api.load(loadedScoreBytes.slice());
+                synthApi.load(loadedScoreBytes.slice());
+            }
+        },
+        setBeatAccents(accents) {
+            beatAccents = Array.isArray(accents) && accents.length > 0
+                ? accents.map(String)
+                : ["strong", "normal", "normal", "normal"];
+            applyMetronomePulse(0);
         },
         setCountInVolume(volume) {
             const value = Number(volume);

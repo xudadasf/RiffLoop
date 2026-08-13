@@ -15,6 +15,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     var metronomeVolume = 0.0
     var countInEnabled = false
     var countInVolume = 0.0
+    var metronomeSubdivisionFactor = 1
+    var beatAccents: [GpBeatAccent] = []
     var rangeLoopingEnabled = true
     var wholeSongLoopingEnabled = false
     var loopCountInEnabled = false
@@ -41,6 +43,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         metronomeVolume: Double = 0.0,
         countInEnabled: Bool = false,
         countInVolume: Double = 0.0,
+        metronomeSubdivisionFactor: Int = 1,
+        beatAccents: [GpBeatAccent] = [],
         rangeLoopingEnabled: Bool = true,
         wholeSongLoopingEnabled: Bool = false,
         loopCountInEnabled: Bool = false,
@@ -66,6 +70,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         self.metronomeVolume = metronomeVolume
         self.countInEnabled = countInEnabled
         self.countInVolume = countInVolume
+        self.metronomeSubdivisionFactor = metronomeSubdivisionFactor
+        self.beatAccents = beatAccents
         self.rangeLoopingEnabled = rangeLoopingEnabled
         self.wholeSongLoopingEnabled = wholeSongLoopingEnabled
         self.loopCountInEnabled = loopCountInEnabled
@@ -94,6 +100,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         metronomeEnabled = try values.decodeIfPresent(Bool.self, forKey: .metronomeEnabled)
             ?? (metronomeVolume > 0)
         countInVolume = try values.decodeIfPresent(Double.self, forKey: .countInVolume) ?? 0
+        metronomeSubdivisionFactor = try values.decodeIfPresent(Int.self, forKey: .metronomeSubdivisionFactor) ?? 1
+        beatAccents = try values.decodeIfPresent([GpBeatAccent].self, forKey: .beatAccents) ?? []
         countInEnabled = try values.decodeIfPresent(Bool.self, forKey: .countInEnabled)
             ?? (countInVolume > 0)
         rangeLoopingEnabled = try values.decodeIfPresent(Bool.self, forKey: .rangeLoopingEnabled)

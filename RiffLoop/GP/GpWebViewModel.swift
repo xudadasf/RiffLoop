@@ -32,6 +32,8 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var metronomeVolume = 0.0
     @Published private(set) var countInEnabled = false
     @Published private(set) var countInVolume = 0.0
+    @Published private(set) var metronomeSubdivisionFactor = 1
+    @Published private(set) var beatAccents = defaultGpBeatAccents(beatsPerMeasure: 4)
     @Published private(set) var rangeLoopingEnabled = true
     @Published private(set) var wholeSongLoopingEnabled = false
     @Published private(set) var loopCountInEnabled = false
@@ -53,6 +55,7 @@ final class GpWebViewModel: ObservableObject {
     private let settingsStore = FilePracticeSettingsStore()
     private var currentFileName: String?
     private var pendingProfile = GpPracticeProfile()
+    private var didApplyPendingProfile = false
     private var previousPositionTick: Double?
     private var playbackStartedAt: Date?
 
@@ -67,6 +70,13 @@ final class GpWebViewModel: ObservableObject {
             kind: .guitarPro,
             fileName: fileName
         )) ?? GpPracticeProfile()
+        metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
+            ? pendingProfile.metronomeSubdivisionFactor
+            : 1
+        beatAccents = pendingProfile.beatAccents.isEmpty
+            ? defaultGpBeatAccents(beatsPerMeasure: 4)
+            : pendingProfile.beatAccents
+        didApplyPendingProfile = false
         score = nil
         playerReady = false
         position = GpPlaybackPosition(currentTime: 0, totalTime: 0, currentTick: 0, endTick: 0)
@@ -187,6 +197,21 @@ final class GpWebViewModel: ObservableObject {
         saveProfile()
     }
 
+    func setMetronomeSubdivisionFactor(_ factor: Int) {
+        guard [1, 2, 4, 8].contains(factor), factor != metronomeSubdivisionFactor else { return }
+        metronomeSubdivisionFactor = factor
+        playerReady = false
+        call("setMetronomeSubdivision", arguments: [factor])
+        saveProfile()
+    }
+
+    func cycleBeatAccent(at index: Int) {
+        guard beatAccents.indices.contains(index) else { return }
+        beatAccents[index] = beatAccents[index].next
+        call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
+        saveProfile()
+    }
+
     func setRangeLoopingEnabled(_ enabled: Bool) {
         guard loopRange != nil else { return }
         rangeLoopingEnabled = enabled
@@ -267,7 +292,12 @@ final class GpWebViewModel: ObservableObject {
             }
         case let .scoreLoaded(metadata):
             score = metadata
-            applyPendingProfile(to: metadata)
+            if didApplyPendingProfile {
+                applyCurrentSettings(to: metadata)
+            } else {
+                didApplyPendingProfile = true
+                applyPendingProfile(to: metadata)
+            }
         case let .renderFinished(metrics):
             renderMetrics = metrics
         case .playerReady:
@@ -304,6 +334,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func sendScore(_ data: Data) {
+        call("setMetronomeSubdivision", arguments: [metronomeSubdivisionFactor])
+        call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
         call("loadScore", arguments: [data.base64EncodedString()])
     }
 
@@ -376,6 +408,12 @@ final class GpWebViewModel: ObservableObject {
         metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 1)
         countInEnabled = pendingProfile.countInEnabled
         countInVolume = min(max(pendingProfile.countInVolume, 0), 1)
+        metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
+            ? pendingProfile.metronomeSubdivisionFactor
+            : 1
+        beatAccents = pendingProfile.beatAccents.isEmpty
+            ? defaultGpBeatAccents(beatsPerMeasure: metadata.beatsPerMeasure ?? 4)
+            : pendingProfile.beatAccents
         wholeSongLoopingEnabled = pendingProfile.wholeSongLoopingEnabled
         loopCountInEnabled = pendingProfile.loopCountInEnabled
         speedLadderEnabled = pendingProfile.speedLadderEnabled
@@ -394,7 +432,15 @@ final class GpWebViewModel: ObservableObject {
             && pendingProfile.rangeLoopingEnabled
             && !wholeSongLoopingEnabled
 
+        applyCurrentSettings(to: metadata)
+    }
+
+    private func applyCurrentSettings(to metadata: GpScoreMetadata) {
+        if beatAccents.isEmpty {
+            beatAccents = defaultGpBeatAccents(beatsPerMeasure: metadata.beatsPerMeasure ?? 4)
+        }
         call("showTracks", arguments: [[displayedTrack]])
+        call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
         call("setPlaybackSpeed", arguments: [playbackSpeed])
         call("setMasterVolume", arguments: [masterVolume])
         call("setBackingVolume", arguments: [backingVolume])
@@ -490,6 +536,8 @@ final class GpWebViewModel: ObservableObject {
                 metronomeVolume: metronomeVolume,
                 countInEnabled: countInEnabled,
                 countInVolume: countInVolume,
+                metronomeSubdivisionFactor: metronomeSubdivisionFactor,
+                beatAccents: beatAccents,
                 rangeLoopingEnabled: rangeLoopingEnabled,
                 wholeSongLoopingEnabled: wholeSongLoopingEnabled,
                 loopCountInEnabled: loopCountInEnabled,
