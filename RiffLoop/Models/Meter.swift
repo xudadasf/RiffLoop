@@ -68,7 +68,7 @@ func parseBeatGrouping(_ input: String, beatsPerMeasure: Int) -> [Int]? {
 
 func defaultBeatGrouping(beatsPerMeasure: Int, beatUnit: Int) -> [Int] {
     let beats = min(max(beatsPerMeasure, 1), 16)
-    switch (beatUnit, beats) {
+    return switch (beatUnit, beats) {
     case (8, 5): [2, 3]
     case (8, 6): [3, 3]
     case (8, 7): [2, 2, 3]
