@@ -62,11 +62,16 @@ jobs:
           xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
           APP="$(find DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name RiffLoop.app -print -quit)"
           test -d "$APP"
-          xcrun simctl install "$DEVICE_ID" "$APP"
-          xcrun simctl launch "$DEVICE_ID" com.riffloop.prototype
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
+            xcrun simctl bootstatus "$DEVICE_ID" -b
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
+            xcrun simctl install "$DEVICE_ID" "$APP"
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
+            xcrun simctl launch "$DEVICE_ID" com.riffloop.prototype
           sleep 2
           mkdir -p TestArtifacts
-          xcrun simctl io "$DEVICE_ID" screenshot TestArtifacts/iPad-mini-home.png
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
+            xcrun simctl io "$DEVICE_ID" screenshot TestArtifacts/iPad-mini-home.png
 
       - name: Upload iPad mini screenshot and test result
         if: always()
