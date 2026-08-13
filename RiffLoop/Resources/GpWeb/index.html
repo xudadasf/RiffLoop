@@ -16,14 +16,25 @@
             background: #f5f2e9;
             touch-action: pan-x pan-y;
         }
-        #score { min-width: 100%; min-height: 100%; color: #171717; }
+        #score { position: relative; min-width: 100%; min-height: 100%; color: #171717; touch-action: none; }
+        #tie-labels { position: absolute; inset: 0; pointer-events: none; z-index: 12; }
+        .tie-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            padding: 0 1px;
+            color: #111;
+            background: #f5f2e9;
+            font: 11px/1.1 -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        #synth-score { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
         .at-cursor-bar { background: rgba(255, 149, 0, 0.22) !important; }
         .at-cursor-beat { background: #ff7a00 !important; width: 3px !important; }
         .at-selection div { background: rgba(255, 184, 71, 0.25) !important; }
     </style>
 </head>
 <body>
-    <main id="viewport"><div id="score"></div></main>
+    <main id="viewport"><div id="score"><div id="tie-labels"></div></div></main>
+    <div id="synth-score"></div>
     <script src="alphaTab.min.js"></script>
     <script src="riffloop-gp.js"></script>
 </body>

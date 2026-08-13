@@ -13,6 +13,7 @@ struct GpScoreMetadata: Codable, Equatable, Sendable {
     let title: String
     let artist: String
     let bars: Int
+    let hasBackingTrack: Bool
     let tracks: [GpTrackMetadata]
 }
 
@@ -47,6 +48,11 @@ enum GpBridgeEvent: Equatable, Sendable {
     case positionChanged(GpPlaybackPosition)
     case playerStateChanged(GpPlaybackState)
     case barHit(GpBarHit)
+    case pointerDown(GpBarHit)
+    case longPress
+    case pointerMove(GpBarHit)
+    case pointerUp
+    case pointerCancel
     case error(String)
 
     static func decode(messageBody: Any) throws -> Self {
@@ -73,6 +79,16 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .playerStateChanged(try decoder.decode(GpPlaybackState.self, from: envelope.payloadData))
         case "barHit":
             return .barHit(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
+        case "pointerDown":
+            return .pointerDown(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
+        case "longPress":
+            return .longPress
+        case "pointerMove":
+            return .pointerMove(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
+        case "pointerUp":
+            return .pointerUp
+        case "pointerCancel":
+            return .pointerCancel
         case "error":
             return .error(try decoder.decode(ErrorPayload.self, from: envelope.payloadData).message)
         default:

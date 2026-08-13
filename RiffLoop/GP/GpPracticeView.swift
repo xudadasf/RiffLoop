@@ -6,7 +6,6 @@ struct GpPracticeView: View {
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = GpWebViewModel()
     @State private var isLibraryPresented = false
-    @State private var speed = 1.0
     @State private var didOpenInitialURL = false
 
     let initialURL: URL?
@@ -88,26 +87,108 @@ struct GpPracticeView: View {
                         .disabled(!viewModel.playerReady)
                 }
 
-                Picker("速度", selection: $speed) {
+                Picker("速度", selection: Binding(
+                    get: { viewModel.playbackSpeed },
+                    set: { viewModel.setPlaybackSpeed($0) }
+                )) {
                     ForEach(speeds, id: \.self) { value in
                         Text(String(format: "%.2g×", value)).tag(value)
                     }
                 }
-                .onChange(of: speed) { _, value in
-                    viewModel.setPlaybackSpeed(value)
-                }
                 .disabled(!viewModel.playerReady)
+
+                Text("合成总音量")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(
+                    value: Binding(
+                        get: { viewModel.masterVolume },
+                        set: { viewModel.setMasterVolume($0) }
+                    ),
+                    in: 0...1
+                )
+                Toggle("谱面合成声音", isOn: Binding(
+                    get: { viewModel.synthEnabled },
+                    set: { viewModel.setSynthEnabled($0) }
+                ))
+                if viewModel.score?.hasBackingTrack == true {
+                    Text("内嵌伴奏音量")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.backingVolume },
+                            set: { viewModel.setBackingVolume($0) }
+                        ),
+                        in: 0...1
+                    )
+                    Toggle("内嵌伴奏", isOn: Binding(
+                        get: { viewModel.backingEnabled },
+                        set: { viewModel.setBackingEnabled($0) }
+                    ))
+                }
+                Text("随谱节拍器")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(
+                    value: Binding(
+                        get: { viewModel.metronomeVolume },
+                        set: { viewModel.setMetronomeVolume($0) }
+                    ),
+                    in: 0...1
+                )
+                Text("预备拍")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Slider(
+                    value: Binding(
+                        get: { viewModel.countInVolume },
+                        set: { viewModel.setCountInVolume($0) }
+                    ),
+                    in: 0...1
+                )
 
                 if let score = viewModel.score {
                     Divider()
-                    Text("轨道")
+                    Text("显示乐谱")
+                        .font(.headline)
+                    Picker("显示轨道", selection: Binding(
+                        get: { viewModel.displayedTrack },
+                        set: { viewModel.showTracks([$0]) }
+                    )) {
+                        ForEach(score.tracks, id: \.index) { track in
+                            Text(track.name).tag(track.index)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Text("轨道声音")
                         .font(.headline)
                     ForEach(score.tracks, id: \.index) { track in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(track.name)
-                            Text("音量 \(track.volume) · \(track.isMute ? "静音" : "发声")\(track.isSolo ? " · 独奏" : "")")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(track.name).lineLimit(1)
+                                Spacer()
+                                Button(viewModel.mutedTracks.contains(track.index) ? "取消静音" : "静音") {
+                                    let muted = !viewModel.mutedTracks.contains(track.index)
+                                    viewModel.setTrackMute(index: track.index, muted: muted)
+                                }
+                                .buttonStyle(.bordered)
+                                Button(viewModel.soloTrack == track.index ? "取消独奏" : "独奏") {
+                                    viewModel.setTrackSolo(
+                                        index: track.index,
+                                        solo: viewModel.soloTrack != track.index
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { viewModel.trackVolumes[track.index] ?? Double(track.volume) / 16 },
+                                    set: { viewModel.setTrackVolume(index: track.index, volume: $0) }
+                                ),
+                                in: 0...1
+                            )
                         }
                     }
                 }
@@ -137,6 +218,19 @@ struct GpPracticeView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+            if let range = viewModel.loopPreview ?? viewModel.loopRange {
+                Text("第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节\(viewModel.loopPreview == nil ? "已循环" : "选择中")")
+                    .font(.caption.bold())
+                    .foregroundStyle(.orange)
+                if viewModel.loopPreview == nil {
+                    Button("清除循环", action: viewModel.clearLoop)
+                        .buttonStyle(.bordered)
+                }
+            } else {
+                Text("长按小节并拖动，松手设置完整小节循环")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Text(viewModel.playerReady ? "离线渲染与播放器已就绪" : "正在准备离线渲染/音色…")
                 .font(.caption)
                 .foregroundStyle(viewModel.playerReady ? .green : .secondary)
@@ -145,7 +239,7 @@ struct GpPracticeView: View {
 
     private func importScore(from url: URL) {
         do {
-            viewModel.loadScore(data: try Data(contentsOf: url))
+            viewModel.loadScore(data: try Data(contentsOf: url), fileName: url.lastPathComponent)
             recentProjects.opened(kind: .guitarPro, fileName: url.lastPathComponent)
         } catch {
             viewModel.reportImportError(error)

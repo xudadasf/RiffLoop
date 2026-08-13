@@ -9,6 +9,7 @@ final class GpBridgeEventTests: XCTestCase {
                 "title": "此生不换",
                 "artist": "青鸟飞鱼",
                 "bars": 34,
+                "hasBackingTrack": true,
                 "tracks": [
                     [
                         "index": 0,
@@ -29,6 +30,7 @@ final class GpBridgeEventTests: XCTestCase {
                     title: "此生不换",
                     artist: "青鸟飞鱼",
                     bars: 34,
+                    hasBackingTrack: true,
                     tracks: [
                         GpTrackMetadata(
                             index: 0,
@@ -47,6 +49,16 @@ final class GpBridgeEventTests: XCTestCase {
     func testRejectsUnknownMessagesInsteadOfSilentlyChangingState() {
         XCTAssertThrowsError(
             try GpBridgeEvent.decode(messageBody: ["event": "futureEvent"])
+        )
+    }
+
+    func testDecodesPointerHitsForLongPressSelection() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: [
+                "event": "pointerMove",
+                "payload": ["index": 8, "startTick": 7_680, "endTick": 8_640],
+            ]),
+            .pointerMove(GpBarHit(index: 8, startTick: 7_680, endTick: 8_640))
         )
     }
 }
