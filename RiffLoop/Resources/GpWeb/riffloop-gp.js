@@ -12,7 +12,7 @@
 
     const api = new alphaTab.AlphaTabApi(scoreElement, {
         core: {
-            scriptFile: "./alphaTab.min.js",
+            scriptFile: new URL("./alphaTab.min.js", window.location.href).href,
             fontDirectory: "./font/",
             useWorkers: true,
             enableLazyLoading: true,
@@ -34,7 +34,7 @@
     });
     const synthApi = new alphaTab.AlphaTabApi(document.getElementById("synth-score"), {
         core: {
-            scriptFile: "./alphaTab.min.js",
+            scriptFile: new URL("./alphaTab.min.js", window.location.href).href,
             fontDirectory: "./font/",
             useWorkers: true
         },

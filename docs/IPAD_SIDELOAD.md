@@ -6,8 +6,8 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 
 1. 打开仓库的 **Actions → iPad Unsigned IPA → Run workflow**。
 2. 等待 `build-device-ipa` 通过。
-3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.23.0-unsigned-arm64`。
-4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.23.0-unsigned-arm64.ipa`。
+3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.23.1-unsigned-arm64`。
+4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.23.1-unsigned-arm64.ipa`。
 
 该 IPA 内含 `Payload/RiffLoop.app`，是 `iphoneos/arm64` 真机构建，但没有 Apple 签名。GitHub 不保存 Apple 账号、密码、证书或签名凭据；签名只在 Windows 的 Sideloadly 中完成。
 
@@ -35,6 +35,19 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 - 不要先删除旧版。卸载会删除应用沙箱中的文件与设置。
 - 若自动刷新未完成，在签名过期前或过期后都可以 USB 连接并用相同配置覆盖安装；只要没有卸载，应用数据应继续保留。
 - 免费 Apple 账号的签名期限和可侧载 App 数量受 Apple 限制；开发者模式不会延长签名期限。
+
+## 在 iPad 中查看签名状态并手动续签
+
+RiffLoop 首页显示当前侧载描述文件的到期时间和预计剩余天数。两天内到期时显示橙色提醒；续签后重新打开 App 或点击“重新检测”即可刷新。
+
+“手动续签”按钮会在 iPad 上显示以下操作说明，但 iPad App 无法给自身重新签名，续签仍需在 Windows 完成：
+
+1. 打开 Sideloadly，让 Windows 与 iPad 处于同一局域网；无线找不到设备时改用 USB。
+2. 把最新 RiffLoop IPA 拖入 Sideloadly，选择这台 iPad 和原来使用的 Apple 账号。
+3. 不要使用修改 Bundle ID 功能；IPA 内的 Bundle ID 应为 `com.riffloop.prototype`。启用 Automatic Refresh，然后点击 Start。
+4. 按 Sideloadly 提示完成 Apple 登录或双重认证。账号、密码和验证码只交给 Sideloadly，不要输入 RiffLoop。
+5. 不要卸载 iPad 上的旧 App，直接覆盖安装；等待 Sideloadly 显示完成。
+6. 重新打开 RiffLoop，点击“重新检测”，确认到期时间已经延后。
 
 Sideloadly 是第三方工具，“自动续签”属于尽量免手动的本机服务，不是 Apple 官方的永久签名方案。Windows 长期关机、网络隔离、防火墙、Apple 登录失效或 Daemon 故障都可能导致刷新失败。
 
