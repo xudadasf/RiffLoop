@@ -45,33 +45,68 @@ jobs:
           xcodebuild -version
           xcodegen --version
 
+      - name: Prepare iPad mini simulator
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(python3 - <<'PY'
+          import json
+          import subprocess
+          import time
+
+          for _ in range(15):
+              data = json.loads(subprocess.check_output(
+                  ["xcrun", "simctl", "list", "devices", "available", "-j"],
+                  text=True,
+              ))
+              for runtime, devices in data["devices"].items():
+                  for device in devices:
+                      if runtime.endswith("iOS-18-5") and device["name"] == "iPad mini (A17 Pro)":
+                          print(device["udid"])
+                          raise SystemExit(0)
+              time.sleep(2)
+
+          runtimes = json.loads(subprocess.check_output(
+              ["xcrun", "simctl", "list", "runtimes", "available", "-j"], text=True,
+          ))["runtimes"]
+          device_types = json.loads(subprocess.check_output(
+              ["xcrun", "simctl", "list", "devicetypes", "-j"], text=True,
+          ))["devicetypes"]
+          runtime = next(item for item in runtimes if item["name"] == "iOS 18.5")
+          device_type = next(item for item in device_types if item["name"] == "iPad mini (A17 Pro)")
+          print(subprocess.check_output([
+              "xcrun", "simctl", "create", "RiffLoop iPad mini",
+              device_type["identifier"], runtime["identifier"],
+          ], text=True).strip())
+          PY
+          )"
+          echo "IPAD_DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
+            xcrun simctl bootstatus "$DEVICE_ID" -b
+
       - name: Build and run unit tests on iPad mini
         run: >-
           xcodebuild test
           -project RiffLoop.xcodeproj
           -scheme RiffLoop
           -sdk iphonesimulator
-          -destination 'platform=iOS Simulator,OS=18.5,name=iPad mini (A17 Pro)'
+          -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
           -derivedDataPath DerivedData
           CODE_SIGNING_ALLOWED=NO
 
       - name: Capture iPad mini launch screenshot
         run: |
           set -euo pipefail
-          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(d["udid"] for runtime, devices in data["devices"].items() if runtime.endswith("iOS-18-5") for d in devices if d["name"] == "iPad mini (A17 Pro)"))')"
-          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
           APP="$(find DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name RiffLoop.app -print -quit)"
           test -d "$APP"
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
-            xcrun simctl bootstatus "$DEVICE_ID" -b
+            xcrun simctl install "$IPAD_DEVICE_ID" "$APP"
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
-            xcrun simctl install "$DEVICE_ID" "$APP"
-          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
-            xcrun simctl launch "$DEVICE_ID" com.riffloop.prototype
+            xcrun simctl launch "$IPAD_DEVICE_ID" com.riffloop.prototype
           sleep 2
           mkdir -p TestArtifacts
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
-            xcrun simctl io "$DEVICE_ID" screenshot TestArtifacts/iPad-mini-home.png
+            xcrun simctl io "$IPAD_DEVICE_ID" screenshot TestArtifacts/iPad-mini-home.png
 
       - name: Upload iPad mini screenshot and test result
         if: always()
