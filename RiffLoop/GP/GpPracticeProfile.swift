@@ -92,10 +92,10 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         backingEnabled = try values.decodeIfPresent(Bool.self, forKey: .backingEnabled) ?? true
         metronomeVolume = try values.decodeIfPresent(Double.self, forKey: .metronomeVolume) ?? 0
         metronomeEnabled = try values.decodeIfPresent(Bool.self, forKey: .metronomeEnabled)
-            ?? metronomeVolume > 0
+            ?? (metronomeVolume > 0)
         countInVolume = try values.decodeIfPresent(Double.self, forKey: .countInVolume) ?? 0
         countInEnabled = try values.decodeIfPresent(Bool.self, forKey: .countInEnabled)
-            ?? countInVolume > 0
+            ?? (countInVolume > 0)
         rangeLoopingEnabled = try values.decodeIfPresent(Bool.self, forKey: .rangeLoopingEnabled)
             ?? (loopRange != nil)
         wholeSongLoopingEnabled = try values.decodeIfPresent(Bool.self, forKey: .wholeSongLoopingEnabled) ?? false
