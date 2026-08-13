@@ -21,7 +21,6 @@ final class PracticeViewModel: ObservableObject {
     @Published var playbackRate: Float = 1
 
     private let metronome = MetronomeEngine()
-    private let mediaStore = ImportedMediaStore()
     private var periodicTimeObserver: Any?
     private var loopBoundaryObserver: Any?
     private var endObserver: NSObjectProtocol?
@@ -47,26 +46,21 @@ final class PracticeViewModel: ObservableObject {
         }
     }
 
-    func importMedia(from sourceURL: URL) {
-        do {
-            pause()
-            let localURL = try mediaStore.copyIntoSandbox(sourceURL)
-            let item = AVPlayerItem(url: localURL)
-            player.replaceCurrentItem(with: item)
-            observeEnd(of: item)
+    func openMedia(at url: URL) {
+        pause()
+        let item = AVPlayerItem(url: url)
+        player.replaceCurrentItem(with: item)
+        observeEnd(of: item)
 
-            currentTime = 0
-            duration = 0
-            beatOffset = nil
-            pointA = nil
-            pointB = nil
-            loopEnabled = false
-            rebuildLoopBoundaryObserver()
-            hasMedia = true
-            errorMessage = nil
-        } catch {
-            errorMessage = "导入失败：\(error.localizedDescription)"
-        }
+        currentTime = 0
+        duration = 0
+        beatOffset = nil
+        pointA = nil
+        pointB = nil
+        loopEnabled = false
+        rebuildLoopBoundaryObserver()
+        hasMedia = true
+        errorMessage = nil
     }
 
     func dismissError() {

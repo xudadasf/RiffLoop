@@ -1,14 +1,20 @@
 import Foundation
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct GpPracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = GpWebViewModel()
-    @State private var isImporterPresented = false
+    @State private var isLibraryPresented = false
     @State private var speed = 1.0
+    @State private var didOpenInitialURL = false
 
-    private let supportedExtensions = Set(["gp", "gpx", "gp3", "gp4", "gp5"])
+    let initialURL: URL?
+
+    init(initialURL: URL? = nil) {
+        self.initialURL = initialURL
+    }
+
     private let speeds = [0.5, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
 
     var body: some View {
@@ -34,16 +40,11 @@ struct GpPracticeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("导入") { isImporterPresented = true }
+                Button("选择文件") { isLibraryPresented = true }
             }
         }
-        .fileImporter(
-            isPresented: $isImporterPresented,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case let .success(urls) = result, let url = urls.first else { return }
-            importScore(from: url)
+        .sheet(isPresented: $isLibraryPresented) {
+            DocumentLibraryView(kind: .guitarPro, onSelect: importScore)
         }
         .alert(
             "RiffLoop",
@@ -58,6 +59,11 @@ struct GpPracticeView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             viewModel.setSceneActive(phase == .active)
+        }
+        .onAppear {
+            guard !didOpenInitialURL, let initialURL else { return }
+            didOpenInitialURL = true
+            importScore(from: initialURL)
         }
     }
 
@@ -138,16 +144,9 @@ struct GpPracticeView: View {
     }
 
     private func importScore(from url: URL) {
-        guard supportedExtensions.contains(url.pathExtension.lowercased()) else {
-            viewModel.reportImportError(ImportError.unsupportedExtension)
-            return
-        }
-
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-
         do {
             viewModel.loadScore(data: try Data(contentsOf: url))
+            recentProjects.opened(kind: .guitarPro, fileName: url.lastPathComponent)
         } catch {
             viewModel.reportImportError(error)
         }
@@ -156,13 +155,5 @@ struct GpPracticeView: View {
     private func format(_ milliseconds: Double) -> String {
         let totalSeconds = max(0, Int(milliseconds / 1_000))
         return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
-    }
-}
-
-private enum ImportError: LocalizedError {
-    case unsupportedExtension
-
-    var errorDescription: String? {
-        "请选择 .gp、.gpx、.gp3、.gp4 或 .gp5 文件。"
     }
 }

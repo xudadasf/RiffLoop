@@ -1,36 +1,87 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject private var recentProjects: RecentProjectsStore
+
     var body: some View {
         NavigationStack {
-            HStack(spacing: 20) {
-                practiceCard(
-                    title: "视频练习",
-                    subtitle: "播放、节拍器与 A/B 循环",
-                    systemImage: "play.rectangle.fill"
-                ) {
-                    PracticeView()
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 20) {
+                    practiceCard(
+                        title: "视频练习",
+                        subtitle: "播放、节拍器与 A/B 循环",
+                        systemImage: "play.rectangle.fill"
+                    ) {
+                        PracticeView()
+                    }
+
+                    practiceCard(
+                        title: "Guitar Pro 乐谱",
+                        subtitle: "离线 alphaTab 1.8.4",
+                        systemImage: "music.note.list"
+                    ) {
+                        GpPracticeView()
+                    }
+
+                    practiceCard(
+                        title: "PDF 谱面",
+                        subtitle: "伴奏、轨迹与自动跟谱",
+                        systemImage: "doc.richtext.fill"
+                    ) {
+                        ContentUnavailableView("PDF 迁移中", systemImage: "hammer.fill")
+                    }
                 }
 
-                practiceCard(
-                    title: "Guitar Pro 乐谱",
-                    subtitle: "离线 alphaTab 1.8.4 技术验证",
-                    systemImage: "music.note.list"
-                ) {
-                    GpPracticeView()
-                }
-
-                practiceCard(
-                    title: "PDF 谱面",
-                    subtitle: "后续纵切迁移",
-                    systemImage: "doc.richtext.fill"
-                ) {
-                    ContentUnavailableView("PDF 迁移中", systemImage: "hammer.fill")
+                if !recentProjects.projects.isEmpty {
+                    Text("最近项目")
+                        .font(.title3.bold())
+                    List {
+                        ForEach(recentProjects.projects) { project in
+                            NavigationLink {
+                                destination(for: project)
+                            } label: {
+                                Label(project.fileName, systemImage: iconName(for: project.kind))
+                            }
+                            .swipeActions {
+                                Button("移除记录", role: .destructive) {
+                                    recentProjects.remove(
+                                        kind: project.kind,
+                                        fileName: project.fileName
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
                 }
             }
             .padding(28)
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("RiffLoop")
+        }
+    }
+
+    @ViewBuilder
+    private func destination(for project: RecentProject) -> some View {
+        let url = RiffLoopDocumentStore()
+            .folderURL(for: project.kind)
+            .appendingPathComponent(project.fileName)
+
+        switch project.kind {
+        case .video:
+            PracticeView(initialURL: url)
+        case .guitarPro:
+            GpPracticeView(initialURL: url)
+        case .pdf:
+            ContentUnavailableView("PDF 迁移中", systemImage: "hammer.fill")
+        }
+    }
+
+    private func iconName(for kind: PracticeKind) -> String {
+        switch kind {
+        case .video: "film"
+        case .guitarPro: "music.note.list"
+        case .pdf: "doc.richtext"
         }
     }
 

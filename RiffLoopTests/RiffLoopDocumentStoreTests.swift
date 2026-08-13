@@ -1,0 +1,69 @@
+import XCTest
+@testable import RiffLoop
+
+final class RiffLoopDocumentStoreTests: XCTestCase {
+    private var temporaryRoot: URL!
+
+    override func setUpWithError() throws {
+        temporaryRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: temporaryRoot,
+            withIntermediateDirectories: true
+        )
+    }
+
+    override func tearDownWithError() throws {
+        try FileManager.default.removeItem(at: temporaryRoot)
+    }
+
+    func testCreatesTheThreeFilesVisiblePracticeFolders() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+
+        try store.prepareDirectories()
+
+        for folder in ["PDF", "视频", "GP"] {
+            var isDirectory = ObjCBool(false)
+            XCTAssertTrue(
+                FileManager.default.fileExists(
+                    atPath: temporaryRoot.appendingPathComponent(folder).path,
+                    isDirectory: &isDirectory
+                )
+            )
+            XCTAssertTrue(isDirectory.boolValue)
+        }
+    }
+
+    func testLibraryOnlyListsSupportedFilesForItsMode() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+        try store.prepareDirectories()
+        let gpFolder = store.folderURL(for: .guitarPro)
+        FileManager.default.createFile(
+            atPath: gpFolder.appendingPathComponent("此生不换.gp").path,
+            contents: Data([1])
+        )
+        FileManager.default.createFile(
+            atPath: gpFolder.appendingPathComponent("说明.txt").path,
+            contents: Data([2])
+        )
+
+        XCTAssertEqual(
+            try store.files(for: .guitarPro).map(\.lastPathComponent),
+            ["此生不换.gp"]
+        )
+    }
+
+    func testImportAddsANumberedSuffixWithoutOverwriting() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+        try store.prepareDirectories()
+        let source = temporaryRoot.appendingPathComponent("practice.mp4")
+        try Data([1, 2, 3]).write(to: source)
+
+        let first = try store.importFile(from: source, for: .video)
+        let second = try store.importFile(from: source, for: .video)
+
+        XCTAssertEqual(first.lastPathComponent, "practice.mp4")
+        XCTAssertEqual(second.lastPathComponent, "practice (2).mp4")
+        XCTAssertEqual(try Data(contentsOf: first), Data([1, 2, 3]))
+    }
+}

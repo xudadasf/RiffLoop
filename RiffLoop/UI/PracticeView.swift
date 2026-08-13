@@ -1,13 +1,20 @@
 import AVKit
 import Foundation
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct PracticeView: View {
+    @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = PracticeViewModel()
-    @State private var isImporterPresented = false
+    @State private var isLibraryPresented = false
     @State private var scrubTime: TimeInterval = 0
     @State private var isScrubbing = false
+    @State private var didOpenInitialURL = false
+
+    let initialURL: URL?
+
+    init(initialURL: URL? = nil) {
+        self.initialURL = initialURL
+    }
 
     private let rates: [Float] = [0.25, 0.5, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
 
@@ -21,13 +28,9 @@ struct PracticeView: View {
         }
         .padding(18)
         .background(Color.black.ignoresSafeArea())
-        .fileImporter(
-            isPresented: $isImporterPresented,
-            allowedContentTypes: [.mpeg4Movie],
-            allowsMultipleSelection: false
-        ) { result in
-            if case let .success(urls) = result, let url = urls.first {
-                viewModel.importMedia(from: url)
+        .sheet(isPresented: $isLibraryPresented) {
+            DocumentLibraryView(kind: .video) { url in
+                open(url)
             }
         }
         .alert(
@@ -46,6 +49,11 @@ struct PracticeView: View {
                 scrubTime = newValue
             }
         }
+        .onAppear {
+            guard !didOpenInitialURL, let initialURL else { return }
+            didOpenInitialURL = true
+            open(initialURL)
+        }
     }
 
     private var videoArea: some View {
@@ -62,8 +70,8 @@ struct PracticeView: View {
                         .font(.system(size: 48))
                     Text("导入一个 MP4 开始技术验证")
                         .font(.title2.weight(.semibold))
-                    Button("从 Files 导入 MP4") {
-                        isImporterPresented = true
+                    Button("选择视频") {
+                        isLibraryPresented = true
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
@@ -102,7 +110,7 @@ struct PracticeView: View {
 
     private var transportControls: some View {
         HStack(spacing: 16) {
-            Button("导入") { isImporterPresented = true }
+            Button("选择文件") { isLibraryPresented = true }
                 .buttonStyle(.bordered)
 
             Button { viewModel.skip(by: -10) } label: {
@@ -242,9 +250,15 @@ struct PracticeView: View {
     private func rateLabel(_ rate: Float) -> String {
         String(format: "%.2g×", rate)
     }
+
+    private func open(_ url: URL) {
+        viewModel.openMedia(at: url)
+        recentProjects.opened(kind: .video, fileName: url.lastPathComponent)
+    }
 }
 
 #Preview("iPad Landscape") {
     PracticeView()
+        .environmentObject(RecentProjectsStore())
         .frame(width: 1_180, height: 820)
 }
