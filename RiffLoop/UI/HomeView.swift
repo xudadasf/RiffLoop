@@ -87,7 +87,7 @@ struct HomeView: View {
 
             Button("重新检测", action: refreshSigningStatus)
                 .buttonStyle(.bordered)
-            Button("手动续签") { isSigningHelpPresented = true }
+            Button("无线续签步骤") { isSigningHelpPresented = true }
                 .buttonStyle(.borderedProminent)
         }
         .padding(16)
@@ -100,12 +100,13 @@ struct HomeView: View {
                 Label("续签需要在 Windows 的 Sideloadly 中完成", systemImage: "desktopcomputer")
                     .font(.title2.bold())
 
-                Text("1. 在 Windows 打开 Sideloadly。让电脑与 iPad 处于同一局域网；若设备未出现，请改用 USB 连接。")
-                Text("2. 把最新的 RiffLoop IPA 拖入 Sideloadly，在 Device 中选择这台 iPad，并选择原来用于安装的 Apple 账号。")
-                Text("3. 不要使用修改 Bundle ID 功能；IPA 内的 Bundle ID 应为 com.riffloop.prototype。保持 Automatic Refresh 开启，然后点击 Start。")
-                Text("4. 若 Apple 要求验证，请在 Sideloadly 中完成密码或双重认证；不要把账号信息填入 RiffLoop。")
-                Text("5. 等待 Sideloadly 显示安装完成。不要先删除 iPad 上的 RiffLoop，直接覆盖安装才能保留文件和设置。")
-                Text("6. 重新打开 RiffLoop 并点“重新检测”，确认到期时间已经延后。")
+                Text("1. 首次设置需用 USB：在 iTunes 的设备摘要中开启“通过 Wi-Fi 与此 iPad 同步”，点击“同步/完成”，并让 Sideloadly 成功安装过一次。")
+                Text("2. 日常无线续签时，电脑与 iPad 连接同一个局域网，保持 iPad 屏幕点亮，并关闭电脑和 iPad 上的 VPN/代理。")
+                Text("3. 在 Windows 打开 Sideloadly，确认 Device 中出现这台 iPad；把最新 RiffLoop IPA 拖入，并继续使用原来的 Apple 账号。")
+                Text("4. 不要修改 Bundle ID；IPA 内应为 com.riffloop.prototype。保持 Automatic Refresh 开启，然后点击 Start。")
+                Text("5. 若 Apple 要求验证，只在 Sideloadly 中完成密码或双重认证，不要把账号信息填入 RiffLoop。")
+                Text("6. 等待 Sideloadly 显示完成。不要卸载旧 App，直接覆盖安装才能保留文件和设置。无线设备未出现时，再接 USB 覆盖安装。")
+                Text("7. 重新打开 RiffLoop 并点“重新检测”，确认到期时间已经延后。")
 
                 Text("iPad App 无法给自身重新签名。此入口用于查看续签步骤和重新检测状态。")
                     .font(.footnote)
@@ -121,7 +122,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(28)
-            .navigationTitle("手动续签")
+            .navigationTitle("无线/手动续签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

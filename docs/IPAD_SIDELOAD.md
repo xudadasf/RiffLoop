@@ -6,8 +6,8 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 
 1. 打开仓库的 **Actions → iPad Unsigned IPA → Run workflow**。
 2. 等待 `build-device-ipa` 通过。
-3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.23.3-unsigned-arm64`。
-4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.23.3-unsigned-arm64.ipa`。
+3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.24.0-unsigned-arm64`。
+4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.24.0-unsigned-arm64.ipa`。
 
 该 IPA 内含 `Payload/RiffLoop.app`，是 `iphoneos/arm64` 真机构建，但没有 Apple 签名。GitHub 不保存 Apple 账号、密码、证书或签名凭据；签名只在 Windows 的 Sideloadly 中完成。
 
@@ -25,7 +25,7 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 2. 输入侧载账号，并启用 **Automatic Refresh** 后开始安装。
 3. Apple 账号和密码只交给本机 Sideloadly，不要写入 RiffLoop、Git 仓库或 GitHub Secrets。
 4. 安装后允许 Sideloadly Daemon 随 Windows 登录自动运行。
-5. 每隔 3～5 天让 Windows 与 iPad 同处一个局域网，并确保电脑开机联网、Daemon 正在运行。免费签名仍只有 7 天，Daemon 只是自动刷新它。
+5. 每隔 3～5 天让 Windows 与 iPad 同处一个局域网，关闭两端 VPN/代理，并确保电脑开机联网、iPad 屏幕点亮、Daemon 正在运行。免费签名仍只有 7 天，Daemon 只是自动刷新它。
 
 无线发现失败时，先点亮 iPad 屏幕并打开 iTunes 检查设备是否出现；仍失败则用 USB 连接，在 Sideloadly 中对同一个 App 执行覆盖安装。
 
@@ -42,12 +42,13 @@ RiffLoop 首页显示当前侧载描述文件的到期时间和预计剩余天�
 
 “手动续签”按钮会在 iPad 上显示以下操作说明，但 iPad App 无法给自身重新签名，续签仍需在 Windows 完成：
 
-1. 打开 Sideloadly，让 Windows 与 iPad 处于同一局域网；无线找不到设备时改用 USB。
-2. 把最新 RiffLoop IPA 拖入 Sideloadly，选择这台 iPad 和原来使用的 Apple 账号。
-3. 不要使用修改 Bundle ID 功能；IPA 内的 Bundle ID 应为 `com.riffloop.prototype`。启用 Automatic Refresh，然后点击 Start。
-4. 按 Sideloadly 提示完成 Apple 登录或双重认证。账号、密码和验证码只交给 Sideloadly，不要输入 RiffLoop。
-5. 不要卸载 iPad 上的旧 App，直接覆盖安装；等待 Sideloadly 显示完成。
-6. 重新打开 RiffLoop，点击“重新检测”，确认到期时间已经延后。
+1. 首次无线设置先用 USB 连接，在 iTunes 的设备摘要中开启“通过 Wi-Fi 与此 iPad 同步”，点击“同步/完成”，并让 Sideloadly 成功安装一次。
+2. 日常续签时关闭 Windows 与 iPad 上的 VPN/代理，让两者连接同一局域网，保持 iPad 屏幕点亮，再打开 Sideloadly；无线找不到设备时改用 USB。
+3. 把最新 RiffLoop IPA 拖入 Sideloadly，选择这台 iPad 和原来使用的 Apple 账号。
+4. 不要使用修改 Bundle ID 功能；IPA 内的 Bundle ID 应为 `com.riffloop.prototype`。启用 Automatic Refresh，然后点击 Start。
+5. 按 Sideloadly 提示完成 Apple 登录或双重认证。账号、密码和验证码只交给 Sideloadly，不要输入 RiffLoop。
+6. 不要卸载 iPad 上的旧 App，直接覆盖安装；等待 Sideloadly 显示完成。
+7. 重新打开 RiffLoop，点击“重新检测”，确认到期时间已经延后。
 
 Sideloadly 是第三方工具，“自动续签”属于尽量免手动的本机服务，不是 Apple 官方的永久签名方案。Windows 长期关机、网络隔离、防火墙、Apple 登录失效或 Daemon 故障都可能导致刷新失败。
 
