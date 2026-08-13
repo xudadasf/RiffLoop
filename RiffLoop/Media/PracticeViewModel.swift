@@ -13,22 +13,46 @@ final class PracticeViewModel: ObservableObject {
 
     @Published var bpm: Double = 120
     @Published var subdivision: Subdivision = .quarter
+    @Published var beatsPerMeasure = 4
+    @Published var beatUnit = 4
+    @Published var beatGrouping = [4]
+    @Published var beatAccents: [BeatAccent] = [.strong, .normal, .normal, .normal]
+    @Published var rhythmMode: RhythmMode = .click
     @Published var metronomeEnabled = true
     @Published var beatOffset: TimeInterval?
     @Published var pointA: TimeInterval?
     @Published var pointB: TimeInterval?
     @Published var loopEnabled = false
     @Published var playbackRate: Float = 1
+    @Published var mediaVolume: Float = 0.75
+    @Published var metronomeVolume: Float = 1
+    @Published var synchronizationOffset: TimeInterval = 0
+    @Published var snapLoopPointsToBeat = true
+    @Published var loopCountInEnabled = false
+    @Published var speedLadderEnabled = false
+    @Published var speedLadderTarget: Float = 1
+    @Published var loopsPerSpeedStep = 3
+    @Published var speedLadderStep: Float = 0.05
+    @Published private(set) var completedLoops = 0
+    @Published private(set) var accumulatedPracticeTime: TimeInterval = 0
+    @Published private(set) var highestPlaybackRate: Float = 1
+    @Published private(set) var currentBeatIndex = 0
 
     private let metronome = MetronomeEngine()
+    private let settingsStore = FilePracticeSettingsStore()
     private var periodicTimeObserver: Any?
     private var loopBoundaryObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var isLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
+    private var currentFileName: String?
+    private var tapTempoTracker = TapTempoTracker()
+    private var lastPracticeSampleDate: Date?
+    private var lastProfileSaveDate = Date.distantPast
 
     init() {
         player.automaticallyWaitsToMinimizeStalling = false
+        player.volume = mediaVolume
         installPeriodicTimeObserver()
     }
 
@@ -48,19 +72,25 @@ final class PracticeViewModel: ObservableObject {
 
     func openMedia(at url: URL) {
         pause()
+        currentFileName = url.lastPathComponent
+        let profile = (try? settingsStore.load(
+            VideoPracticeProfile.self,
+            kind: .video,
+            fileName: url.lastPathComponent
+        )) ?? .default
+        apply(profile)
+
         let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
         observeEnd(of: item)
 
-        currentTime = 0
+        currentTime = max(0, profile.lastPosition)
         duration = 0
-        beatOffset = nil
-        pointA = nil
-        pointB = nil
-        loopEnabled = false
         rebuildLoopBoundaryObserver()
         hasMedia = true
         errorMessage = nil
+        player.seek(to: cmTime(currentTime), toleranceBefore: .zero, toleranceAfter: .zero)
+        saveProfile()
     }
 
     func dismissError() {
@@ -73,6 +103,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        recordPracticeTime()
         transportGeneration &+= 1
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
@@ -80,6 +111,8 @@ final class PracticeViewModel: ObservableObject {
         metronome.stop()
         isPlaying = false
         isLoopTransitioning = false
+        lastPracticeSampleDate = nil
+        saveProfile()
     }
 
     func seek(to seconds: TimeInterval) {
@@ -114,22 +147,26 @@ final class PracticeViewModel: ObservableObject {
 
     func setBeatOne() {
         beatOffset = currentTime
+        saveProfile()
         restartAfterTimingChange()
     }
 
     func setPointA() {
-        pointA = currentTime
+        pointA = loopPoint(from: currentTime)
         normalizeLoopPointsAfterSettingA()
         rebuildLoopBoundaryObserver()
+        saveProfile()
     }
 
     func setPointB() {
-        guard pointA == nil || currentTime > (pointA ?? 0) else {
+        let point = loopPoint(from: currentTime)
+        guard pointA == nil || point > (pointA ?? 0) else {
             errorMessage = "B 点必须晚于 A 点。"
             return
         }
-        pointB = currentTime
+        pointB = point
         rebuildLoopBoundaryObserver()
+        saveProfile()
     }
 
     func setLoopEnabled(_ enabled: Bool) {
@@ -140,16 +177,103 @@ final class PracticeViewModel: ObservableObject {
         }
         loopEnabled = enabled
         rebuildLoopBoundaryObserver()
+        saveProfile()
     }
 
     func applyTimingSettings() {
         bpm = min(max(bpm, 30), 300)
+        beatsPerMeasure = min(max(beatsPerMeasure, 1), 16)
+        if ![2, 4, 8, 16].contains(beatUnit) { beatUnit = 4 }
+        if beatGrouping.reduce(0, +) != beatsPerMeasure {
+            beatGrouping = defaultBeatGrouping(
+                beatsPerMeasure: beatsPerMeasure,
+                beatUnit: beatUnit
+            )
+        }
+        if beatAccents.count != beatsPerMeasure {
+            beatAccents = defaultBeatAccents(
+                beatsPerMeasure: beatsPerMeasure,
+                grouping: beatGrouping
+            )
+        }
+        subdivision = effectiveSubdivision(subdivision, rhythmMode: rhythmMode)
+        synchronizationOffset = min(max(synchronizationOffset, -0.5), 0.5)
+        saveProfile()
         restartAfterTimingChange()
     }
 
     func setPlaybackRate(_ rate: Float) {
-        playbackRate = rate
+        playbackRate = min(max(rate, 0.25), 1.5)
+        highestPlaybackRate = max(highestPlaybackRate, playbackRate)
+        saveProfile()
         restartAfterTimingChange()
+    }
+
+    func setMediaVolume(_ volume: Float) {
+        mediaVolume = min(max(volume, 0), 1)
+        player.volume = mediaVolume
+        saveProfile()
+    }
+
+    func setMetronomeVolume(_ volume: Float) {
+        metronomeVolume = min(max(volume, 0), 1)
+        saveProfile()
+        restartAfterTimingChange()
+    }
+
+    func adjustSynchronization(by seconds: TimeInterval) {
+        synchronizationOffset = min(max(synchronizationOffset + seconds, -0.5), 0.5)
+        applyTimingSettings()
+    }
+
+    func setMeter(beats: Int, unit: Int) {
+        beatsPerMeasure = min(max(beats, 1), 16)
+        beatUnit = [2, 4, 8, 16].contains(unit) ? unit : 4
+        beatGrouping = defaultBeatGrouping(
+            beatsPerMeasure: beatsPerMeasure,
+            beatUnit: beatUnit
+        )
+        beatAccents = defaultBeatAccents(
+            beatsPerMeasure: beatsPerMeasure,
+            grouping: beatGrouping
+        )
+        applyTimingSettings()
+    }
+
+    func setBeatGrouping(_ input: String) -> Bool {
+        guard let grouping = parseBeatGrouping(input, beatsPerMeasure: beatsPerMeasure) else {
+            return false
+        }
+        beatGrouping = grouping
+        beatAccents = defaultBeatAccents(
+            beatsPerMeasure: beatsPerMeasure,
+            grouping: grouping
+        )
+        applyTimingSettings()
+        return true
+    }
+
+    func cycleAccent(at index: Int) {
+        guard beatAccents.indices.contains(index) else { return }
+        beatAccents[index] = beatAccents[index].next
+        applyTimingSettings()
+    }
+
+    func recordTap() {
+        let milliseconds = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        if let estimate = tapTempoTracker.recordTap(timestampMilliseconds: milliseconds) {
+            bpm = estimate
+            applyTimingSettings()
+        }
+    }
+
+    func clearLoop() {
+        pointA = nil
+        pointB = nil
+        loopEnabled = false
+        completedLoops = 0
+        rebuildLoopBoundaryObserver()
+        saveProfile()
     }
 
     func skip(by seconds: TimeInterval) {
@@ -161,7 +285,7 @@ final class PracticeViewModel: ObservableObject {
         return (pointA, pointB)
     }
 
-    private func coordinatedStart(at mediaTime: TimeInterval) {
+    private func coordinatedStart(at mediaTime: TimeInterval, includeCountIn: Bool = false) {
         transportGeneration &+= 1
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
@@ -176,31 +300,35 @@ final class PracticeViewModel: ObservableObject {
             }
 
             let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
-            let hostStartTime = CMTimeAdd(
+            let countInMediaDuration = includeCountIn && metronomeEnabled
+                ? Double(beatsPerMeasure) * 60 / bpm
+                : 0
+            let anchorHostTime = CMTimeAdd(
                 hostNow,
                 CMTime(seconds: 0.100, preferredTimescale: 1_000_000_000)
             )
-            let hostStart = hostStartTime.seconds
             let anchor = TransportAnchor(
-                mediaTime: startTime,
-                hostTime: hostStart,
+                mediaTime: startTime - countInMediaDuration,
+                hostTime: anchorHostTime.seconds,
                 mediaRate: Double(playbackRate)
+            )
+            let mediaHostTime = CMTime(
+                seconds: anchor.hostTime(forMediaTime: startTime),
+                preferredTimescale: 1_000_000_000
             )
 
             player.setRate(
                 playbackRate,
                 time: cmTime(startTime),
-                atHostTime: hostStartTime
+                atHostTime: mediaHostTime
             )
 
             if metronomeEnabled, let beatOffset {
                 try metronome.synchronize(
-                    timeline: BeatTimeline(
-                        bpm: bpm,
-                        beatOffset: beatOffset,
-                        subdivision: subdivision
-                    ),
-                    anchor: anchor
+                    timeline: makeTimeline(beatOffset: beatOffset + synchronizationOffset),
+                    anchor: anchor,
+                    rhythmMode: rhythmMode,
+                    volume: metronomeVolume
                 )
             } else {
                 metronome.stop()
@@ -208,6 +336,7 @@ final class PracticeViewModel: ObservableObject {
 
             isPlaying = true
             currentTime = startTime
+            lastPracticeSampleDate = Date()
             errorMessage = nil
         } catch {
             player.pause()
@@ -231,6 +360,18 @@ final class PracticeViewModel: ObservableObject {
         else { return }
 
         isLoopTransitioning = true
+        let ladder = speedAfterCompletedLoop(
+            currentSpeed: Double(playbackRate),
+            targetSpeed: Double(speedLadderTarget),
+            previousCompletedLoops: completedLoops,
+            enabled: speedLadderEnabled,
+            loopsPerStep: loopsPerSpeedStep,
+            speedStep: Double(speedLadderStep)
+        )
+        completedLoops = ladder.completedLoops
+        playbackRate = Float(ladder.playbackSpeed)
+        highestPlaybackRate = max(highestPlaybackRate, playbackRate)
+        saveProfile()
         transportGeneration &+= 1
         let generation = transportGeneration
         player.pause()
@@ -257,7 +398,10 @@ final class PracticeViewModel: ObservableObject {
                         else { return }
                         self.isLoopTransitioning = false
                         if ready, self.loopEnabled, self.isPlaying {
-                            self.coordinatedStart(at: range.a)
+                            self.coordinatedStart(
+                                at: range.a,
+                                includeCountIn: self.loopCountInEnabled
+                            )
                         } else {
                             self.pause()
                         }
@@ -284,6 +428,11 @@ final class PracticeViewModel: ObservableObject {
                 let seconds = time.seconds
                 if seconds.isFinite {
                     self.currentTime = max(0, seconds)
+                    self.updateCurrentBeat()
+                    self.recordPracticeTime()
+                    if Date().timeIntervalSince(self.lastProfileSaveDate) >= 2 {
+                        self.saveProfile()
+                    }
                 }
 
                 if let item = self.player.currentItem {
@@ -331,5 +480,121 @@ final class PracticeViewModel: ObservableObject {
 
     private func cmTime(_ seconds: TimeInterval) -> CMTime {
         CMTime(seconds: seconds, preferredTimescale: 1_000_000_000)
+    }
+
+    private func loopPoint(from position: TimeInterval) -> TimeInterval {
+        snapLoopPointsToBeat
+            ? snapToNearestBeat(position, beatOffset: beatOffset, bpm: bpm)
+            : position
+    }
+
+    private func makeTimeline(beatOffset: TimeInterval) -> BeatTimeline {
+        BeatTimeline(
+            bpm: bpm,
+            beatOffset: beatOffset,
+            subdivision: effectiveSubdivision(subdivision, rhythmMode: rhythmMode),
+            quarterNotesPerMeasure: beatsPerMeasure,
+            beatGrouping: beatGrouping,
+            beatAccents: beatAccents
+        )
+    }
+
+    private func updateCurrentBeat() {
+        guard let beatOffset else {
+            currentBeatIndex = 0
+            return
+        }
+        let timeline = makeTimeline(beatOffset: beatOffset + synchronizationOffset)
+        let event = timeline.eventIndex(atOrAfter: currentTime) - 1
+        currentBeatIndex = timeline.beatIndex(event)
+    }
+
+    private func recordPracticeTime() {
+        guard isPlaying else {
+            lastPracticeSampleDate = nil
+            return
+        }
+        let now = Date()
+        if let lastPracticeSampleDate {
+            accumulatedPracticeTime += min(max(now.timeIntervalSince(lastPracticeSampleDate), 0), 0.5)
+        }
+        self.lastPracticeSampleDate = now
+    }
+
+    private func apply(_ profile: VideoPracticeProfile) {
+        bpm = min(max(profile.bpm, 30), 300)
+        beatsPerMeasure = min(max(profile.beatsPerMeasure, 1), 16)
+        beatUnit = [2, 4, 8, 16].contains(profile.beatUnit) ? profile.beatUnit : 4
+        beatGrouping = profile.beatGrouping.reduce(0, +) == beatsPerMeasure
+            ? profile.beatGrouping
+            : defaultBeatGrouping(beatsPerMeasure: beatsPerMeasure, beatUnit: beatUnit)
+        beatAccents = profile.beatAccents.count == beatsPerMeasure
+            ? profile.beatAccents
+            : defaultBeatAccents(beatsPerMeasure: beatsPerMeasure, grouping: beatGrouping)
+        subdivision = profile.subdivision
+        rhythmMode = profile.rhythmMode
+        metronomeEnabled = profile.metronomeEnabled
+        mediaVolume = min(max(profile.mediaVolume, 0), 1)
+        metronomeVolume = min(max(profile.metronomeVolume, 0), 1)
+        synchronizationOffset = min(max(profile.synchronizationOffset, -0.5), 0.5)
+        beatOffset = profile.beatOffset
+        pointA = profile.pointA
+        pointB = profile.pointB
+        loopEnabled = profile.loopEnabled
+            && profile.pointA != nil
+            && profile.pointB.map { $0 > (profile.pointA ?? 0) } == true
+        snapLoopPointsToBeat = profile.snapLoopPointsToBeat
+        playbackRate = min(max(profile.playbackRate, 0.25), 1.5)
+        loopCountInEnabled = profile.loopCountInEnabled
+        speedLadderEnabled = profile.speedLadderEnabled
+        speedLadderTarget = min(max(profile.speedLadderTarget, 0.5), 1.5)
+        loopsPerSpeedStep = min(max(profile.loopsPerSpeedStep, 1), 10)
+        speedLadderStep = min(max(profile.speedLadderStep, 0.01), 0.25)
+        accumulatedPracticeTime = max(0, profile.accumulatedPracticeTime)
+        completedLoops = max(0, profile.completedLoops)
+        highestPlaybackRate = max(profile.highestPlaybackRate, playbackRate)
+        player.volume = mediaVolume
+    }
+
+    private func saveProfile() {
+        guard let currentFileName else { return }
+        let profile = VideoPracticeProfile(
+            bpm: bpm,
+            beatsPerMeasure: beatsPerMeasure,
+            beatUnit: beatUnit,
+            beatGrouping: beatGrouping,
+            beatAccents: beatAccents,
+            subdivision: subdivision,
+            rhythmMode: rhythmMode,
+            metronomeEnabled: metronomeEnabled,
+            mediaVolume: mediaVolume,
+            metronomeVolume: metronomeVolume,
+            synchronizationOffset: synchronizationOffset,
+            beatOffset: beatOffset,
+            pointA: pointA,
+            pointB: pointB,
+            loopEnabled: loopEnabled,
+            snapLoopPointsToBeat: snapLoopPointsToBeat,
+            playbackRate: playbackRate,
+            loopCountInEnabled: loopCountInEnabled,
+            speedLadderEnabled: speedLadderEnabled,
+            speedLadderTarget: speedLadderTarget,
+            loopsPerSpeedStep: loopsPerSpeedStep,
+            speedLadderStep: speedLadderStep,
+            lastPosition: currentTime,
+            accumulatedPracticeTime: accumulatedPracticeTime,
+            completedLoops: completedLoops,
+            highestPlaybackRate: highestPlaybackRate
+        )
+        do {
+            try settingsStore.save(
+                profile,
+                kind: .video,
+                fileName: currentFileName
+            )
+            lastProfileSaveDate = Date()
+        } catch {
+            errorMessage = "练习设置保存失败：\(error.localizedDescription)"
+        }
     }
 }

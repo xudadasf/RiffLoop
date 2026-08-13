@@ -9,6 +9,7 @@ struct PracticeView: View {
     @State private var scrubTime: TimeInterval = 0
     @State private var isScrubbing = false
     @State private var didOpenInitialURL = false
+    @State private var groupingInput = "4"
 
     let initialURL: URL?
 
@@ -24,7 +25,14 @@ struct PracticeView: View {
             timeline
             transportControls
             loopControls
-            metronomeControls
+            ScrollView(.vertical) {
+                VStack(spacing: 12) {
+                    metronomeControls
+                    meterAndRhythmControls
+                    volumeAndTrainingControls
+                }
+            }
+            .frame(maxHeight: 230)
         }
         .padding(18)
         .background(Color.black.ignoresSafeArea())
@@ -195,10 +203,10 @@ struct PracticeView: View {
 
             Picker("细分", selection: $viewModel.subdivision) {
                 ForEach(Subdivision.allCases) { subdivision in
-                    Text(subdivision.rawValue).tag(subdivision)
+                    Text(subdivision.label(forBeatUnit: viewModel.beatUnit)).tag(subdivision)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             .onChange(of: viewModel.subdivision) { _, _ in
                 viewModel.applyTimingSettings()
             }
@@ -225,6 +233,107 @@ struct PracticeView: View {
         .font(.headline)
         .controlSize(.large)
         .disabled(!viewModel.hasMedia)
+    }
+
+    private var meterAndRhythmControls: some View {
+        HStack(spacing: 12) {
+            Stepper(
+                "\(viewModel.beatsPerMeasure)/\(viewModel.beatUnit)",
+                value: Binding(
+                    get: { viewModel.beatsPerMeasure },
+                    set: { viewModel.setMeter(beats: $0, unit: viewModel.beatUnit) }
+                ),
+                in: 1...16
+            )
+            .frame(width: 150)
+
+            Picker("拍值", selection: Binding(
+                get: { viewModel.beatUnit },
+                set: { viewModel.setMeter(beats: viewModel.beatsPerMeasure, unit: $0) }
+            )) {
+                ForEach([2, 4, 8, 16], id: \.self) { Text("/\($0)").tag($0) }
+            }
+            .pickerStyle(.menu)
+
+            TextField("分组 2+2+3", text: $groupingInput)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 130)
+                .onSubmit {
+                    if !viewModel.setBeatGrouping(groupingInput) {
+                        groupingInput = viewModel.beatGrouping.map(String.init).joined(separator: "+")
+                    }
+                }
+
+            Picker("训练", selection: $viewModel.rhythmMode) {
+                ForEach(RhythmMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+            .onChange(of: viewModel.rhythmMode) { _, _ in viewModel.applyTimingSettings() }
+
+            HStack(spacing: 4) {
+                ForEach(viewModel.beatAccents.indices, id: \.self) { index in
+                    Button("\(index + 1)\n\(viewModel.beatAccents[index].label)") {
+                        viewModel.cycleAccent(at: index)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(index == viewModel.currentBeatIndex ? .orange : .gray)
+                }
+            }
+        }
+        .font(.subheadline)
+    }
+
+    private var volumeAndTrainingControls: some View {
+        HStack(spacing: 14) {
+            Text("视频")
+            Slider(
+                value: Binding(
+                    get: { Double(viewModel.mediaVolume) },
+                    set: { viewModel.setMediaVolume(Float($0)) }
+                ),
+                in: 0...1
+            )
+            .frame(width: 100)
+
+            Text("节拍")
+            Slider(
+                value: Binding(
+                    get: { Double(viewModel.metronomeVolume) },
+                    set: { viewModel.setMetronomeVolume(Float($0)) }
+                ),
+                in: 0...1
+            )
+            .frame(width: 100)
+
+            Button("Tap Tempo", action: viewModel.recordTap)
+                .buttonStyle(.borderedProminent)
+
+            Toggle("拍点吸附", isOn: $viewModel.snapLoopPointsToBeat)
+                .toggleStyle(.button)
+            Toggle("预备 1 小节", isOn: $viewModel.loopCountInEnabled)
+                .toggleStyle(.button)
+            Toggle("循环阶梯", isOn: $viewModel.speedLadderEnabled)
+                .toggleStyle(.button)
+
+            HStack(spacing: 4) {
+                Text("同步 \(Int((viewModel.synchronizationOffset * 1_000).rounded())) ms")
+                ForEach([-10, -1, 1, 10], id: \.self) { milliseconds in
+                    Button(milliseconds > 0 ? "+\(milliseconds)" : "\(milliseconds)") {
+                        viewModel.adjustSynchronization(by: Double(milliseconds) / 1_000)
+                    }
+                }
+            }
+
+            Text("循环 \(viewModel.completedLoops) · 练习 \(Int(viewModel.accumulatedPracticeTime / 60)) 分钟")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .font(.subheadline)
+        .onChange(of: viewModel.beatGrouping) { _, grouping in
+            groupingInput = grouping.map(String.init).joined(separator: "+")
+        }
     }
 
     private func valueCard(title: String, value: TimeInterval?) -> some View {

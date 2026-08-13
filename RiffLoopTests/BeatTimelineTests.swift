@@ -53,6 +53,23 @@ final class BeatTimelineTests: XCTestCase {
         )
     }
 
+    func testRhythmTrainingModesUseTheSameTimelineClock() {
+        let timeline = BeatTimeline(
+            bpm: 120,
+            beatOffset: 0,
+            subdivision: .eighth,
+            quarterNotesPerMeasure: 4
+        )
+
+        XCTAssertTrue(timeline.shouldPlay(2, mode: .backbeat))
+        XCTAssertTrue(timeline.shouldPlay(6, mode: .backbeat))
+        XCTAssertFalse(timeline.shouldPlay(0, mode: .backbeat))
+        XCTAssertTrue(timeline.shouldPlay(1, mode: .offbeats))
+        XCTAssertFalse(timeline.shouldPlay(2, mode: .offbeats))
+        XCTAssertTrue(timeline.shouldPlay(0, mode: .gapBars))
+        XCTAssertFalse(timeline.shouldPlay(8, mode: .gapBars))
+    }
+
     private func makeTimeline(_ subdivision: Subdivision) -> BeatTimeline {
         BeatTimeline(bpm: 120, beatOffset: 0, subdivision: subdivision)
     }
