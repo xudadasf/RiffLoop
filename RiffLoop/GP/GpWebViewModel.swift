@@ -314,15 +314,46 @@ final class GpWebViewModel: ObservableObject {
         do {
             let data = try JSONSerialization.data(withJSONObject: arguments)
             guard let json = String(data: data, encoding: .utf8) else { return }
-            webView.evaluateJavaScript("window.riffloop.\(function).apply(null, \(json))") {
-                [weak self] _, error in
-                guard let error else { return }
+            let functionData = try JSONSerialization.data(withJSONObject: [function])
+            guard let functionJSON = String(data: functionData, encoding: .utf8) else { return }
+            let script = """
+                (() => {
+                    const name = \(functionJSON)[0];
+                    try {
+                        const bridge = window.riffloop;
+                        if (!bridge) {
+                            return { ok: false, message: "window.riffloop 尚未加载" };
+                        }
+                        const command = bridge[name];
+                        if (typeof command !== "function") {
+                            return { ok: false, message: `命令不存在：${name}` };
+                        }
+                        command.apply(null, \(json));
+                        return { ok: true };
+                    } catch (error) {
+                        return {
+                            ok: false,
+                            message: String(error?.stack || error?.message || error)
+                        };
+                    }
+                })()
+                """
+            webView.evaluateJavaScript(script) { [weak self] result, error in
                 Task { @MainActor [weak self] in
-                    self?.errorMessage = "GP 命令执行失败：\(error.localizedDescription)"
+                    if let error {
+                        self?.errorMessage = "GP 命令 \(function) 执行失败：\(error.localizedDescription)"
+                        return
+                    }
+                    guard
+                        let result = result as? [String: Any],
+                        result["ok"] as? Bool == false
+                    else { return }
+                    let message = result["message"] as? String ?? "未知 JavaScript 异常"
+                    self?.errorMessage = "GP 命令 \(function) 执行失败：\(message)"
                 }
             }
         } catch {
-            errorMessage = "GP 命令编码失败：\(error.localizedDescription)"
+            errorMessage = "GP 命令 \(function) 编码失败：\(error.localizedDescription)"
         }
     }
 }
