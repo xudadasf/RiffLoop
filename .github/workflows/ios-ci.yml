@@ -3,7 +3,19 @@ name: iOS CI
 on:
   push:
     branches: [main]
+    paths:
+      - "RiffLoop/**"
+      - "RiffLoopTests/**"
+      - "project.yml"
+      - ".xcode-version"
+      - ".github/workflows/ios-ci.yml"
   pull_request:
+    paths:
+      - "RiffLoop/**"
+      - "RiffLoopTests/**"
+      - "project.yml"
+      - ".xcode-version"
+      - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
 
 concurrency:
@@ -33,12 +45,12 @@ jobs:
           xcodebuild -version
           xcodegen --version
 
-      - name: Build and run unit tests
+      - name: Build and run unit tests on iPad mini
         run: >-
           xcodebuild test
           -project RiffLoop.xcodeproj
           -scheme RiffLoop
           -sdk iphonesimulator
-          -destination 'platform=iOS Simulator,OS=18.5,name=iPad Pro 13-inch (M4)'
+          -destination 'platform=iOS Simulator,OS=18.5,name=iPad mini (A17 Pro)'
           -derivedDataPath DerivedData
           CODE_SIGNING_ALLOWED=NO

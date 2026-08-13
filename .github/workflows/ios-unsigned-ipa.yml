@@ -1,0 +1,78 @@
+name: iPad Unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "codex/ipad-migration"
+    paths:
+      - "RiffLoop/**"
+      - "project.yml"
+      - ".xcode-version"
+      - ".github/workflows/ios-unsigned-ipa.yml"
+
+concurrency:
+  group: ios-unsigned-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-device-ipa:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build unsigned arm64 device app
+        run: >-
+          xcodebuild build
+          -project RiffLoop.xcodeproj
+          -scheme RiffLoop
+          -configuration Release
+          -sdk iphoneos
+          -derivedDataPath "$RUNNER_TEMP/DerivedData"
+          ARCHS=arm64
+          ONLY_ACTIVE_ARCH=NO
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+
+      - name: Verify device bundle and create IPA
+        env:
+          EXPECTED_BUNDLE_ID: com.riffloop.prototype
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/RiffLoop.app"
+          EXECUTABLE="$APP/RiffLoop"
+          PACKAGE="$RUNNER_TEMP/package"
+          IPA="$RUNNER_TEMP/RiffLoop-iPad-0.23.0-unsigned-arm64.ipa"
+
+          test -d "$APP"
+          test -x "$EXECUTABLE"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")" = "$EXPECTED_BUNDLE_ID"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$APP/Info.plist")" = "iPhoneOS"
+          test "$(lipo -archs "$EXECUTABLE")" = "arm64"
+          test ! -e "$APP/embedded.mobileprovision"
+
+          mkdir -p "$PACKAGE/Payload"
+          ditto "$APP" "$PACKAGE/Payload/RiffLoop.app"
+          (cd "$PACKAGE" && zip -qry "$IPA" Payload)
+          unzip -t "$IPA"
+          unzip -l "$IPA"
+
+      - name: Upload unsigned arm64 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: RiffLoop-iPad-0.23.0-unsigned-arm64
+          path: ${{ runner.temp }}/RiffLoop-iPad-0.23.0-unsigned-arm64.ipa
+          if-no-files-found: error
+          retention-days: 30
