@@ -9,6 +9,7 @@ struct PdfPracticeView: View {
     @State private var controlsVisible = true
     @State private var expandedControls = false
     @State private var didOpenInitialURL = false
+    @State private var groupingInput = "4"
 
     let initialURL: URL?
 
@@ -126,89 +127,204 @@ struct PdfPracticeView: View {
     private var practicePanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("练习控制").font(.title3.bold())
-                    Spacer()
-                    Button("关闭") {
-                        expandedControls = false
-                        revealControls()
-                    }
-                }
+                practiceHeader
+                pdfTransportSection
+                pdfLoopSection
+                pdfMetronomeSection
+                pdfSoundAndStatsSection
+                Divider()
+                autoFollowSection
+            }
+            .padding(18)
+            .onChange(of: viewModel.beatGrouping) { _, grouping in
+                groupingInput = grouping.map(String.init).joined(separator: "+")
+            }
+        }
+    }
 
+    private var practiceHeader: some View {
+        HStack {
+            Text("练习控制").font(.title3.bold())
+            Spacer()
+            Button("关闭") {
+                expandedControls = false
+                revealControls()
+            }
+        }
+    }
+
+    private var pdfTransportSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
                 Button(viewModel.isPlaying ? "暂停" : "播放", action: viewModel.togglePlayback)
                     .buttonStyle(.borderedProminent)
                 Button("停止", action: viewModel.stop)
-
-                Slider(
-                    value: Binding(
-                        get: { viewModel.currentTime },
-                        set: { viewModel.seek(to: $0) }
-                    ),
-                    in: 0...max(viewModel.duration, 0.01)
-                )
-                Text("\(format(viewModel.currentTime)) / \(format(viewModel.duration))")
-                    .monospacedDigit()
-
-                HStack {
-                    Button("Set A", action: viewModel.setPointA)
-                    Button("Set B", action: viewModel.setPointB)
-                    Toggle("Loop", isOn: $viewModel.loopEnabled)
-                        .onChange(of: viewModel.loopEnabled) { _, _ in viewModel.updateAudioSettings() }
-                }
-
-                Stepper("BPM \(Int(viewModel.bpm))", value: $viewModel.bpm, in: 30...300)
-                    .onChange(of: viewModel.bpm) { _, _ in viewModel.updateAudioSettings() }
-                Toggle("节拍器", isOn: $viewModel.metronomeEnabled)
-                    .onChange(of: viewModel.metronomeEnabled) { _, _ in viewModel.updateAudioSettings() }
-
-                Text("伴奏音量")
-                Slider(
-                    value: Binding(
-                        get: { Double(viewModel.audioVolume) },
-                        set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
-                    ),
-                    in: 0...1
-                )
-                Text("节拍器音量")
-                Slider(
-                    value: Binding(
-                        get: { Double(viewModel.metronomeVolume) },
-                        set: { viewModel.metronomeVolume = Float($0); viewModel.updateAudioSettings() }
-                    ),
-                    in: 0...1
-                )
-
-                Text("同步 \(Int(viewModel.synchronizationOffset * 1_000)) ms")
-                HStack {
-                    ForEach([-10, -1, 1, 10], id: \.self) { value in
-                        Button(value > 0 ? "+\(value)" : "\(value)") {
-                            viewModel.synchronizationOffset += Double(value) / 1_000
-                            viewModel.updateAudioSettings()
-                        }
-                    }
-                }
-
-                Divider()
-                Text("自动跟谱").font(.headline)
-                Text("已保存 \(viewModel.readingPoints.count) 个位置点")
-                    .foregroundStyle(.secondary)
-                if viewModel.isRecordingReadingTrack {
-                    Button("结束并保存记录", action: viewModel.finishReadingTrackRecording)
-                } else {
-                    Button(
-                        viewModel.readingPoints.isEmpty ? "开始记录" : "重新记录",
-                        action: viewModel.startReadingTrackRecording
-                    )
-                }
-                if !viewModel.readingPoints.isEmpty {
-                    Button(
-                        viewModel.isAutoFollowing ? "关闭自动跟谱" : "启动自动跟谱",
-                        action: viewModel.toggleAutoFollow
-                    )
-                    Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
+            }
+            Picker("速度", selection: Binding(
+                get: { viewModel.playbackRate },
+                set: { viewModel.setPlaybackRate($0) }
+            )) {
+                ForEach([Float(0.25), 0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
+                    Text(String(format: "%.2g×", $0)).tag($0)
                 }
             }
-            .padding(18)
+            Slider(
+                value: Binding(
+                    get: { viewModel.currentTime },
+                    set: { viewModel.seek(to: $0) }
+                ),
+                in: 0...max(viewModel.duration, 0.01)
+            )
+            Text("\(format(viewModel.currentTime)) / \(format(viewModel.duration))")
+                .monospacedDigit()
+        }
+    }
+
+    private var pdfLoopSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button("设 A", action: viewModel.setPointA)
+                Button("设 B", action: viewModel.setPointB)
+                Toggle("A/B 循环", isOn: $viewModel.loopEnabled)
+                    .onChange(of: viewModel.loopEnabled) { _, _ in viewModel.updateAudioSettings() }
+            }
+            Toggle("每轮预备 1 小节", isOn: Binding(
+                get: { viewModel.loopCountInEnabled },
+                set: { viewModel.setLoopCountInEnabled($0) }
+            ))
+            Toggle("循环阶梯", isOn: Binding(
+                get: { viewModel.speedLadderEnabled },
+                set: { viewModel.setSpeedLadderEnabled($0) }
+            ))
+            if viewModel.speedLadderEnabled {
+                Picker("每几轮提高", selection: Binding(
+                    get: { viewModel.loopsPerSpeedStep },
+                    set: { viewModel.setLoopsPerSpeedStep($0) }
+                )) {
+                    ForEach([1, 2, 3, 5], id: \.self) { Text("\($0) 轮").tag($0) }
+                }
+                Picker("每次提高", selection: Binding(
+                    get: { viewModel.speedLadderStep },
+                    set: { viewModel.setSpeedLadderStep($0) }
+                )) {
+                    ForEach([Float(0.02), 0.05, 0.1], id: \.self) {
+                        Text("+\(Int(($0 * 100).rounded()))%").tag($0)
+                    }
+                }
+                Picker("目标速度", selection: Binding(
+                    get: { viewModel.speedLadderTarget },
+                    set: { viewModel.setSpeedLadderTarget($0) }
+                )) {
+                    ForEach([Float(0.8), 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
+                        Text("\(Int(($0 * 100).rounded()))%").tag($0)
+                    }
+                }
+                Text("已完成 \(viewModel.completedLoops) 轮")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var pdfMetronomeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Stepper("BPM \(Int(viewModel.bpm))", value: $viewModel.bpm, in: 30...300)
+                .onChange(of: viewModel.bpm) { _, _ in viewModel.updateAudioSettings() }
+            Toggle("节拍器", isOn: $viewModel.metronomeEnabled)
+                .onChange(of: viewModel.metronomeEnabled) { _, _ in viewModel.updateAudioSettings() }
+            Picker("细分", selection: $viewModel.subdivision) {
+                ForEach(Subdivision.allCases) { Text($0.label(forBeatUnit: 4)).tag($0) }
+            }
+            .onChange(of: viewModel.subdivision) { _, _ in viewModel.updateAudioSettings() }
+            Picker("训练模式", selection: $viewModel.rhythmMode) {
+                ForEach(RhythmMode.allCases) { Text($0.label).tag($0) }
+            }
+            .onChange(of: viewModel.rhythmMode) { _, _ in viewModel.updateAudioSettings() }
+            Stepper(
+                "每小节 \(viewModel.beatsPerMeasure) 拍",
+                value: Binding(
+                    get: { viewModel.beatsPerMeasure },
+                    set: { viewModel.setMeter(beats: $0) }
+                ),
+                in: 1...16
+            )
+            TextField("拍子分组，例如 2+2+3", text: $groupingInput)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    if !viewModel.setBeatGrouping(groupingInput) {
+                        groupingInput = viewModel.beatGrouping.map(String.init).joined(separator: "+")
+                    }
+                }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    ForEach(viewModel.beatAccents.indices, id: \.self) { index in
+                        Button("\(index + 1) \(viewModel.beatAccents[index].label)") {
+                            viewModel.cycleAccent(at: index)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    private var pdfSoundAndStatsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("伴奏音量")
+            Slider(
+                value: Binding(
+                    get: { Double(viewModel.audioVolume) },
+                    set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
+                ),
+                in: 0...1
+            )
+            Text("节拍器音量")
+            Slider(
+                value: Binding(
+                    get: { Double(viewModel.metronomeVolume) },
+                    set: { viewModel.metronomeVolume = Float($0); viewModel.updateAudioSettings() }
+                ),
+                in: 0...1
+            )
+            Text("同步 \(Int(viewModel.synchronizationOffset * 1_000)) ms")
+            HStack {
+                ForEach([-10, -5, -1, 1, 5, 10], id: \.self) { value in
+                    Button(value > 0 ? "+\(value)" : "\(value)") {
+                        viewModel.synchronizationOffset += Double(value) / 1_000
+                        viewModel.updateAudioSettings()
+                    }
+                }
+            }
+            Text(
+                "练习 \(Int(viewModel.accumulatedPracticeTime / 60)) 分钟 · "
+                    + "累计循环 \(viewModel.totalCompletedLoops) 轮 · "
+                    + "最高 \(Int((viewModel.highestPlaybackRate * 100).rounded()))%"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var autoFollowSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("自动跟谱").font(.headline)
+            Text("已保存 \(viewModel.readingPoints.count) 个位置点")
+                .foregroundStyle(.secondary)
+            if viewModel.isRecordingReadingTrack {
+                Button("结束并保存记录", action: viewModel.finishReadingTrackRecording)
+            } else {
+                Button(
+                    viewModel.readingPoints.isEmpty ? "开始记录" : "重新记录",
+                    action: viewModel.startReadingTrackRecording
+                )
+            }
+            if !viewModel.readingPoints.isEmpty {
+                Button(
+                    viewModel.isAutoFollowing ? "关闭自动跟谱" : "启动自动跟谱",
+                    action: viewModel.toggleAutoFollow
+                )
+                Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
+            }
         }
     }
 

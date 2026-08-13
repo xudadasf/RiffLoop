@@ -25,9 +25,23 @@ final class PdfPracticeViewModel: ObservableObject {
     @Published var synchronizationOffset = 0.0
     @Published var metronomeEnabled = true
     @Published var metronomeVolume: Float = 1
+    @Published var subdivision: Subdivision = .quarter
+    @Published var beatsPerMeasure = 4
+    @Published var beatGrouping = [4]
+    @Published var beatAccents: [BeatAccent] = [.strong, .normal, .normal, .normal]
+    @Published var rhythmMode: RhythmMode = .click
     @Published var pointA: TimeInterval?
     @Published var pointB: TimeInterval?
     @Published var loopEnabled = false
+    @Published private(set) var loopCountInEnabled = false
+    @Published private(set) var speedLadderEnabled = false
+    @Published private(set) var speedLadderTarget: Float = 1
+    @Published private(set) var loopsPerSpeedStep = 3
+    @Published private(set) var speedLadderStep: Float = 0.05
+    @Published private(set) var completedLoops = 0
+    @Published private(set) var accumulatedPracticeTime: TimeInterval = 0
+    @Published private(set) var totalCompletedLoops = 0
+    @Published private(set) var highestPlaybackRate: Float = 1
 
     @Published private(set) var readingPoints: [PdfReadingPoint] = []
     @Published private(set) var isRecordingReadingTrack = false
@@ -39,6 +53,8 @@ final class PdfPracticeViewModel: ObservableObject {
     private let metronome = MetronomeEngine()
     private var periodicObserver: Any?
     private var boundaryObserver: Any?
+    private var lastPracticeSampleDate: Date?
+    private var isLoopTransitioning = false
 
     init() {
         periodicObserver = player.addPeriodicTimeObserver(
@@ -113,20 +129,27 @@ final class PdfPracticeViewModel: ObservableObject {
         isPlaying ? pause() : play()
     }
 
-    func play() {
+    func play(includeCountIn: Bool = false) {
         guard player.currentItem != nil || metronomeEnabled else { return }
         let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
-        let hostStart = CMTimeAdd(
+        let countInMediaDuration = includeCountIn && metronomeEnabled
+            ? Double(beatsPerMeasure) * 60 / bpm
+            : 0
+        let anchorHostTime = CMTimeAdd(
             hostNow,
             CMTime(seconds: 0.1, preferredTimescale: 1_000_000_000)
         )
         let anchor = TransportAnchor(
-            mediaTime: currentTime,
-            hostTime: hostStart.seconds,
+            mediaTime: currentTime - countInMediaDuration,
+            hostTime: anchorHostTime.seconds,
             mediaRate: Double(playbackRate)
         )
         if player.currentItem != nil {
-            player.setRate(playbackRate, time: cmTime(currentTime), atHostTime: hostStart)
+            player.setRate(
+                playbackRate,
+                time: cmTime(currentTime),
+                atHostTime: cmTime(anchor.hostTime(forMediaTime: currentTime))
+            )
         }
         if metronomeEnabled, let beatOffset {
             do {
@@ -134,9 +157,13 @@ final class PdfPracticeViewModel: ObservableObject {
                     timeline: BeatTimeline(
                         bpm: bpm,
                         beatOffset: beatOffset + synchronizationOffset,
-                        subdivision: .quarter
+                        subdivision: effectiveSubdivision(subdivision, rhythmMode: rhythmMode),
+                        quarterNotesPerMeasure: beatsPerMeasure,
+                        beatGrouping: beatGrouping,
+                        beatAccents: beatAccents
                     ),
                     anchor: anchor,
+                    rhythmMode: rhythmMode,
                     volume: metronomeVolume
                 )
             } catch {
@@ -144,12 +171,15 @@ final class PdfPracticeViewModel: ObservableObject {
             }
         }
         isPlaying = true
+        lastPracticeSampleDate = Date()
     }
 
     func pause() {
+        recordPracticeTime()
         player.pause()
         metronome.stop()
         isPlaying = false
+        lastPracticeSampleDate = nil
         save()
     }
 
@@ -203,6 +233,71 @@ final class PdfPracticeViewModel: ObservableObject {
         rebuildBoundaryObserver()
         save()
         if isPlaying { play() }
+    }
+
+    func setPlaybackRate(_ rate: Float) {
+        playbackRate = min(max(rate, 0.25), 1.5)
+        highestPlaybackRate = max(highestPlaybackRate, playbackRate)
+        updateAudioSettings()
+    }
+
+    func setMeter(beats: Int) {
+        beatsPerMeasure = min(max(beats, 1), 16)
+        beatGrouping = [beatsPerMeasure]
+        beatAccents = defaultBeatAccents(
+            beatsPerMeasure: beatsPerMeasure,
+            grouping: beatGrouping
+        )
+        updateAudioSettings()
+    }
+
+    func setBeatGrouping(_ input: String) -> Bool {
+        guard let grouping = parseBeatGrouping(input, beatsPerMeasure: beatsPerMeasure) else {
+            message = "拍子分组必须为正整数，并且总和等于每小节拍数。"
+            return false
+        }
+        beatGrouping = grouping
+        beatAccents = defaultBeatAccents(
+            beatsPerMeasure: beatsPerMeasure,
+            grouping: grouping
+        )
+        updateAudioSettings()
+        return true
+    }
+
+    func cycleAccent(at index: Int) {
+        guard beatAccents.indices.contains(index) else { return }
+        beatAccents[index] = beatAccents[index].next
+        updateAudioSettings()
+    }
+
+    func setLoopCountInEnabled(_ enabled: Bool) {
+        loopCountInEnabled = enabled
+        save()
+    }
+
+    func setSpeedLadderEnabled(_ enabled: Bool) {
+        speedLadderEnabled = enabled
+        completedLoops = 0
+        save()
+    }
+
+    func setSpeedLadderTarget(_ target: Float) {
+        speedLadderTarget = min(max(target, 0.25), 1.5)
+        completedLoops = 0
+        save()
+    }
+
+    func setLoopsPerSpeedStep(_ loops: Int) {
+        loopsPerSpeedStep = min(max(loops, 1), 10)
+        completedLoops = 0
+        save()
+    }
+
+    func setSpeedLadderStep(_ step: Float) {
+        speedLadderStep = min(max(step, 0.01), 0.25)
+        completedLoops = 0
+        save()
     }
 
     func setPage(_ index: Int) {
@@ -273,6 +368,7 @@ final class PdfPracticeViewModel: ObservableObject {
     func dismissMessage() { message = nil }
 
     private func timeChanged(_ seconds: TimeInterval) {
+        recordPracticeTime()
         if seconds.isFinite { currentTime = max(0, seconds) }
         if let item = player.currentItem, item.duration.seconds.isFinite {
             duration = max(0, item.duration.seconds)
@@ -313,8 +409,56 @@ final class PdfPracticeViewModel: ObservableObject {
             forTimes: [NSValue(time: cmTime(pointB))],
             queue: .main
         ) { [weak self] in
-            Task { @MainActor [weak self] in self?.seek(to: pointA) }
+            Task { @MainActor [weak self] in self?.handleLoopBoundary() }
         }
+    }
+
+    private func handleLoopBoundary() {
+        guard
+            loopEnabled,
+            let pointA,
+            let pointB,
+            pointB > pointA,
+            isPlaying,
+            !isLoopTransitioning
+        else { return }
+
+        isLoopTransitioning = true
+        let update = speedAfterCompletedLoop(
+            currentSpeed: Double(playbackRate),
+            targetSpeed: Double(speedLadderTarget),
+            previousCompletedLoops: completedLoops,
+            enabled: speedLadderEnabled,
+            loopsPerStep: loopsPerSpeedStep,
+            speedStep: Double(speedLadderStep)
+        )
+        completedLoops = update.completedLoops
+        totalCompletedLoops += 1
+        playbackRate = Float(update.playbackSpeed)
+        highestPlaybackRate = max(highestPlaybackRate, playbackRate)
+        recordPracticeTime()
+        player.pause()
+        metronome.stop()
+        player.seek(to: cmTime(pointA), toleranceBefore: .zero, toleranceAfter: .zero) {
+            [weak self] finished in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.isLoopTransitioning = false
+                guard finished, self.loopEnabled, self.isPlaying else {
+                    self.pause()
+                    return
+                }
+                self.currentTime = pointA
+                self.play(includeCountIn: self.loopCountInEnabled)
+            }
+        }
+        save()
+    }
+
+    private func recordPracticeTime() {
+        defer { lastPracticeSampleDate = isPlaying ? Date() : nil }
+        guard isPlaying, let lastPracticeSampleDate else { return }
+        accumulatedPracticeTime += max(0, Date().timeIntervalSince(lastPracticeSampleDate))
     }
 
     private func apply(_ profile: PdfPracticeProfile) {
@@ -330,11 +474,29 @@ final class PdfPracticeViewModel: ObservableObject {
         synchronizationOffset = profile.synchronizationOffset
         metronomeEnabled = profile.metronomeEnabled
         metronomeVolume = profile.metronomeVolume
+        subdivision = profile.subdivision
+        beatsPerMeasure = min(max(profile.beatsPerMeasure, 1), 16)
+        beatGrouping = profile.beatGrouping.reduce(0, +) == beatsPerMeasure
+            ? profile.beatGrouping
+            : [beatsPerMeasure]
+        beatAccents = profile.beatAccents.count == beatsPerMeasure
+            ? profile.beatAccents
+            : defaultBeatAccents(beatsPerMeasure: beatsPerMeasure, grouping: beatGrouping)
+        rhythmMode = profile.rhythmMode
         pointA = profile.pointA
         pointB = profile.pointB
         loopEnabled = profile.loopEnabled
             && profile.pointA != nil
             && profile.pointB.map { $0 > (profile.pointA ?? 0) } == true
+        loopCountInEnabled = profile.loopCountInEnabled
+        speedLadderEnabled = profile.speedLadderEnabled
+        speedLadderTarget = min(max(profile.speedLadderTarget, 0.25), 1.5)
+        loopsPerSpeedStep = min(max(profile.loopsPerSpeedStep, 1), 10)
+        speedLadderStep = min(max(profile.speedLadderStep, 0.01), 0.25)
+        accumulatedPracticeTime = max(0, profile.accumulatedPracticeTime)
+        totalCompletedLoops = max(0, profile.totalCompletedLoops)
+        highestPlaybackRate = max(playbackRate, profile.highestPlaybackRate)
+        completedLoops = 0
         readingPoints = profile.readingPoints
     }
 
@@ -353,9 +515,22 @@ final class PdfPracticeViewModel: ObservableObject {
             synchronizationOffset: synchronizationOffset,
             metronomeEnabled: metronomeEnabled,
             metronomeVolume: metronomeVolume,
+            subdivision: subdivision,
+            beatsPerMeasure: beatsPerMeasure,
+            beatGrouping: beatGrouping,
+            beatAccents: beatAccents,
+            rhythmMode: rhythmMode,
             pointA: pointA,
             pointB: pointB,
             loopEnabled: loopEnabled,
+            loopCountInEnabled: loopCountInEnabled,
+            speedLadderEnabled: speedLadderEnabled,
+            speedLadderTarget: speedLadderTarget,
+            loopsPerSpeedStep: loopsPerSpeedStep,
+            speedLadderStep: speedLadderStep,
+            accumulatedPracticeTime: accumulatedPracticeTime,
+            totalCompletedLoops: totalCompletedLoops,
+            highestPlaybackRate: highestPlaybackRate,
             readingPoints: readingPoints
         )
         try? settingsStore.save(profile, kind: .pdf, fileName: pdfFileName)
