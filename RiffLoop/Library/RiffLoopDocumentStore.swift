@@ -47,6 +47,34 @@ struct RiffLoopDocumentStore {
         }
     }
 
+    func pdfAudioFiles() throws -> [URL] {
+        try prepareDirectories()
+        let extensions = Set(["mp3", "m4a", "wav", "aac", "flac"])
+        return try fileManager.contentsOfDirectory(
+            at: folderURL(for: .pdf),
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+        .filter { extensions.contains($0.pathExtension.lowercased()) }
+        .sorted {
+            $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+        }
+    }
+
+    func importPdfAudio(from sourceURL: URL) throws -> URL {
+        let extensions = Set(["mp3", "m4a", "wav", "aac", "flac"])
+        guard extensions.contains(sourceURL.pathExtension.lowercased()) else {
+            throw RiffLoopDocumentStoreError.unsupportedPdfAudio
+        }
+        try prepareDirectories()
+        let destination = availableDestination(
+            in: folderURL(for: .pdf),
+            fileName: sourceURL.lastPathComponent
+        )
+        try fileManager.copyItem(at: sourceURL, to: destination)
+        return destination
+    }
+
     func importFile(from sourceURL: URL, for kind: PracticeKind) throws -> URL {
         let fileExtension = sourceURL.pathExtension.lowercased()
         guard kind.supportedExtensions.contains(fileExtension) else {
@@ -86,11 +114,14 @@ struct RiffLoopDocumentStore {
 
 enum RiffLoopDocumentStoreError: LocalizedError {
     case unsupportedFile(PracticeKind)
+    case unsupportedPdfAudio
 
     var errorDescription: String? {
         switch self {
         case let .unsupportedFile(kind):
             "所选文件不是受支持的\(kind.title)格式。"
+        case .unsupportedPdfAudio:
+            "请选择 MP3、M4A、WAV、AAC 或 FLAC 伴奏。"
         }
     }
 }

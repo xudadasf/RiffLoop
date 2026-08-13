@@ -28,7 +28,7 @@ struct HomeView: View {
                         subtitle: "伴奏、轨迹与自动跟谱",
                         systemImage: "doc.richtext.fill"
                     ) {
-                        ContentUnavailableView("PDF 迁移中", systemImage: "hammer.fill")
+                        PdfPracticeView()
                     }
                 }
 
@@ -73,7 +73,7 @@ struct HomeView: View {
         case .guitarPro:
             GpPracticeView(initialURL: url)
         case .pdf:
-            ContentUnavailableView("PDF 迁移中", systemImage: "hammer.fill")
+            PdfPracticeView(initialURL: url)
         }
     }
 
