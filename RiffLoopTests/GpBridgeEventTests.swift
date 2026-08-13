@@ -61,4 +61,28 @@ final class GpBridgeEventTests: XCTestCase {
             .pointerMove(GpBarHit(index: 8, startTick: 7_680, endTick: 8_640))
         )
     }
+
+    func testDecodesSeekFlagUsedToRejectFalseLoopCompletions() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: [
+                "event": "positionChanged",
+                "payload": [
+                    "currentTime": 1_000,
+                    "totalTime": 10_000,
+                    "currentTick": 960,
+                    "endTick": 9_600,
+                    "isSeek": true,
+                ],
+            ]),
+            .positionChanged(
+                GpPlaybackPosition(
+                    currentTime: 1_000,
+                    totalTime: 10_000,
+                    currentTick: 960,
+                    endTick: 9_600,
+                    isSeek: true
+                )
+            )
+        )
+    }
 }

@@ -27,6 +27,21 @@ struct GpPlaybackPosition: Codable, Equatable, Sendable {
     let totalTime: Double
     let currentTick: Double
     let endTick: Double
+    let isSeek: Bool?
+
+    init(
+        currentTime: Double,
+        totalTime: Double,
+        currentTick: Double,
+        endTick: Double,
+        isSeek: Bool? = nil
+    ) {
+        self.currentTime = currentTime
+        self.totalTime = totalTime
+        self.currentTick = currentTick
+        self.endTick = endTick
+        self.isSeek = isSeek
+    }
 }
 
 struct GpPlaybackState: Codable, Equatable, Sendable {
@@ -47,6 +62,7 @@ enum GpBridgeEvent: Equatable, Sendable {
     case playerReady
     case positionChanged(GpPlaybackPosition)
     case playerStateChanged(GpPlaybackState)
+    case playerFinished
     case barHit(GpBarHit)
     case pointerDown(GpBarHit)
     case longPress
@@ -77,6 +93,8 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .positionChanged(try decoder.decode(GpPlaybackPosition.self, from: envelope.payloadData))
         case "playerStateChanged":
             return .playerStateChanged(try decoder.decode(GpPlaybackState.self, from: envelope.payloadData))
+        case "playerFinished":
+            return .playerFinished
         case "barHit":
             return .barHit(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
         case "pointerDown":

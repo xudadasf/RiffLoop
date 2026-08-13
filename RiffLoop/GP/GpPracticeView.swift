@@ -7,6 +7,7 @@ struct GpPracticeView: View {
     @StateObject private var viewModel = GpWebViewModel()
     @State private var isLibraryPresented = false
     @State private var didOpenInitialURL = false
+    @State private var controlsVisible = true
 
     let initialURL: URL?
 
@@ -31,9 +32,18 @@ struct GpPracticeView: View {
                     }
                 }
 
-            controls
-                .frame(width: 300)
-                .background(Color(white: 0.08))
+                .overlay(alignment: .topTrailing) {
+                    if !controlsVisible {
+                        compactControls
+                            .padding(12)
+                    }
+                }
+
+            if controlsVisible {
+                controls
+                    .frame(width: 340)
+                    .background(Color(white: 0.08))
+            }
         }
         .navigationTitle("Guitar Pro 练习")
         .navigationBarTitleDisplayMode(.inline)
@@ -69,6 +79,13 @@ struct GpPracticeView: View {
     private var controls: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("控制")
+                        .font(.title3.bold())
+                    Spacer()
+                    Button("收起") { controlsVisible = false }
+                }
+
                 status
 
                 HStack {
@@ -87,15 +104,17 @@ struct GpPracticeView: View {
                         .disabled(!viewModel.playerReady)
                 }
 
-                Picker("速度", selection: Binding(
-                    get: { viewModel.playbackSpeed },
-                    set: { viewModel.setPlaybackSpeed($0) }
-                )) {
-                    ForEach(speeds, id: \.self) { value in
-                        Text(String(format: "%.2g×", value)).tag(value)
-                    }
-                }
-                .disabled(!viewModel.playerReady)
+                speedControls
+
+                Divider()
+                loopControls
+
+                Divider()
+                metronomeControls
+
+                Divider()
+                Text("声音")
+                    .font(.headline)
 
                 Text("合成总音量")
                     .font(.caption)
@@ -127,27 +146,6 @@ struct GpPracticeView: View {
                         set: { viewModel.setBackingEnabled($0) }
                     ))
                 }
-                Text("随谱节拍器")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Slider(
-                    value: Binding(
-                        get: { viewModel.metronomeVolume },
-                        set: { viewModel.setMetronomeVolume($0) }
-                    ),
-                    in: 0...1
-                )
-                Text("预备拍")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Slider(
-                    value: Binding(
-                        get: { viewModel.countInVolume },
-                        set: { viewModel.setCountInVolume($0) }
-                    ),
-                    in: 0...1
-                )
-
                 if let score = viewModel.score {
                     Divider()
                     Text("显示乐谱")
@@ -193,9 +191,155 @@ struct GpPracticeView: View {
                     }
                 }
 
+                Divider()
+                Text("练习记录")
+                    .font(.headline)
+                Text(
+                    "本次 \(formatDuration(viewModel.sessionPracticeMilliseconds)) · "
+                        + "累计 \(formatDuration(viewModel.totalPracticeMilliseconds)) · "
+                        + "累计循环 \(viewModel.totalCompletedLoops) 轮 · "
+                        + "最高 \(Int((viewModel.highestPracticeSpeed * 100).rounded()))%"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
                 Spacer(minLength: 0)
             }
             .padding(16)
+        }
+    }
+
+    private var compactControls: some View {
+        VStack(spacing: 10) {
+            Button("控制") { controlsVisible = true }
+                .buttonStyle(.borderedProminent)
+            Button(action: viewModel.togglePlayback) {
+                Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.title2)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .disabled(!viewModel.playerReady)
+        }
+        .padding(10)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var speedControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("速度")
+                .font(.headline)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(speeds, id: \.self) { value in
+                        Button(String(format: "%.2g×", value)) {
+                            viewModel.setPlaybackSpeed(value)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(viewModel.playbackSpeed == value ? .orange : .secondary)
+                    }
+                }
+            }
+            .disabled(!viewModel.playerReady)
+        }
+    }
+
+    private var loopControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("循环")
+                .font(.headline)
+            Text("长按小节并拖动，松手设置完整小节 A/B 范围。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Toggle("A/B 循环", isOn: Binding(
+                get: { viewModel.rangeLoopingEnabled },
+                set: { viewModel.setRangeLoopingEnabled($0) }
+            ))
+            .disabled(viewModel.loopRange == nil)
+            Toggle("每轮预备 1 小节", isOn: Binding(
+                get: { viewModel.loopCountInEnabled },
+                set: { viewModel.setLoopCountInEnabled($0) }
+            ))
+            .disabled(!viewModel.rangeLoopingEnabled)
+            Toggle("循环阶梯", isOn: Binding(
+                get: { viewModel.speedLadderEnabled },
+                set: { viewModel.setSpeedLadderEnabled($0) }
+            ))
+            .disabled(!viewModel.rangeLoopingEnabled)
+
+            if viewModel.speedLadderEnabled {
+                Picker("每几轮提高", selection: Binding(
+                    get: { viewModel.loopsPerSpeedStep },
+                    set: { viewModel.setLoopsPerSpeedStep($0) }
+                )) {
+                    ForEach([1, 2, 3, 5], id: \.self) { Text("\($0) 轮").tag($0) }
+                }
+                Picker("每次提高", selection: Binding(
+                    get: { viewModel.speedLadderStep },
+                    set: { viewModel.setSpeedLadderStep($0) }
+                )) {
+                    ForEach([0.02, 0.05, 0.1], id: \.self) {
+                        Text("+\(Int(($0 * 100).rounded()))%").tag($0)
+                    }
+                }
+                Picker("目标速度", selection: Binding(
+                    get: { viewModel.speedLadderTarget },
+                    set: { viewModel.setSpeedLadderTarget($0) }
+                )) {
+                    ForEach([0.8, 0.9, 1.0, 1.1, 1.25, 1.5], id: \.self) {
+                        Text("\(Int(($0 * 100).rounded()))%").tag($0)
+                    }
+                }
+                Text("已完成 \(viewModel.completedLoops) 轮")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle("整曲循环", isOn: Binding(
+                get: { viewModel.wholeSongLoopingEnabled },
+                set: { viewModel.setWholeSongLoopingEnabled($0) }
+            ))
+            .disabled(viewModel.rangeLoopingEnabled)
+        }
+    }
+
+    private var metronomeControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("节拍器")
+                .font(.headline)
+            Toggle("播放节拍", isOn: Binding(
+                get: { viewModel.metronomeEnabled },
+                set: { viewModel.setMetronomeEnabled($0) }
+            ))
+            if viewModel.metronomeEnabled {
+                Slider(
+                    value: Binding(
+                        get: { viewModel.metronomeVolume },
+                        set: { viewModel.setMetronomeVolume($0) }
+                    ),
+                    in: 0...1
+                )
+                Text("节拍音量 \(Int((viewModel.metronomeVolume * 100).rounded()))%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Toggle("开始前预备拍", isOn: Binding(
+                get: { viewModel.countInEnabled },
+                set: { viewModel.setCountInEnabled($0) }
+            ))
+            if viewModel.countInEnabled || viewModel.loopCountInEnabled {
+                Slider(
+                    value: Binding(
+                        get: { viewModel.countInVolume },
+                        set: { viewModel.setCountInVolume($0) }
+                    ),
+                    in: 0...1
+                )
+                Text("预备拍音量 \(Int((viewModel.countInVolume * 100).rounded()))%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -249,5 +393,10 @@ struct GpPracticeView: View {
     private func format(_ milliseconds: Double) -> String {
         let totalSeconds = max(0, Int(milliseconds / 1_000))
         return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
+    private func formatDuration(_ milliseconds: Int64) -> String {
+        let totalMinutes = Int(max(0, milliseconds / 60_000))
+        return String(format: "%02d:%02d", totalMinutes / 60, totalMinutes % 60)
     }
 }

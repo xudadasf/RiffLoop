@@ -28,8 +28,22 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var backingVolume = 0.75
     @Published private(set) var synthEnabled = true
     @Published private(set) var backingEnabled = true
+    @Published private(set) var metronomeEnabled = false
     @Published private(set) var metronomeVolume = 0.0
+    @Published private(set) var countInEnabled = false
     @Published private(set) var countInVolume = 0.0
+    @Published private(set) var rangeLoopingEnabled = true
+    @Published private(set) var wholeSongLoopingEnabled = false
+    @Published private(set) var loopCountInEnabled = false
+    @Published private(set) var speedLadderEnabled = false
+    @Published private(set) var speedLadderTarget = 1.0
+    @Published private(set) var loopsPerSpeedStep = 3
+    @Published private(set) var speedLadderStep = 0.05
+    @Published private(set) var completedLoops = 0
+    @Published private(set) var sessionPracticeMilliseconds: Int64 = 0
+    @Published private(set) var totalPracticeMilliseconds: Int64 = 0
+    @Published private(set) var totalCompletedLoops = 0
+    @Published private(set) var highestPracticeSpeed = 1.0
     @Published private(set) var errorMessage: String?
 
     private weak var webView: WKWebView?
@@ -39,6 +53,8 @@ final class GpWebViewModel: ObservableObject {
     private let settingsStore = FilePracticeSettingsStore()
     private var currentFileName: String?
     private var pendingProfile = GpPracticeProfile()
+    private var previousPositionTick: Double?
+    private var playbackStartedAt: Date?
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -54,6 +70,9 @@ final class GpWebViewModel: ObservableObject {
         score = nil
         playerReady = false
         position = GpPlaybackPosition(currentTime: 0, totalTime: 0, currentTick: 0, endTick: 0)
+        previousPositionTick = nil
+        completedLoops = 0
+        sessionPracticeMilliseconds = 0
         selectedBar = nil
         errorMessage = nil
 
@@ -82,6 +101,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setPlaybackSpeed(_ speed: Double) {
         playbackSpeed = min(max(speed, 0.5), 1.5)
+        highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
         call("setPlaybackSpeed", arguments: [playbackSpeed])
         saveProfile()
     }
@@ -143,24 +163,88 @@ final class GpWebViewModel: ObservableObject {
 
     func setMetronomeVolume(_ volume: Double) {
         metronomeVolume = min(max(volume, 0), 1)
-        call("setMetronomeVolume", arguments: [metronomeVolume])
+        call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
+        saveProfile()
+    }
+
+    func setMetronomeEnabled(_ enabled: Bool) {
+        metronomeEnabled = enabled
+        if enabled, metronomeVolume == 0 { metronomeVolume = 0.85 }
+        call("setMetronomeVolume", arguments: [enabled ? metronomeVolume : 0])
         saveProfile()
     }
 
     func setCountInVolume(_ volume: Double) {
         countInVolume = min(max(volume, 0), 1)
-        call("setCountInVolume", arguments: [countInVolume])
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
+        saveProfile()
+    }
+
+    func setCountInEnabled(_ enabled: Bool) {
+        countInEnabled = enabled
+        if enabled, countInVolume == 0 { countInVolume = 0.85 }
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
+        saveProfile()
+    }
+
+    func setRangeLoopingEnabled(_ enabled: Bool) {
+        guard loopRange != nil else { return }
+        rangeLoopingEnabled = enabled
+        if enabled { wholeSongLoopingEnabled = false }
+        completedLoops = 0
+        call("setRangeLoopingEnabled", arguments: [enabled])
+        saveProfile()
+    }
+
+    func setWholeSongLoopingEnabled(_ enabled: Bool) {
+        wholeSongLoopingEnabled = enabled
+        if enabled { rangeLoopingEnabled = false }
+        completedLoops = 0
+        call("setWholeSongLoopingEnabled", arguments: [enabled])
+        saveProfile()
+    }
+
+    func setLoopCountInEnabled(_ enabled: Bool) {
+        loopCountInEnabled = enabled
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
+        saveProfile()
+    }
+
+    func setSpeedLadderEnabled(_ enabled: Bool) {
+        speedLadderEnabled = enabled
+        completedLoops = 0
+        saveProfile()
+    }
+
+    func setSpeedLadderTarget(_ target: Double) {
+        speedLadderTarget = min(max(target, 0.5), 1.5)
+        completedLoops = 0
+        saveProfile()
+    }
+
+    func setLoopsPerSpeedStep(_ loops: Int) {
+        loopsPerSpeedStep = min(max(loops, 1), 10)
+        completedLoops = 0
+        saveProfile()
+    }
+
+    func setSpeedLadderStep(_ step: Double) {
+        speedLadderStep = min(max(step, 0.01), 0.25)
+        completedLoops = 0
         saveProfile()
     }
 
     func clearLoop() {
         loopRange = nil
         loopPreview = nil
+        rangeLoopingEnabled = false
+        completedLoops = 0
         call("clearPlaybackRange")
         saveProfile()
     }
 
     func setSceneActive(_ isActive: Bool) {
+        if !isActive { updatePracticeClock(isPlaying: false) }
         call("lifecycle", arguments: [isActive])
     }
 
@@ -189,9 +273,15 @@ final class GpWebViewModel: ObservableObject {
         case .playerReady:
             playerReady = true
         case let .positionChanged(position):
+            recordLoopCompletionIfNeeded(position)
             self.position = position
+            previousPositionTick = position.currentTick
         case let .playerStateChanged(state):
             isPlaying = state.state == 1
+            updatePracticeClock(isPlaying: isPlaying)
+        case .playerFinished:
+            isPlaying = false
+            updatePracticeClock(isPlaying: false)
         case let .barHit(bar):
             selectedBar = bar
         case let .pointerDown(bar):
@@ -254,6 +344,9 @@ final class GpWebViewModel: ObservableObject {
         case let .commit(range):
             loopPreview = nil
             loopRange = range
+            rangeLoopingEnabled = true
+            wholeSongLoopingEnabled = false
+            completedLoops = 0
             call(
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
@@ -279,13 +372,27 @@ final class GpWebViewModel: ObservableObject {
         backingVolume = min(max(pendingProfile.backingVolume, 0), 1)
         synthEnabled = pendingProfile.synthEnabled
         backingEnabled = pendingProfile.backingEnabled
+        metronomeEnabled = pendingProfile.metronomeEnabled
         metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 1)
+        countInEnabled = pendingProfile.countInEnabled
         countInVolume = min(max(pendingProfile.countInVolume, 0), 1)
+        wholeSongLoopingEnabled = pendingProfile.wholeSongLoopingEnabled
+        loopCountInEnabled = pendingProfile.loopCountInEnabled
+        speedLadderEnabled = pendingProfile.speedLadderEnabled
+        speedLadderTarget = min(max(pendingProfile.speedLadderTarget, 0.5), 1.5)
+        loopsPerSpeedStep = min(max(pendingProfile.loopsPerSpeedStep, 1), 10)
+        speedLadderStep = min(max(pendingProfile.speedLadderStep, 0.01), 0.25)
+        totalPracticeMilliseconds = max(0, pendingProfile.totalPracticeMilliseconds)
+        totalCompletedLoops = max(0, pendingProfile.totalCompletedLoops)
+        highestPracticeSpeed = max(playbackSpeed, pendingProfile.highestPracticeSpeed)
         loopRange = pendingProfile.loopRange.flatMap { range in
             range.firstBar >= 0 && range.lastBar < metadata.bars && range.endTick > range.startTick
                 ? range
                 : nil
         }
+        rangeLoopingEnabled = loopRange != nil
+            && pendingProfile.rangeLoopingEnabled
+            && !wholeSongLoopingEnabled
 
         call("showTracks", arguments: [[displayedTrack]])
         call("setPlaybackSpeed", arguments: [playbackSpeed])
@@ -293,8 +400,8 @@ final class GpWebViewModel: ObservableObject {
         call("setBackingVolume", arguments: [backingVolume])
         call("setSynthEnabled", arguments: [synthEnabled])
         call("setBackingEnabled", arguments: [backingEnabled])
-        call("setMetronomeVolume", arguments: [metronomeVolume])
-        call("setCountInVolume", arguments: [countInVolume])
+        call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
         for index in mutedTracks { call("setTrackMute", arguments: [index, true]) }
         if let soloTrack { call("setTrackSolo", arguments: [soloTrack, true]) }
         for (index, volume) in trackVolumes {
@@ -305,7 +412,64 @@ final class GpWebViewModel: ObservableObject {
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
             )
+            call("setRangeLoopingEnabled", arguments: [rangeLoopingEnabled])
+        } else {
+            rangeLoopingEnabled = false
         }
+        call("setWholeSongLoopingEnabled", arguments: [wholeSongLoopingEnabled])
+    }
+
+    private var effectiveCountInVolume: Double {
+        countInEnabled || (rangeLoopingEnabled && loopCountInEnabled) ? countInVolume : 0
+    }
+
+    private func recordLoopCompletionIfNeeded(_ newPosition: GpPlaybackPosition) {
+        guard
+            newPosition.isSeek != true,
+            rangeLoopingEnabled,
+            let range = loopRange,
+            let previousPositionTick
+        else { return }
+
+        let loopLength = range.endTick - range.startTick
+        guard
+            loopLength > 0,
+            previousPositionTick >= range.startTick + loopLength * 0.75,
+            newPosition.currentTick <= range.startTick + loopLength * 0.25
+        else { return }
+
+        let update = speedAfterCompletedLoop(
+            currentSpeed: playbackSpeed,
+            targetSpeed: speedLadderTarget,
+            previousCompletedLoops: completedLoops,
+            enabled: speedLadderEnabled,
+            loopsPerStep: loopsPerSpeedStep,
+            speedStep: speedLadderStep
+        )
+        completedLoops = update.completedLoops
+        totalCompletedLoops += 1
+        if update.playbackSpeed != playbackSpeed {
+            playbackSpeed = update.playbackSpeed
+            highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
+            call("setPlaybackSpeed", arguments: [playbackSpeed])
+        }
+        if loopCountInEnabled {
+            call("restartRangeWithCountIn")
+        }
+        saveProfile()
+    }
+
+    private func updatePracticeClock(isPlaying: Bool) {
+        if isPlaying {
+            if playbackStartedAt == nil { playbackStartedAt = Date() }
+            return
+        }
+        guard let playbackStartedAt else { return }
+        let elapsed = Int64(max(0, Date().timeIntervalSince(playbackStartedAt) * 1_000))
+        self.playbackStartedAt = nil
+        sessionPracticeMilliseconds += elapsed
+        totalPracticeMilliseconds += elapsed
+        saveProfile()
     }
 
     private func saveProfile() {
@@ -322,8 +486,20 @@ final class GpWebViewModel: ObservableObject {
                 backingVolume: backingVolume,
                 synthEnabled: synthEnabled,
                 backingEnabled: backingEnabled,
+                metronomeEnabled: metronomeEnabled,
                 metronomeVolume: metronomeVolume,
-                countInVolume: countInVolume
+                countInEnabled: countInEnabled,
+                countInVolume: countInVolume,
+                rangeLoopingEnabled: rangeLoopingEnabled,
+                wholeSongLoopingEnabled: wholeSongLoopingEnabled,
+                loopCountInEnabled: loopCountInEnabled,
+                speedLadderEnabled: speedLadderEnabled,
+                speedLadderTarget: speedLadderTarget,
+                loopsPerSpeedStep: loopsPerSpeedStep,
+                speedLadderStep: speedLadderStep,
+                totalPracticeMilliseconds: totalPracticeMilliseconds,
+                totalCompletedLoops: totalCompletedLoops,
+                highestPracticeSpeed: highestPracticeSpeed
             ),
             kind: .guitarPro,
             fileName: currentFileName

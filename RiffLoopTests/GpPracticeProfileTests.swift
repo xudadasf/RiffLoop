@@ -28,4 +28,16 @@ final class GpPracticeProfileTests: XCTestCase {
             profile
         )
     }
+
+    func testLegacyProfileRestoresNewPracticeControlsWithSafeDefaults() throws {
+        let data = Data(#"{"playbackSpeed":0.8,"displayedTrack":0,"mutedTracks":[],"trackVolumes":{},"masterVolume":0.75,"backingVolume":0.75,"synthEnabled":true,"backingEnabled":true,"metronomeVolume":0.6,"countInVolume":0.4}"#.utf8)
+
+        let profile = try JSONDecoder().decode(GpPracticeProfile.self, from: data)
+
+        XCTAssertTrue(profile.metronomeEnabled)
+        XCTAssertTrue(profile.countInEnabled)
+        XCTAssertFalse(profile.wholeSongLoopingEnabled)
+        XCTAssertEqual(profile.loopsPerSpeedStep, 3)
+        XCTAssertEqual(profile.speedLadderStep, 0.05)
+    }
 }

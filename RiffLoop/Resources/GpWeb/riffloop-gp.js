@@ -51,7 +51,21 @@
     let backingVolume = 0.75;
     let startingBoth = false;
     let soundFontBytes = null;
+    let committedRange = null;
+    let rangeLoopingEnabled = false;
+    let wholeSongLoopingEnabled = false;
     const canUseBacking = () => Boolean(api.score?.backingTrack);
+    const applyLoopMode = () => {
+        const useRange = rangeLoopingEnabled && committedRange;
+        const range = useRange ? {
+            startTick: committedRange.startTick,
+            endTick: committedRange.endTick
+        } : null;
+        api.playbackRange = range;
+        synthApi.playbackRange = range ? { ...range } : null;
+        api.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
+        synthApi.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
+    };
     const playPauseBoth = () => {
         if (startingBoth) return;
         startingBoth = true;
@@ -167,12 +181,14 @@
         currentTime: position.currentTime,
         totalTime: position.endTime,
         currentTick: position.currentTick,
-        endTick: position.endTick
+        endTick: position.endTick,
+        isSeek: Boolean(position.isSeek)
     }));
     api.playerStateChanged.on((state) => post("playerStateChanged", {
         state: state.state,
         stopped: state.stopped
     }));
+    api.playerFinished.on(() => post("playerFinished"));
     const firstBeatInBar = (index) => {
         for (const track of api.score?.tracks || []) {
             for (const staff of track.staves || []) {
@@ -349,6 +365,9 @@
         loadScore(base64) {
             try {
                 window.riffloopCommittedBars = null;
+                committedRange = null;
+                rangeLoopingEnabled = false;
+                wholeSongLoopingEnabled = false;
                 const bytes = decodeBase64(base64);
                 api.load(bytes);
                 synthApi.load(bytes);
@@ -426,11 +445,10 @@
             };
         },
         clearPlaybackRange() {
-            api.playbackRange = null;
-            synthApi.playbackRange = null;
-            api.isLooping = false;
-            synthApi.isLooping = false;
+            committedRange = null;
+            rangeLoopingEnabled = false;
             window.riffloopCommittedBars = null;
+            applyLoopMode();
             api.clearPlaybackRangeHighlight();
         },
         previewRange(firstBar, lastBar) {
@@ -439,18 +457,33 @@
             if (startBeat && endBeat) api.highlightPlaybackRange(startBeat, endBeat);
         },
         commitRange(firstBar, lastBar, startTick, endTick) {
-            api.playbackRange = {
+            committedRange = {
                 startTick: Number(startTick),
                 endTick: Number(endTick)
             };
-            synthApi.playbackRange = {
-                startTick: Number(startTick),
-                endTick: Number(endTick)
-            };
-            api.isLooping = true;
-            synthApi.isLooping = true;
+            rangeLoopingEnabled = true;
+            wholeSongLoopingEnabled = false;
+            applyLoopMode();
             window.riffloop.previewRange(firstBar, lastBar);
             window.riffloopCommittedBars = [Number(firstBar), Number(lastBar)];
+        },
+        setRangeLoopingEnabled(enabled) {
+            rangeLoopingEnabled = Boolean(enabled) && Boolean(committedRange);
+            if (rangeLoopingEnabled) wholeSongLoopingEnabled = false;
+            applyLoopMode();
+        },
+        setWholeSongLoopingEnabled(enabled) {
+            wholeSongLoopingEnabled = Boolean(enabled);
+            if (wholeSongLoopingEnabled) rangeLoopingEnabled = false;
+            applyLoopMode();
+        },
+        restartRangeWithCountIn() {
+            if (!committedRange) return;
+            api.pause();
+            synthApi.pause();
+            api.tickPosition = committedRange.startTick;
+            synthApi.tickPosition = committedRange.startTick;
+            setTimeout(playPauseBoth, 50);
         },
         cancelRangePreview() {
             const bars = window.riffloopCommittedBars;
