@@ -81,7 +81,7 @@ jobs:
           )"
           echo "IPAD_DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
           xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
-          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
             xcrun simctl bootstatus "$DEVICE_ID" -b
 
       - name: Build and run unit tests on iPad mini
