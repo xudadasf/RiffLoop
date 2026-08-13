@@ -40,7 +40,7 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 
 RiffLoop 首页显示当前侧载描述文件的到期时间和预计剩余天数。两天内到期时显示橙色提醒；续签后重新打开 App 或点击“重新检测”即可刷新。
 
-“手动续签”按钮会在 iPad 上显示以下操作说明，但 iPad App 无法给自身重新签名，续签仍需在 Windows 完成：
+“无线续签步骤”按钮会在 iPad 上显示以下操作说明，但 iPad App 无法给自身重新签名，续签仍需在 Windows 完成：
 
 1. 首次无线设置先用 USB 连接，在 iTunes 的设备摘要中开启“通过 Wi-Fi 与此 iPad 同步”，点击“同步/完成”，并让 Sideloadly 成功安装一次。
 2. 日常续签时关闭 Windows 与 iPad 上的 VPN/代理，让两者连接同一局域网，保持 iPad 屏幕点亮，再打开 Sideloadly；无线找不到设备时改用 USB。
