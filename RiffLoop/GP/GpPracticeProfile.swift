@@ -2,6 +2,7 @@ import Foundation
 
 struct GpPracticeProfile: Codable, Equatable, Sendable {
     var playbackSpeed = 1.0
+    var lastPositionTick = 0.0
     var displayedTrack = 0
     var mutedTracks: Set<Int> = []
     var soloTrack: Int?
@@ -30,6 +31,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
 
     init(
         playbackSpeed: Double = 1.0,
+        lastPositionTick: Double = 0,
         displayedTrack: Int = 0,
         mutedTracks: Set<Int> = [],
         soloTrack: Int? = nil,
@@ -57,6 +59,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         highestPracticeSpeed: Double = 1.0
     ) {
         self.playbackSpeed = playbackSpeed
+        self.lastPositionTick = lastPositionTick
         self.displayedTrack = displayedTrack
         self.mutedTracks = mutedTracks
         self.soloTrack = soloTrack
@@ -87,6 +90,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         playbackSpeed = try values.decodeIfPresent(Double.self, forKey: .playbackSpeed) ?? 1
+        lastPositionTick = try values.decodeIfPresent(Double.self, forKey: .lastPositionTick) ?? 0
         displayedTrack = try values.decodeIfPresent(Int.self, forKey: .displayedTrack) ?? 0
         mutedTracks = try values.decodeIfPresent(Set<Int>.self, forKey: .mutedTracks) ?? []
         soloTrack = try values.decodeIfPresent(Int.self, forKey: .soloTrack)

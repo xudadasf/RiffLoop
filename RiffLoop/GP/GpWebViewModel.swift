@@ -60,6 +60,8 @@ final class GpWebViewModel: ObservableObject {
     private var didApplyPendingProfile = false
     private var previousPositionTick: Double?
     private var playbackStartedAt: Date?
+    private var pendingResumeTick: Double?
+    private var lastProfileSaveDate = Date.distantPast
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -72,6 +74,11 @@ final class GpWebViewModel: ObservableObject {
             kind: .guitarPro,
             fileName: fileName
         )) ?? GpPracticeProfile()
+        pendingResumeTick = pendingProfile.lastPositionTick.isFinite
+            && pendingProfile.lastPositionTick > 0
+            ? pendingProfile.lastPositionTick
+            : nil
+        lastProfileSaveDate = Date()
         metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
             ? pendingProfile.metronomeSubdivisionFactor
             : 1
@@ -290,7 +297,10 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSceneActive(_ isActive: Bool) {
-        if !isActive { updatePracticeClock(isPlaying: false) }
+        if !isActive {
+            updatePracticeClock(isPlaying: false)
+            saveProfile()
+        }
         call("lifecycle", arguments: [isActive])
     }
 
@@ -323,10 +333,21 @@ final class GpWebViewModel: ObservableObject {
             renderMetrics = metrics
         case .playerReady:
             playerReady = true
+            if let pendingResumeTick {
+                self.pendingResumeTick = nil
+                seek(to: pendingResumeTick)
+            }
         case let .positionChanged(position):
             recordLoopCompletionIfNeeded(position)
             self.position = position
             previousPositionTick = position.currentTick
+            if
+                pendingResumeTick == nil,
+                playerReady,
+                Date().timeIntervalSince(lastProfileSaveDate) >= 2
+            {
+                saveProfile()
+            }
         case let .playerStateChanged(state):
             isPlaying = state.state == 1
             updatePracticeClock(isPlaying: isPlaying)
@@ -545,6 +566,7 @@ final class GpWebViewModel: ObservableObject {
         try? settingsStore.save(
             GpPracticeProfile(
                 playbackSpeed: playbackSpeed,
+                lastPositionTick: position.currentTick.isFinite ? max(0, position.currentTick) : 0,
                 displayedTrack: displayedTrack,
                 mutedTracks: mutedTracks,
                 soloTrack: soloTrack,
@@ -574,6 +596,7 @@ final class GpWebViewModel: ObservableObject {
             kind: .guitarPro,
             fileName: currentFileName
         )
+        lastProfileSaveDate = Date()
     }
 
     private func call(_ function: String, arguments: [Any] = []) {
