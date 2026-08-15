@@ -19,6 +19,8 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var selectedBar: GpBarHit?
     @Published private(set) var loopRange: GpLoopBarRange?
     @Published private(set) var loopPreview: GpLoopBarRange?
+    @Published private(set) var loopPickStep: GpLoopPickStep = .inactive
+    @Published private(set) var loopSelectionMessage: String?
     @Published private(set) var playbackSpeed = 1.0
     @Published private(set) var displayedTrack = 0
     @Published private(set) var mutedTracks = Set<Int>()
@@ -84,6 +86,11 @@ final class GpWebViewModel: ObservableObject {
         completedLoops = 0
         sessionPracticeMilliseconds = 0
         selectedBar = nil
+        loopRange = nil
+        loopPreview = nil
+        _ = loopSelection.setPickingEnabled(false)
+        loopPickStep = .inactive
+        loopSelectionMessage = nil
         errorMessage = nil
 
         guard rendererReady else {
@@ -260,12 +267,26 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func clearLoop() {
+        _ = loopSelection.setPickingEnabled(false)
+        loopPickStep = .inactive
+        loopSelectionMessage = nil
         loopRange = nil
         loopPreview = nil
         rangeLoopingEnabled = false
         completedLoops = 0
         call("clearPlaybackRange")
         saveProfile()
+    }
+
+    func setLoopPickingEnabled(_ enabled: Bool) {
+        handle(loopSelection.setPickingEnabled(enabled))
+        loopPickStep = loopSelection.step
+        if enabled {
+            pause()
+            loopSelectionMessage = "请点起始小节 A"
+        } else {
+            loopSelectionMessage = nil
+        }
     }
 
     func setSceneActive(_ isActive: Bool) {
@@ -313,17 +334,10 @@ final class GpWebViewModel: ObservableObject {
             isPlaying = false
             updatePracticeClock(isPlaying: false)
         case let .barHit(bar):
-            selectedBar = bar
-        case let .pointerDown(bar):
-            handle(loopSelection.pointerDown(on: bar))
-        case .longPress:
-            handle(loopSelection.longPressActivated())
-        case let .pointerMove(bar):
-            handle(loopSelection.pointerMoved(to: bar))
-        case .pointerUp:
-            handle(loopSelection.pointerUp())
-        case .pointerCancel:
-            handle(loopSelection.cancel())
+            handle(loopSelection.tap(on: bar))
+            loopPickStep = loopSelection.step
+        case .pointerDown, .longPress, .pointerMove, .pointerUp, .pointerCancel:
+            break
         case let .error(message):
             errorMessage = message
         }
@@ -366,13 +380,16 @@ final class GpWebViewModel: ObservableObject {
         case let .seek(bar):
             selectedBar = bar
             seek(to: bar.startTick)
-        case .pauseForSelection:
+        case let .selectStart(range):
             pause()
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        case let .preview(range):
+            loopRange = nil
             loopPreview = range
+            rangeLoopingEnabled = false
+            wholeSongLoopingEnabled = false
+            completedLoops = 0
+            loopSelectionMessage = "A 为第 \(range.firstBar + 1) 小节，请点终止小节 B"
             call("previewRange", arguments: [range.firstBar, range.lastBar])
-            UISelectionFeedbackGenerator().selectionChanged()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case let .commit(range):
             loopPreview = nil
             loopRange = range
@@ -383,10 +400,15 @@ final class GpWebViewModel: ObservableObject {
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
             )
+            loopSelectionMessage = "已循环第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             saveProfile()
+        case .rejectEndBeforeStart:
+            loopSelectionMessage = "终止小节 B 不能早于起始小节 A，请重新点选 B"
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .cancelSelection:
             loopPreview = nil
+            loopSelectionMessage = nil
             call("cancelRangePreview")
         }
     }

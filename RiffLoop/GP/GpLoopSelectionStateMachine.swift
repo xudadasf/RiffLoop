@@ -7,76 +7,65 @@ struct GpLoopBarRange: Codable, Equatable, Sendable {
     let endTick: Double
 }
 
+enum GpLoopPickStep: Equatable, Sendable {
+    case inactive
+    case start
+    case end(startBar: Int)
+}
+
 enum GpLoopSelectionAction: Equatable, Sendable {
     case none
     case seek(GpBarHit)
-    case pauseForSelection
-    case preview(GpLoopBarRange)
+    case selectStart(GpLoopBarRange)
     case commit(GpLoopBarRange)
+    case rejectEndBeforeStart
     case cancelSelection
 }
 
 struct GpLoopSelectionStateMachine: Sendable {
     private enum State: Sendable {
-        case idle
-        case pressing(GpBarHit)
-        case selecting(anchor: GpBarHit, current: GpBarHit)
+        case inactive
+        case awaitingStart
+        case awaitingEnd(GpBarHit)
     }
 
-    private var state: State = .idle
+    private var state: State = .inactive
 
-    mutating func pointerDown(on bar: GpBarHit) -> GpLoopSelectionAction {
-        state = .pressing(bar)
-        return .none
-    }
-
-    mutating func longPressActivated() -> GpLoopSelectionAction {
-        guard case let .pressing(anchor) = state else { return .none }
-        state = .selecting(anchor: anchor, current: anchor)
-        return .pauseForSelection
-    }
-
-    mutating func pointerMoved(to bar: GpBarHit) -> GpLoopSelectionAction {
+    var step: GpLoopPickStep {
         switch state {
-        case .idle:
-            return .none
-        case .pressing:
-            state = .pressing(bar)
-            return .none
-        case let .selecting(anchor, _):
-            state = .selecting(anchor: anchor, current: bar)
-            guard let range = normalizedRange(anchor: anchor, current: bar) else { return .none }
-            return .preview(range)
+        case .inactive: .inactive
+        case .awaitingStart: .start
+        case let .awaitingEnd(start): .end(startBar: start.index)
         }
     }
 
-    mutating func pointerUp() -> GpLoopSelectionAction {
-        defer { state = .idle }
-        switch state {
-        case .idle:
+    mutating func setPickingEnabled(_ enabled: Bool) -> GpLoopSelectionAction {
+        if enabled {
+            state = .awaitingStart
             return .none
-        case let .pressing(bar):
+        }
+        let wasPicking = step != .inactive
+        state = .inactive
+        return wasPicking ? .cancelSelection : .none
+    }
+
+    mutating func tap(on bar: GpBarHit) -> GpLoopSelectionAction {
+        switch state {
+        case .inactive:
             return .seek(bar)
-        case let .selecting(anchor, current):
-            guard let range = normalizedRange(anchor: anchor, current: current) else {
-                return .cancelSelection
-            }
+        case .awaitingStart:
+            guard let range = range(from: bar, through: bar) else { return .none }
+            state = .awaitingEnd(bar)
+            return .selectStart(range)
+        case let .awaitingEnd(start):
+            guard bar.index >= start.index else { return .rejectEndBeforeStart }
+            guard let range = range(from: start, through: bar) else { return .none }
+            state = .inactive
             return .commit(range)
         }
     }
 
-    mutating func cancel() -> GpLoopSelectionAction {
-        guard case .selecting = state else {
-            state = .idle
-            return .none
-        }
-        state = .idle
-        return .cancelSelection
-    }
-
-    private func normalizedRange(anchor: GpBarHit, current: GpBarHit) -> GpLoopBarRange? {
-        let first = anchor.index <= current.index ? anchor : current
-        let last = anchor.index <= current.index ? current : anchor
+    private func range(from first: GpBarHit, through last: GpBarHit) -> GpLoopBarRange? {
         guard
             first.index >= 0,
             last.index >= first.index,

@@ -11,6 +11,7 @@ struct PracticeView: View {
     @State private var didOpenInitialURL = false
     @State private var groupingInput = "4"
     @State private var controlsVisible = true
+    @State private var metronomeSettingsVisible = false
 
     let initialURL: URL?
 
@@ -72,7 +73,7 @@ struct PracticeView: View {
 
     private var compactControls: some View {
         VStack(spacing: 10) {
-            Button("控制") { controlsVisible = true }
+            Button("设置调整") { controlsVisible = true }
                 .buttonStyle(.borderedProminent)
             Button(action: viewModel.togglePlayback) {
                 Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
@@ -109,7 +110,7 @@ struct PracticeView: View {
 
     private var sideHeader: some View {
         HStack {
-            Text("控制").font(.title3.bold())
+            Text("视频练习").font(.title3.bold())
             Spacer()
             Button("收起") { controlsVisible = false }
         }
@@ -191,61 +192,89 @@ struct PracticeView: View {
     private var compactMetronomeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("节拍器").font(.headline)
-            Toggle("播放节拍", isOn: $viewModel.metronomeEnabled)
-                .onChange(of: viewModel.metronomeEnabled) { _, _ in viewModel.applyTimingSettings() }
             HStack {
-                Text("BPM")
-                TextField("120", value: $viewModel.bpm, format: .number.precision(.fractionLength(0)))
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 72)
-                    .onSubmit { viewModel.applyTimingSettings() }
-                Stepper("", value: $viewModel.bpm, in: 30...300, step: 1).labelsHidden()
-                Button("Tap", action: viewModel.recordTap)
-                Button("设第 1 拍", action: viewModel.setBeatOne)
-            }
-            Picker("细分", selection: $viewModel.subdivision) {
-                ForEach(Subdivision.allCases) {
-                    Text($0.label(forBeatUnit: viewModel.beatUnit)).tag($0)
+                Toggle("开启节拍器", isOn: $viewModel.metronomeEnabled)
+                    .onChange(of: viewModel.metronomeEnabled) { _, _ in
+                        viewModel.applyTimingSettings()
+                    }
+                Button {
+                    withAnimation { metronomeSettingsVisible.toggle() }
+                } label: {
+                    Label(
+                        metronomeSettingsVisible ? "收起设置" : "设置调整",
+                        systemImage: "gearshape"
+                    )
                 }
+                .buttonStyle(.bordered)
             }
-            .onChange(of: viewModel.subdivision) { _, _ in viewModel.applyTimingSettings() }
-            HStack {
-                Stepper(
-                    "\(viewModel.beatsPerMeasure)/\(viewModel.beatUnit)",
-                    value: Binding(
-                        get: { viewModel.beatsPerMeasure },
-                        set: { viewModel.setMeter(beats: $0, unit: viewModel.beatUnit) }
-                    ),
-                    in: 1...16
-                )
-                Picker("拍值", selection: Binding(
-                    get: { viewModel.beatUnit },
-                    set: { viewModel.setMeter(beats: viewModel.beatsPerMeasure, unit: $0) }
-                )) {
-                    ForEach([2, 4, 8, 16], id: \.self) { Text("/\($0)").tag($0) }
+
+            if metronomeSettingsVisible {
+                HStack {
+                    Text("BPM")
+                    TextField("120", value: $viewModel.bpm, format: .number.precision(.fractionLength(0)))
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.center)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 72)
+                        .onSubmit { viewModel.applyTimingSettings() }
+                    Stepper("", value: $viewModel.bpm, in: 30...300, step: 1).labelsHidden()
+                    Button("Tap", action: viewModel.recordTap)
+                    Button("设第 1 拍", action: viewModel.setBeatOne)
                 }
-            }
-            TextField("拍子分组，例如 2+2+3", text: $groupingInput)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit {
-                    if !viewModel.setBeatGrouping(groupingInput) {
-                        groupingInput = viewModel.beatGrouping.map(String.init).joined(separator: "+")
+                Picker("细分", selection: $viewModel.subdivision) {
+                    ForEach(Subdivision.allCases) {
+                        Text($0.label(forBeatUnit: viewModel.beatUnit)).tag($0)
                     }
                 }
-            Picker("训练模式", selection: $viewModel.rhythmMode) {
-                ForEach(RhythmMode.allCases) { Text($0.label).tag($0) }
-            }
-            .onChange(of: viewModel.rhythmMode) { _, _ in viewModel.applyTimingSettings() }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 5) {
-                    ForEach(viewModel.beatAccents.indices, id: \.self) { index in
-                        Button("\(index + 1) \(viewModel.beatAccents[index].label)") {
-                            viewModel.cycleAccent(at: index)
+                .onChange(of: viewModel.subdivision) { _, _ in viewModel.applyTimingSettings() }
+                HStack {
+                    Stepper(
+                        "\(viewModel.beatsPerMeasure)/\(viewModel.beatUnit)",
+                        value: Binding(
+                            get: { viewModel.beatsPerMeasure },
+                            set: { viewModel.setMeter(beats: $0, unit: viewModel.beatUnit) }
+                        ),
+                        in: 1...16
+                    )
+                    Picker("拍值", selection: Binding(
+                        get: { viewModel.beatUnit },
+                        set: { viewModel.setMeter(beats: viewModel.beatsPerMeasure, unit: $0) }
+                    )) {
+                        ForEach([2, 4, 8, 16], id: \.self) { Text("/\($0)").tag($0) }
+                    }
+                }
+                TextField("拍子分组，例如 2+2+3", text: $groupingInput)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        if !viewModel.setBeatGrouping(groupingInput) {
+                            groupingInput = viewModel.beatGrouping.map(String.init).joined(separator: "+")
                         }
-                        .buttonStyle(.bordered)
-                        .tint(index == viewModel.currentBeatIndex ? .orange : .secondary)
+                    }
+                Picker("训练模式", selection: $viewModel.rhythmMode) {
+                    ForEach(RhythmMode.allCases) { Text($0.label).tag($0) }
+                }
+                .onChange(of: viewModel.rhythmMode) { _, _ in viewModel.applyTimingSettings() }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(viewModel.beatAccents.indices, id: \.self) { index in
+                            Button("\(index + 1) \(viewModel.beatAccents[index].label)") {
+                                viewModel.cycleAccent(at: index)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(index == viewModel.currentBeatIndex ? .orange : .secondary)
+                        }
+                    }
+                }
+                volumeSlider("节拍音量", value: Double(viewModel.metronomeVolume)) {
+                    viewModel.setMetronomeVolume(Float($0))
+                }
+                Text("节拍微调 \(Int((viewModel.synchronizationOffset * 1_000).rounded())) ms")
+                    .font(.caption)
+                HStack {
+                    ForEach([-10, -5, -1, 1, 5, 10], id: \.self) { milliseconds in
+                        Button(milliseconds > 0 ? "+\(milliseconds)" : "\(milliseconds)") {
+                            viewModel.adjustSynchronization(by: Double(milliseconds) / 1_000)
+                        }
                     }
                 }
             }
@@ -254,21 +283,9 @@ struct PracticeView: View {
 
     private var compactSoundSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("声音与同步").font(.headline)
+            Text("视频声音与练习记录").font(.headline)
             volumeSlider("视频音量", value: Double(viewModel.mediaVolume)) {
                 viewModel.setMediaVolume(Float($0))
-            }
-            volumeSlider("节拍音量", value: Double(viewModel.metronomeVolume)) {
-                viewModel.setMetronomeVolume(Float($0))
-            }
-            Text("节拍微调 \(Int((viewModel.synchronizationOffset * 1_000).rounded())) ms")
-                .font(.caption)
-            HStack {
-                ForEach([-10, -5, -1, 1, 5, 10], id: \.self) { milliseconds in
-                    Button(milliseconds > 0 ? "+\(milliseconds)" : "\(milliseconds)") {
-                        viewModel.adjustSynchronization(by: Double(milliseconds) / 1_000)
-                    }
-                }
             }
             Text(
                 "本次循环 \(viewModel.completedLoops) 轮 · "

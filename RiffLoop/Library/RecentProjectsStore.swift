@@ -44,6 +44,10 @@ final class RecentProjectsStore: ObservableObject {
         save()
     }
 
+    func mostRecent(kind: PracticeKind) -> RecentProject? {
+        projects.first { $0.kind == kind }
+    }
+
     private func save() {
         guard let data = try? JSONEncoder().encode(projects) else { return }
         defaults.set(data, forKey: storageKey)

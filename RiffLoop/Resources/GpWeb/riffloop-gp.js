@@ -285,40 +285,6 @@
     };
 
     let pointer = null;
-    let longPressTimer = null;
-    let selectionFrame = null;
-    const stopLongPressTimer = () => {
-        if (longPressTimer !== null) clearTimeout(longPressTimer);
-        longPressTimer = null;
-    };
-    const stopAutoScroll = () => {
-        if (selectionFrame !== null) cancelAnimationFrame(selectionFrame);
-        selectionFrame = null;
-    };
-    const postPointerMove = () => {
-        if (!pointer?.selecting) return;
-        const hit = hitBar(pointer.clientX, pointer.clientY);
-        if (hit && hit.index !== pointer.lastBarIndex) {
-            pointer.lastBarIndex = hit.index;
-            post("pointerMove", hit);
-        }
-    };
-    const autoScroll = () => {
-        if (!pointer?.selecting) return;
-        const viewportRect = document.getElementById("viewport").getBoundingClientRect();
-        const edge = 64;
-        let delta = 0;
-        if (pointer.clientY < viewportRect.top + edge) {
-            delta = -Math.ceil((viewportRect.top + edge - pointer.clientY) / 5);
-        } else if (pointer.clientY > viewportRect.bottom - edge) {
-            delta = Math.ceil((pointer.clientY - viewportRect.bottom + edge) / 5);
-        }
-        if (delta !== 0) {
-            document.getElementById("viewport").scrollBy(0, Math.max(-18, Math.min(18, delta)));
-            postPointerMove();
-        }
-        selectionFrame = requestAnimationFrame(autoScroll);
-    };
 
     scoreElement.addEventListener("pointerdown", (event) => {
         if (!event.isPrimary) return;
@@ -334,52 +300,30 @@
             startX: event.clientX,
             startY: event.clientY,
             previousY: event.clientY,
-            dragging: false,
-            selecting: false,
-            lastBarIndex: hit.index
+            dragging: false
         };
-        post("pointerDown", hit);
-        longPressTimer = setTimeout(() => {
-            if (!pointer) return;
-            pointer.selecting = true;
-            post("longPress");
-            autoScroll();
-        }, 500);
     }, true);
 
     scoreElement.addEventListener("pointermove", (event) => {
         if (!pointer || pointer.id !== event.pointerId) return;
-        pointer.clientX = event.clientX;
-        pointer.clientY = event.clientY;
-        if (!pointer.selecting) {
-            const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
-            if (distance > 14) {
-                stopLongPressTimer();
-                pointer.dragging = true;
-            }
-            if (pointer.dragging) {
-                document.getElementById("viewport").scrollBy(0, pointer.previousY - event.clientY);
-            }
-            pointer.previousY = event.clientY;
-            const hit = hitBar(event.clientX, event.clientY);
-            if (hit && hit.index !== pointer.lastBarIndex) {
-                pointer.lastBarIndex = hit.index;
-                post("pointerMove", hit);
-            }
-            return;
+        const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
+        if (distance > 14) {
+            pointer.dragging = true;
         }
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        postPointerMove();
+        if (pointer.dragging) {
+            document.getElementById("viewport").scrollBy(0, pointer.previousY - event.clientY);
+        }
+        pointer.previousY = event.clientY;
     }, true);
 
     const finishPointer = (event, cancelled) => {
         if (!pointer || pointer.id !== event.pointerId) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        stopLongPressTimer();
-        stopAutoScroll();
-        post(cancelled ? "pointerCancel" : "pointerUp");
+        if (!cancelled && !pointer.dragging) {
+            const hit = hitBar(event.clientX, event.clientY);
+            if (hit) post("barHit", hit);
+        }
         pointer = null;
     };
     scoreElement.addEventListener("pointerup", (event) => finishPointer(event, false), true);

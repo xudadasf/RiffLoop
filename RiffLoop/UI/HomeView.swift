@@ -14,7 +14,7 @@ struct HomeView: View {
                         subtitle: "播放、节拍器与 A/B 循环",
                         systemImage: "play.rectangle.fill"
                     ) {
-                        PracticeView()
+                        PracticeView(initialURL: mostRecentURL(for: .video))
                     }
 
                     practiceCard(
@@ -22,7 +22,7 @@ struct HomeView: View {
                         subtitle: "离线 alphaTab 1.8.4",
                         systemImage: "music.note.list"
                     ) {
-                        GpPracticeView()
+                        GpPracticeView(initialURL: mostRecentURL(for: .guitarPro))
                     }
 
                     practiceCard(
@@ -30,7 +30,7 @@ struct HomeView: View {
                         subtitle: "伴奏、轨迹与自动跟谱",
                         systemImage: "doc.richtext.fill"
                     ) {
-                        PdfPracticeView()
+                        PdfPracticeView(initialURL: mostRecentURL(for: .pdf))
                     }
                 }
 
@@ -200,6 +200,14 @@ struct HomeView: View {
         case .guitarPro: "music.note.list"
         case .pdf: "doc.richtext"
         }
+    }
+
+    private func mostRecentURL(for kind: PracticeKind) -> URL? {
+        guard let project = recentProjects.mostRecent(kind: kind) else { return nil }
+        let url = RiffLoopDocumentStore()
+            .folderURL(for: kind)
+            .appendingPathComponent(project.fileName)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     private func practiceCard<Destination: View>(
