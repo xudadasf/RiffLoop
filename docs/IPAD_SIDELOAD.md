@@ -6,8 +6,8 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 
 1. 打开仓库的 **Actions → iPad Unsigned IPA → Run workflow**。
 2. 等待 `build-device-ipa` 通过。
-3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.24.2-unsigned-arm64`。
-4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.24.2-unsigned-arm64.ipa`。
+3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.24.3-unsigned-arm64`。
+4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.24.3-unsigned-arm64.ipa`。
 
 该 IPA 内含 `Payload/RiffLoop.app`，是 `iphoneos/arm64` 真机构建，但没有 Apple 签名。GitHub 不保存 Apple 账号、密码、证书或签名凭据；签名只在 Windows 的 Sideloadly 中完成。
 
@@ -54,7 +54,7 @@ Sideloadly 是第三方工具，“自动续签”属于尽量免手动的本机
 
 ## iPad mini 6 真机验收
 
-云端 `iOS CI` 会在 iPad mini 尺寸模拟器上运行单元测试并保存首页截图，但模拟器不能证明 Web Audio、worker、触觉和真机音频同步。首次侧载后请在 iPad mini 6 / iPadOS 18.7.3 上检查：
+云端 `iOS CI` 会在 iPad mini 尺寸模拟器上运行单元测试并保存首页截图，但模拟器不能证明 Web Audio、worker、触觉和真机音频同步。首次侧载后请在 iPad mini 6 / iPadOS 27 Developer Beta 上检查：
 
 - Files 中出现 `在我的 iPad/RiffLoop/{PDF、视频、GP}`，退出重开仍能恢复最近项目与位置。
 - 视频、PDF 伴奏和 GP 连续播放，进入后台再返回后可以明确地暂停并重新播放，没有残留声。

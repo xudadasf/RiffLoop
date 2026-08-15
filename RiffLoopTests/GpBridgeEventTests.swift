@@ -85,4 +85,14 @@ final class GpBridgeEventTests: XCTestCase {
             )
         )
     }
+
+    @MainActor
+    func testLeavingForegroundImmediatelyClearsPlayingState() {
+        let viewModel = GpWebViewModel()
+        viewModel.receive(.playerStateChanged(GpPlaybackState(state: 1, stopped: false)))
+
+        viewModel.setSceneActive(false)
+
+        XCTAssertFalse(viewModel.isPlaying)
+    }
 }

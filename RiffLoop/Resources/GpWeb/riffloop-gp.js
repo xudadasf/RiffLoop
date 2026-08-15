@@ -48,6 +48,7 @@
     });
     let synthEnabled = true;
     let backingEnabled = true;
+    let synthVolume = 0.75;
     let backingVolume = 0.75;
     let startingBoth = false;
     let soundFontBytes = null;
@@ -115,12 +116,8 @@
             ? !(api.isPlaying || synthApi.isPlaying)
             : !api.isPlaying;
         if (shouldPlay) {
-            if (canUseBacking()) {
-                if (backingEnabled || synthEnabled) api.play();
-                if (synthEnabled) synthApi.play();
-            } else if (synthEnabled) {
-                api.play();
-            }
+            api.play();
+            if (canUseBacking() && synthEnabled) synthApi.play();
         } else {
             api.pause();
             synthApi.pause();
@@ -370,8 +367,9 @@
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
             const value = Number(volume);
-            synthApi.masterVolume = value;
-            if (!canUseBacking()) api.masterVolume = value;
+            synthVolume = value;
+            synthApi.masterVolume = synthEnabled ? synthVolume : 0;
+            if (!canUseBacking()) api.masterVolume = synthEnabled ? synthVolume : 0;
         },
         setBackingVolume(volume) {
             backingVolume = Number(volume);
@@ -379,16 +377,22 @@
         },
         setSynthEnabled(enabled) {
             synthEnabled = Boolean(enabled);
-            if (!synthEnabled) {
-                if (canUseBacking()) synthApi.pause();
-                else api.pause();
+            synthApi.masterVolume = synthEnabled ? synthVolume : 0;
+            if (canUseBacking()) {
+                if (!synthEnabled) {
+                    synthApi.pause();
+                } else if (api.isPlaying && !synthApi.isPlaying) {
+                    synthApi.tickPosition = api.tickPosition;
+                    synthApi.play();
+                }
+            } else {
+                api.masterVolume = synthEnabled ? synthVolume : 0;
             }
         },
         setBackingEnabled(enabled) {
             backingEnabled = Boolean(enabled);
             if (canUseBacking()) {
                 api.masterVolume = backingEnabled ? backingVolume : 0;
-                if (!backingEnabled && !synthEnabled) api.pause();
             }
         },
         setMetronomeVolume(volume) {

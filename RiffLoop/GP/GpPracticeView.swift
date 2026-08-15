@@ -74,6 +74,7 @@ struct GpPracticeView: View {
             didOpenInitialURL = true
             importScore(from: initialURL)
         }
+        .onDisappear(perform: viewModel.pause)
     }
 
     private var controls: some View {

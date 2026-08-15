@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct PdfPracticeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = PdfPracticeViewModel()
     @State private var pdfLibraryPresented = false
@@ -87,6 +88,9 @@ struct PdfPracticeView: View {
             guard !didOpenInitialURL, let initialURL else { return }
             didOpenInitialURL = true
             openPdf(initialURL)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { viewModel.pause() }
         }
         .onDisappear(perform: viewModel.pause)
     }

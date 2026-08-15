@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 
 struct PracticeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = PracticeViewModel()
     @State private var isLibraryPresented = false
@@ -64,11 +65,15 @@ struct PracticeView: View {
                 scrubTime = newValue
             }
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { viewModel.pause() }
+        }
         .onAppear {
             guard !didOpenInitialURL, let initialURL else { return }
             didOpenInitialURL = true
             open(initialURL)
         }
+        .onDisappear(perform: viewModel.pause)
     }
 
     private var compactControls: some View {

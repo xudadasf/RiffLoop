@@ -298,6 +298,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setSceneActive(_ isActive: Bool) {
         if !isActive {
+            isPlaying = false
             updatePracticeClock(isPlaying: false)
             saveProfile()
         }
