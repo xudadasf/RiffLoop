@@ -54,7 +54,7 @@ jobs:
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/RiffLoop.app"
           EXECUTABLE="$APP/RiffLoop"
           PACKAGE="$RUNNER_TEMP/package"
-          IPA="$RUNNER_TEMP/RiffLoop-iPad-0.24.0-unsigned-arm64.ipa"
+          IPA="$RUNNER_TEMP/RiffLoop-iPad-0.24.1-unsigned-arm64.ipa"
 
           test -d "$APP"
           test -x "$EXECUTABLE"
@@ -72,7 +72,7 @@ jobs:
       - name: Upload unsigned arm64 IPA
         uses: actions/upload-artifact@v4
         with:
-          name: RiffLoop-iPad-0.24.0-unsigned-arm64
-          path: ${{ runner.temp }}/RiffLoop-iPad-0.24.0-unsigned-arm64.ipa
+          name: RiffLoop-iPad-0.24.1-unsigned-arm64
+          path: ${{ runner.temp }}/RiffLoop-iPad-0.24.1-unsigned-arm64.ipa
           if-no-files-found: error
           retention-days: 30
