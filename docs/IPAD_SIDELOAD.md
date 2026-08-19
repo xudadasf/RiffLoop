@@ -4,10 +4,19 @@ RiffLoop iPad 版固定使用 Bundle ID `com.riffloop.prototype`。后续构建�
 
 ## 从 GitHub Actions 下载 IPA
 
-1. 打开仓库的 **Actions → iPad Unsigned IPA → Run workflow**。
+1. 打开仓库的 **Actions → iPad Unsigned IPA → Run workflow**（该工作流仅手动触发）。
 2. 等待 `build-device-ipa` 通过。
 3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.24.3-unsigned-arm64`。
 4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.24.3-unsigned-arm64.ipa`。
+
+在 Windows 上也可用仓库脚本自动完成第 3、4 步（需要本机 git 凭据可用）：
+
+```powershell
+pwsh -File scripts/download-ipa.ps1            # 当前提交的成功构建
+pwsh -File scripts/download-ipa.ps1 -AllowOlderCommit  # 最近一次成功构建
+```
+
+脚本会把 IPA 和 `build-info.json`（含运行链接与 SHA256）解压到 `output/release-<版本>-build<构建号>/`。
 
 该 IPA 内含 `Payload/RiffLoop.app`，是 `iphoneos/arm64` 真机构建，但没有 Apple 签名。GitHub 不保存 Apple 账号、密码、证书或签名凭据；签名只在 Windows 的 Sideloadly 中完成。
 

@@ -18,7 +18,7 @@ Android 版使用 Kotlin、Jetpack Compose、Media3 和 alphaTab，最低支持 
 
 ## iPad mini 6 版本
 
-- 无 Mac 开发：Windows 上维护 Swift 代码，GitHub Actions `iOS CI` 在 iPad mini 尺寸模拟器上构建并跑单元测试，`iPad Unsigned IPA` 出未签名 arm64 IPA，再由 Windows 上的 Sideloadly 签名并覆盖安装到 iPad mini 6（Bundle ID 固定为 `com.riffloop.prototype`，详见 [`docs/IPAD_SIDELOAD.md`](docs/IPAD_SIDELOAD.md)）。
+- 无 Mac 开发：Windows 上维护 Swift 代码，GitHub Actions `iOS CI` 在 iPad mini 尺寸模拟器上构建并跑单元测试；`iPad Unsigned IPA`（手动触发，省 macOS 分钟）出未签名 arm64 IPA，再由 Windows 上的 Sideloadly 签名并覆盖安装到 iPad mini 6（Bundle ID 固定为 `com.riffloop.prototype`，详见 [`docs/IPAD_SIDELOAD.md`](docs/IPAD_SIDELOAD.md)，`scripts/download-ipa.ps1` 可自动下载产物）。
 - 已移植 Android 的视频、PDF、Guitar Pro 三种练习模式：独立节拍器、训练模式、逐拍重音、Tap Tempo、毫秒级节拍微调、A/B 循环、预备拍与循环阶梯、最近项目与设置恢复、练习记录。
 - Guitar Pro 模式使用离线 alphaTab 1.8.4：每行 2 小节、内嵌伴奏与谱面合成独立开关/音量、互斥静音/独奏、恢复上次播放位置。轻点谱面跳转播放位置；长按谱面并拖动选择 A/B 循环范围（支持正向、反向、跨行、回拖缩小和单小节选择，靠近上下边缘自动滚动），松手确认，取消手势不覆盖旧范围。
 - 首页显示侧载签名到期时间与剩余天数，并提供无线续签步骤说明。

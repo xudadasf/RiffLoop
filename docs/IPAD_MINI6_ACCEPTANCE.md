@@ -1,4 +1,4 @@
-# iPad mini 6 真机验收清单（0.24.3 / build 35）
+# iPad mini 6 真机验收清单（0.24.3 / build 36）
 
 本清单用于把 `RiffLoop-iPad-0.24.3-unsigned-arm64.ipa` 覆盖安装到 iPad mini 6 后逐项验收。
 每项结果记为「通过 / 失败 / 未测」，失败项附一句现象描述（画面、声音、复现步骤）。
@@ -11,8 +11,8 @@
 ## 1. Sideloadly 覆盖安装（不要先卸载旧版）
 
 1. 用 USB 连接 iPad 与 Windows，iPad 上点「信任」；iPad 屏幕保持点亮。
-2. 打开 Sideloadly，把解压好的 IPA 拖入：
-   `output\release-0.24.3-build35\RiffLoop-iPad-0.24.3-unsigned-arm64.ipa`
+2. 打开 Sideloadly，把解压好的 IPA 拖入（先用 `pwsh -File scripts/download-ipa.ps1` 从 GitHub 下载到
+   `output\release-0.24.3-build36\RiffLoop-iPad-0.24.3-unsigned-arm64.ipa`）。
 3. 选择这台 iPad 和之前使用的同一个 Apple 账号；**不要启用修改 Bundle ID**（保持 `com.riffloop.prototype`）。
 4. 启用 **Automatic Refresh**，点击 Start，按提示完成 Apple 登录/双重认证。
 5. 等待 Sideloadly 显示完成；在 iPad 上直接覆盖安装。
