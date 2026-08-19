@@ -40,7 +40,7 @@ if ($ciRun.status -eq "in_progress" -or $ciRun.status -eq "queued") {
 }
 
 # 2. Dispatch the unsigned IPA workflow for the branch.
-$dispatchStarted = Get-Date
+$dispatchStarted = (Get-Date).ToUniversalTime()
 Write-Host "dispatch iPad Unsigned IPA @ $branch"
 Invoke-RestMethod -Method Post `
     -Uri "https://api.github.com/repos/$ownerRepo/actions/workflows/ios-unsigned-ipa.yml/dispatches" `
@@ -73,7 +73,7 @@ $ipaRun = $null
 for ($i = 0; $i -lt 15 -and -not $ipaRun; $i++) {
     $runs = Invoke-RestMethod -Uri "https://api.github.com/repos/$ownerRepo/actions/runs?per_page=10" -Headers $headers
     $ipaRun = $runs.workflow_runs | Where-Object {
-        $_.name -eq "iPad Unsigned IPA" -and $_.created_at -ge $dispatchStarted
+        $_.name -eq "iPad Unsigned IPA" -and $_.created_at.ToUniversalTime() -ge $dispatchStarted
     } | Select-Object -First 1
     if (-not $ipaRun) { Start-Sleep -Seconds 5 }
 }
