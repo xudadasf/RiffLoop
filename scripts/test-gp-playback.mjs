@@ -216,6 +216,59 @@ const source = readFileSync(
             "a long press released without moving must commit a single-bar range"
         );
     }
+
+    {
+        const h = makeHarness((x, y) => bar(2));
+        h.pointerDown(100, 100);
+        h.pointerCancel(100, 100);
+        assert.equal(h.pendingTimers(), 0, "cancelling before the long press must clear its timer");
+        assert.deepEqual(h.posted, [], "a cancelled pending tap must not seek or select");
+    }
+
+    {
+        const h = makeHarness((x, y) => (y >= 600 ? null : bar(2)));
+        h.pointerDown(100, 100);
+        h.fireLongPress();
+        h.pointerMove(100, 900);
+        h.pointerUp(100, 900);
+        assert.deepEqual(
+            h.posted,
+            [["pointerDown", bar(2)], ["pointerMove", bar(2)], ["pointerUp"]],
+            "dragging outside the score must keep the last hit bar and still commit"
+        );
+    }
+
+    {
+        const h = makeHarness((x, y) => bar(x < 400 ? 2 : 8));
+        h.pointerDown(350, 100);
+        h.pointerMove(352, 101);
+        h.pointerUp(420, 100);
+        assert.deepEqual(
+            h.posted,
+            [["barHit", bar(8)]],
+            "a tap that slides under the slop must seek the bar at the release position"
+        );
+    }
+
+    {
+        const h = makeHarness((x, y) => bar(y < 200 ? 2 : 5));
+        h.pointerDown(100, 100);
+        h.fireLongPress();
+        h.pointerMove(100, 300);
+        h.pointerMove(100, 150);
+        h.pointerUp(100, 150);
+        assert.deepEqual(
+            h.posted,
+            [
+                ["pointerDown", bar(2)],
+                ["pointerMove", bar(5)],
+                ["pointerMove", bar(2)],
+                ["pointerMove", bar(2)],
+                ["pointerUp"],
+            ],
+            "dragging back over the start bar must shrink the selection to a single bar"
+        );
+    }
 }
 
 console.log("GP playback transport policy passed");
