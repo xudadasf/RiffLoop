@@ -17,7 +17,7 @@ enum GpLoopSelectionAction: Equatable, Sendable {
 }
 
 struct GpLoopSelectionStateMachine: Sendable {
-    private enum State: Sendable {
+    private enum State: Equatable, Sendable {
         case inactive
         case dragging(start: GpBarHit, current: GpBarHit)
     }
