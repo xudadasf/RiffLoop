@@ -2,45 +2,98 @@ import XCTest
 @testable import RiffLoop
 
 final class GpLoopSelectionStateMachineTests: XCTestCase {
-    func testTapOutsidePickingModeSeeks() {
+    func testTapSeeks() {
         var machine = GpLoopSelectionStateMachine()
         let bar = makeBar(3)
 
         XCTAssertEqual(machine.tap(on: bar), .seek(bar))
     }
 
-    func testPickingModeSelectsStartThenCommitsEnd() {
+    func testTapIsIgnoredWhileDragging() {
         var machine = GpLoopSelectionStateMachine()
-        XCTAssertEqual(machine.setPickingEnabled(true), .none)
-        XCTAssertEqual(machine.step, .start)
-
         XCTAssertEqual(
-            machine.tap(on: makeBar(2)),
+            machine.dragStart(on: makeBar(2)),
             .selectStart(GpLoopBarRange(firstBar: 2, lastBar: 2, startTick: 1_920, endTick: 2_880))
         )
-        XCTAssertEqual(machine.step, .end(startBar: 2))
+
+        XCTAssertEqual(machine.tap(on: makeBar(5)), .none)
+    }
+
+    func testDragStartPreviewsASingleBar() {
+        var machine = GpLoopSelectionStateMachine()
+
         XCTAssertEqual(
-            machine.tap(on: makeBar(5)),
+            machine.dragStart(on: makeBar(2)),
+            .selectStart(GpLoopBarRange(firstBar: 2, lastBar: 2, startTick: 1_920, endTick: 2_880))
+        )
+        XCTAssertTrue(machine.isDragging)
+    }
+
+    func testDragForwardUpdatesPreview() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBar(2))
+
+        XCTAssertEqual(
+            machine.dragUpdate(to: makeBar(5)),
+            .updatePreview(
+                GpLoopBarRange(firstBar: 2, lastBar: 5, startTick: 1_920, endTick: 5_760)
+            )
+        )
+    }
+
+    func testDragBackwardNormalizesThePreview() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBar(5))
+
+        XCTAssertEqual(
+            machine.dragUpdate(to: makeBar(2)),
+            .updatePreview(
+                GpLoopBarRange(firstBar: 2, lastBar: 5, startTick: 1_920, endTick: 5_760)
+            )
+        )
+    }
+
+    func testDragCanShrinkBackTowardTheStart() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBar(2))
+        machine.dragUpdate(to: makeBar(7))
+
+        XCTAssertEqual(
+            machine.dragUpdate(to: makeBar(3)),
+            .updatePreview(
+                GpLoopBarRange(firstBar: 2, lastBar: 3, startTick: 1_920, endTick: 3_840)
+            )
+        )
+    }
+
+    func testDragEndCommitsTheLastPreviewedRange() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBar(2))
+        machine.dragUpdate(to: makeBar(5))
+
+        XCTAssertEqual(
+            machine.dragEnd(),
             .commit(GpLoopBarRange(firstBar: 2, lastBar: 5, startTick: 1_920, endTick: 5_760))
         )
-        XCTAssertEqual(machine.step, .inactive)
+        XCTAssertFalse(machine.isDragging)
     }
 
-    func testEndBeforeStartIsRejectedAndWaitsForAnotherEnd() {
+    func testDragEndAfterBackwardDragCommitsTheNormalizedRange() {
         var machine = GpLoopSelectionStateMachine()
-        machine.setPickingEnabled(true)
-        machine.tap(on: makeBar(5))
+        machine.dragStart(on: makeBar(5))
+        machine.dragUpdate(to: makeBar(2))
 
-        XCTAssertEqual(machine.tap(on: makeBar(2)), .rejectEndBeforeStart)
-        XCTAssertEqual(machine.step, .end(startBar: 5))
+        XCTAssertEqual(
+            machine.dragEnd(),
+            .commit(GpLoopBarRange(firstBar: 2, lastBar: 5, startTick: 1_920, endTick: 5_760))
+        )
     }
 
-    func testSameBarCanBeStartAndEnd() {
+    func testSameBarDragCommitsASingleBarRange() {
         var machine = GpLoopSelectionStateMachine()
-        machine.setPickingEnabled(true)
-        machine.tap(on: makeBar(7))
+        machine.dragStart(on: makeBar(7))
 
-        guard case let .commit(range) = machine.tap(on: makeBar(7)) else {
+        guard case let .commit(range) = machine.dragEnd() else {
             return XCTFail("Expected a committed single-bar range")
         }
         XCTAssertEqual(range.firstBar, 7)
@@ -48,13 +101,27 @@ final class GpLoopSelectionStateMachineTests: XCTestCase {
         XCTAssertGreaterThan(range.endTick, range.startTick)
     }
 
-    func testDisablingPickingCancelsStartPreview() {
+    func testDragCancelKeepsTheOldRangeAndClearsState() {
         var machine = GpLoopSelectionStateMachine()
-        machine.setPickingEnabled(true)
-        machine.tap(on: makeBar(2))
+        machine.dragStart(on: makeBar(2))
+        machine.dragUpdate(to: makeBar(5))
 
-        XCTAssertEqual(machine.setPickingEnabled(false), .cancelSelection)
-        XCTAssertEqual(machine.step, .inactive)
+        XCTAssertEqual(machine.dragCancel(), .cancelSelection)
+        XCTAssertFalse(machine.isDragging)
+        XCTAssertEqual(machine.tap(on: makeBar(3)), .seek(makeBar(3)))
+    }
+
+    func testDragCancelBeforeStartIsANoOp() {
+        var machine = GpLoopSelectionStateMachine()
+
+        XCTAssertEqual(machine.dragCancel(), .none)
+    }
+
+    func testSecondDragStartIsIgnoredWhileDragging() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBar(2))
+
+        XCTAssertEqual(machine.dragStart(on: makeBar(9)), .none)
     }
 
     private func makeBar(_ index: Int) -> GpBarHit {

@@ -85,7 +85,6 @@ enum GpBridgeEvent: Equatable, Sendable {
     case playerFinished
     case barHit(GpBarHit)
     case pointerDown(GpBarHit)
-    case longPress
     case pointerMove(GpBarHit)
     case pointerUp
     case pointerCancel
@@ -119,8 +118,6 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .barHit(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
         case "pointerDown":
             return .pointerDown(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
-        case "longPress":
-            return .longPress
         case "pointerMove":
             return .pointerMove(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
         case "pointerUp":

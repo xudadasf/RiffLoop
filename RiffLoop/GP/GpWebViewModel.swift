@@ -19,7 +19,6 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var selectedBar: GpBarHit?
     @Published private(set) var loopRange: GpLoopBarRange?
     @Published private(set) var loopPreview: GpLoopBarRange?
-    @Published private(set) var loopPickStep: GpLoopPickStep = .inactive
     @Published private(set) var loopSelectionMessage: String?
     @Published private(set) var playbackSpeed = 1.0
     @Published private(set) var displayedTrack = 0
@@ -95,8 +94,6 @@ final class GpWebViewModel: ObservableObject {
         selectedBar = nil
         loopRange = nil
         loopPreview = nil
-        _ = loopSelection.setPickingEnabled(false)
-        loopPickStep = .inactive
         loopSelectionMessage = nil
         errorMessage = nil
 
@@ -274,26 +271,13 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func clearLoop() {
-        _ = loopSelection.setPickingEnabled(false)
-        loopPickStep = .inactive
-        loopSelectionMessage = nil
         loopRange = nil
         loopPreview = nil
+        loopSelectionMessage = nil
         rangeLoopingEnabled = false
         completedLoops = 0
         call("clearPlaybackRange")
         saveProfile()
-    }
-
-    func setLoopPickingEnabled(_ enabled: Bool) {
-        handle(loopSelection.setPickingEnabled(enabled))
-        loopPickStep = loopSelection.step
-        if enabled {
-            pause()
-            loopSelectionMessage = "请点起始小节 A"
-        } else {
-            loopSelectionMessage = nil
-        }
     }
 
     func setSceneActive(_ isActive: Bool) {
@@ -357,9 +341,14 @@ final class GpWebViewModel: ObservableObject {
             updatePracticeClock(isPlaying: false)
         case let .barHit(bar):
             handle(loopSelection.tap(on: bar))
-            loopPickStep = loopSelection.step
-        case .pointerDown, .longPress, .pointerMove, .pointerUp, .pointerCancel:
-            break
+        case let .pointerDown(bar):
+            handle(loopSelection.dragStart(on: bar))
+        case let .pointerMove(bar):
+            handle(loopSelection.dragUpdate(to: bar))
+        case .pointerUp:
+            handle(loopSelection.dragEnd())
+        case .pointerCancel:
+            handle(loopSelection.dragCancel())
         case let .error(message):
             errorMessage = message
         }
@@ -409,9 +398,12 @@ final class GpWebViewModel: ObservableObject {
             rangeLoopingEnabled = false
             wholeSongLoopingEnabled = false
             completedLoops = 0
-            loopSelectionMessage = "A 为第 \(range.firstBar + 1) 小节，请点终止小节 B"
+            loopSelectionMessage = "已选第 \(range.firstBar + 1) 小节 · 拖动选择终止小节，松手确认"
             call("previewRange", arguments: [range.firstBar, range.lastBar])
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        case let .updatePreview(range):
+            loopPreview = range
+            call("previewRange", arguments: [range.firstBar, range.lastBar])
         case let .commit(range):
             loopPreview = nil
             loopRange = range
@@ -425,9 +417,6 @@ final class GpWebViewModel: ObservableObject {
             loopSelectionMessage = "已循环第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             saveProfile()
-        case .rejectEndBeforeStart:
-            loopSelectionMessage = "终止小节 B 不能早于起始小节 A，请重新点选 B"
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .cancelSelection:
             loopPreview = nil
             loopSelectionMessage = nil

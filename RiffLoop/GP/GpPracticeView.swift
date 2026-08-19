@@ -250,26 +250,12 @@ struct GpPracticeView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("A/B 区间循环")
                 .font(.headline)
-            Text("与安卓一致：先开启点谱选择，再点一次 A 小节、点一次 B 小节。")
+            Text("长按谱面并拖动选择循环范围，松手确认；靠近上下边缘可继续滚动选择。轻点谱面跳转播放位置。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            HStack {
-                Button {
-                    viewModel.setLoopPickingEnabled(viewModel.loopPickStep == .inactive)
-                } label: {
-                    Label(
-                        viewModel.loopPickStep == .inactive ? "点谱选择 A/B" : "取消点选",
-                        systemImage: viewModel.loopPickStep == .inactive ? "hand.tap" : "xmark"
-                    )
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(viewModel.loopPickStep == .inactive ? .orange : .secondary)
-                .disabled(viewModel.score == nil)
-
-                if viewModel.loopRange != nil || viewModel.loopPreview != nil {
-                    Button("清除", action: viewModel.clearLoop)
-                        .buttonStyle(.bordered)
-                }
+            if viewModel.loopRange != nil {
+                Button("清除", action: viewModel.clearLoop)
+                    .buttonStyle(.bordered)
             }
             if let message = viewModel.loopSelectionMessage {
                 Text(message)
@@ -277,7 +263,7 @@ struct GpPracticeView: View {
                     .foregroundStyle(.orange)
             }
             if let range = viewModel.loopPreview {
-                Text("A：第 \(range.firstBar + 1) 小节 · B：等待点选")
+                Text("选择中：第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节 · 松手确认")
                     .font(.caption)
             } else if let range = viewModel.loopRange {
                 Text("A：第 \(range.firstBar + 1) 小节 · B：第 \(range.lastBar + 1) 小节末")
@@ -420,11 +406,11 @@ struct GpPracticeView: View {
                     .foregroundStyle(.orange)
             }
             if let range = viewModel.loopPreview ?? viewModel.loopRange {
-                Text("第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节\(viewModel.loopPreview == nil ? "已循环" : "已选择 A")")
+                Text("第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节\(viewModel.loopPreview == nil ? "已循环" : "选择中")")
                     .font(.caption.bold())
                     .foregroundStyle(.orange)
             } else {
-                Text("普通点按用于跳转；点“点谱选择 A/B”后依次选择起止小节")
+                Text("轻点谱面跳转播放位置；长按并拖动选择 A/B 循环范围")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

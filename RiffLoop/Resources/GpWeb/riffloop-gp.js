@@ -2,6 +2,7 @@
     "use strict";
 
     const scoreElement = document.getElementById("score");
+    const LONG_PRESS_MILLISECONDS = 400;
     const post = (event, payload) => {
         const handler = window.webkit?.messageHandlers?.riffloop;
         if (handler) {
@@ -281,50 +282,126 @@
         return nearest;
     };
 
-    let pointer = null;
+    const createPointerSelection = (deps) => {
+        const DRAG_SLOP_PIXELS = 10;
+        const EDGE_SCROLL_ZONE_PIXELS = 64;
+        const EDGE_SCROLL_STEP_PIXELS = 12;
 
-    scoreElement.addEventListener("pointerdown", (event) => {
-        if (!event.isPrimary) return;
-        const hit = hitBar(event.clientX, event.clientY);
-        if (!hit) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        scoreElement.setPointerCapture(event.pointerId);
-        pointer = {
-            id: event.pointerId,
-            clientX: event.clientX,
-            clientY: event.clientY,
-            startX: event.clientX,
-            startY: event.clientY,
-            previousY: event.clientY,
-            dragging: false
+        const { element, viewport, hitBar, post, scheduleLongPress, cancelLongPress } = deps;
+        let pointer = null;
+        let longPressTimer = null;
+
+        const clearLongPress = () => {
+            if (longPressTimer !== null) {
+                cancelLongPress(longPressTimer);
+                longPressTimer = null;
+            }
         };
-    }, true);
+        const startSelection = () => {
+            if (!pointer || pointer.mode !== "pending") return;
+            longPressTimer = null;
+            pointer.mode = "select";
+            post("pointerDown", pointer.hit);
+        };
+        const scrollToward = (clientY) => {
+            const rect = viewport.getBoundingClientRect();
+            const topDistance = clientY - rect.top;
+            const bottomDistance = rect.bottom - clientY;
+            if (topDistance < EDGE_SCROLL_ZONE_PIXELS) {
+                const strength = 1 - topDistance / EDGE_SCROLL_ZONE_PIXELS;
+                viewport.scrollBy(0, -(EDGE_SCROLL_STEP_PIXELS * strength + 1));
+            } else if (bottomDistance < EDGE_SCROLL_ZONE_PIXELS) {
+                const strength = 1 - bottomDistance / EDGE_SCROLL_ZONE_PIXELS;
+                viewport.scrollBy(0, EDGE_SCROLL_STEP_PIXELS * strength + 1);
+            }
+        };
 
-    scoreElement.addEventListener("pointermove", (event) => {
-        if (!pointer || pointer.id !== event.pointerId) return;
-        const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
-        if (distance > 14) {
-            pointer.dragging = true;
-        }
-        if (pointer.dragging) {
-            document.getElementById("viewport").scrollBy(0, pointer.previousY - event.clientY);
-        }
-        pointer.previousY = event.clientY;
-    }, true);
-
-    const finishPointer = (event, cancelled) => {
-        if (!pointer || pointer.id !== event.pointerId) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        if (!cancelled && !pointer.dragging) {
-            const hit = hitBar(event.clientX, event.clientY);
-            if (hit) post("barHit", hit);
-        }
-        pointer = null;
+        return {
+            pointerDown(event) {
+                if (!event.isPrimary) return;
+                const hit = hitBar(event.clientX, event.clientY);
+                if (!hit) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                element.setPointerCapture(event.pointerId);
+                pointer = {
+                    id: event.pointerId,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    previousY: event.clientY,
+                    hit,
+                    mode: "pending"
+                };
+                longPressTimer = scheduleLongPress(startSelection);
+            },
+            pointerMove(event) {
+                if (!pointer || pointer.id !== event.pointerId) return;
+                if (pointer.mode === "pending") {
+                    const distance = Math.hypot(
+                        event.clientX - pointer.startX,
+                        event.clientY - pointer.startY
+                    );
+                    if (distance > DRAG_SLOP_PIXELS) {
+                        clearLongPress();
+                        pointer.mode = "scroll";
+                    }
+                }
+                if (pointer.mode === "scroll") {
+                    viewport.scrollBy(0, pointer.previousY - event.clientY);
+                    pointer.previousY = event.clientY;
+                    return;
+                }
+                if (pointer.mode === "select") {
+                    event.preventDefault();
+                    const hit = hitBar(event.clientX, event.clientY);
+                    if (hit && hit.index !== pointer.hit.index) {
+                        pointer.hit = hit;
+                        post("pointerMove", hit);
+                    }
+                    scrollToward(event.clientY);
+                }
+            },
+            pointerUp(event) {
+                if (!pointer || pointer.id !== event.pointerId) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                clearLongPress();
+                const mode = pointer.mode;
+                const lastHit = pointer.hit;
+                pointer = null;
+                if (mode === "select") {
+                    post("pointerMove", lastHit);
+                    post("pointerUp");
+                    return;
+                }
+                if (mode === "pending") {
+                    const hit = hitBar(event.clientX, event.clientY) || lastHit;
+                    if (hit) post("barHit", hit);
+                }
+            },
+            pointerCancel(event) {
+                if (!pointer || pointer.id !== event.pointerId) return;
+                clearLongPress();
+                const mode = pointer.mode;
+                pointer = null;
+                if (mode === "select") post("pointerCancel");
+            }
+        };
     };
-    scoreElement.addEventListener("pointerup", (event) => finishPointer(event, false), true);
-    scoreElement.addEventListener("pointercancel", (event) => finishPointer(event, true), true);
+
+    const pointerSelection = createPointerSelection({
+        element: scoreElement,
+        viewport: document.getElementById("viewport"),
+        hitBar,
+        post,
+        scheduleLongPress: (callback) => setTimeout(callback, LONG_PRESS_MILLISECONDS),
+        cancelLongPress: clearTimeout
+    });
+
+    scoreElement.addEventListener("pointerdown", (event) => pointerSelection.pointerDown(event), true);
+    scoreElement.addEventListener("pointermove", (event) => pointerSelection.pointerMove(event), true);
+    scoreElement.addEventListener("pointerup", (event) => pointerSelection.pointerUp(event), true);
+    scoreElement.addEventListener("pointercancel", (event) => pointerSelection.pointerCancel(event), true);
 
     const decodeBase64 = (base64) => {
         const binary = atob(base64);

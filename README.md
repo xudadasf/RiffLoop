@@ -1,47 +1,45 @@
-# RiffLoop Technical Prototype 0.1
+# RiffLoop Technical Prototype 0.23.0
 
-RiffLoop 是一个面向 iPad 横屏练习场景的乐器练习助手。本仓库当前只验证最关键的技术链路：
+RiffLoop 是一个横屏乐器练习助手。Android 版本持续开发并在真机验证；iOS/iPad mini 6 版本已恢复开发，通过 GitHub Actions 云编译 + Sideloadly 侧载真机验证。
 
-`本地 MP4 → AVPlayer → BPM / Subdivision → Beat Offset → AB Loop → 节拍器重新同步`
+## Android 版本
 
-## 当前实现
+应用启动后可选择三种练习方式：
 
-- 从 Files 导入 MP4，并复制到 App 沙盒后播放。
-- 播放、暂停、拖动、前后 5/10 秒、0.25×–1.5× 速度。
-- BPM 30–300，Quarter / Eighth / 16th / Triplet。
-- `Set Beat 1` 记录当前媒体时间作为节拍时间轴原点。
-- `Set A`、`Set B` 和 Loop 开关。
-- 每次播放、Seek、速度变化或 Loop 回跳后，把 `AVPlayer` 和 `AVAudioEngine` 重新绑定到同一 host time。
-- 纯时间数学单元测试，以及 GitHub macOS 云端构建工作流。
-- 手动触发的签名、Archive 和 TestFlight 上传工作流骨架。
+- 视频练习：导入本地 MP4/MOV，使用独立音量的低延迟节拍器、基础鼓机、节奏训练模式、变速、AB Loop 和全屏播放。
+- Guitar Pro 乐谱练习：导入 `.gp`、`.gpx`、`.gp3`、`.gp4` 或 `.gp5`，以每行 2 小节、约 2 行谱面的布局显示五线谱和电吉他六线谱；`.gp` 内嵌伴奏与谱面合成使用独立声音开关和音量，可单独或同步混合播放；显示轨道与声音控制明确分离，合成轨道支持互斥的静音/独奏。控制侧栏将播放、速度、循环和节拍器放在轨道混音之前，收起后仍保留高对比度播放按钮；六线谱会补出 alphaTab 省略的同小节延音目标品位。
+- PDF 谱面练习：导入 PDF，使用贴边高透明度深色浮层，显示约 4.5 秒后自动收起，只保留“控制”唤出按钮；支持翻页、缩放、位置记忆和可收起的节拍器。每份 PDF 可绑定并长期记住自己的本地伴奏，支持播放、暂停、停止、更换、移除、拍点对齐、变速、独立音量和 A/B 循环。可为每份 PDF 录制并长期保存“时间、页码、页面内位置”轨迹，之后按伴奏或独立节拍器时间自动滚动和翻页。
+- 视频、Guitar Pro 乐谱、PDF 和 PDF 伴奏统一放在手机的 `下载/RiffLoop`，并归入 `视频`、`GP`、`PDF` 三个浅层子文件夹。首次使用只需授权一次 `RiffLoop` 文件夹；之后“选择文件”直接在软件内浏览、刷新和关闭，不再进入系统文件选择器。可用文件管理器或电脑向对应目录添加文件。
+- 视频和谱面 A/B 循环均支持每轮 1 小节预备拍，以及可配置轮数、提速幅度和目标速度的循环阶梯练习。
+- 视频和 PDF 伴奏练习提供 −500～+500 ms 的双向节拍器微调；负值提前、正值延后，并提供 ±1/±5/±10 ms 快捷按钮。
+- Tap Tempo、通用拍号、拍子分组、逐拍重音、拍点吸附、毫秒级拍点微调、可视化节拍、项目恢复和练习记录已加入。
 
-当前明确不包含项目保存、Marker、Count-in、自动提速、GP、PDF 和 AI 功能。
+Android 版使用 Kotlin、Jetpack Compose、Media3 和 alphaTab，最低支持 Android 8.1。构建、安装和测试步骤见 [`android/README.md`](android/README.md)，第三方许可见 [`android/THIRD_PARTY_NOTICES.md`](android/THIRD_PARTY_NOTICES.md)。
 
-## 工程生成与构建
+## iPad mini 6 版本
 
-仓库使用 [XcodeGen](https://github.com/yonaskolb/XcodeGen) 从 `project.yml` 生成 Xcode 工程，避免在没有 Mac 的 Windows 环境手工维护易损坏的 `.pbxproj`。
+- 无 Mac 开发：Windows 上维护 Swift 代码，GitHub Actions `iOS CI` 在 iPad mini 尺寸模拟器上构建并跑单元测试，`iPad Unsigned IPA` 出未签名 arm64 IPA，再由 Windows 上的 Sideloadly 签名并覆盖安装到 iPad mini 6（Bundle ID 固定为 `com.riffloop.prototype`，详见 [`docs/IPAD_SIDELOAD.md`](docs/IPAD_SIDELOAD.md)）。
+- 已移植 Android 的视频、PDF、Guitar Pro 三种练习模式：独立节拍器、训练模式、逐拍重音、Tap Tempo、毫秒级节拍微调、A/B 循环、预备拍与循环阶梯、最近项目与设置恢复、练习记录。
+- Guitar Pro 模式使用离线 alphaTab 1.8.4：每行 2 小节、内嵌伴奏与谱面合成独立开关/音量、互斥静音/独奏、恢复上次播放位置。轻点谱面跳转播放位置；长按谱面并拖动选择 A/B 循环范围（支持正向、反向、跨行、回拖缩小和单小节选择，靠近上下边缘自动滚动），松手确认，取消手势不覆盖旧范围。
+- 首页显示侧载签名到期时间与剩余天数，并提供无线续签步骤说明。
+- iPad 真机验收清单见 [`docs/IPAD_MINI6_ACCEPTANCE.md`](docs/IPAD_MINI6_ACCEPTANCE.md)。
 
-在 macOS 上：
+## 当前状态
 
-```bash
-brew install xcodegen
-xcodegen generate
-xcodebuild test \
-  -project RiffLoop.xcodeproj \
-  -scheme RiffLoop \
-  -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,OS=18.5,name=iPad Pro 13-inch (M4)' \
-  CODE_SIGNING_ALLOWED=NO
-```
-
-没有 Mac 时，把仓库推送到 GitHub；`.github/workflows/ios-ci.yml` 会执行相同的工程生成、编译和单元测试。
+- Android 0.23.0 改为首次一次性授权 `下载/RiffLoop`；之后视频、GP、PDF 和伴奏均在软件内选择、刷新和关闭，彻底移除日常流程中的系统文件选择器。
+- Android 0.22.1 将专属目录选择改为应用内文件页，可一次关闭返回软件；外部导入选择器从手机根目录启动，取消时不再逐级退出四层目录。
+- Android 0.22.0 新增可直接在文件管理器中找到的 `下载/RiffLoop/{PDF、视频、GP}` 专属目录；新导入文件使用稳定副本，同名文件自动编号且不覆盖。
+- Android 0.21.1 修复 Skia 渲染结果未进入六线谱延音目标补绘链路的问题；《此生不换》第 10、33、34 小节的括号品位已在真机显示，同时提高 PDF 控件透明度。
+- Android 0.21.0 完成“练习优先”的界面收口：视频首屏固定播放、A/B、循环与节拍器开关；GP 先显示运输、速度、循环和节拍器；PDF 浮层提高对比度并自动隐藏，且统一使用“首页”。
+- Android 0.20.2 修复横屏手机上视频时间和 BPM 快捷按钮被挤压的问题；视频会按文件保存并在冷启动后恢复上次播放位置，首页练习记录明确标为视频统计。
+- Android 0.20 新增双向毫秒级节拍器微调；同时保留基于音频实际呈现时钟和真机声学测量的自动同步修正。
+- 视频连续播放 30 秒正常推进，媒体音轨未记录欠载；独立节拍器、连音细分和全屏界面正常。强、次强、普通点击现在使用明显不同的音高、响度与衰减，并只在拍子起点应用所选重音。
+- 用户的《此生不换》`.gp` 展开后的 290 个音符均可正确解析和渲染；逐小节核对确认 31 个延音目标、46 个滑音标记、7 个击勾弦目标、10 个推弦和 14 个装饰音均无丢失。同小节延音目标会按 Guitar Pro 的形式补充括号品位，已对照 Guitar Pro 8 验证第 10、33、34 小节。
+- Android 0.20 当前定位为“只读乐谱练习器”，暂不编辑或创作 Guitar Pro 乐谱；PDF 自动跟谱使用用户录制轨迹，不做 OCR 或自动识别小节。
+- iPad 0.24.3 (build 36) 完成 GP 长按拖动选循环范围，替换原来的“按钮点选 A/B”流程；等待 Sideloadly 覆盖安装并按 `docs/IPAD_MINI6_ACCEPTANCE.md` 真机验收。
 
 ## 下一步
 
-1. 先让 `iOS CI` 变绿。
-2. 配置 Apple Developer 和 TestFlight secrets，手动运行 `Upload TestFlight`。
-3. 在真实 iPad 上按 [测试清单](docs/PHASE0_TEST_PLAN.md)完成 50 次循环听感与录音验证。
-4. 只有 Phase 0 达标后，再进入完整 MVP。
-
-更详细的同步原理见 [架构说明](docs/ARCHITECTURE.md)，无 Mac 的发布步骤见 [云构建与 TestFlight](docs/CLOUD_BUILD_AND_TESTFLIGHT.md)。
-
+1. 请记录仍感觉异常的 Guitar Pro 小节号或时间点，以区分排版、技巧数据与 MIDI 合成音色问题；alphaTab 的 MIDI 音色不会等同 Guitar Pro RSE。
+2. 使用不含内置节拍声的视频，实测 Spark MINI 链路并记录合适的同步补偿值。
+3. 用一份完整的长 PDF 实际录制整首轨迹，确认长时间平滑滚动的主观速度和翻页时机。

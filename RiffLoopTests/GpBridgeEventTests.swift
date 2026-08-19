@@ -52,13 +52,32 @@ final class GpBridgeEventTests: XCTestCase {
         )
     }
 
-    func testDecodesPointerHitsForLongPressSelection() throws {
+    func testDecodesPointerHitsForLongPressDragSelection() throws {
+        let hit = GpBarHit(index: 8, startTick: 7_680, endTick: 8_640)
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: [
+                "event": "pointerDown",
+                "payload": ["index": 8, "startTick": 7_680, "endTick": 8_640],
+            ]),
+            .pointerDown(hit)
+        )
         XCTAssertEqual(
             try GpBridgeEvent.decode(messageBody: [
                 "event": "pointerMove",
                 "payload": ["index": 8, "startTick": 7_680, "endTick": 8_640],
             ]),
-            .pointerMove(GpBarHit(index: 8, startTick: 7_680, endTick: 8_640))
+            .pointerMove(hit)
+        )
+    }
+
+    func testDecodesPointerCompletionEventsWithoutPayload() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: ["event": "pointerUp"]),
+            .pointerUp
+        )
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: ["event": "pointerCancel"]),
+            .pointerCancel
         )
     }
 
