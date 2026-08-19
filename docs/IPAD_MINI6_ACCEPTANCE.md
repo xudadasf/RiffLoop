@@ -8,6 +8,11 @@
 1. 打开 iPad「设置 → 通用 → iPad 存储空间」，点 RiffLoop，记下右侧「版本」数字。
 2. 打开 RiffLoop 首页，记下显示的签名到期时间和剩余天数（若有）。
 
+> 电脑侧自动检测（可选）：iPad 插上 USB 后，在 Windows 上运行
+> `pwsh -File scripts/device-check.ps1`，会自动读取真机安装版本/签名、进程状态、
+> 截图、20 秒系统日志错误扫描和沙箱 Documents 结构，报告存到
+> `output/acceptance-auto/device-check-<时间>/`。触摸手势、声音听感仍需人工验证。
+
 ## 1. Sideloadly 覆盖安装（不要先卸载旧版）
 
 1. 用 USB 连接 iPad 与 Windows，iPad 上点「信任」；iPad 屏幕保持点亮。
