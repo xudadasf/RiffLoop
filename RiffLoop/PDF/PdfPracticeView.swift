@@ -46,6 +46,7 @@ struct PdfPracticeView: View {
             if controlsVisible {
                 overlayControls
                     .transition(.opacity)
+                    .zIndex(2)
             } else {
                 Button("控制", action: revealControls)
                     .buttonStyle(.borderedProminent)
@@ -122,6 +123,7 @@ struct PdfPracticeView: View {
                     Button("移除", action: viewModel.removeAudio)
                 }
             }
+            .padding(.bottom, 24)
         }
         .buttonStyle(.borderedProminent)
         .tint(.black.opacity(0.72))

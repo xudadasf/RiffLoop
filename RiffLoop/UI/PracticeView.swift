@@ -226,12 +226,20 @@ struct PracticeView: View {
                     Button("Tap", action: viewModel.recordTap)
                     Button("设第 1 拍", action: viewModel.setBeatOne)
                 }
-                Picker("细分", selection: $viewModel.subdivision) {
-                    ForEach(Subdivision.allCases) {
-                        Text($0.label(forBeatUnit: viewModel.beatUnit)).tag($0)
+                Text("节拍细分")
+                    .font(.subheadline.weight(.semibold))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Subdivision.allCases) { subdivision in
+                            Button(subdivision.label(forBeatUnit: viewModel.beatUnit)) {
+                                viewModel.subdivision = subdivision
+                                viewModel.applyTimingSettings()
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(viewModel.subdivision == subdivision ? .orange : .secondary)
+                        }
                     }
                 }
-                .onChange(of: viewModel.subdivision) { _, _ in viewModel.applyTimingSettings() }
                 HStack {
                     Stepper(
                         "\(viewModel.beatsPerMeasure)/\(viewModel.beatUnit)",
@@ -345,7 +353,9 @@ struct PracticeView: View {
         HStack(spacing: 12) {
             Text(formatTime(isScrubbing ? scrubTime : viewModel.currentTime))
                 .monospacedDigit()
-                .frame(width: 82, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 96, alignment: .leading)
 
             Slider(
                 value: $scrubTime,
@@ -361,9 +371,11 @@ struct PracticeView: View {
 
             Text(formatTime(viewModel.duration))
                 .monospacedDigit()
-                .frame(width: 82, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 96, alignment: .trailing)
         }
-        .font(.headline)
+        .font(.subheadline.weight(.semibold))
     }
 
     private var transportControls: some View {

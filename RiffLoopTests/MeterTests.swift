@@ -23,9 +23,10 @@ final class MeterTests: XCTestCase {
     }
 
     func testSubdivisionLabelsFollowBeatUnit() {
-        XCTAssertEqual(Subdivision.quarter.label(forBeatUnit: 4), "Quarter")
-        XCTAssertEqual(Subdivision.quarter.label(forBeatUnit: 8), "Eighth")
-        XCTAssertEqual(Subdivision.eighth.label(forBeatUnit: 8), "Sixteenth")
-        XCTAssertEqual(Subdivision.eighth.label(forBeatUnit: 16), "Thirty-second")
+        XCTAssertEqual(Subdivision.quarter.label(forBeatUnit: 4), "四分音符")
+        XCTAssertEqual(Subdivision.quarter.label(forBeatUnit: 8), "八分音符")
+        XCTAssertEqual(Subdivision.eighth.label(forBeatUnit: 8), "十六分音符")
+        XCTAssertEqual(Subdivision.eighth.label(forBeatUnit: 16), "三十二分音符")
+        XCTAssertEqual(Subdivision.triplet.label(forBeatUnit: 4), "三连音")
     }
 }

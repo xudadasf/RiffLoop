@@ -22,6 +22,21 @@ const source = readFileSync(
         /POSITION_POST_INTERVAL_MILLISECONDS = 50[\s\S]*?now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS/,
         "native position updates must be throttled so the WKWebView bridge cannot overwhelm the iPad UI"
     );
+    assert.match(
+        source,
+        /LONG_PRESS_MILLISECONDS = 600/,
+        "range selection must require a deliberate hold long enough to avoid accidental activation while scrolling"
+    );
+    assert.match(
+        source,
+        /commitRange\(firstBar, lastBar, startTick, endTick\)[\s\S]*?applyLoopMode\(\);[\s\S]*?seekBoth\(rangeStartTick\);/,
+        "committing a loop must align both players to the selected A point"
+    );
+    assert.match(
+        source,
+        /api\.playerFinished\.on\(\(\) => \{[\s\S]*?api\.isLooping[\s\S]*?return;[\s\S]*?post\("playerFinished"\)/,
+        "a range wrap must not be reported to native code as terminal playback completion"
+    );
 
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";
@@ -149,7 +164,16 @@ const source = readFileSync(
             getBoundingClientRect: () => ({ top: 0, bottom: 600, left: 0, right: 800 }),
             scrollBy(dx, dy) { this.scrolls.push(dy); },
         };
-        const element = { setPointerCapture() {} };
+        const interactionClasses = new Set();
+        const element = {
+            setPointerCapture() {},
+            getBoundingClientRect: () => ({ top: 0, left: 0 }),
+            style: { setProperty() {} },
+            classList: {
+                add(...names) { names.forEach((name) => interactionClasses.add(name)); },
+                remove(...names) { names.forEach((name) => interactionClasses.delete(name)); },
+            },
+        };
         const scheduleLongPress = (fn) => {
             timerFns.push(fn);
             return timerFns.length;
@@ -186,6 +210,7 @@ const source = readFileSync(
         return {
             posted,
             viewport,
+            interactionClasses,
             fireLongPress() {
                 const fns = timerFns.splice(0);
                 fns.forEach((fn) => fn());
@@ -220,9 +245,12 @@ const source = readFileSync(
     {
         const h = makeHarness((x, y) => bar(y < 200 ? 2 : 5));
         h.pointerDown(100, 100);
+        assert.equal(h.interactionClasses.has("range-press-pending"), true);
         h.fireLongPress();
+        assert.equal(h.interactionClasses.has("range-selecting"), true);
         h.pointerMove(100, 300);
         h.pointerUp(100, 300);
+        assert.equal(h.interactionClasses.size, 0);
         assert.deepEqual(
             h.posted,
             [
@@ -251,7 +279,7 @@ const source = readFileSync(
     {
         const h = makeHarness((x, y) => bar(2));
         h.pointerDown(100, 100);
-        h.pointerMove(220, 220);
+        h.pointerMove(109, 100);
         assert.equal(h.pendingTimers(), 0, "moving beyond the slop must cancel the long-press timer");
         h.pointerUp(220, 220);
         assert.deepEqual(h.posted, [], "a scroll drag must not post any selection or seek events");

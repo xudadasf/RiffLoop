@@ -125,6 +125,12 @@ struct DocumentLibraryView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        .task {
+            while !Task.isCancelled {
+                model.refresh()
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+        }
     }
 
     private var iconName: String {

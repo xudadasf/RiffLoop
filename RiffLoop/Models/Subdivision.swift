@@ -50,16 +50,26 @@ enum Subdivision: String, CaseIterable, Codable, Identifiable, Sendable {
         case .thirtySecond: simpleDivision = 8
         default: simpleDivision = nil
         }
-        guard let simpleDivision else { return rawValue }
+        guard let simpleDivision else {
+            switch self {
+            case .triplet: return "三连音"
+            case .quintuplet: return "五连音"
+            case .sextuplet: return "六连音"
+            case .septuplet: return "七连音"
+            case .nonuplet: return "九连音"
+            case .quarterNoteTriplet: return "四分音符三连音"
+            default: return rawValue
+            }
+        }
 
         switch beatUnit * simpleDivision {
-        case 2: return "Half"
-        case 4: return "Quarter"
-        case 8: return "Eighth"
-        case 16: return "Sixteenth"
-        case 32: return "Thirty-second"
-        case 64: return "Sixty-fourth"
-        case 128: return "Hundred twenty-eighth"
+        case 2: return "二分音符"
+        case 4: return "四分音符"
+        case 8: return "八分音符"
+        case 16: return "十六分音符"
+        case 32: return "三十二分音符"
+        case 64: return "六十四分音符"
+        case 128: return "一百二十八分音符"
         default: return rawValue
         }
     }

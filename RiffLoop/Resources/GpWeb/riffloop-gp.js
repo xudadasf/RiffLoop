@@ -2,7 +2,7 @@
     "use strict";
 
     const scoreElement = document.getElementById("score");
-    const LONG_PRESS_MILLISECONDS = 400;
+    const LONG_PRESS_MILLISECONDS = 600;
     const POSITION_POST_INTERVAL_MILLISECONDS = 50;
     const post = (event, payload) => {
         const handler = window.webkit?.messageHandlers?.riffloop;
@@ -138,6 +138,11 @@
         api.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
         synthApi.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
     };
+    const seekBoth = (tick) => {
+        const position = Number(tick);
+        api.tickPosition = position;
+        synthApi.tickPosition = position;
+    };
     const playPauseBoth = () => {
         if (startingBoth) return;
         startingBoth = true;
@@ -265,7 +270,10 @@
         state: state.state,
         stopped: state.stopped
     }));
-    api.playerFinished.on(() => post("playerFinished"));
+    api.playerFinished.on(() => {
+        if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;
+        post("playerFinished");
+    });
     const playbackRangeTrack = () => api.tracks?.[0] || api.score?.tracks?.[0];
     const playbackRangeBeats = (index) => playbackRangeTrack()
         ?.staves?.[0]
@@ -323,7 +331,7 @@
     };
 
     const createPointerSelection = (deps) => {
-        const DRAG_SLOP_PIXELS = 10;
+        const DRAG_SLOP_PIXELS = 8;
         const EDGE_SCROLL_ZONE_PIXELS = 64;
         const EDGE_SCROLL_STEP_PIXELS = 12;
 
@@ -341,7 +349,12 @@
             if (!pointer || pointer.mode !== "pending") return;
             longPressTimer = null;
             pointer.mode = "select";
+            element.classList.remove("range-press-pending");
+            element.classList.add("range-selecting");
             post("pointerDown", pointer.hit);
+        };
+        const clearInteractionFeedback = () => {
+            element.classList.remove("range-press-pending", "range-selecting");
         };
         const scrollToward = (clientY) => {
             const rect = viewport.getBoundingClientRect();
@@ -372,6 +385,10 @@
                     hit,
                     mode: "pending"
                 };
+                const rect = element.getBoundingClientRect();
+                element.style.setProperty("--range-press-x", `${event.clientX - rect.left}px`);
+                element.style.setProperty("--range-press-y", `${event.clientY - rect.top}px`);
+                element.classList.add("range-press-pending");
                 longPressTimer = scheduleLongPress(startSelection);
             },
             pointerMove(event) {
@@ -384,6 +401,7 @@
                     if (distance > DRAG_SLOP_PIXELS) {
                         clearLongPress();
                         pointer.mode = "scroll";
+                        clearInteractionFeedback();
                     }
                 }
                 if (pointer.mode === "scroll") {
@@ -409,6 +427,7 @@
                 const mode = pointer.mode;
                 const lastHit = pointer.hit;
                 pointer = null;
+                clearInteractionFeedback();
                 if (mode === "select") {
                     post("pointerMove", lastHit);
                     post("pointerUp");
@@ -424,6 +443,7 @@
                 clearLongPress();
                 const mode = pointer.mode;
                 pointer = null;
+                clearInteractionFeedback();
                 if (mode === "select") post("pointerCancel");
             }
         };
@@ -481,7 +501,7 @@
         playPause() { playPauseBoth(); },
         pause() { api.pause(); synthApi.pause(); },
         stop() { api.stop(); synthApi.stop(); },
-        seekTick(tick) { api.tickPosition = Number(tick); synthApi.tickPosition = Number(tick); },
+        seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
             const value = Number(volume);
@@ -581,13 +601,15 @@
             refreshPendingRangeHighlight();
         },
         commitRange(firstBar, lastBar, startTick, endTick) {
+            const rangeStartTick = Number(startTick);
             committedRange = {
-                startTick: Number(startTick),
+                startTick: rangeStartTick,
                 endTick: Number(endTick)
             };
             rangeLoopingEnabled = true;
             wholeSongLoopingEnabled = false;
             applyLoopMode();
+            seekBoth(rangeStartTick);
             window.riffloop.previewRange(firstBar, lastBar);
             window.riffloopCommittedBars = [Number(firstBar), Number(lastBar)];
         },
