@@ -53,7 +53,7 @@ if (-not $Wait) {
     return
 }
 
-function Wait-Run([int]$runId, [datetime]$deadline, [string]$label) {
+function Wait-Run([long]$runId, [datetime]$deadline, [string]$label) {
     while ((Get-Date) -lt $deadline) {
         $run = Invoke-RestMethod -Uri "https://api.github.com/repos/$ownerRepo/actions/runs/$runId" -Headers $headers
         if ($run.status -eq "completed") {
