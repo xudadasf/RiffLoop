@@ -94,7 +94,9 @@ function Find-DeviceName {
     if (-not $win) { return $null }
     $nameCond = New-Object System.Windows.Automation.PropertyCondition(
         [System.Windows.Automation.AutomationElement]::NameProperty, "iDevice:")
-    $combo = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCond)
+    $combo = $win.FindAll([System.Windows.Automation.TreeScope]::Descendants, $nameCond) |
+        Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ComboBox } |
+        Select-Object -First 1
     if (-not $combo) { return $null }
     try {
         $value = $combo.GetCurrentPattern(
@@ -131,7 +133,9 @@ Write-Host "设备：$deviceName"
 $win = Get-MainWindow
 $acctCond = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::NameProperty, "Apple ID:")
-$acct = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $acctCond)
+$acct = $win.FindAll([System.Windows.Automation.TreeScope]::Descendants, $acctCond) |
+    Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ComboBox } |
+    Select-Object -First 1
 $acctOk = $false
 if ($acct) {
     try {
