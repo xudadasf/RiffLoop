@@ -37,6 +37,39 @@ const source = readFileSync(
         /api\.playerFinished\.on\(\(\) => \{[\s\S]*?api\.isLooping[\s\S]*?return;[\s\S]*?post\("playerFinished"\)/,
         "a range wrap must not be reported to native code as terminal playback completion"
     );
+    assert.match(
+        source,
+        /api\.playerPositionChanged\.on\(\(position\) => \{[\s\S]*?if \(enforceCommittedRange\(position\)\) return;/,
+        "every player position update must enforce the committed range before bridge throttling"
+    );
+
+    const loopStartMarker = "    const enforceCommittedRange = (position) => {";
+    const loopEndMarker = "\n    const playPauseBoth";
+    const loopStart = source.indexOf(loopStartMarker);
+    const loopEnd = source.indexOf(loopEndMarker, loopStart);
+    assert.notEqual(loopStart, -1, "range enforcement implementation is missing");
+    assert.notEqual(loopEnd, -1, "range enforcement implementation boundary is missing");
+    const loopImplementation = source.slice(loopStart, loopEnd);
+    const makeRangeEnforcer = new Function(
+        "seekBoth",
+        "rangeLoopingEnabled",
+        "committedRange",
+        `${loopImplementation}\nreturn enforceCommittedRange;`
+    );
+    const seeks = [];
+    const enforceCommittedRange = makeRangeEnforcer(
+        (tick) => seeks.push(tick),
+        true,
+        { startTick: 30720, endTick: 34560 }
+    );
+    assert.equal(enforceCommittedRange({ currentTick: 34559, isSeek: false }), false);
+    assert.equal(enforceCommittedRange({ currentTick: 34560, isSeek: false }), true);
+    assert.deepEqual(seeks, [30720], "crossing B must seek both transports back to A");
+    assert.equal(
+        enforceCommittedRange({ currentTick: 40000, isSeek: true }),
+        false,
+        "the corrective seek notification must not recursively seek"
+    );
 
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";

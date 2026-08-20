@@ -143,6 +143,16 @@
         api.tickPosition = position;
         synthApi.tickPosition = position;
     };
+    const enforceCommittedRange = (position) => {
+        if (
+            !rangeLoopingEnabled
+            || !committedRange
+            || position.isSeek
+            || Number(position.currentTick) < committedRange.endTick
+        ) return false;
+        seekBoth(committedRange.startTick);
+        return true;
+    };
     const playPauseBoth = () => {
         if (startingBoth) return;
         startingBoth = true;
@@ -255,6 +265,9 @@
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
     api.playerPositionChanged.on((position) => {
+        // alphaTab's native range can be lost when its internal player is rebuilt.
+        // Keep the visible synth and embedded backing transport inside the committed range.
+        if (enforceCommittedRange(position)) return;
         const now = performance.now();
         if (!position.isSeek && now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS) return;
         lastPositionPostTime = now;

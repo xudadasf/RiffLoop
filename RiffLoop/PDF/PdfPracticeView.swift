@@ -53,6 +53,7 @@ struct PdfPracticeView: View {
                     .tint(.black.opacity(0.72))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(8)
+                    .zIndex(2)
             }
 
             if expandedControls {
