@@ -6,8 +6,8 @@ RiffLoop 未签名 IPA 的基础 Bundle ID 固定为 `com.riffloop.prototype`。
 
 1. 打开仓库的 **Actions → iPad Unsigned IPA → Run workflow**（该工作流仅手动触发）。
 2. 等待 `build-device-ipa` 通过。
-3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.24.4-unsigned-arm64`。
-4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.24.4-unsigned-arm64.ipa`。
+3. 在该次运行的 **Artifacts** 下载 `RiffLoop-iPad-0.24.5-unsigned-arm64`。
+4. 解压下载的 artifact，得到 `RiffLoop-iPad-0.24.5-unsigned-arm64.ipa`。
 
 在 Windows 上也可用仓库脚本自动完成第 3、4 步（需要本机 git 凭据可用）：
 

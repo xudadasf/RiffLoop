@@ -7,6 +7,22 @@ const source = readFileSync(
 );
 
 {
+    assert.match(
+        source,
+        /const api = new alphaTab\.AlphaTabApi[\s\S]*?playerMode: alphaTab\.PlayerMode\.EnabledSynthesizer/,
+        "the rendered score must use the synthesizer clock so a short backing clip cannot freeze its cursor"
+    );
+    assert.match(
+        source,
+        /const synthApi = new alphaTab\.AlphaTabApi[\s\S]*?playerMode: alphaTab\.PlayerMode\.EnabledAutomatic/,
+        "the hidden player must own embedded backing-track playback"
+    );
+    assert.match(
+        source,
+        /POSITION_POST_INTERVAL_MILLISECONDS = 50[\s\S]*?now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS/,
+        "native position updates must be throttled so the WKWebView bridge cannot overwhelm the iPad UI"
+    );
+
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";
     const start = source.indexOf(startMarker);
@@ -60,10 +76,9 @@ const source = readFileSync(
             "api",
             "synthApi",
             "canUseBacking",
-            "synthEnabled",
             `let startingBoth = false;\n${implementation}\nplayPauseBoth();`
         );
-        execute(api, synthApi, () => hasBacking, synthEnabled);
+        execute(api, synthApi, () => hasBacking);
         return { api, synthApi };
     }
 
@@ -81,7 +96,11 @@ const source = readFileSync(
     {
         const { api, synthApi } = runPlayback({ hasBacking: true, synthEnabled: false });
         assert.equal(api.playCalls, 1, "muting both sources must not disable the main transport");
-        assert.equal(synthApi.playCalls, 0, "muted synthesis must stay silent");
+        assert.equal(
+            synthApi.playCalls,
+            1,
+            "a muted backing player must keep its transport aligned for seamless re-enabling"
+        );
     }
 
     {

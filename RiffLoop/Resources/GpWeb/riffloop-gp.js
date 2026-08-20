@@ -3,6 +3,7 @@
 
     const scoreElement = document.getElementById("score");
     const LONG_PRESS_MILLISECONDS = 400;
+    const POSITION_POST_INTERVAL_MILLISECONDS = 50;
     const post = (event, payload) => {
         const handler = window.webkit?.messageHandlers?.riffloop;
         if (handler) {
@@ -26,7 +27,10 @@
             scale: 0.82
         },
         player: {
-            playerMode: alphaTab.PlayerMode.EnabledAutomatic,
+            // Keep the rendered score on the synthesizer clock. Some GP files contain a
+            // very short embedded backing clip; using that clip as the visible player's
+            // clock makes the cursor stop as soon as the clip ends.
+            playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
             soundFont: null,
             scrollElement: "#viewport",
             scrollMode: alphaTab.ScrollMode.Smooth,
@@ -44,7 +48,8 @@
         },
         display: { scale: 0.1 },
         player: {
-            playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
+            // This hidden player is only started when the score has a backing track.
+            playerMode: alphaTab.PlayerMode.EnabledAutomatic,
             soundFont: null,
             enableCursor: false,
             enableUserInteraction: false
@@ -66,6 +71,7 @@
     let scoreHasLoaded = false;
     let didNotifyPlayerReady = false;
     let pendingRangeHighlight = null;
+    let lastPositionPostTime = Number.NEGATIVE_INFINITY;
     const metronomeGain = (pulse) => {
         const factor = Math.max(1, metronomeSubdivisionFactor);
         if (pulse % factor !== 0) return 0.20;
@@ -79,7 +85,7 @@
     const applyMetronomePulse = (pulse) => {
         const volume = metronomeMasterVolume * metronomeGain(pulse);
         api.metronomeVolume = volume;
-        synthApi.metronomeVolume = volume;
+        synthApi.metronomeVolume = 0;
     };
     const configureMetronomeEvents = (playerApi) => {
         playerApi.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
@@ -103,7 +109,6 @@
         });
     };
     configureMetronomeEvents(api);
-    configureMetronomeEvents(synthApi);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
     const isPlaybackReady = (state) => state.hasLoaded
         && state.mainReady
@@ -140,11 +145,11 @@
             ? !(api.isPlaying || synthApi.isPlaying)
             : !api.isPlaying;
         if (shouldPlay) {
-            if (canUseBacking() && synthEnabled) {
+            if (canUseBacking()) {
                 synthApi.tickPosition = api.tickPosition;
             }
             api.play();
-            if (canUseBacking() && synthEnabled) synthApi.play();
+            if (canUseBacking()) synthApi.play();
         } else {
             api.pause();
             synthApi.pause();
@@ -175,11 +180,11 @@
 
     api.error.on((error) => post("error", { message: errorMessage(error) }));
     synthApi.error.on((error) => post("error", {
-        message: `合成音色加载失败：${errorMessage(error)}`
+        message: `内嵌伴奏加载失败：${errorMessage(error)}`
     }));
     api.scoreLoaded.on((score) => {
         scoreHasLoaded = true;
-        if (soundFontBytes && !score.backingTrack) {
+        if (soundFontBytes) {
             api.loadSoundFont(soundFontBytes.slice(), false);
         }
         post("scoreLoaded", {
@@ -244,13 +249,18 @@
     });
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
-    api.playerPositionChanged.on((position) => post("positionChanged", {
-        currentTime: position.currentTime,
-        totalTime: position.endTime,
-        currentTick: position.currentTick,
-        endTick: position.endTick,
-        isSeek: Boolean(position.isSeek)
-    }));
+    api.playerPositionChanged.on((position) => {
+        const now = performance.now();
+        if (!position.isSeek && now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS) return;
+        lastPositionPostTime = now;
+        post("positionChanged", {
+            currentTime: position.currentTime,
+            totalTime: position.endTime,
+            currentTick: position.currentTick,
+            endTick: position.endTick,
+            isSeek: Boolean(position.isSeek)
+        });
+    });
     api.playerStateChanged.on((state) => post("playerStateChanged", {
         state: state.state,
         stopped: state.stopped
@@ -446,8 +456,7 @@
         loadSoundFont(base64) {
             try {
                 soundFontBytes = decodeBase64(base64);
-                synthApi.loadSoundFont(soundFontBytes.slice(), false);
-                if (api.score && !canUseBacking()) {
+                if (api.score) {
                     api.loadSoundFont(soundFontBytes.slice(), false);
                 }
             } catch (error) {
@@ -477,31 +486,20 @@
         setMasterVolume(volume) {
             const value = Number(volume);
             synthVolume = value;
-            synthApi.masterVolume = synthEnabled ? synthVolume : 0;
-            if (!canUseBacking()) api.masterVolume = synthEnabled ? synthVolume : 0;
+            api.masterVolume = synthEnabled ? synthVolume : 0;
         },
         setBackingVolume(volume) {
             backingVolume = Number(volume);
-            if (canUseBacking()) api.masterVolume = backingEnabled ? backingVolume : 0;
+            if (canUseBacking()) synthApi.masterVolume = backingEnabled ? backingVolume : 0;
         },
         setSynthEnabled(enabled) {
             synthEnabled = Boolean(enabled);
-            synthApi.masterVolume = synthEnabled ? synthVolume : 0;
-            if (canUseBacking()) {
-                if (!synthEnabled) {
-                    synthApi.pause();
-                } else if (api.isPlaying && !synthApi.isPlaying) {
-                    synthApi.tickPosition = api.tickPosition;
-                    synthApi.play();
-                }
-            } else {
-                api.masterVolume = synthEnabled ? synthVolume : 0;
-            }
+            api.masterVolume = synthEnabled ? synthVolume : 0;
         },
         setBackingEnabled(enabled) {
             backingEnabled = Boolean(enabled);
             if (canUseBacking()) {
-                api.masterVolume = backingEnabled ? backingVolume : 0;
+                synthApi.masterVolume = backingEnabled ? backingVolume : 0;
             }
         },
         setMetronomeVolume(volume) {
@@ -533,8 +531,8 @@
         },
         setCountInVolume(volume) {
             const value = Number(volume);
-            synthApi.countInVolume = value;
-            if (!canUseBacking()) api.countInVolume = value;
+            api.countInVolume = value;
+            synthApi.countInVolume = 0;
         },
         showTracks(indices) {
             if (!api.score) return;
