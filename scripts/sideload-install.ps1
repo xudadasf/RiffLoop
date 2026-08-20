@@ -96,6 +96,11 @@ function Find-DeviceName {
         [System.Windows.Automation.AutomationElement]::NameProperty, "iDevice:")
     $combo = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $nameCond)
     if (-not $combo) { return $null }
+    try {
+        $value = $combo.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        if ($value -and $value -ne "<no devices detected>") { return $value }
+    } catch {}
     $items = $combo.FindAll([System.Windows.Automation.TreeScope]::Descendants,
         [System.Windows.Automation.Condition]::TrueCondition)
     foreach ($it in $items) {
@@ -129,6 +134,11 @@ $acctCond = New-Object System.Windows.Automation.PropertyCondition(
 $acct = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $acctCond)
 $acctOk = $false
 if ($acct) {
+    try {
+        $accountValue = $acct.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        $acctOk = $accountValue -and $accountValue -ne "[+] Add New Apple ID"
+    } catch {}
     foreach ($it in $acct.FindAll([System.Windows.Automation.TreeScope]::Descendants,
         [System.Windows.Automation.Condition]::TrueCondition)) {
         if ($it.Current.Name -and $it.Current.Name -ne "[+] Add New Apple ID") { $acctOk = $true }
@@ -137,20 +147,9 @@ if ($acct) {
 if (-not $acctOk) { throw "Sideloadly 没有记住的 Apple 账号，请先在 GUI 中登录一次" }
 Write-Host "Apple 账号已记住"
 
-# 5. Make sure "Use automatic bundle ID" is ON, matching the existing installation.
-$desc = $win.FindAll([System.Windows.Automation.TreeScope]::Descendants,
-    [System.Windows.Automation.Condition]::TrueCondition)
-foreach ($el in $desc) {
-    if ($el.Current.Name -eq "Use automatic bundle ID:") {
-        $tp = $el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-        if ($tp.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::Off) {
-            $tp.Toggle()
-            Write-Host "已开启 Use automatic bundle ID"
-        } else {
-            Write-Host "Use automatic bundle ID 已是开启状态"
-        }
-    }
-}
+# Sideloadly 0.60 automatically mangles the bundle ID on current iOS versions.
+# The daemon log is verified after Start because this setting is no longer exposed
+# as a named UI Automation control.
 
 if ($DryRun) {
     Write-Host "DryRun：已就绪，未点击 Start。"
@@ -171,6 +170,8 @@ $null = Wait-Until {
 } "安装完成"
 $log = Get-Content $stdoutLog -Raw
 if ($log -notmatch "Installing 100%: Complete") { throw "安装未确认完成，请查看日志：$stdoutLog" }
+if ($log -notmatch "will mangle bundleID") { throw "未确认自动 Bundle ID，请不要启动应用并检查 Sideloadly 设置" }
+if ($log -notmatch "App successfully prepared for auto-refresh") { throw "未确认 Automatic Refresh 已登记" }
 Write-Host "安装完成：Installing 100%: Complete"
 
 # 7. Verify the daemon registered the install for auto-refresh.
