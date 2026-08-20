@@ -359,7 +359,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func sendScore(_ data: Data) {
-        call("setMetronomeSubdivision", arguments: [metronomeSubdivisionFactor])
+        call("prepareMetronomeSubdivision", arguments: [metronomeSubdivisionFactor])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
         call("loadScore", arguments: [data.base64EncodedString()])
     }

@@ -8,6 +8,7 @@ on:
       - "RiffLoopTests/**"
       - "project.yml"
       - "scripts/test-gp-playback.mjs"
+      - "scripts/test-gp-display.mjs"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   pull_request:
@@ -16,6 +17,7 @@ on:
       - "RiffLoopTests/**"
       - "project.yml"
       - "scripts/test-gp-playback.mjs"
+      - "scripts/test-gp-display.mjs"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
@@ -43,7 +45,9 @@ jobs:
         run: xcodegen generate
 
       - name: Test embedded GP playback policy
-        run: node scripts/test-gp-playback.mjs
+        run: |
+          node scripts/test-gp-playback.mjs
+          node scripts/test-gp-display.mjs
 
       - name: Show tool versions
         run: |

@@ -29,7 +29,10 @@
             playerMode: alphaTab.PlayerMode.EnabledAutomatic,
             soundFont: null,
             scrollElement: "#viewport",
+            scrollMode: alphaTab.ScrollMode.Smooth,
             enableCursor: true,
+            enableAnimatedBeatCursor: true,
+            enableElementHighlighting: true,
             enableUserInteraction: true
         }
     });
@@ -60,6 +63,9 @@
     let metronomeSubdivisionFactor = 1;
     let metronomeMasterVolume = 0;
     let beatAccents = ["strong", "normal", "normal", "normal"];
+    let scoreHasLoaded = false;
+    let didNotifyPlayerReady = false;
+    let pendingRangeHighlight = null;
     const metronomeGain = (pulse) => {
         const factor = Math.max(1, metronomeSubdivisionFactor);
         if (pulse % factor !== 0) return 0.20;
@@ -99,6 +105,23 @@
     configureMetronomeEvents(api);
     configureMetronomeEvents(synthApi);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
+    const isPlaybackReady = (state) => state.hasLoaded
+        && state.mainReady
+        && (!state.hasBacking || state.synthReady);
+    const resetPlaybackReadiness = () => {
+        scoreHasLoaded = false;
+        didNotifyPlayerReady = false;
+    };
+    const notifyPlayerReady = () => {
+        if (didNotifyPlayerReady || !isPlaybackReady({
+            hasLoaded: scoreHasLoaded,
+            hasBacking: canUseBacking(),
+            mainReady: Boolean(api.isReadyForPlayback),
+            synthReady: Boolean(synthApi.isReadyForPlayback)
+        })) return;
+        didNotifyPlayerReady = true;
+        post("playerReady");
+    };
     const applyLoopMode = () => {
         const useRange = rangeLoopingEnabled && committedRange;
         const range = useRange ? {
@@ -117,6 +140,9 @@
             ? !(api.isPlaying || synthApi.isPlaying)
             : !api.isPlaying;
         if (shouldPlay) {
+            if (canUseBacking() && synthEnabled) {
+                synthApi.tickPosition = api.tickPosition;
+            }
             api.play();
             if (canUseBacking() && synthEnabled) synthApi.play();
         } else {
@@ -152,6 +178,7 @@
         message: `合成音色加载失败：${errorMessage(error)}`
     }));
     api.scoreLoaded.on((score) => {
+        scoreHasLoaded = true;
         if (soundFontBytes && !score.backingTrack) {
             api.loadSoundFont(soundFontBytes.slice(), false);
         }
@@ -164,6 +191,7 @@
             beatsPerMeasure: score.masterBars[0]?.timeSignatureNumerator || 4,
             beatUnit: score.masterBars[0]?.timeSignatureDenominator || 4
         });
+        notifyPlayerReady();
     });
     const drawTiedTabDestinations = () => {
         let layer = document.getElementById("tie-labels");
@@ -208,17 +236,14 @@
     };
     api.renderFinished.on((result) => {
         drawTiedTabDestinations();
+        refreshPendingRangeHighlight();
         post("renderFinished", {
             width: Number(result.totalWidth || scoreElement.scrollWidth || 0),
             height: Number(result.totalHeight || scoreElement.scrollHeight || 0)
         });
     });
-    api.playerReady.on(() => {
-        if (!canUseBacking()) post("playerReady");
-    });
-    synthApi.playerReady.on(() => {
-        if (canUseBacking()) post("playerReady");
-    });
+    api.playerReady.on(notifyPlayerReady);
+    synthApi.playerReady.on(notifyPlayerReady);
     api.playerPositionChanged.on((position) => post("positionChanged", {
         currentTime: position.currentTime,
         totalTime: position.endTime,
@@ -231,29 +256,34 @@
         stopped: state.stopped
     }));
     api.playerFinished.on(() => post("playerFinished"));
+    const playbackRangeTrack = () => api.tracks?.[0] || api.score?.tracks?.[0];
+    const playbackRangeBeats = (index) => playbackRangeTrack()
+        ?.staves?.[0]
+        ?.bars?.[index]
+        ?.voices?.[0]
+        ?.beats || [];
     const firstBeatInBar = (index) => {
-        for (const track of api.score?.tracks || []) {
-            for (const staff of track.staves || []) {
-                const bar = staff.bars?.[index];
-                for (const voice of bar?.voices || []) {
-                    if (voice.beats?.length) return voice.beats[0];
-                }
-            }
-        }
-        return null;
+        const beats = playbackRangeBeats(index);
+        return beats[0] || null;
     };
 
     const lastBeatInBar = (index) => {
-        let result = null;
-        for (const track of api.score?.tracks || []) {
-            for (const staff of track.staves || []) {
-                const bar = staff.bars?.[index];
-                for (const voice of bar?.voices || []) {
-                    if (voice.beats?.length) result = voice.beats[voice.beats.length - 1];
-                }
-            }
+        const beats = playbackRangeBeats(index);
+        return beats[beats.length - 1] || null;
+    };
+
+    const refreshPendingRangeHighlight = () => {
+        if (!pendingRangeHighlight) return;
+        const startBeat = firstBeatInBar(pendingRangeHighlight.firstBar);
+        const endBeat = lastBeatInBar(pendingRangeHighlight.lastBar);
+        if (!startBeat || !endBeat) return;
+        try {
+            api.highlightPlaybackRange(startBeat, endBeat);
+            pendingRangeHighlight = null;
+        } catch {
+            // Bounds can be unavailable during the frame that replaces a rendered track.
+            api.clearPlaybackRangeHighlight();
         }
-        return result;
     };
 
     const hitBar = (clientX, clientY) => {
@@ -426,7 +456,9 @@
         },
         loadScore(base64) {
             try {
+                resetPlaybackReadiness();
                 window.riffloopCommittedBars = null;
+                pendingRangeHighlight = null;
                 committedRange = null;
                 rangeLoopingEnabled = false;
                 wholeSongLoopingEnabled = false;
@@ -476,6 +508,10 @@
             metronomeMasterVolume = Number(volume);
             applyMetronomePulse(0);
         },
+        prepareMetronomeSubdivision(factor) {
+            const value = Number(factor);
+            if ([1, 2, 4, 8].includes(value)) metronomeSubdivisionFactor = value;
+        },
         setMetronomeSubdivision(factor) {
             const value = Number(factor);
             if (![1, 2, 4, 8].includes(value) || value === metronomeSubdivisionFactor) return;
@@ -484,6 +520,7 @@
             if (loadedScoreBytes) {
                 api.pause();
                 synthApi.pause();
+                resetPlaybackReadiness();
                 api.load(loadedScoreBytes.slice());
                 synthApi.load(loadedScoreBytes.slice());
             }
@@ -531,6 +568,7 @@
             };
         },
         clearPlaybackRange() {
+            pendingRangeHighlight = null;
             committedRange = null;
             rangeLoopingEnabled = false;
             window.riffloopCommittedBars = null;
@@ -538,9 +576,11 @@
             api.clearPlaybackRangeHighlight();
         },
         previewRange(firstBar, lastBar) {
-            const startBeat = firstBeatInBar(Number(firstBar));
-            const endBeat = lastBeatInBar(Number(lastBar));
-            if (startBeat && endBeat) api.highlightPlaybackRange(startBeat, endBeat);
+            pendingRangeHighlight = {
+                firstBar: Number(firstBar),
+                lastBar: Number(lastBar)
+            };
+            refreshPendingRangeHighlight();
         },
         commitRange(firstBar, lastBar, startTick, endTick) {
             committedRange = {

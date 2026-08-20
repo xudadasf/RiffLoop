@@ -3,8 +3,8 @@
 # This script automates exactly the manual sequence proven on 2026-08-19:
 #   1. Load the IPA into Sideloadly via the command-line argument.
 #   2. Wait for an iDevice to appear in the device combo (USB or Wi-Fi).
-#   3. Force "Use automatic bundle ID" OFF so the bundle ID stays
-#      com.riffloop.prototype and the app sandbox (Documents) is preserved.
+#   3. Keep "Use automatic bundle ID" ON, matching the existing installation.
+#      With the same Apple account this preserves the signed bundle ID and sandbox.
 #   4. Click Start and wait for "Installing 100%: Complete".
 #   5. Verify the daemon registered the install for automatic refresh.
 #
@@ -119,7 +119,7 @@ while ((Get-Date) -lt $deadline -and -not $deviceName) {
         Start-Sleep -Seconds 10
     }
 }
-if (-not $deviceName) { throw "等待超时仍未检测到 iPad：请确认 USB 连接并在 iPad 上点“信任”后重试" }
+if (-not $deviceName) { throw "等待超时仍未检测到 iPad：请确认 USB 连接并在 iPad 上点「信任」后重试" }
 Write-Host "设备：$deviceName"
 
 # 4. Verify an Apple ID is remembered (a non-empty account combo beyond the add option).
@@ -137,17 +137,17 @@ if ($acct) {
 if (-not $acctOk) { throw "Sideloadly 没有记住的 Apple 账号，请先在 GUI 中登录一次" }
 Write-Host "Apple 账号已记住"
 
-# 5. Make sure "Use automatic bundle ID" is OFF (keeps com.riffloop.prototype).
+# 5. Make sure "Use automatic bundle ID" is ON, matching the existing installation.
 $desc = $win.FindAll([System.Windows.Automation.TreeScope]::Descendants,
     [System.Windows.Automation.Condition]::TrueCondition)
 foreach ($el in $desc) {
     if ($el.Current.Name -eq "Use automatic bundle ID:") {
         $tp = $el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-        if ($tp.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) {
+        if ($tp.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::Off) {
             $tp.Toggle()
-            Write-Host "已关闭 Use automatic bundle ID"
+            Write-Host "已开启 Use automatic bundle ID"
         } else {
-            Write-Host "Use automatic bundle ID 已是关闭状态"
+            Write-Host "Use automatic bundle ID 已是开启状态"
         }
     }
 }

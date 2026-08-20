@@ -1,6 +1,6 @@
-# iPad mini 6 真机验收清单（0.24.3 / build 36）
+# iPad mini 6 真机验收清单（0.24.4 / build 37）
 
-本清单用于把 `RiffLoop-iPad-0.24.3-unsigned-arm64.ipa` 覆盖安装到 iPad mini 6 后逐项验收。
+本清单用于把 `RiffLoop-iPad-0.24.4-unsigned-arm64.ipa` 覆盖安装到 iPad mini 6 后逐项验收。
 每项结果记为「通过 / 失败 / 未测」，失败项附一句现象描述（画面、声音、复现步骤）。
 
 ## 0. 安装前：确认真机当前版本
@@ -17,8 +17,8 @@
 
 1. 用 USB 连接 iPad 与 Windows，iPad 上点「信任」；iPad 屏幕保持点亮。
 2. 打开 Sideloadly，把解压好的 IPA 拖入（先用 `pwsh -File scripts/download-ipa.ps1` 从 GitHub 下载到
-   `output\release-0.24.3-build36\RiffLoop-iPad-0.24.3-unsigned-arm64.ipa`）。
-3. 选择这台 iPad 和之前使用的同一个 Apple 账号；**不要启用修改 Bundle ID**（保持 `com.riffloop.prototype`）。
+   `output\release-0.24.4-build37\RiffLoop-iPad-0.24.4-unsigned-arm64.ipa`）。
+3. 选择这台 iPad 和之前使用的同一个 Apple 账号；保持 **Use automatic bundle ID** 开启，必须与当前安装一致。
 4. 启用 **Automatic Refresh**，点击 Start，按提示完成 Apple 登录/双重认证。
 5. 等待 Sideloadly 显示完成；在 iPad 上直接覆盖安装。
 6. 打开 RiffLoop → 首页点「重新检测」，确认签名到期时间已延后，且旧文件/设置还在。
@@ -52,9 +52,13 @@
 ## 5. Guitar Pro 练习
 
 - [ ] 导入《此生不换》类 `.gp`，每行 2 小节、约 2 行谱面的布局正常。
+- [ ] 播放时当前小节为淡蓝底、当前音符为蓝色、3 px 蓝色节拍光标清晰可见；跨行时平滑跟随，不突然把整页跳走。
+- [ ] 连续播放至少 30 秒，时间、音符高亮、节拍光标和滚屏持续前进，不停在某个时间点。
 - [ ] 第 10、33、34 小节同小节延音目标的括号品位可见（对照 Guitar Pro 8）。
-- [ ] 普通轻点谱面移动播放光标并开始播放；再点暂停。
+- [ ] 普通轻点谱面只移动播放光标，不误触发 A/B 选择；随后点播放可从该位置继续。
 - [ ] 长按后拖动可框选循环范围：正向、反向、跨行、回拖缩小、单小节选择均按完整小节；取消手势不覆盖旧范围；靠近上下边缘能继续滚动选择。
+- [ ] 切换显示轨道后再次长按选择 A/B，橙色区间仍正确显示，不出现 `A JavaScript exception occurred` 或 GP 命令失败。
+- [ ] 播放中切换节拍细分，等待重新准备后播放按钮恢复可用，时间继续推进。
 - [ ] 内嵌伴奏与合成声音可独立开关/调音量并同步混合；显示轨道变化不会隐式改变静音/独奏；静音/独奏互斥。
 - [ ] 节拍器细分随谱面拍号变化；预备拍、整曲循环可用。
 - [ ] 播放一半退出该曲再进入，播放位置被恢复（昨天修复项）。

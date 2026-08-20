@@ -7,6 +7,37 @@ const source = readFileSync(
 );
 
 {
+    const startMarker = "    const isPlaybackReady = (state) =>";
+    const endMarker = "\n    const notifyPlayerReady";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "isPlaybackReady implementation is missing");
+    assert.notEqual(end, -1, "isPlaybackReady implementation boundary is missing");
+    const implementation = source.slice(start, end);
+    const execute = new Function(`${implementation}\nreturn isPlaybackReady;`);
+    const isPlaybackReady = execute();
+
+    assert.equal(isPlaybackReady({ hasLoaded: false, hasBacking: false, mainReady: true, synthReady: true }), false);
+    assert.equal(isPlaybackReady({ hasLoaded: true, hasBacking: false, mainReady: true, synthReady: false }), true);
+    assert.equal(isPlaybackReady({ hasLoaded: true, hasBacking: true, mainReady: true, synthReady: false }), false);
+    assert.equal(isPlaybackReady({ hasLoaded: true, hasBacking: true, mainReady: false, synthReady: true }), false);
+    assert.equal(isPlaybackReady({ hasLoaded: true, hasBacking: true, mainReady: true, synthReady: true }), true);
+}
+
+{
+    assert.match(
+        source,
+        /prepareMetronomeSubdivision\(factor\)[\s\S]*?metronomeSubdivisionFactor = value;[\s\S]*?setMetronomeSubdivision\(factor\)/,
+        "loading a new file needs a non-reloading metronome subdivision command"
+    );
+    const subdivision = source.slice(
+        source.indexOf("        setMetronomeSubdivision(factor)"),
+        source.indexOf("        setBeatAccents(accents)")
+    );
+    assert.match(subdivision, /resetPlaybackReadiness\(\)/, "reloading after a subdivision change must reset player readiness");
+}
+
+{
     const startMarker = "    const playPauseBoth = () => {";
     const endMarker = "\n\n    const trackPayload";
     const start = source.indexOf(startMarker);
@@ -15,9 +46,16 @@ const source = readFileSync(
     assert.notEqual(end, -1, "playPauseBoth implementation boundary is missing");
     const implementation = source.slice(start, end);
 
-    function runPlayback({ hasBacking, synthEnabled, mainPlaying = false, synthPlaying = false }) {
-        const api = player(mainPlaying);
-        const synthApi = player(synthPlaying);
+    function runPlayback({
+        hasBacking,
+        synthEnabled,
+        mainPlaying = false,
+        synthPlaying = false,
+        mainTick = 2400,
+        synthTick = 0,
+    }) {
+        const api = player(mainPlaying, mainTick);
+        const synthApi = player(synthPlaying, synthTick);
         const execute = new Function(
             "api",
             "synthApi",
@@ -29,9 +67,10 @@ const source = readFileSync(
         return { api, synthApi };
     }
 
-    function player(isPlaying) {
+    function player(isPlaying, tickPosition) {
         return {
             isPlaying,
+            tickPosition,
             playCalls: 0,
             pauseCalls: 0,
             play() { this.playCalls += 1; },
@@ -54,6 +93,11 @@ const source = readFileSync(
         const { api, synthApi } = runPlayback({ hasBacking: true, synthEnabled: true });
         assert.equal(api.playCalls, 1);
         assert.equal(synthApi.playCalls, 1);
+        assert.equal(
+            synthApi.tickPosition,
+            api.tickPosition,
+            "backing and synthesis must start from the same score position"
+        );
     }
 
     {

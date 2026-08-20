@@ -18,7 +18,7 @@ Android 版使用 Kotlin、Jetpack Compose、Media3 和 alphaTab，最低支持 
 
 ## iPad mini 6 版本
 
-- 无 Mac 开发：Windows 上维护 Swift 代码，GitHub Actions `iOS CI` 在 iPad mini 尺寸模拟器上构建并跑单元测试；`iPad Unsigned IPA`（手动触发，省 macOS 分钟）出未签名 arm64 IPA，再由 Windows 上的 Sideloadly 签名并覆盖安装到 iPad mini 6（Bundle ID 固定为 `com.riffloop.prototype`，详见 [`docs/IPAD_SIDELOAD.md`](docs/IPAD_SIDELOAD.md)，`scripts/download-ipa.ps1` 可自动下载产物）。
+- 无 Mac 开发：Windows 上维护 Swift 代码，GitHub Actions `iOS CI` 在 iPad mini 尺寸模拟器上构建并跑单元测试；`iPad Unsigned IPA`（手动触发，省 macOS 分钟）出基础 Bundle ID 为 `com.riffloop.prototype` 的未签名 arm64 IPA，再由 Windows 上的 Sideloadly 使用同一账号和自动 Bundle ID 覆盖安装到 iPad mini 6（详见 [`docs/IPAD_SIDELOAD.md`](docs/IPAD_SIDELOAD.md)，`scripts/download-ipa.ps1` 可自动下载产物）。
 - 已移植 Android 的视频、PDF、Guitar Pro 三种练习模式：独立节拍器、训练模式、逐拍重音、Tap Tempo、毫秒级节拍微调、A/B 循环、预备拍与循环阶梯、最近项目与设置恢复、练习记录。
 - Guitar Pro 模式使用离线 alphaTab 1.8.4：每行 2 小节、内嵌伴奏与谱面合成独立开关/音量、互斥静音/独奏、恢复上次播放位置。轻点谱面跳转播放位置；长按谱面并拖动选择 A/B 循环范围（支持正向、反向、跨行、回拖缩小和单小节选择，靠近上下边缘自动滚动），松手确认，取消手势不覆盖旧范围。
 - 首页显示侧载签名到期时间与剩余天数，并提供无线续签步骤说明。
@@ -36,7 +36,7 @@ Android 版使用 Kotlin、Jetpack Compose、Media3 和 alphaTab，最低支持 
 - 视频连续播放 30 秒正常推进，媒体音轨未记录欠载；独立节拍器、连音细分和全屏界面正常。强、次强、普通点击现在使用明显不同的音高、响度与衰减，并只在拍子起点应用所选重音。
 - 用户的《此生不换》`.gp` 展开后的 290 个音符均可正确解析和渲染；逐小节核对确认 31 个延音目标、46 个滑音标记、7 个击勾弦目标、10 个推弦和 14 个装饰音均无丢失。同小节延音目标会按 Guitar Pro 的形式补充括号品位，已对照 Guitar Pro 8 验证第 10、33、34 小节。
 - Android 0.20 当前定位为“只读乐谱练习器”，暂不编辑或创作 Guitar Pro 乐谱；PDF 自动跟谱使用用户录制轨迹，不做 OCR 或自动识别小节。
-- iPad 0.24.3 (build 36) 完成 GP 长按拖动选循环范围，替换原来的“按钮点选 A/B”流程；等待 Sideloadly 覆盖安装并按 `docs/IPAD_MINI6_ACCEPTANCE.md` 真机验收。
+- iPad 0.24.4 (build 37) 修复 GP 节拍光标不可见、当前音符无高亮、跨行滚屏跳跃、双播放器起点/准备状态竞态，以及多轨 A/B 选区触发 JavaScript 异常；等待 Sideloadly 覆盖安装并按 `docs/IPAD_MINI6_ACCEPTANCE.md` 真机验收。
 
 ## 下一步
 
