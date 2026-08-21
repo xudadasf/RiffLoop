@@ -24,6 +24,11 @@ assert.match(
     "every native pause command must use the coordinated GP transport"
 );
 assert.match(
+    gpWeb,
+    /reportState: \(playing, stopped\) => post\("playerStateChanged", \{[\s\S]*?state: playing \? 1 : 0/,
+    "GP controls and paused-only loop actions must follow the coordinated transport state"
+);
+assert.match(
     gpView,
     /if viewModel\.loopRange != nil, !viewModel\.isPlaying \{[\s\S]*?Button\("退出区间循环", action: viewModel\.clearLoop\)/,
     "the loop exit action must only appear while playback is paused"

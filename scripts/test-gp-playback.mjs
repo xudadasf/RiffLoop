@@ -138,13 +138,16 @@ const source = readFileSync(
         const api = player(false, 2400);
         const synthApi = player(false, 0);
         const scheduled = [];
+        const reportedStates = [];
         const transport = createTransportController({
             api,
             synthApi,
             canUseBacking: () => true,
             schedule: (action, delay) => scheduled.push({ action, delay }),
+            reportState: (playing, stopped) => reportedStates.push({ playing, stopped }),
         });
         transport.play();
+        assert.deepEqual(reportedStates.at(-1), { playing: true, stopped: false });
         assert.equal(api.playCalls, 1, "muting both sources must not disable the main transport");
         assert.equal(
             synthApi.playCalls,
@@ -157,6 +160,7 @@ const source = readFileSync(
             "backing and synthesis must start from the same score position"
         );
         transport.pause();
+        assert.deepEqual(reportedStates.at(-1), { playing: false, stopped: false });
         assert.equal(api.pauseCalls, 1);
         assert.equal(synthApi.pauseCalls, 1);
         assert.deepEqual(scheduled.map(({ delay }) => delay), [80, 240]);

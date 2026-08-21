@@ -114,6 +114,7 @@
     const canUseBacking = () => Boolean(api.score?.backingTrack);
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
+        const reportState = deps.reportState || (() => {});
         let wantsPlayback = false;
         let pauseGeneration = 0;
         const pauseNow = () => {
@@ -124,6 +125,7 @@
             wantsPlayback = false;
             const generation = ++pauseGeneration;
             pauseNow();
+            reportState(false, false);
             const pauseAgain = () => {
                 if (!wantsPlayback && generation === pauseGeneration) pauseNow();
             };
@@ -136,6 +138,7 @@
             if (canUseBacking()) synthApi.tickPosition = api.tickPosition;
             api.play();
             if (canUseBacking()) synthApi.play();
+            reportState(true, false);
         };
         const toggle = () => {
             if (wantsPlayback || api.isPlaying || synthApi.isPlaying) pause();
@@ -146,10 +149,12 @@
             pauseGeneration += 1;
             api.stop();
             synthApi.stop();
+            reportState(false, true);
         };
         const markStopped = () => {
             wantsPlayback = false;
             pauseGeneration += 1;
+            reportState(false, true);
         };
         return { play, pause, toggle, stop, markStopped };
     };
@@ -157,7 +162,11 @@
         api,
         synthApi,
         canUseBacking,
-        schedule: window.setTimeout.bind(window)
+        schedule: window.setTimeout.bind(window),
+        reportState: (playing, stopped) => post("playerStateChanged", {
+            state: playing ? 1 : 0,
+            stopped
+        })
     });
     const isPlaybackReady = (state) => state.hasLoaded
         && state.mainReady
