@@ -76,13 +76,13 @@
     let lastPositionPostTime = Number.NEGATIVE_INFINITY;
     const metronomeGain = (pulse) => {
         const factor = Math.max(1, metronomeSubdivisionFactor);
-        if (pulse % factor !== 0) return 0.20;
+        if (pulse % factor !== 0) return 0.07;
         const accent = beatAccents[Math.floor(pulse / factor)]
             || (pulse === 0 ? "strong" : "normal");
         if (accent === "strong") return 1;
-        if (accent === "subAccent") return 0.45;
+        if (accent === "subAccent") return 0.32;
         if (accent === "muted") return 0;
-        return 0.18;
+        return 0.10;
     };
     const applyMetronomePulse = (pulse) => {
         const volume = metronomeMasterVolume * metronomeGain(pulse);
@@ -112,9 +112,44 @@
     };
     configureMetronomeEvents(api);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
+    const BACKING_DRIFT_TOLERANCE_MILLISECONDS = 120;
+    const BACKING_CORRECTION_INTERVAL_MILLISECONDS = 400;
+    const createBackingSynchronizer = (deps) => {
+        const { synthApi, canUseBacking, now } = deps;
+        let lastCorrectionTime = Number.NEGATIVE_INFINITY;
+        const align = (scoreTime) => {
+            const target = Number(scoreTime);
+            if (!canUseBacking() || !Number.isFinite(target)) return false;
+            synthApi.timePosition = Math.max(0, target);
+            lastCorrectionTime = now();
+            return true;
+        };
+        const correct = (scoreTime, shouldResume) => {
+            const target = Number(scoreTime);
+            const backingTime = Number(synthApi.timePosition);
+            const timestamp = now();
+            if (
+                !canUseBacking()
+                || !Number.isFinite(target)
+                || !Number.isFinite(backingTime)
+                || Math.abs(backingTime - target) < BACKING_DRIFT_TOLERANCE_MILLISECONDS
+                || timestamp - lastCorrectionTime < BACKING_CORRECTION_INTERVAL_MILLISECONDS
+            ) return false;
+            synthApi.pause();
+            synthApi.timePosition = Math.max(0, target);
+            if (shouldResume) synthApi.play();
+            lastCorrectionTime = timestamp;
+            return true;
+        };
+        const reset = () => { lastCorrectionTime = Number.NEGATIVE_INFINITY; };
+        return { align, correct, reset };
+    };
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
         const reportState = deps.reportState || (() => {});
+        const alignBacking = deps.alignBacking || (() => {
+            synthApi.timePosition = api.timePosition;
+        });
         let wantsPlayback = false;
         let pauseGeneration = 0;
         const pauseNow = () => {
@@ -135,7 +170,7 @@
         const play = () => {
             wantsPlayback = true;
             pauseGeneration += 1;
-            if (canUseBacking()) synthApi.tickPosition = api.tickPosition;
+            if (canUseBacking()) alignBacking();
             api.play();
             if (canUseBacking()) synthApi.play();
             reportState(true, false);
@@ -159,10 +194,16 @@
         const isPlayingIntent = () => wantsPlayback;
         return { play, pause, toggle, stop, markStopped, isPlayingIntent };
     };
+    const backingSynchronizer = createBackingSynchronizer({
+        synthApi,
+        canUseBacking: () => canUseBacking() && backingEnabled,
+        now: () => performance.now()
+    });
     const transport = createTransportController({
         api,
         synthApi,
         canUseBacking,
+        alignBacking: () => backingSynchronizer.align(api.timePosition),
         schedule: window.setTimeout.bind(window),
         reportState: (playing, stopped) => post("playerStateChanged", {
             state: playing ? 1 : 0,
@@ -197,14 +238,56 @@
         api.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
         synthApi.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
     };
-    const seekBoth = (tick) => {
+    const loopScrollPlan = (rangeTop, rangeBottom, viewportHeight) => {
+        const rangeHeight = Math.max(0, Number(rangeBottom) - Number(rangeTop));
+        const visibleHeight = Math.max(0, Number(viewportHeight));
+        if (rangeHeight <= Math.max(0, visibleHeight - 64)) {
+            return {
+                mode: "locked",
+                targetTop: Math.max(0, Math.round(Number(rangeTop) - (visibleHeight - rangeHeight) / 2))
+            };
+        }
+        return { mode: "offscreen", targetTop: null };
+    };
+    const applyRangeScrollPolicy = (firstBar, lastBar) => {
+        const lookup = api.renderer?.boundsLookup;
+        const firstBounds = lookup?.findMasterBarByIndex(Number(firstBar))?.realBounds;
+        const lastBounds = lookup?.findMasterBarByIndex(Number(lastBar))?.realBounds;
+        if (!firstBounds || !lastBounds) return;
+        const plan = loopScrollPlan(
+            firstBounds.y,
+            lastBounds.y + lastBounds.h,
+            viewportElement.clientHeight
+        );
+        const scrollMode = plan.mode === "locked"
+            ? alphaTab.ScrollMode.Off
+            : alphaTab.ScrollMode.OffScreen;
+        if (api.settings.player.scrollMode !== scrollMode) {
+            api.settings.player.scrollMode = scrollMode;
+            api.settings.player.scrollSpeed = 450;
+            api.settings.player.nativeBrowserSmoothScroll = false;
+            api.updateSettings();
+        }
+        if (plan.targetTop !== null && Math.abs(viewportElement.scrollTop - plan.targetTop) > 2) {
+            viewportElement.scrollTo({ top: plan.targetTop, behavior: "smooth" });
+        }
+    };
+    const restoreScoreScrollPolicy = () => {
+        if (api.settings.player.scrollMode === alphaTab.ScrollMode.Smooth) return;
+        api.settings.player.scrollMode = alphaTab.ScrollMode.Smooth;
+        api.settings.player.scrollOffsetY = scoreFollowOffset(viewportElement.clientHeight || window.innerHeight);
+        api.updateSettings();
+    };
+    const seekBoth = (tick, options = {}) => {
         const position = Number(tick);
         api.tickPosition = position;
         synthApi.tickPosition = position;
+        if (options.reveal === false) return;
         window.setTimeout(() => {
             if (api.isReadyForPlayback) api.scrollToCursor();
         }, 50);
     };
+    const stopTick = () => rangeLoopingEnabled && committedRange ? committedRange.startTick : 0;
     const enforceCommittedRange = (position) => {
         if (
             !rangeLoopingEnabled
@@ -212,7 +295,7 @@
             || position.isSeek
             || Number(position.currentTick) < committedRange.endTick
         ) return false;
-        seekBoth(committedRange.startTick);
+        seekBoth(committedRange.startTick, { reveal: false });
         return true;
     };
     const playPauseBoth = () => {
@@ -315,6 +398,7 @@
         // alphaTab's native range can be lost when its internal player is rebuilt.
         // Keep the visible synth and embedded backing transport inside the committed range.
         if (enforceCommittedRange(position)) return;
+        backingSynchronizer.correct(position.currentTime, transport.isPlayingIntent());
         const now = performance.now();
         if (!position.isSeek && now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS) return;
         lastPositionPostTime = now;
@@ -561,6 +645,8 @@
                 committedRange = null;
                 rangeLoopingEnabled = false;
                 wholeSongLoopingEnabled = false;
+                backingSynchronizer.reset();
+                restoreScoreScrollPolicy();
                 loadedScoreBytes = decodeBase64(base64);
                 api.load(loadedScoreBytes.slice());
                 synthApi.load(loadedScoreBytes.slice());
@@ -570,7 +656,7 @@
         },
         playPause() { playPauseBoth(); },
         pause() { transport.pause(); },
-        stop() { transport.stop(); seekBoth(0); },
+        stop() { transport.stop(); seekBoth(stopTick()); },
         seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
@@ -587,8 +673,13 @@
             api.masterVolume = synthEnabled ? synthVolume : 0;
         },
         setBackingEnabled(enabled) {
+            const wasEnabled = backingEnabled;
             backingEnabled = Boolean(enabled);
             if (canUseBacking()) {
+                if (backingEnabled && !wasEnabled) {
+                    transport.pause();
+                    backingSynchronizer.align(api.timePosition);
+                }
                 synthApi.masterVolume = backingEnabled ? backingVolume : 0;
             }
         },
@@ -660,6 +751,7 @@
             rangeLoopingEnabled = false;
             window.riffloopCommittedBars = null;
             applyLoopMode();
+            restoreScoreScrollPolicy();
             api.clearPlaybackRangeHighlight();
         },
         previewRange(firstBar, lastBar) {
@@ -673,24 +765,33 @@
             const rangeStartTick = Number(startTick);
             committedRange = {
                 startTick: rangeStartTick,
-                endTick: Number(endTick)
+                endTick: Number(endTick),
+                firstBar: Number(firstBar),
+                lastBar: Number(lastBar)
             };
             rangeLoopingEnabled = true;
             wholeSongLoopingEnabled = false;
             applyLoopMode();
-            seekBoth(rangeStartTick);
+            seekBoth(rangeStartTick, { reveal: false });
             window.riffloop.previewRange(firstBar, lastBar);
             window.riffloopCommittedBars = [Number(firstBar), Number(lastBar)];
+            window.setTimeout(() => applyRangeScrollPolicy(firstBar, lastBar), 50);
         },
         setRangeLoopingEnabled(enabled) {
             rangeLoopingEnabled = Boolean(enabled) && Boolean(committedRange);
             if (rangeLoopingEnabled) wholeSongLoopingEnabled = false;
             applyLoopMode();
+            if (rangeLoopingEnabled) {
+                applyRangeScrollPolicy(committedRange.firstBar, committedRange.lastBar);
+            } else {
+                restoreScoreScrollPolicy();
+            }
         },
         setWholeSongLoopingEnabled(enabled) {
             wholeSongLoopingEnabled = Boolean(enabled);
             if (wholeSongLoopingEnabled) rangeLoopingEnabled = false;
             applyLoopMode();
+            if (wholeSongLoopingEnabled) restoreScoreScrollPolicy();
         },
         restartRangeWithCountIn() {
             if (!committedRange) return;

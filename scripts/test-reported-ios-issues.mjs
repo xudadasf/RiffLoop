@@ -36,8 +36,8 @@ assert.match(
 );
 assert.match(
     gpView,
-    /if viewModel\.loopRange != nil, !viewModel\.isPlaying \{[\s\S]*?Button\("退出区间循环", action: viewModel\.clearLoop\)/,
-    "the loop exit action must only appear while playback is paused"
+    /\.overlay\(alignment: \.bottomLeading\) \{[\s\S]*?if viewModel\.loopRange != nil, !viewModel\.isPlaying \{[\s\S]*?Button\(action: viewModel\.clearLoop\)[\s\S]*?退出区间循环/,
+    "the loop exit action must appear directly over the score while playback is paused"
 );
 
 for (const expected of [
@@ -47,12 +47,17 @@ for (const expected of [
 ]) {
     assert.match(metronome, expected, "native strong, secondary and normal clicks must be clearly separated");
 }
-assert.match(gpWeb, /if \(accent === "subAccent"\) return 0\.45;/);
-assert.match(gpWeb, /return 0\.18;/);
+assert.match(gpWeb, /if \(accent === "subAccent"\) return 0\.32;/);
+assert.match(gpWeb, /return 0\.10;/);
 assert.match(
     gpPage,
-    /\.at-cursor-beat\s*\{[\s\S]*?background: transparent !important;[\s\S]*?\.at-cursor-beat::after\s*\{[\s\S]*?width: 2px;[\s\S]*?background: rgba\(0, 122, 255, 0\.82\);/,
+    /\.at-cursor-beat\s*\{[\s\S]*?background: transparent !important;[\s\S]*?\.at-cursor-beat::after\s*\{[\s\S]*?width: 70%;[\s\S]*?background: rgba\(0, 122, 255, 0\.28\);/,
     "the GP beat cursor must stay visible without fully covering the note beneath it"
+);
+assert.match(
+    gpWeb,
+    /setBackingEnabled\(enabled\) \{[\s\S]*?transport\.pause\(\);[\s\S]*?backingSynchronizer\.align\(api\.timePosition\)/,
+    "enabling embedded backing mid-score must pause and align it to the current score time"
 );
 
 assert.match(pdfView, /Button\("控制", action: openPracticePanel\)/);

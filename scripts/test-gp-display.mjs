@@ -25,15 +25,21 @@ assert.doesNotMatch(
 );
 assert.match(beatCursor, /background\s*:\s*transparent/i, "the moving cursor layer must not cover notation");
 const beatCursorLine = cssRule(".at-cursor-beat::after");
-assert.match(beatCursorLine, /width\s*:\s*2px/i, "the visible beat cursor line must be thin");
+assert.match(beatCursorLine, /width\s*:\s*70%/i, "the visible beat cursor must retain 70% of alphaTab's beat width");
 assert.match(
     beatCursorLine,
-    /background\s*:\s*rgba\(0,\s*122,\s*255,\s*0\.82\)/i,
-    "the thin beat cursor must remain visibly blue"
+    /background\s*:\s*rgba\(0,\s*122,\s*255,\s*0\.28\)/i,
+    "the wider beat cursor must stay translucent so notation remains visible"
 );
 
 const barCursor = cssRule(".at-cursor-bar");
 assert.match(barCursor, /rgba\(0,\s*122,\s*255,\s*0\.1\)/i, "the current bar must use a subtle blue tint");
+const loopSelection = cssRule(".at-selection div");
+assert.match(
+    loopSelection,
+    /rgba\(0,\s*92,\s*210,\s*0\.2\)/i,
+    "the selected loop must use a blue tint slightly deeper than the current bar"
+);
 
 assert.match(html, /\.at-highlight\s*,\s*\.at-highlight\s+\*/, "played notation needs a visible highlight rule");
 assert.match(html, /fill\s*:\s*#006edc/i, "played notation must visibly differ from unplayed notation");

@@ -29,7 +29,7 @@ const source = readFileSync(
     );
     assert.match(
         source,
-        /commitRange\(firstBar, lastBar, startTick, endTick\)[\s\S]*?applyLoopMode\(\);[\s\S]*?seekBoth\(rangeStartTick\);/,
+        /commitRange\(firstBar, lastBar, startTick, endTick\)[\s\S]*?applyLoopMode\(\);[\s\S]*?seekBoth\(rangeStartTick, \{ reveal: false \}\);[\s\S]*?applyRangeScrollPolicy/,
         "committing a loop must align both players to the selected A point"
     );
     assert.match(
@@ -44,13 +44,13 @@ const source = readFileSync(
     );
     assert.match(
         source,
-        /const seekBoth = \(tick\) => \{[\s\S]*?window\.setTimeout\(\(\) => \{[\s\S]*?if \(api\.isReadyForPlayback\) api\.scrollToCursor\(\);[\s\S]*?\}, 50\);/,
-        "every coordinated seek must promptly bring the score cursor into view"
+        /const seekBoth = \(tick, options = \{\}\) => \{[\s\S]*?if \(options\.reveal === false\) return;[\s\S]*?api\.scrollToCursor\(\)/,
+        "ordinary seeks may reveal the cursor, but loop wraps must be able to preserve the viewport"
     );
     assert.match(
         source,
-        /stop\(\) \{ transport\.stop\(\); seekBoth\(0\); \}/,
-        "stopping both players must also return the score viewport to the song start"
+        /const stopTick = \(\) => rangeLoopingEnabled && committedRange \? committedRange\.startTick : 0;[\s\S]*?stop\(\) \{ transport\.stop\(\); seekBoth\(stopTick\(\)\); \}/,
+        "stop must return to A while range looping is active and to the song start otherwise"
     );
 
     const loopStartMarker = "    const enforceCommittedRange = (position) => {";
@@ -68,13 +68,17 @@ const source = readFileSync(
     );
     const seeks = [];
     const enforceCommittedRange = makeRangeEnforcer(
-        (tick) => seeks.push(tick),
+        (tick, options) => seeks.push({ tick, options }),
         true,
         { startTick: 30720, endTick: 34560 }
     );
     assert.equal(enforceCommittedRange({ currentTick: 34559, isSeek: false }), false);
     assert.equal(enforceCommittedRange({ currentTick: 34560, isSeek: false }), true);
-    assert.deepEqual(seeks, [30720], "crossing B must seek both transports back to A");
+    assert.deepEqual(
+        seeks,
+        [{ tick: 30720, options: { reveal: false } }],
+        "crossing B must return both transports to A without jumping the viewport"
+    );
     assert.equal(
         enforceCommittedRange({ currentTick: 40000, isSeek: true }),
         false,
@@ -99,6 +103,67 @@ const source = readFileSync(
 }
 
 {
+    const startMarker = "    const loopScrollPlan = (rangeTop, rangeBottom, viewportHeight) => {";
+    const endMarker = "\n    const applyRangeScrollPolicy";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "adaptive loop scrolling policy is missing");
+    assert.notEqual(end, -1, "adaptive loop scrolling policy boundary is missing");
+    const implementation = source.slice(start, end);
+    const execute = new Function(`${implementation}\nreturn loopScrollPlan;`);
+    const loopScrollPlan = execute();
+
+    assert.deepEqual(
+        loopScrollPlan(400, 760, 900),
+        { mode: "locked", targetTop: 130 },
+        "a loop that fits on screen must be centered once and then kept stable"
+    );
+    assert.deepEqual(
+        loopScrollPlan(100, 1300, 900),
+        { mode: "offscreen", targetTop: null },
+        "a loop taller than the viewport must scroll only when the cursor leaves the display"
+    );
+}
+
+{
+    const startMarker = "    const BACKING_DRIFT_TOLERANCE_MILLISECONDS";
+    const endMarker = "\n    const createTransportController";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "backing synchronizer is missing");
+    assert.notEqual(end, -1, "backing synchronizer boundary is missing");
+    const implementation = source.slice(start, end);
+    const execute = new Function(`${implementation}\nreturn createBackingSynchronizer;`);
+    const createBackingSynchronizer = execute();
+    let now = 0;
+    const backing = {
+        timePosition: 0,
+        isPlaying: true,
+        pauseCalls: 0,
+        playCalls: 0,
+        pause() { this.pauseCalls += 1; this.isPlaying = false; },
+        play() { this.playCalls += 1; this.isPlaying = true; },
+    };
+    const synchronizer = createBackingSynchronizer({
+        synthApi: backing,
+        canUseBacking: () => true,
+        now: () => now,
+    });
+
+    assert.equal(synchronizer.align(9_200), true);
+    assert.equal(backing.timePosition, 9_200, "enabling backing must seek it to the score time");
+    now = 500;
+    backing.timePosition = 10_150;
+    assert.equal(synchronizer.correct(10_000, true), true);
+    assert.equal(backing.timePosition, 10_000, "a noticeable backing drift must be corrected in milliseconds");
+    assert.equal(backing.pauseCalls, 1);
+    assert.equal(backing.playCalls, 1, "a correction during playback must resume the backing transport");
+    now = 700;
+    backing.timePosition = 10_300;
+    assert.equal(synchronizer.correct(10_000, true), false, "drift correction must be rate limited");
+}
+
+{
     assert.match(
         source,
         /prepareMetronomeSubdivision\(factor\)[\s\S]*?metronomeSubdivisionFactor = value;[\s\S]*?setMetronomeSubdivision\(factor\)/,
@@ -113,7 +178,7 @@ const source = readFileSync(
 
 {
     const startMarker = "    const createTransportController = (deps) => {";
-    const endMarker = "\n    const transport = createTransportController";
+    const endMarker = "\n    const backingSynchronizer = createBackingSynchronizer";
     const start = source.indexOf(startMarker);
     const end = source.indexOf(endMarker, start);
     assert.notEqual(start, -1, "coordinated transport implementation is missing");
@@ -122,10 +187,11 @@ const source = readFileSync(
     const execute = new Function(`${implementation}\nreturn createTransportController;`);
     const createTransportController = execute();
 
-    function player(isPlaying, tickPosition) {
+    function player(isPlaying, tickPosition, timePosition = tickPosition) {
         return {
             isPlaying,
             tickPosition,
+            timePosition,
             playCalls: 0,
             pauseCalls: 0,
             play() { this.playCalls += 1; this.isPlaying = true; },
@@ -156,9 +222,9 @@ const source = readFileSync(
             "a muted backing player must keep its transport aligned for seamless re-enabling"
         );
         assert.equal(
-            synthApi.tickPosition,
-            api.tickPosition,
-            "backing and synthesis must start from the same score position"
+            synthApi.timePosition,
+            api.timePosition,
+            "backing and synthesis must start from the same score time"
         );
         transport.pause();
         assert.deepEqual(reportedStates.at(-1), { playing: false, stopped: false });

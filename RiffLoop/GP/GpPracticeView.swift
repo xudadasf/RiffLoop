@@ -39,6 +39,17 @@ struct GpPracticeView: View {
                     }
                 }
 
+                .overlay(alignment: .bottomLeading) {
+                    if viewModel.loopRange != nil, !viewModel.isPlaying {
+                        Button(action: viewModel.clearLoop) {
+                            Label("退出区间循环", systemImage: "xmark.circle.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                        .padding(16)
+                    }
+                }
+
             if controlsVisible {
                 controls
                     .frame(width: 340)
@@ -253,10 +264,6 @@ struct GpPracticeView: View {
             Text("长按谱面并拖动选择循环范围，松手确认；靠近上下边缘可继续滚动选择。轻点谱面跳转播放位置。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if viewModel.loopRange != nil, !viewModel.isPlaying {
-                Button("退出区间循环", action: viewModel.clearLoop)
-                    .buttonStyle(.bordered)
-            }
             if let message = viewModel.loopSelectionMessage {
                 Text(message)
                     .font(.caption.bold())
