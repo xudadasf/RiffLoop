@@ -68,9 +68,17 @@
         #synth-score { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
         .at-cursor-bar { background: rgba(0, 122, 255, 0.1) !important; }
         .at-cursor-beat {
-            background: #007aff !important;
-            border-radius: 2px;
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 6px rgba(0, 122, 255, 0.45);
+            background: transparent !important;
+        }
+        .at-cursor-beat::after {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 50%;
+            width: 2px;
+            transform: translateX(-50%);
+            background: rgba(0, 122, 255, 0.82);
+            border-radius: 1px;
+            box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.75), 0 0 4px rgba(0, 122, 255, 0.42);
         }
         .at-highlight,
         .at-highlight * {

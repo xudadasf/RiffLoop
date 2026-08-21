@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const gpWeb = read("RiffLoop/Resources/GpWeb/riffloop-gp.js");
+const gpPage = read("RiffLoop/Resources/GpWeb/index.html");
 const gpView = read("RiffLoop/GP/GpPracticeView.swift");
 const metronome = read("RiffLoop/Audio/MetronomeEngine.swift");
 const pdfView = read("RiffLoop/PDF/PdfPracticeView.swift");
@@ -48,6 +49,11 @@ for (const expected of [
 }
 assert.match(gpWeb, /if \(accent === "subAccent"\) return 0\.45;/);
 assert.match(gpWeb, /return 0\.18;/);
+assert.match(
+    gpPage,
+    /\.at-cursor-beat\s*\{[\s\S]*?background: transparent !important;[\s\S]*?\.at-cursor-beat::after\s*\{[\s\S]*?width: 2px;[\s\S]*?background: rgba\(0, 122, 255, 0\.82\);/,
+    "the GP beat cursor must stay visible without fully covering the note beneath it"
+);
 
 assert.match(pdfView, /Button\("控制", action: openPracticePanel\)/);
 assert.match(pdfView, /Button\("返回 PDF"\)[\s\S]*?closePracticePanel\(\)/);

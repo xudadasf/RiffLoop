@@ -23,7 +23,14 @@ assert.doesNotMatch(
     /\bwidth\s*:/,
     "the beat cursor width must remain controlled by alphaTab's inline transform"
 );
-assert.match(beatCursor, /background\s*:\s*#007aff/i, "the beat cursor must be visibly blue");
+assert.match(beatCursor, /background\s*:\s*transparent/i, "the moving cursor layer must not cover notation");
+const beatCursorLine = cssRule(".at-cursor-beat::after");
+assert.match(beatCursorLine, /width\s*:\s*2px/i, "the visible beat cursor line must be thin");
+assert.match(
+    beatCursorLine,
+    /background\s*:\s*rgba\(0,\s*122,\s*255,\s*0\.82\)/i,
+    "the thin beat cursor must remain visibly blue"
+);
 
 const barCursor = cssRule(".at-cursor-bar");
 assert.match(barCursor, /rgba\(0,\s*122,\s*255,\s*0\.1\)/i, "the current bar must use a subtle blue tint");

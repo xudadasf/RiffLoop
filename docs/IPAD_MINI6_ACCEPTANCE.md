@@ -1,6 +1,6 @@
-# iPad mini 6 真机验收清单（0.25.2 / build 45）
+# iPad mini 6 真机验收清单（0.25.3 / build 46）
 
-本清单用于把 `RiffLoop-iPad-0.25.2-unsigned-arm64.ipa` 覆盖安装到 iPad mini 6 后逐项验收。
+本清单用于把 `RiffLoop-iPad-0.25.3-unsigned-arm64.ipa` 覆盖安装到 iPad mini 6 后逐项验收。
 每项结果记为「通过 / 失败 / 未测」，失败项附一句现象描述（画面、声音、复现步骤）。
 
 ## 0. 安装前：确认真机当前版本
@@ -17,7 +17,7 @@
 
 1. 用 USB 连接 iPad 与 Windows，iPad 上点「信任」；iPad 屏幕保持点亮。
 2. 打开 Sideloadly，把解压好的 IPA 拖入（先用 `pwsh -File scripts/download-ipa.ps1` 从 GitHub 下载到
-   `output\release-0.25.2-build45\RiffLoop-iPad-0.25.2-unsigned-arm64.ipa`）。
+   `output\release-0.25.3-build46\RiffLoop-iPad-0.25.3-unsigned-arm64.ipa`）。
 3. 选择这台 iPad 和之前使用的同一个 Apple 账号；保持 **Use automatic bundle ID** 开启，必须与当前安装一致。
 4. 启用 **Automatic Refresh**，点击 Start，按提示完成 Apple 登录/双重认证。
 5. 等待 Sideloadly 显示完成；在 iPad 上直接覆盖安装。
@@ -52,7 +52,7 @@
 ## 5. Guitar Pro 练习
 
 - [ ] 导入《此生不换》类 `.gp`，每行 2 小节、约 2 行谱面的布局正常。
-- [ ] 播放时当前小节所在行保持在显示区域中部，后续行可见；当前音符和蓝色节拍光标清晰，跨行时平滑跟随。
+- [ ] 播放时当前小节所在行保持在显示区域中部，后续行可见；2 px 半透明蓝色节拍光标清晰且不遮住后面的音符，跨行时平滑跟随。
 - [ ] 连续播放至少 30 秒，时间、音符高亮、节拍光标和滚屏持续前进，不停在某个时间点。
 - [ ] 第 10、33、34 小节同小节延音目标的括号品位可见（对照 Guitar Pro 8）。
 - [ ] 普通轻点谱面只移动播放光标；普通滑动立即滚谱，不误触发 A/B 选择；随后点播放可从该位置继续。
