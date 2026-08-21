@@ -2,6 +2,33 @@ import XCTest
 @testable import RiffLoop
 
 final class GpLoopSelectionStateMachineTests: XCTestCase {
+    func testResumeOutsideEnabledLoopUsesLoopStart() {
+        let range = GpLoopBarRange(firstBar: 8, lastBar: 8, startTick: 30_720, endTick: 34_560)
+
+        XCTAssertEqual(
+            gpResumeTick(savedTick: 64_000, loopRange: range, rangeLoopingEnabled: true),
+            range.startTick
+        )
+    }
+
+    func testResumeInsideEnabledLoopPreservesSavedTick() {
+        let range = GpLoopBarRange(firstBar: 8, lastBar: 8, startTick: 30_720, endTick: 34_560)
+
+        XCTAssertEqual(
+            gpResumeTick(savedTick: 32_000, loopRange: range, rangeLoopingEnabled: true),
+            32_000
+        )
+    }
+
+    func testResumeOutsideDisabledLoopPreservesSavedTick() {
+        let range = GpLoopBarRange(firstBar: 8, lastBar: 8, startTick: 30_720, endTick: 34_560)
+
+        XCTAssertEqual(
+            gpResumeTick(savedTick: 64_000, loopRange: range, rangeLoopingEnabled: false),
+            64_000
+        )
+    }
+
     func testTapSeeks() {
         var machine = GpLoopSelectionStateMachine()
         let bar = makeBar(3)

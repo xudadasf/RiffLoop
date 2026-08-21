@@ -320,7 +320,13 @@ final class GpWebViewModel: ObservableObject {
             playerReady = true
             if let pendingResumeTick {
                 self.pendingResumeTick = nil
-                seek(to: pendingResumeTick)
+                seek(
+                    to: gpResumeTick(
+                        savedTick: pendingResumeTick,
+                        loopRange: loopRange,
+                        rangeLoopingEnabled: rangeLoopingEnabled
+                    )
+                )
             }
         case let .positionChanged(position):
             recordLoopCompletionIfNeeded(position)

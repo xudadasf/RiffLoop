@@ -7,6 +7,20 @@ struct GpLoopBarRange: Codable, Equatable, Sendable {
     let endTick: Double
 }
 
+func gpResumeTick(
+    savedTick: Double,
+    loopRange: GpLoopBarRange?,
+    rangeLoopingEnabled: Bool
+) -> Double {
+    guard
+        rangeLoopingEnabled,
+        let loopRange,
+        !(loopRange.startTick ..< loopRange.endTick).contains(savedTick)
+    else { return savedTick }
+
+    return loopRange.startTick
+}
+
 enum GpLoopSelectionAction: Equatable, Sendable {
     case none
     case seek(GpBarHit)

@@ -42,6 +42,11 @@ const source = readFileSync(
         /api\.playerPositionChanged\.on\(\(position\) => \{[\s\S]*?if \(enforceCommittedRange\(position\)\) return;/,
         "every player position update must enforce the committed range before bridge throttling"
     );
+    assert.match(
+        source,
+        /const seekBoth = \(tick\) => \{[\s\S]*?window\.setTimeout\(\(\) => \{[\s\S]*?if \(api\.isReadyForPlayback\) api\.scrollToCursor\(\);[\s\S]*?\}, 50\);/,
+        "every coordinated seek must promptly bring the score cursor into view"
+    );
 
     const loopStartMarker = "    const enforceCommittedRange = (position) => {";
     const loopEndMarker = "\n    const playPauseBoth";

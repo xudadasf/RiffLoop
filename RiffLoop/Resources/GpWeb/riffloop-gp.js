@@ -142,6 +142,9 @@
         const position = Number(tick);
         api.tickPosition = position;
         synthApi.tickPosition = position;
+        window.setTimeout(() => {
+            if (api.isReadyForPlayback) api.scrollToCursor();
+        }, 50);
     };
     const enforceCommittedRange = (position) => {
         if (
