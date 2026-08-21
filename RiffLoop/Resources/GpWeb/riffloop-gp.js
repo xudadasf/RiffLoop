@@ -156,7 +156,8 @@
             pauseGeneration += 1;
             reportState(false, true);
         };
-        return { play, pause, toggle, stop, markStopped };
+        const isPlayingIntent = () => wantsPlayback;
+        return { play, pause, toggle, stop, markStopped, isPlayingIntent };
     };
     const transport = createTransportController({
         api,
@@ -326,8 +327,8 @@
         });
     });
     api.playerStateChanged.on((state) => post("playerStateChanged", {
-        state: state.state,
-        stopped: state.stopped
+        state: transport.isPlayingIntent() ? 1 : 0,
+        stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
     }));
     api.playerFinished.on(() => {
         if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;

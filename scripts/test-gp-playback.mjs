@@ -148,6 +148,7 @@ const source = readFileSync(
         });
         transport.play();
         assert.deepEqual(reportedStates.at(-1), { playing: true, stopped: false });
+        assert.equal(transport.isPlayingIntent(), true);
         assert.equal(api.playCalls, 1, "muting both sources must not disable the main transport");
         assert.equal(
             synthApi.playCalls,
@@ -161,6 +162,7 @@ const source = readFileSync(
         );
         transport.pause();
         assert.deepEqual(reportedStates.at(-1), { playing: false, stopped: false });
+        assert.equal(transport.isPlayingIntent(), false);
         assert.equal(api.pauseCalls, 1);
         assert.equal(synthApi.pauseCalls, 1);
         assert.deepEqual(scheduled.map(({ delay }) => delay), [80, 240]);
