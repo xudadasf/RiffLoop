@@ -79,8 +79,8 @@ final class PracticeHistoryStore: ObservableObject {
         return Array(symbols[first...]) + Array(symbols[..<first])
     }
 
-    func secondsThisWeek(containing date: Date = Date()) -> TimeInterval {
-        guard let interval = calendar.dateInterval(of: .weekOfYear, for: date) else { return 0 }
+    func secondsThisWeek(containing targetDate: Date = Date()) -> TimeInterval {
+        guard let interval = calendar.dateInterval(of: .weekOfYear, for: targetDate) else { return 0 }
         return dailySeconds.reduce(into: 0) { result, entry in
             guard let day = date(fromKey: entry.key), interval.contains(day) else { return }
             result += entry.value
