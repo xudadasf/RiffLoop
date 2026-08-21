@@ -253,6 +253,36 @@ assert.match(
         const transport = createTransportController({
             api,
             synthApi,
+            canUseBacking: () => true,
+            shouldDeferBacking: () => true,
+            alignBacking: (scoreTime) => { synthApi.timePosition = scoreTime; },
+            schedule: () => {},
+        });
+
+        transport.play();
+        assert.equal(api.playCalls, 1, "the score transport must start the count-in immediately");
+        assert.equal(
+            synthApi.playCalls,
+            0,
+            "the embedded backing must stay paused while the score player is sounding its count-in"
+        );
+
+        assert.equal(transport.startDeferredBacking(2_480), true);
+        assert.equal(synthApi.timePosition, 2_480, "backing must align to the first real score position");
+        assert.equal(synthApi.playCalls, 1, "backing must start exactly when score playback begins");
+        assert.equal(
+            transport.startDeferredBacking(2_500),
+            false,
+            "ordinary score position updates must not restart the backing"
+        );
+    }
+
+    {
+        const api = player(false, 2400);
+        const synthApi = player(false, 0);
+        const transport = createTransportController({
+            api,
+            synthApi,
             canUseBacking: () => false,
             schedule: () => {},
         });

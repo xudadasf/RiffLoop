@@ -560,6 +560,7 @@ final class GpWebViewModel: ObservableObject {
         self.playbackStartedAt = nil
         sessionPracticeMilliseconds += elapsed
         totalPracticeMilliseconds += elapsed
+        PracticeHistoryStore.shared.record(seconds: Double(elapsed) / 1_000)
         saveProfile()
     }
 

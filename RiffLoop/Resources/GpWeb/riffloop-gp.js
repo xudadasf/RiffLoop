@@ -69,6 +69,7 @@
     let loadedScoreBytes = null;
     let metronomeSubdivisionFactor = 1;
     let metronomeMasterVolume = 0;
+    let countInMasterVolume = 0;
     let beatAccents = ["strong", "normal", "normal", "normal"];
     let scoreHasLoaded = false;
     let didNotifyPlayerReady = false;
@@ -165,10 +166,12 @@
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
         const reportState = deps.reportState || (() => {});
+        const shouldDeferBacking = deps.shouldDeferBacking || (() => false);
         const alignBacking = deps.alignBacking || (() => {
             synthApi.timePosition = api.timePosition;
         });
         let wantsPlayback = false;
+        let backingDeferred = false;
         let pauseGeneration = 0;
         const pauseNow = () => {
             api.pause();
@@ -176,6 +179,7 @@
         };
         const pause = () => {
             wantsPlayback = false;
+            backingDeferred = false;
             const generation = ++pauseGeneration;
             pauseNow();
             reportState(false, false);
@@ -188,10 +192,18 @@
         const play = () => {
             wantsPlayback = true;
             pauseGeneration += 1;
-            if (canUseBacking()) alignBacking();
+            backingDeferred = canUseBacking() && shouldDeferBacking();
+            if (canUseBacking() && !backingDeferred) alignBacking(api.timePosition);
             api.play();
-            if (canUseBacking()) synthApi.play();
+            if (canUseBacking() && !backingDeferred) synthApi.play();
             reportState(true, false);
+        };
+        const startDeferredBacking = (scoreTime) => {
+            if (!wantsPlayback || !backingDeferred || !canUseBacking()) return false;
+            backingDeferred = false;
+            alignBacking(scoreTime);
+            synthApi.play();
+            return true;
         };
         const toggle = () => {
             if (wantsPlayback || api.isPlaying || synthApi.isPlaying) pause();
@@ -199,6 +211,7 @@
         };
         const stop = () => {
             wantsPlayback = false;
+            backingDeferred = false;
             pauseGeneration += 1;
             api.stop();
             synthApi.stop();
@@ -206,11 +219,12 @@
         };
         const markStopped = () => {
             wantsPlayback = false;
+            backingDeferred = false;
             pauseGeneration += 1;
             reportState(false, true);
         };
         const isPlayingIntent = () => wantsPlayback;
-        return { play, pause, toggle, stop, markStopped, isPlayingIntent };
+        return { play, pause, toggle, stop, markStopped, startDeferredBacking, isPlayingIntent };
     };
     const backingAligner = createBackingAligner({
         synthApi,
@@ -220,7 +234,8 @@
         api,
         synthApi,
         canUseBacking,
-        alignBacking: () => backingAligner.align(api.timePosition),
+        alignBacking: (scoreTime = api.timePosition) => backingAligner.align(scoreTime),
+        shouldDeferBacking: () => countInMasterVolume > 0,
         schedule: window.setTimeout.bind(window),
         reportState: (playing, stopped) => post("playerStateChanged", {
             state: playing ? 1 : 0,
@@ -299,9 +314,11 @@
         const position = Number(tick);
         api.tickPosition = position;
         synthApi.tickPosition = position;
+        refreshPendingRangeHighlight();
         if (options.reveal === false) return;
         window.setTimeout(() => {
             if (api.isReadyForPlayback) api.scrollToCursor();
+            refreshPendingRangeHighlight();
         }, 50);
     };
     const stopTick = () => rangeLoopingEnabled && committedRange ? committedRange.startTick : 0;
@@ -412,6 +429,7 @@
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
     api.playerPositionChanged.on((position) => {
+        if (!position.isSeek) transport.startDeferredBacking(position.currentTime);
         // alphaTab's native range can be lost when its internal player is rebuilt.
         // Keep the visible synth and embedded backing transport inside the committed range.
         if (enforceCommittedRange(position)) return;
@@ -766,7 +784,8 @@
         },
         setCountInVolume(volume) {
             const value = Number(volume);
-            api.countInVolume = value;
+            countInMasterVolume = Number.isFinite(value) ? Math.max(0, value) : 0;
+            api.countInVolume = countInMasterVolume;
             synthApi.countInVolume = 0;
         },
         showTracks(indices) {

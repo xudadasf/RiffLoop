@@ -72,5 +72,16 @@ assert.match(
     /previewRange\(firstBar, lastBar, startTick, endTick\)/,
     "native range previews must include precise note ticks"
 );
+{
+    const start = script.indexOf("    const seekBoth = (tick, options = {}) => {");
+    const end = script.indexOf("\n    const stopTick", start);
+    assert.notEqual(start, -1, "coordinated seek implementation is missing");
+    assert.notEqual(end, -1, "coordinated seek implementation boundary is missing");
+    assert.match(
+        script.slice(start, end),
+        /refreshPendingRangeHighlight\(\);/,
+        "tapping a note inside an active loop must restore the loop highlight after seeking"
+    );
+}
 
 console.log("GP playback display policy passed");

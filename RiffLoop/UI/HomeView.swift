@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var recentProjects: RecentProjectsStore
+    @StateObject private var practiceHistory = PracticeHistoryStore.shared
     @State private var signingStatus = SigningStatusSnapshot.current()
     @State private var isSigningHelpPresented = false
 
@@ -19,7 +20,7 @@ struct HomeView: View {
 
                     practiceCard(
                         title: "Guitar Pro 乐谱",
-                        subtitle: "离线 alphaTab 1.8.4",
+                        subtitle: "音符级循环与内嵌伴奏",
                         systemImage: "music.note.list"
                     ) {
                         GpPracticeView(initialURL: mostRecentURL(for: .guitarPro))
@@ -34,6 +35,7 @@ struct HomeView: View {
                     }
                 }
 
+                practiceCalendarCard
                 signingStatusCard
 
                 if !recentProjects.projects.isEmpty {
@@ -60,13 +62,111 @@ struct HomeView: View {
                 }
             }
             .padding(28)
-            .background(Color.black.ignoresSafeArea())
+            .background {
+                LinearGradient(
+                    colors: [Color(red: 0.08, green: 0.09, blue: 0.13), .black],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+            }
             .navigationTitle("RiffLoop")
             .onAppear(perform: refreshSigningStatus)
             .sheet(isPresented: $isSigningHelpPresented) {
                 signingHelp
             }
         }
+    }
+
+    private var practiceCalendarCard: some View {
+        let days = practiceHistory.calendarDays()
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+
+        return HStack(alignment: .center, spacing: 28) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("练习日历", systemImage: "calendar.badge.clock")
+                    .font(.title3.bold())
+                    .foregroundStyle(.orange)
+                Text("颜色越深，练习时间越长")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 24) {
+                    practiceMetric("今天", seconds: practiceHistory.seconds(on: Date()))
+                    practiceMetric("本周", seconds: practiceHistory.secondsThisWeek())
+                    practiceMetric("累计", seconds: practiceHistory.totalSeconds)
+                }
+
+                Text("按天统计从此版本开始，原有各文件累计时长保持不变。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            LazyVGrid(columns: columns, spacing: 5) {
+                ForEach(Array(practiceHistory.weekdaySymbols().enumerated()), id: \.offset) { _, symbol in
+                    Text(symbol)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(days) { day in
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(practiceColor(for: day))
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay {
+                            if Calendar.current.isDateInToday(day.date) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(.orange, lineWidth: 2)
+                            }
+                        }
+                        .accessibilityLabel(day.date.formatted(date: .abbreviated, time: .omitted))
+                        .accessibilityValue(formatPracticeDuration(day.seconds))
+                }
+            }
+            .frame(width: 240)
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [Color.orange.opacity(0.13), Color.white.opacity(0.06)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.orange.opacity(0.22), lineWidth: 1)
+        }
+    }
+
+    private func practiceMetric(_ title: String, seconds: TimeInterval) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(formatPracticeDuration(seconds))
+                .font(.headline.monospacedDigit())
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func practiceColor(for day: PracticeDay) -> Color {
+        guard !day.isFuture else { return Color.white.opacity(0.08) }
+        let minutes = day.seconds / 60
+        if minutes == 0 { return .white }
+        if minutes < 5 { return Color.orange.opacity(0.3) }
+        if minutes < 15 { return Color.orange.opacity(0.5) }
+        if minutes < 30 { return Color.orange.opacity(0.7) }
+        return .orange
+    }
+
+    private func formatPracticeDuration(_ seconds: TimeInterval) -> String {
+        let totalMinutes = Int(max(0, seconds) / 60)
+        if totalMinutes < 60 { return "\(totalMinutes) 分钟" }
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        return minutes == 0 ? "\(hours) 小时" : "\(hours)小时 \(minutes)分"
     }
 
     private var signingStatusCard: some View {
@@ -231,7 +331,19 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: 220, alignment: .leading)
             .padding(22)
-            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 18))
+            .background(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.12), Color.white.opacity(0.06)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.22), radius: 12, y: 6)
         }
         .buttonStyle(.plain)
     }

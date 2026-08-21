@@ -8,6 +8,10 @@ const gpView = read("RiffLoop/GP/GpPracticeView.swift");
 const metronome = read("RiffLoop/Audio/MetronomeEngine.swift");
 const pdfView = read("RiffLoop/PDF/PdfPracticeView.swift");
 const pdfViewModel = read("RiffLoop/PDF/PdfPracticeViewModel.swift");
+const mediaViewModel = read("RiffLoop/Media/PracticeViewModel.swift");
+const gpViewModel = read("RiffLoop/GP/GpWebViewModel.swift");
+const homeView = read("RiffLoop/UI/HomeView.swift");
+const practiceHistory = read("RiffLoop/Library/PracticeHistoryStore.swift");
 
 assert.match(
     gpWeb,
@@ -66,6 +70,19 @@ assert.match(
     /setBackingEnabled\(enabled\) \{[\s\S]*?transport\.pause\(\);[\s\S]*?backingAligner\.align\(api\.timePosition\)/,
     "enabling embedded backing mid-score must pause and align it to the current score time"
 );
+assert.match(
+    gpWeb,
+    /shouldDeferBacking: \(\) => countInMasterVolume > 0[\s\S]*?playerPositionChanged\.on\(\(position\) => \{[\s\S]*?startDeferredBacking\(position\.currentTime\)/,
+    "count-in playback must defer embedded backing until the first real score position"
+);
+
+for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
+    assert.match(source, /PracticeHistoryStore\.shared\.record\(/, "every practice mode must update daily history");
+}
+assert.match(homeView, /练习日历[\s\S]*?颜色越深，练习时间越长/);
+assert.match(homeView, /if minutes == 0 \{ return \.white \}/);
+assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
+assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");
 
 assert.match(pdfView, /Button\("控制", action: openPracticePanel\)/);
 assert.match(pdfView, /Button\("返回 PDF"\)[\s\S]*?closePracticePanel\(\)/);
