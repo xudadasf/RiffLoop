@@ -15,7 +15,8 @@ final class PdfPracticeViewModel: ObservableObject {
 
     @Published private(set) var player = AVPlayer()
     @Published private(set) var audioFileName: String?
-    @Published private(set) var isPlaying = false
+    @Published private(set) var isAudioPlaying = false
+    @Published private(set) var isMetronomePlaying = false
     @Published private(set) var currentTime = 0.0
     @Published private(set) var duration = 0.0
     @Published var playbackRate: Float = 1
@@ -55,6 +56,8 @@ final class PdfPracticeViewModel: ObservableObject {
     private var boundaryObserver: Any?
     private var lastPracticeSampleDate: Date?
     private var isLoopTransitioning = false
+
+    var isPlaying: Bool { isAudioPlaying || isMetronomePlaying }
 
     init() {
         periodicObserver = player.addPeriodicTimeObserver(
@@ -129,58 +132,67 @@ final class PdfPracticeViewModel: ObservableObject {
         isPlaying ? pause() : play()
     }
 
+    func toggleAudioPlayback() {
+        guard player.currentItem != nil else { return }
+        isAudioPlaying ? pauseAudio() : startPlayback(
+            audio: true,
+            metronome: isMetronomePlaying
+        )
+    }
+
+    func toggleMetronomePlayback() {
+        if isMetronomePlaying {
+            pauseMetronome()
+        } else {
+            if !metronomeEnabled { metronomeEnabled = true }
+            startPlayback(audio: isAudioPlaying, metronome: true)
+        }
+    }
+
     func play(includeCountIn: Bool = false) {
-        guard player.currentItem != nil || metronomeEnabled else { return }
-        let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
-        let countInMediaDuration = includeCountIn && metronomeEnabled
-            ? Double(beatsPerMeasure) * 60 / bpm
-            : 0
-        let anchorHostTime = CMTimeAdd(
-            hostNow,
-            CMTime(seconds: 0.1, preferredTimescale: 1_000_000_000)
+        startPlayback(
+            audio: player.currentItem != nil,
+            metronome: metronomeEnabled,
+            includeCountIn: includeCountIn
         )
-        let anchor = TransportAnchor(
-            mediaTime: currentTime - countInMediaDuration,
-            hostTime: anchorHostTime.seconds,
-            mediaRate: Double(playbackRate)
-        )
-        if player.currentItem != nil {
-            player.setRate(
-                playbackRate,
-                time: cmTime(currentTime),
-                atHostTime: cmTime(anchor.hostTime(forMediaTime: currentTime))
-            )
-        }
-        if metronomeEnabled, let beatOffset {
-            do {
-                try metronome.synchronize(
-                    timeline: BeatTimeline(
-                        bpm: bpm,
-                        beatOffset: beatOffset + synchronizationOffset,
-                        subdivision: effectiveSubdivision(subdivision, rhythmMode: rhythmMode),
-                        quarterNotesPerMeasure: beatsPerMeasure,
-                        beatGrouping: beatGrouping,
-                        beatAccents: beatAccents
-                    ),
-                    anchor: anchor,
-                    rhythmMode: rhythmMode,
-                    volume: metronomeVolume
-                )
-            } catch {
-                message = "节拍器启动失败：\(error.localizedDescription)"
-            }
-        }
-        isPlaying = true
-        lastPracticeSampleDate = Date()
     }
 
     func pause() {
         recordPracticeTime()
         player.pause()
         metronome.stop()
-        isPlaying = false
+        isAudioPlaying = false
+        isMetronomePlaying = false
         lastPracticeSampleDate = nil
         save()
+    }
+
+    func pauseAudio() {
+        recordPracticeTime()
+        player.pause()
+        isAudioPlaying = false
+        lastPracticeSampleDate = isPlaying ? Date() : nil
+        save()
+    }
+
+    func pauseMetronome() {
+        recordPracticeTime()
+        metronome.stop()
+        isMetronomePlaying = false
+        lastPracticeSampleDate = isPlaying ? Date() : nil
+        save()
+    }
+
+    func stopAudio() {
+        pauseAudio()
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) {
+            [weak self] finished in
+            Task { @MainActor [weak self] in
+                guard let self, finished else { return }
+                self.currentTime = 0
+                self.save()
+            }
+        }
     }
 
     func stop() {
@@ -190,17 +202,41 @@ final class PdfPracticeViewModel: ObservableObject {
 
     func seek(to seconds: TimeInterval) {
         let target = duration > 0 ? min(max(seconds, 0), duration) : max(seconds, 0)
-        let wasPlaying = isPlaying
+        let resumeAudio = isAudioPlaying
+        let resumeMetronome = isMetronomePlaying
+        recordPracticeTime()
         player.pause()
         metronome.stop()
+        isAudioPlaying = false
+        isMetronomePlaying = false
+        guard player.currentItem != nil else {
+            currentTime = target
+            if resumeMetronome { startPlayback(audio: false, metronome: true) }
+            return
+        }
         player.seek(to: cmTime(target), toleranceBefore: .zero, toleranceAfter: .zero) {
             [weak self] finished in
             Task { @MainActor [weak self] in
                 guard let self, finished else { return }
                 self.currentTime = target
-                if wasPlaying { self.play() }
+                if resumeAudio || resumeMetronome {
+                    self.startPlayback(audio: resumeAudio, metronome: resumeMetronome)
+                } else {
+                    self.lastPracticeSampleDate = nil
+                    self.save()
+                }
             }
         }
+    }
+
+    func setBeatOneAtAudioStart() {
+        beatOffset = 0
+        updateAudioSettings()
+    }
+
+    func setBeatOneAtCurrentPosition() {
+        beatOffset = currentTime
+        updateAudioSettings()
     }
 
     func setPointA() {
@@ -224,6 +260,8 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func updateAudioSettings() {
+        let resumeAudio = isAudioPlaying
+        let resumeMetronome = isMetronomePlaying
         bpm = min(max(bpm, 30), 300)
         playbackRate = min(max(playbackRate, 0.25), 1.5)
         audioVolume = min(max(audioVolume, 0), 1)
@@ -232,7 +270,9 @@ final class PdfPracticeViewModel: ObservableObject {
         player.volume = audioVolume
         rebuildBoundaryObserver()
         save()
-        if isPlaying { play() }
+        if resumeAudio || resumeMetronome {
+            startPlayback(audio: resumeAudio, metronome: resumeMetronome)
+        }
     }
 
     func setPlaybackRate(_ rate: Float) {
@@ -367,6 +407,70 @@ final class PdfPracticeViewModel: ObservableObject {
 
     func dismissMessage() { message = nil }
 
+    private func startPlayback(
+        audio shouldPlayAudio: Bool,
+        metronome shouldPlayMetronome: Bool,
+        includeCountIn: Bool = false
+    ) {
+        let startAudio = shouldPlayAudio && player.currentItem != nil
+        let startMetronome = shouldPlayMetronome && metronomeEnabled && beatOffset != nil
+        guard startAudio || startMetronome else { return }
+
+        recordPracticeTime()
+        player.pause()
+        metronome.stop()
+
+        let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
+        let countInMediaDuration = includeCountIn && startMetronome
+            ? Double(beatsPerMeasure) * 60 / bpm
+            : 0
+        let anchorHostTime = CMTimeAdd(
+            hostNow,
+            CMTime(seconds: 0.1, preferredTimescale: 1_000_000_000)
+        )
+        let anchor = TransportAnchor(
+            mediaTime: currentTime - countInMediaDuration,
+            hostTime: anchorHostTime.seconds,
+            mediaRate: Double(playbackRate)
+        )
+
+        if startAudio {
+            player.setRate(
+                playbackRate,
+                time: cmTime(currentTime),
+                atHostTime: cmTime(anchor.hostTime(forMediaTime: currentTime))
+            )
+        }
+
+        var metronomeStarted = false
+        if startMetronome, let beatOffset {
+            do {
+                try metronome.synchronize(
+                    timeline: BeatTimeline(
+                        bpm: bpm,
+                        beatOffset: beatOffset + synchronizationOffset,
+                        subdivision: effectiveSubdivision(subdivision, rhythmMode: rhythmMode),
+                        quarterNotesPerMeasure: beatsPerMeasure,
+                        beatGrouping: beatGrouping,
+                        beatAccents: beatAccents
+                    ),
+                    anchor: anchor,
+                    rhythmMode: rhythmMode,
+                    volume: metronomeVolume
+                )
+                metronomeStarted = true
+                message = nil
+            } catch {
+                message = "节拍器启动失败：\(error.localizedDescription)"
+            }
+        }
+
+        isAudioPlaying = startAudio
+        isMetronomePlaying = metronomeStarted
+        lastPracticeSampleDate = isPlaying ? Date() : nil
+        save()
+    }
+
     private func timeChanged(_ seconds: TimeInterval) {
         recordPracticeTime()
         if seconds.isFinite { currentTime = max(0, seconds) }
@@ -419,7 +523,7 @@ final class PdfPracticeViewModel: ObservableObject {
             let pointA,
             let pointB,
             pointB > pointA,
-            isPlaying,
+            isAudioPlaying,
             !isLoopTransitioning
         else { return }
 
@@ -437,19 +541,26 @@ final class PdfPracticeViewModel: ObservableObject {
         playbackRate = Float(update.playbackSpeed)
         highestPlaybackRate = max(highestPlaybackRate, playbackRate)
         recordPracticeTime()
+        let resumeMetronome = isMetronomePlaying
         player.pause()
         metronome.stop()
+        isAudioPlaying = false
+        isMetronomePlaying = false
         player.seek(to: cmTime(pointA), toleranceBefore: .zero, toleranceAfter: .zero) {
             [weak self] finished in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.isLoopTransitioning = false
-                guard finished, self.loopEnabled, self.isPlaying else {
+                guard finished, self.loopEnabled else {
                     self.pause()
                     return
                 }
                 self.currentTime = pointA
-                self.play(includeCountIn: self.loopCountInEnabled)
+                self.startPlayback(
+                    audio: true,
+                    metronome: resumeMetronome,
+                    includeCountIn: self.loopCountInEnabled
+                )
             }
         }
         save()

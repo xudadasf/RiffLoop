@@ -48,7 +48,7 @@ struct PdfPracticeView: View {
                     .transition(.opacity)
                     .zIndex(2)
             } else {
-                Button("控制", action: revealControls)
+                Button("控制", action: openPracticePanel)
                     .buttonStyle(.borderedProminent)
                     .tint(.black.opacity(0.72))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -60,8 +60,9 @@ struct PdfPracticeView: View {
                 practicePanel
                     .frame(width: 340)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .background(.black.opacity(0.94))
+                    .background(.black.opacity(0.82))
                     .transition(.move(edge: .trailing))
+                    .zIndex(3)
             }
         }
         .navigationTitle(viewModel.pdfFileName ?? "PDF 谱面")
@@ -102,7 +103,7 @@ struct PdfPracticeView: View {
             HStack {
                 Button("文件") { pdfLibraryPresented = true }
                 Spacer()
-                Button("节拍器") { expandedControls = true }
+                Button("控制", action: openPracticePanel)
             }
             Spacer()
             HStack(spacing: 10) {
@@ -116,8 +117,13 @@ struct PdfPracticeView: View {
                     .disabled(viewModel.pageIndex + 1 >= viewModel.pageCount)
                 Spacer()
                 Button(readingButtonTitle, action: handleReadingButton)
-                Button(viewModel.isPlaying ? "暂停" : (viewModel.audioFileName == nil ? "开始节拍器" : "播放伴奏")) {
-                    viewModel.togglePlayback()
+                if viewModel.audioFileName != nil {
+                    Button(viewModel.isAudioPlaying ? "暂停伴奏" : "播放伴奏") {
+                        viewModel.toggleAudioPlayback()
+                    }
+                }
+                Button(viewModel.isMetronomePlaying ? "暂停节拍器" : "启动节拍器") {
+                    viewModel.toggleMetronomePlayback()
                 }
                 Button("伴奏") { audioLibraryPresented = true }
                 if viewModel.audioFileName != nil {
@@ -138,6 +144,7 @@ struct PdfPracticeView: View {
                 pdfTransportSection
                 pdfLoopSection
                 pdfMetronomeSection
+                pdfAlignmentSection
                 pdfSoundAndStatsSection
                 Divider()
                 autoFollowSection
@@ -153,37 +160,56 @@ struct PdfPracticeView: View {
         HStack {
             Text("练习控制").font(.title3.bold())
             Spacer()
-            Button("关闭") {
-                expandedControls = false
-                revealControls()
+            Button("返回 PDF") {
+                closePracticePanel()
             }
         }
     }
 
     private var pdfTransportSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Button(viewModel.isPlaying ? "暂停" : "播放", action: viewModel.togglePlayback)
-                    .buttonStyle(.borderedProminent)
-                Button("停止", action: viewModel.stop)
-            }
-            Picker("速度", selection: Binding(
-                get: { viewModel.playbackRate },
-                set: { viewModel.setPlaybackRate($0) }
-            )) {
-                ForEach([Float(0.25), 0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
-                    Text(String(format: "%.2g×", $0)).tag($0)
+            Text("伴奏").font(.headline)
+            if let audioFileName = viewModel.audioFileName {
+                Text(audioFileName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Button(viewModel.isAudioPlaying ? "暂停伴奏" : "播放伴奏", action: viewModel.toggleAudioPlayback)
+                        .buttonStyle(.borderedProminent)
+                    Button("停止伴奏", action: viewModel.stopAudio)
+                    Button("更换", action: { audioLibraryPresented = true })
                 }
+                Picker("速度", selection: Binding(
+                    get: { viewModel.playbackRate },
+                    set: { viewModel.setPlaybackRate($0) }
+                )) {
+                    ForEach([Float(0.25), 0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
+                        Text(String(format: "%.2g×", $0)).tag($0)
+                    }
+                }
+                Slider(
+                    value: Binding(
+                        get: { viewModel.currentTime },
+                        set: { viewModel.seek(to: $0) }
+                    ),
+                    in: 0...max(viewModel.duration, 0.01)
+                )
+                Text("\(format(viewModel.currentTime)) / \(format(viewModel.duration))")
+                    .monospacedDigit()
+                Text("伴奏音量")
+                Slider(
+                    value: Binding(
+                        get: { Double(viewModel.audioVolume) },
+                        set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
+                    ),
+                    in: 0...1
+                )
+            } else {
+                Text("未选择伴奏，节拍器仍可独立使用。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("选择伴奏") { audioLibraryPresented = true }
             }
-            Slider(
-                value: Binding(
-                    get: { viewModel.currentTime },
-                    set: { viewModel.seek(to: $0) }
-                ),
-                in: 0...max(viewModel.duration, 0.01)
-            )
-            Text("\(format(viewModel.currentTime)) / \(format(viewModel.duration))")
-                .monospacedDigit()
         }
     }
 
@@ -235,6 +261,12 @@ struct PdfPracticeView: View {
 
     private var pdfMetronomeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Text("节拍器").font(.headline)
+            Button(
+                viewModel.isMetronomePlaying ? "暂停节拍器" : "启动节拍器",
+                action: viewModel.toggleMetronomePlayback
+            )
+            .buttonStyle(.borderedProminent)
             Stepper("BPM \(Int(viewModel.bpm))", value: $viewModel.bpm, in: 30...300)
                 .onChange(of: viewModel.bpm) { _, _ in viewModel.updateAudioSettings() }
             Toggle("节拍器", isOn: $viewModel.metronomeEnabled)
@@ -272,19 +304,6 @@ struct PdfPracticeView: View {
                     }
                 }
             }
-        }
-    }
-
-    private var pdfSoundAndStatsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("伴奏音量")
-            Slider(
-                value: Binding(
-                    get: { Double(viewModel.audioVolume) },
-                    set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
-                ),
-                in: 0...1
-            )
             Text("节拍器音量")
             Slider(
                 value: Binding(
@@ -293,15 +312,36 @@ struct PdfPracticeView: View {
                 ),
                 in: 0...1
             )
-            Text("同步 \(Int(viewModel.synchronizationOffset * 1_000)) ms")
-            HStack {
-                ForEach([-10, -5, -1, 1, 5, 10], id: \.self) { value in
-                    Button(value > 0 ? "+\(value)" : "\(value)") {
-                        viewModel.synchronizationOffset += Double(value) / 1_000
-                        viewModel.updateAudioSettings()
+        }
+    }
+
+    @ViewBuilder
+    private var pdfAlignmentSection: some View {
+        if viewModel.audioFileName != nil {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("伴奏与节拍器对齐").font(.headline)
+                Text("默认第 1 拍从伴奏开头开始，也可以把当前播放位置设为第 1 拍。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("伴奏开头＝第1拍", action: viewModel.setBeatOneAtAudioStart)
+                Button("当前位置＝第1拍", action: viewModel.setBeatOneAtCurrentPosition)
+                Text("第 1 拍位置：\(format(viewModel.beatOffset ?? 0))")
+                    .monospacedDigit()
+                Text("微调 \(Int(viewModel.synchronizationOffset * 1_000)) ms")
+                HStack {
+                    ForEach([-10, -5, -1, 1, 5, 10], id: \.self) { value in
+                        Button(value > 0 ? "+\(value)" : "\(value)") {
+                            viewModel.synchronizationOffset += Double(value) / 1_000
+                            viewModel.updateAudioSettings()
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private var pdfSoundAndStatsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text(
                 "练习 \(Int(viewModel.accumulatedPracticeTime / 60)) 分钟 · "
                     + "累计循环 \(viewModel.totalCompletedLoops) 轮 · "
@@ -362,6 +402,20 @@ struct PdfPracticeView: View {
 
     private func revealControls() {
         withAnimation { controlsVisible = true }
+    }
+
+    private func openPracticePanel() {
+        withAnimation {
+            controlsVisible = false
+            expandedControls = true
+        }
+    }
+
+    private func closePracticePanel() {
+        withAnimation {
+            expandedControls = false
+            controlsVisible = true
+        }
     }
 
     private func format(_ seconds: TimeInterval) -> String {

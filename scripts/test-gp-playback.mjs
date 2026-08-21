@@ -49,7 +49,7 @@ const source = readFileSync(
     );
     assert.match(
         source,
-        /stop\(\) \{ api\.stop\(\); synthApi\.stop\(\); seekBoth\(0\); \}/,
+        /stop\(\) \{ transport\.stop\(\); seekBoth\(0\); \}/,
         "stopping both players must also return the score viewport to the song start"
     );
 
@@ -112,33 +112,15 @@ const source = readFileSync(
 }
 
 {
-    const startMarker = "    const playPauseBoth = () => {";
-    const endMarker = "\n\n    const trackPayload";
+    const startMarker = "    const createTransportController = (deps) => {";
+    const endMarker = "\n    const transport = createTransportController";
     const start = source.indexOf(startMarker);
     const end = source.indexOf(endMarker, start);
-    assert.notEqual(start, -1, "playPauseBoth implementation is missing");
-    assert.notEqual(end, -1, "playPauseBoth implementation boundary is missing");
+    assert.notEqual(start, -1, "coordinated transport implementation is missing");
+    assert.notEqual(end, -1, "coordinated transport implementation boundary is missing");
     const implementation = source.slice(start, end);
-
-    function runPlayback({
-        hasBacking,
-        synthEnabled,
-        mainPlaying = false,
-        synthPlaying = false,
-        mainTick = 2400,
-        synthTick = 0,
-    }) {
-        const api = player(mainPlaying, mainTick);
-        const synthApi = player(synthPlaying, synthTick);
-        const execute = new Function(
-            "api",
-            "synthApi",
-            "canUseBacking",
-            `let startingBoth = false;\n${implementation}\nplayPauseBoth();`
-        );
-        execute(api, synthApi, () => hasBacking);
-        return { api, synthApi };
-    }
+    const execute = new Function(`${implementation}\nreturn createTransportController;`);
+    const createTransportController = execute();
 
     function player(isPlaying, tickPosition) {
         return {
@@ -146,45 +128,60 @@ const source = readFileSync(
             tickPosition,
             playCalls: 0,
             pauseCalls: 0,
-            play() { this.playCalls += 1; },
-            pause() { this.pauseCalls += 1; },
+            play() { this.playCalls += 1; this.isPlaying = true; },
+            pause() { this.pauseCalls += 1; this.isPlaying = false; },
+            stop() { this.isPlaying = false; },
         };
     }
 
     {
-        const { api, synthApi } = runPlayback({ hasBacking: true, synthEnabled: false });
+        const api = player(false, 2400);
+        const synthApi = player(false, 0);
+        const scheduled = [];
+        const transport = createTransportController({
+            api,
+            synthApi,
+            canUseBacking: () => true,
+            schedule: (action, delay) => scheduled.push({ action, delay }),
+        });
+        transport.play();
         assert.equal(api.playCalls, 1, "muting both sources must not disable the main transport");
         assert.equal(
             synthApi.playCalls,
             1,
             "a muted backing player must keep its transport aligned for seamless re-enabling"
         );
-    }
-
-    {
-        const { api } = runPlayback({ hasBacking: false, synthEnabled: false });
-        assert.equal(api.playCalls, 1, "a score without backing must still allow silent transport");
-    }
-
-    {
-        const { api, synthApi } = runPlayback({ hasBacking: true, synthEnabled: true });
-        assert.equal(api.playCalls, 1);
-        assert.equal(synthApi.playCalls, 1);
         assert.equal(
             synthApi.tickPosition,
             api.tickPosition,
             "backing and synthesis must start from the same score position"
         );
+        transport.pause();
+        assert.equal(api.pauseCalls, 1);
+        assert.equal(synthApi.pauseCalls, 1);
+        assert.deepEqual(scheduled.map(({ delay }) => delay), [80, 240]);
+
+        api.isPlaying = true;
+        synthApi.isPlaying = true;
+        scheduled[0].action();
+        assert.equal(api.isPlaying, false, "a late main-player start must be paused again");
+        assert.equal(synthApi.isPlaying, false, "a late backing-player start must be paused again");
+        assert.equal(api.pauseCalls, 2);
+        assert.equal(synthApi.pauseCalls, 2);
     }
 
     {
-        const { api, synthApi } = runPlayback({
-            hasBacking: true,
-            synthEnabled: true,
-            mainPlaying: true,
+        const api = player(false, 2400);
+        const synthApi = player(false, 0);
+        const transport = createTransportController({
+            api,
+            synthApi,
+            canUseBacking: () => false,
+            schedule: () => {},
         });
-        assert.equal(api.pauseCalls, 1);
-        assert.equal(synthApi.pauseCalls, 1);
+        transport.toggle();
+        assert.equal(api.playCalls, 1, "a score without backing must still allow silent transport");
+        assert.equal(synthApi.playCalls, 0);
     }
 }
 

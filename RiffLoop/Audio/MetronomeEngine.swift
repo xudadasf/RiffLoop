@@ -2,6 +2,41 @@ import AVFoundation
 import Foundation
 import QuartzCore
 
+struct MetronomeClickVoice: Equatable, Sendable {
+    let frequency: Double
+    let amplitude: Float
+    let decay: Double
+}
+
+func metronomeClickVoice(for accent: BeatAccent) -> MetronomeClickVoice {
+    switch accent {
+    case .strong:
+        MetronomeClickVoice(
+            frequency: 2_600,
+            amplitude: 0.95,
+            decay: 65
+        )
+    case .subAccent:
+        MetronomeClickVoice(
+            frequency: 1_800,
+            amplitude: 0.66,
+            decay: 85
+        )
+    case .normal:
+        MetronomeClickVoice(
+            frequency: 1_100,
+            amplitude: 0.44,
+            decay: 105
+        )
+    case .muted:
+        MetronomeClickVoice(
+            frequency: 1_100,
+            amplitude: 0,
+            decay: 105
+        )
+    }
+}
+
 final class MetronomeEngine {
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
@@ -138,39 +173,48 @@ final class MetronomeEngine {
     }
 
     private func rebuildClickBuffers(duration: TimeInterval) {
+        let strongVoice = metronomeClickVoice(for: .strong)
+        let subAccentVoice = metronomeClickVoice(for: .subAccent)
+        let normalVoice = metronomeClickVoice(for: .normal)
         accentClick = Self.makeClick(
-            frequency: 2_350,
-            amplitude: 0.95,
+            frequency: strongVoice.frequency,
+            amplitude: strongVoice.amplitude,
+            decay: strongVoice.decay,
             duration: duration,
             format: format
         )
         subAccentClick = Self.makeClick(
-            frequency: 1_900,
-            amplitude: 0.72,
+            frequency: subAccentVoice.frequency,
+            amplitude: subAccentVoice.amplitude,
+            decay: subAccentVoice.decay,
             duration: duration,
             format: format
         )
         regularClick = Self.makeClick(
-            frequency: 1_450,
-            amplitude: 0.52,
+            frequency: normalVoice.frequency,
+            amplitude: normalVoice.amplitude,
+            decay: normalVoice.decay,
             duration: duration,
             format: format
         )
         subdivisionClick = Self.makeClick(
             frequency: 1_150,
             amplitude: 0.30,
+            decay: 110,
             duration: duration,
             format: format
         )
         kickClick = Self.makeClick(
             frequency: 120,
             amplitude: 0.95,
+            decay: 70,
             duration: duration,
             format: format
         )
         snareClick = Self.makeClick(
             frequency: 1_700,
             amplitude: 0.78,
+            decay: 90,
             duration: duration,
             format: format
         )
@@ -179,6 +223,7 @@ final class MetronomeEngine {
     private static func makeClick(
         frequency: Double,
         amplitude: Float,
+        decay: Double,
         duration: TimeInterval,
         format: AVAudioFormat
     ) -> AVAudioPCMBuffer {
@@ -190,7 +235,7 @@ final class MetronomeEngine {
 
         for frame in 0..<Int(frameCount) {
             let seconds = Double(frame) / format.sampleRate
-            let envelope = Float(exp(-seconds * 85))
+            let envelope = Float(exp(-seconds * decay))
             let sample = amplitude * envelope * Float(sin(2 * .pi * frequency * seconds))
 
             for channel in 0..<Int(format.channelCount) {

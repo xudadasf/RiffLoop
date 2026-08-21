@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const gpWeb = read("RiffLoop/Resources/GpWeb/riffloop-gp.js");
+const gpView = read("RiffLoop/GP/GpPracticeView.swift");
+const metronome = read("RiffLoop/Audio/MetronomeEngine.swift");
+const pdfView = read("RiffLoop/PDF/PdfPracticeView.swift");
+const pdfViewModel = read("RiffLoop/PDF/PdfPracticeViewModel.swift");
+
+assert.match(
+    gpWeb,
+    /const scoreFollowOffset = \(height\) => -Math\.round\(Math\.max\(0, Number\(height\) \|\| 0\) \* 0\.42\);[\s\S]*?scrollOffsetY: scoreFollowOffset/,
+    "the active GP row must be vertically centered with room for following rows"
+);
+assert.match(
+    gpWeb,
+    /const createTransportController = \(deps\) => \{[\s\S]*?schedule\(pauseAgain, 80\);[\s\S]*?schedule\(pauseAgain, 240\);/,
+    "GP pause must retry both transports after asynchronous player startup settles"
+);
+assert.match(
+    gpWeb,
+    /pause\(\) \{ transport\.pause\(\); \}/,
+    "every native pause command must use the coordinated GP transport"
+);
+assert.match(
+    gpView,
+    /if viewModel\.loopRange != nil, !viewModel\.isPlaying \{[\s\S]*?Button\("退出区间循环", action: viewModel\.clearLoop\)/,
+    "the loop exit action must only appear while playback is paused"
+);
+
+for (const expected of [
+    /frequency: 2_600,[\s\S]*?amplitude: 0\.95,[\s\S]*?decay: 65/,
+    /frequency: 1_800,[\s\S]*?amplitude: 0\.66,[\s\S]*?decay: 85/,
+    /frequency: 1_100,[\s\S]*?amplitude: 0\.44,[\s\S]*?decay: 105/,
+]) {
+    assert.match(metronome, expected, "native strong, secondary and normal clicks must be clearly separated");
+}
+assert.match(gpWeb, /if \(accent === "subAccent"\) return 0\.45;/);
+assert.match(gpWeb, /return 0\.18;/);
+
+assert.match(pdfView, /Button\("控制", action: openPracticePanel\)/);
+assert.match(pdfView, /Button\("返回 PDF"\)[\s\S]*?closePracticePanel\(\)/);
+assert.match(pdfView, /\.background\(\.black\.opacity\(0\.82\)\)/);
+assert.match(pdfView, /\.zIndex\(3\)/);
+assert.match(pdfView, /暂停伴奏|播放伴奏/);
+assert.match(pdfView, /暂停节拍器|启动节拍器/);
+assert.match(pdfView, /伴奏开头＝第1拍/);
+assert.match(pdfView, /当前位置＝第1拍/);
+assert.match(pdfViewModel, /func toggleAudioPlayback\(\)/);
+assert.match(pdfViewModel, /func toggleMetronomePlayback\(\)/);
+assert.match(pdfViewModel, /func setBeatOneAtAudioStart\(\)/);
+assert.match(pdfViewModel, /func setBeatOneAtCurrentPosition\(\)/);
+
+console.log("Reported iOS issue policies passed");

@@ -253,8 +253,8 @@ struct GpPracticeView: View {
             Text("长按谱面并拖动选择循环范围，松手确认；靠近上下边缘可继续滚动选择。轻点谱面跳转播放位置。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if viewModel.loopRange != nil {
-                Button("清除", action: viewModel.clearLoop)
+            if viewModel.loopRange != nil, !viewModel.isPlaying {
+                Button("退出区间循环", action: viewModel.clearLoop)
                     .buttonStyle(.bordered)
             }
             if let message = viewModel.loopSelectionMessage {

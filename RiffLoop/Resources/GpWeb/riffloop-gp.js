@@ -2,6 +2,8 @@
     "use strict";
 
     const scoreElement = document.getElementById("score");
+    const viewportElement = document.getElementById("viewport");
+    const scoreFollowOffset = (height) => -Math.round(Math.max(0, Number(height) || 0) * 0.42);
     const LONG_PRESS_MILLISECONDS = 600;
     const POSITION_POST_INTERVAL_MILLISECONDS = 50;
     const post = (event, payload) => {
@@ -34,6 +36,7 @@
             soundFont: null,
             scrollElement: "#viewport",
             scrollMode: alphaTab.ScrollMode.Smooth,
+            scrollOffsetY: scoreFollowOffset(viewportElement.clientHeight || window.innerHeight),
             enableCursor: true,
             enableAnimatedBeatCursor: true,
             enableElementHighlighting: true,
@@ -59,7 +62,6 @@
     let backingEnabled = true;
     let synthVolume = 0.75;
     let backingVolume = 0.75;
-    let startingBoth = false;
     let soundFontBytes = null;
     let committedRange = null;
     let rangeLoopingEnabled = false;
@@ -78,9 +80,9 @@
         const accent = beatAccents[Math.floor(pulse / factor)]
             || (pulse === 0 ? "strong" : "normal");
         if (accent === "strong") return 1;
-        if (accent === "subAccent") return 0.62;
+        if (accent === "subAccent") return 0.45;
         if (accent === "muted") return 0;
-        return 0.34;
+        return 0.18;
     };
     const applyMetronomePulse = (pulse) => {
         const volume = metronomeMasterVolume * metronomeGain(pulse);
@@ -110,6 +112,53 @@
     };
     configureMetronomeEvents(api);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
+    const createTransportController = (deps) => {
+        const { api, synthApi, canUseBacking, schedule } = deps;
+        let wantsPlayback = false;
+        let pauseGeneration = 0;
+        const pauseNow = () => {
+            api.pause();
+            synthApi.pause();
+        };
+        const pause = () => {
+            wantsPlayback = false;
+            const generation = ++pauseGeneration;
+            pauseNow();
+            const pauseAgain = () => {
+                if (!wantsPlayback && generation === pauseGeneration) pauseNow();
+            };
+            schedule(pauseAgain, 80);
+            schedule(pauseAgain, 240);
+        };
+        const play = () => {
+            wantsPlayback = true;
+            pauseGeneration += 1;
+            if (canUseBacking()) synthApi.tickPosition = api.tickPosition;
+            api.play();
+            if (canUseBacking()) synthApi.play();
+        };
+        const toggle = () => {
+            if (wantsPlayback || api.isPlaying || synthApi.isPlaying) pause();
+            else play();
+        };
+        const stop = () => {
+            wantsPlayback = false;
+            pauseGeneration += 1;
+            api.stop();
+            synthApi.stop();
+        };
+        const markStopped = () => {
+            wantsPlayback = false;
+            pauseGeneration += 1;
+        };
+        return { play, pause, toggle, stop, markStopped };
+    };
+    const transport = createTransportController({
+        api,
+        synthApi,
+        canUseBacking,
+        schedule: window.setTimeout.bind(window)
+    });
     const isPlaybackReady = (state) => state.hasLoaded
         && state.mainReady
         && (!state.hasBacking || state.synthReady);
@@ -157,22 +206,7 @@
         return true;
     };
     const playPauseBoth = () => {
-        if (startingBoth) return;
-        startingBoth = true;
-        const shouldPlay = canUseBacking()
-            ? !(api.isPlaying || synthApi.isPlaying)
-            : !api.isPlaying;
-        if (shouldPlay) {
-            if (canUseBacking()) {
-                synthApi.tickPosition = api.tickPosition;
-            }
-            api.play();
-            if (canUseBacking()) synthApi.play();
-        } else {
-            api.pause();
-            synthApi.pause();
-        }
-        startingBoth = false;
+        transport.toggle();
     };
 
     const trackPayload = (track) => ({
@@ -288,6 +322,7 @@
     }));
     api.playerFinished.on(() => {
         if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;
+        transport.markStopped();
         post("playerFinished");
     });
     const playbackRangeTrack = () => api.tracks?.[0] || api.score?.tracks?.[0];
@@ -501,6 +536,7 @@
         },
         loadScore(base64) {
             try {
+                transport.pause();
                 resetPlaybackReadiness();
                 window.riffloopCommittedBars = null;
                 pendingRangeHighlight = null;
@@ -515,8 +551,8 @@
             }
         },
         playPause() { playPauseBoth(); },
-        pause() { api.pause(); synthApi.pause(); },
-        stop() { api.stop(); synthApi.stop(); seekBoth(0); },
+        pause() { transport.pause(); },
+        stop() { transport.stop(); seekBoth(0); },
         seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
@@ -552,8 +588,7 @@
             metronomeSubdivisionFactor = value;
             applyMetronomePulse(0);
             if (loadedScoreBytes) {
-                api.pause();
-                synthApi.pause();
+                transport.pause();
                 resetPlaybackReadiness();
                 api.load(loadedScoreBytes.slice());
                 synthApi.load(loadedScoreBytes.slice());
@@ -641,11 +676,10 @@
         },
         restartRangeWithCountIn() {
             if (!committedRange) return;
-            api.pause();
-            synthApi.pause();
+            transport.pause();
             api.tickPosition = committedRange.startTick;
             synthApi.tickPosition = committedRange.startTick;
-            setTimeout(playPauseBoth, 50);
+            setTimeout(transport.play, 50);
         },
         cancelRangePreview() {
             const bars = window.riffloopCommittedBars;
@@ -653,7 +687,7 @@
             else api.clearPlaybackRangeHighlight();
         },
         lifecycle(active) {
-            if (!active) { api.pause(); synthApi.pause(); }
+            if (!active) transport.pause();
         }
     };
 
