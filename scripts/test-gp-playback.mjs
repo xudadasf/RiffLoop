@@ -210,12 +210,14 @@ assert.match(
         const synthApi = player(false, 0);
         const scheduled = [];
         const reportedStates = [];
+        const backingAudibility = [];
         const transport = createTransportController({
             api,
             synthApi,
             canUseBacking: () => true,
             schedule: (action, delay) => scheduled.push({ action, delay }),
             reportState: (playing, stopped) => reportedStates.push({ playing, stopped }),
+            setBackingAudible: (audible) => backingAudibility.push(audible),
         });
         transport.play();
         assert.deepEqual(reportedStates.at(-1), { playing: true, stopped: false });
@@ -231,6 +233,12 @@ assert.match(
             api.timePosition,
             "backing and synthesis must start from the same score time"
         );
+        assert.deepEqual(backingAudibility, [false], "backing must prewarm silently");
+        assert.equal(transport.startDeferredBacking(2_480), false);
+        api.timePosition = 2_500;
+        assert.equal(transport.markBackingStarted(api.timePosition), true);
+        assert.equal(synthApi.timePosition, 2_500, "startup correction must use the latest score time");
+        assert.deepEqual(backingAudibility, [false, true], "backing becomes audible only after both clocks are ready");
         transport.pause();
         assert.deepEqual(reportedStates.at(-1), { playing: false, stopped: false });
         assert.equal(transport.isPlayingIntent(), false);
@@ -250,12 +258,13 @@ assert.match(
     {
         const api = player(false, 2400);
         const synthApi = player(false, 0);
+        const backingAudibility = [];
         const transport = createTransportController({
             api,
             synthApi,
             canUseBacking: () => true,
-            shouldDeferBacking: () => true,
             alignBacking: (scoreTime) => { synthApi.timePosition = scoreTime; },
+            setBackingAudible: (audible) => backingAudibility.push(audible),
             schedule: () => {},
         });
 
@@ -263,13 +272,27 @@ assert.match(
         assert.equal(api.playCalls, 1, "the score transport must start the count-in immediately");
         assert.equal(
             synthApi.playCalls,
-            0,
-            "the embedded backing must stay paused while the score player is sounding its count-in"
+            1,
+            "the embedded backing transport must prewarm during count-in"
+        );
+        assert.deepEqual(backingAudibility, [false], "prewarmed backing must remain silent during count-in");
+        assert.equal(transport.markBackingStarted(api.timePosition), false);
+
+        assert.equal(
+            transport.startDeferredBacking(api.timePosition),
+            false,
+            "a stationary position notification at the playback anchor is still part of the count-in"
+        );
+        assert.equal(
+            synthApi.playCalls,
+            1,
+            "stationary count-in events must not restart the prewarmed backing"
         );
 
         assert.equal(transport.startDeferredBacking(2_480), true);
         assert.equal(synthApi.timePosition, 2_480, "backing must align to the first real score position");
-        assert.equal(synthApi.playCalls, 1, "backing must start exactly when score playback begins");
+        assert.equal(synthApi.playCalls, 1, "backing playback must be started exactly once");
+        assert.deepEqual(backingAudibility, [false, true]);
         assert.equal(
             transport.startDeferredBacking(2_500),
             false,
@@ -289,6 +312,47 @@ assert.match(
         transport.toggle();
         assert.equal(api.playCalls, 1, "a score without backing must still allow silent transport");
         assert.equal(synthApi.playCalls, 0);
+    }
+
+    for (const speed of [0.5, 0.75, 1, 1.25, 1.5]) {
+        for (const anchor of [0, 45_000, 90_000]) {
+            for (const backingStartsFirst of [false, true]) {
+                const api = player(false, anchor, anchor);
+                const synthApi = player(false, 0, 0);
+                api.playbackSpeed = speed;
+                synthApi.playbackSpeed = speed;
+                const backingAudibility = [];
+                const transport = createTransportController({
+                    api,
+                    synthApi,
+                    canUseBacking: () => true,
+                    alignBacking: (scoreTime) => { synthApi.timePosition = scoreTime; },
+                    setBackingAudible: (audible) => backingAudibility.push(audible),
+                    schedule: () => {},
+                });
+
+                transport.play();
+                assert.equal(transport.startDeferredBacking(anchor), false);
+                assert.equal(transport.startDeferredBacking(anchor), false);
+                const advancedTime = anchor + 120 * speed;
+                if (backingStartsFirst) {
+                    assert.equal(transport.markBackingStarted(anchor), false);
+                    assert.equal(transport.startDeferredBacking(advancedTime), true);
+                } else {
+                    assert.equal(transport.startDeferredBacking(advancedTime), false);
+                    api.timePosition = advancedTime + 20 * speed;
+                    assert.equal(transport.markBackingStarted(api.timePosition), true);
+                }
+                assert.equal(synthApi.playCalls, 1);
+                assert.deepEqual(backingAudibility, [false, true]);
+                assert.equal(
+                    synthApi.timePosition,
+                    backingStartsFirst ? advancedTime : api.timePosition,
+                    `backing must align once at ${speed}x from ${anchor}ms`
+                );
+                assert.equal(transport.startDeferredBacking(advancedTime + 500), false);
+            }
+        }
     }
 }
 

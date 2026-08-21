@@ -8,60 +8,71 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 20) {
-                    practiceCard(
-                        title: "视频练习",
-                        subtitle: "播放、节拍器与 A/B 循环",
-                        systemImage: "play.rectangle.fill"
-                    ) {
-                        PracticeView(initialURL: mostRecentURL(for: .video))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(spacing: 20) {
+                        practiceCard(
+                            title: "视频练习",
+                            subtitle: "播放、节拍器与 A/B 循环",
+                            systemImage: "play.rectangle.fill"
+                        ) {
+                            PracticeView(initialURL: mostRecentURL(for: .video))
+                        }
+
+                        practiceCard(
+                            title: "Guitar Pro 乐谱",
+                            subtitle: "音符级循环与内嵌伴奏",
+                            systemImage: "music.note.list"
+                        ) {
+                            GpPracticeView(initialURL: mostRecentURL(for: .guitarPro))
+                        }
+
+                        practiceCard(
+                            title: "PDF 谱面",
+                            subtitle: "伴奏、轨迹与自动跟谱",
+                            systemImage: "doc.richtext.fill"
+                        ) {
+                            PdfPracticeView(initialURL: mostRecentURL(for: .pdf))
+                        }
                     }
 
-                    practiceCard(
-                        title: "Guitar Pro 乐谱",
-                        subtitle: "音符级循环与内嵌伴奏",
-                        systemImage: "music.note.list"
-                    ) {
-                        GpPracticeView(initialURL: mostRecentURL(for: .guitarPro))
-                    }
+                    practiceCalendarCard
+                    signingStatusCard
 
-                    practiceCard(
-                        title: "PDF 谱面",
-                        subtitle: "伴奏、轨迹与自动跟谱",
-                        systemImage: "doc.richtext.fill"
-                    ) {
-                        PdfPracticeView(initialURL: mostRecentURL(for: .pdf))
-                    }
-                }
+                    if !recentProjects.projects.isEmpty {
+                        Text("最近项目")
+                            .font(.title3.bold())
+                        LazyVStack(spacing: 8) {
+                            ForEach(recentProjects.projects) { project in
+                                HStack(spacing: 12) {
+                                    NavigationLink {
+                                        destination(for: project)
+                                    } label: {
+                                        Label(project.fileName, systemImage: iconName(for: project.kind))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
 
-                practiceCalendarCard
-                signingStatusCard
-
-                if !recentProjects.projects.isEmpty {
-                    Text("最近项目")
-                        .font(.title3.bold())
-                    List {
-                        ForEach(recentProjects.projects) { project in
-                            NavigationLink {
-                                destination(for: project)
-                            } label: {
-                                Label(project.fileName, systemImage: iconName(for: project.kind))
-                            }
-                            .swipeActions {
-                                Button("移除记录", role: .destructive) {
-                                    recentProjects.remove(
-                                        kind: project.kind,
-                                        fileName: project.fileName
-                                    )
+                                    Button(role: .destructive) {
+                                        recentProjects.remove(
+                                            kind: project.kind,
+                                            fileName: project.fileName
+                                        )
+                                    } label: {
+                                        Label("移除记录", systemImage: "trash")
+                                            .labelStyle(.iconOnly)
+                                    }
+                                    .buttonStyle(.bordered)
                                 }
+                                .padding(14)
+                                .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
                             }
                         }
                     }
-                    .listStyle(.plain)
                 }
+                .padding(28)
             }
-            .padding(28)
             .background {
                 LinearGradient(
                     colors: [Color(red: 0.08, green: 0.09, blue: 0.13), .black],

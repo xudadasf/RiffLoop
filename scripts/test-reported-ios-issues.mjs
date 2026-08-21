@@ -72,14 +72,15 @@ assert.match(
 );
 assert.match(
     gpWeb,
-    /shouldDeferBacking: \(\) => countInMasterVolume > 0[\s\S]*?playerPositionChanged\.on\(\(position\) => \{[\s\S]*?startDeferredBacking\(position\.currentTime\)/,
-    "count-in playback must defer embedded backing until the first real score position"
+    /setBackingAudible\(false\)[\s\S]*?synthApi\.play\(\)[\s\S]*?api\.play\(\)[\s\S]*?synthApi\.playerStateChanged\.on[\s\S]*?markBackingStarted\(api\.timePosition\)[\s\S]*?playerPositionChanged\.on\(\(position\) => \{[\s\S]*?startDeferredBacking\(position\.currentTime\)/,
+    "embedded backing must prewarm silently and become audible only after both playback clocks are ready"
 );
 
 for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
     assert.match(source, /PracticeHistoryStore\.shared\.record\(/, "every practice mode must update daily history");
 }
 assert.match(homeView, /练习日历[\s\S]*?颜色越深，练习时间越长/);
+assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
 assert.match(homeView, /if minutes == 0 \{ return \.white \}/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
 assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");

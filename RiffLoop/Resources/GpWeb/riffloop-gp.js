@@ -166,20 +166,37 @@
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
         const reportState = deps.reportState || (() => {});
-        const shouldDeferBacking = deps.shouldDeferBacking || (() => false);
         const alignBacking = deps.alignBacking || (() => {
             synthApi.timePosition = api.timePosition;
         });
+        const setBackingAudible = deps.setBackingAudible || (() => {});
         let wantsPlayback = false;
-        let backingDeferred = false;
+        let backingPriming = false;
+        let backingStarted = false;
+        let scoreAdvanced = false;
+        let playbackAnchorTime = 0;
+        let latestScoreTime = 0;
         let pauseGeneration = 0;
+        const resetBackingPriming = () => {
+            backingPriming = false;
+            backingStarted = false;
+            scoreAdvanced = false;
+            setBackingAudible(true);
+        };
+        const finishBackingPriming = () => {
+            if (!wantsPlayback || !backingPriming || !backingStarted || !scoreAdvanced) return false;
+            backingPriming = false;
+            alignBacking(latestScoreTime);
+            setBackingAudible(true);
+            return true;
+        };
         const pauseNow = () => {
             api.pause();
             synthApi.pause();
         };
         const pause = () => {
             wantsPlayback = false;
-            backingDeferred = false;
+            resetBackingPriming();
             const generation = ++pauseGeneration;
             pauseNow();
             reportState(false, false);
@@ -192,18 +209,38 @@
         const play = () => {
             wantsPlayback = true;
             pauseGeneration += 1;
-            backingDeferred = canUseBacking() && shouldDeferBacking();
-            if (canUseBacking() && !backingDeferred) alignBacking(api.timePosition);
+            playbackAnchorTime = Number(api.timePosition) || 0;
+            latestScoreTime = playbackAnchorTime;
+            backingPriming = canUseBacking();
+            backingStarted = false;
+            scoreAdvanced = false;
+            if (backingPriming) {
+                alignBacking(playbackAnchorTime);
+                setBackingAudible(false);
+                synthApi.play();
+            }
             api.play();
-            if (canUseBacking() && !backingDeferred) synthApi.play();
             reportState(true, false);
         };
         const startDeferredBacking = (scoreTime) => {
-            if (!wantsPlayback || !backingDeferred || !canUseBacking()) return false;
-            backingDeferred = false;
-            alignBacking(scoreTime);
-            synthApi.play();
-            return true;
+            const target = Number(scoreTime);
+            if (
+                !wantsPlayback
+                || !backingPriming
+                || !canUseBacking()
+                || !Number.isFinite(target)
+                || target <= playbackAnchorTime + 0.5
+            ) return false;
+            scoreAdvanced = true;
+            latestScoreTime = target;
+            return finishBackingPriming();
+        };
+        const markBackingStarted = (scoreTime) => {
+            if (!wantsPlayback || !backingPriming || !canUseBacking()) return false;
+            backingStarted = true;
+            const target = Number(scoreTime);
+            if (scoreAdvanced && Number.isFinite(target)) latestScoreTime = target;
+            return finishBackingPriming();
         };
         const toggle = () => {
             if (wantsPlayback || api.isPlaying || synthApi.isPlaying) pause();
@@ -211,7 +248,7 @@
         };
         const stop = () => {
             wantsPlayback = false;
-            backingDeferred = false;
+            resetBackingPriming();
             pauseGeneration += 1;
             api.stop();
             synthApi.stop();
@@ -219,23 +256,38 @@
         };
         const markStopped = () => {
             wantsPlayback = false;
-            backingDeferred = false;
+            resetBackingPriming();
             pauseGeneration += 1;
             reportState(false, true);
         };
+        const applyBackingOutput = () => setBackingAudible(!backingPriming);
         const isPlayingIntent = () => wantsPlayback;
-        return { play, pause, toggle, stop, markStopped, startDeferredBacking, isPlayingIntent };
+        return {
+            play,
+            pause,
+            toggle,
+            stop,
+            markStopped,
+            startDeferredBacking,
+            markBackingStarted,
+            applyBackingOutput,
+            isPlayingIntent
+        };
     };
     const backingAligner = createBackingAligner({
         synthApi,
-        canUseBacking: () => canUseBacking() && backingEnabled
+        canUseBacking
     });
     const transport = createTransportController({
         api,
         synthApi,
         canUseBacking,
         alignBacking: (scoreTime = api.timePosition) => backingAligner.align(scoreTime),
-        shouldDeferBacking: () => countInMasterVolume > 0,
+        setBackingAudible: (audible) => {
+            if (canUseBacking()) {
+                synthApi.masterVolume = audible && backingEnabled ? backingVolume : 0;
+            }
+        },
         schedule: window.setTimeout.bind(window),
         reportState: (playing, stopped) => post("playerStateChanged", {
             state: playing ? 1 : 0,
@@ -428,6 +480,11 @@
     });
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
+    synthApi.playerStateChanged.on((state) => {
+        if (synthApi.isPlaying || state?.state === 1) {
+            transport.markBackingStarted(api.timePosition);
+        }
+    });
     api.playerPositionChanged.on((position) => {
         if (!position.isSeek) transport.startDeferredBacking(position.currentTime);
         // alphaTab's native range can be lost when its internal player is rebuilt.
@@ -739,7 +796,7 @@
         },
         setBackingVolume(volume) {
             backingVolume = Number(volume);
-            if (canUseBacking()) synthApi.masterVolume = backingEnabled ? backingVolume : 0;
+            transport.applyBackingOutput();
         },
         setSynthEnabled(enabled) {
             synthEnabled = Boolean(enabled);
@@ -753,7 +810,7 @@
                     transport.pause();
                     backingAligner.align(api.timePosition);
                 }
-                synthApi.masterVolume = backingEnabled ? backingVolume : 0;
+                transport.applyBackingOutput();
             }
         },
         setMetronomeVolume(volume) {
