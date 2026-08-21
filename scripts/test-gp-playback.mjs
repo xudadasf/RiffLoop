@@ -47,6 +47,11 @@ const source = readFileSync(
         /const seekBoth = \(tick\) => \{[\s\S]*?window\.setTimeout\(\(\) => \{[\s\S]*?if \(api\.isReadyForPlayback\) api\.scrollToCursor\(\);[\s\S]*?\}, 50\);/,
         "every coordinated seek must promptly bring the score cursor into view"
     );
+    assert.match(
+        source,
+        /stop\(\) \{ api\.stop\(\); synthApi\.stop\(\); seekBoth\(0\); \}/,
+        "stopping both players must also return the score viewport to the song start"
+    );
 
     const loopStartMarker = "    const enforceCommittedRange = (position) => {";
     const loopEndMarker = "\n    const playPauseBoth";

@@ -516,7 +516,7 @@
         },
         playPause() { playPauseBoth(); },
         pause() { api.pause(); synthApi.pause(); },
-        stop() { api.stop(); synthApi.stop(); },
+        stop() { api.stop(); synthApi.stop(); seekBoth(0); },
         seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
