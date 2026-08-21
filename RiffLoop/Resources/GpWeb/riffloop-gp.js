@@ -365,7 +365,7 @@
         }
     };
 
-    const hitBar = (clientX, clientY) => {
+    const hitScorePosition = (clientX, clientY) => {
         const lookup = api.renderer?.boundsLookup;
         if (!lookup || !api.score?.masterBars?.length) return null;
         const rect = scoreElement.getBoundingClientRect();
@@ -373,7 +373,15 @@
         const y = clientY - rect.top;
         const beat = lookup.getBeatAtPos(x, y);
         const beatIndex = beat?.voice?.bar?.masterBar?.index;
-        if (Number.isInteger(beatIndex)) return barPayload(beatIndex);
+        if (Number.isInteger(beatIndex)) {
+            const bar = barPayload(beatIndex);
+            if (!bar) return null;
+            const beatTick = Number(api.tickCache?.getBeatStart(beat) ?? beat.absolutePlaybackStart);
+            return {
+                bar,
+                seekTick: Number.isFinite(beatTick) ? beatTick : bar.startTick
+            };
+        }
 
         let nearest = null;
         let nearestDistance = Number.POSITIVE_INFINITY;
@@ -388,7 +396,7 @@
                 nearest = barPayload(index);
             }
         }
-        return nearest;
+        return nearest ? { bar: nearest, seekTick: nearest.startTick } : null;
     };
 
     const createPointerSelection = (deps) => {
@@ -396,7 +404,7 @@
         const EDGE_SCROLL_ZONE_PIXELS = 64;
         const EDGE_SCROLL_STEP_PIXELS = 12;
 
-        const { element, viewport, hitBar, post, scheduleLongPress, cancelLongPress } = deps;
+        const { element, viewport, hitScorePosition, post, scheduleLongPress, cancelLongPress } = deps;
         let pointer = null;
         let longPressTimer = null;
 
@@ -412,7 +420,7 @@
             pointer.mode = "select";
             element.classList.remove("range-press-pending");
             element.classList.add("range-selecting");
-            post("pointerDown", pointer.hit);
+            post("pointerDown", pointer.hit.bar);
         };
         const clearInteractionFeedback = () => {
             element.classList.remove("range-press-pending", "range-selecting");
@@ -433,7 +441,7 @@
         return {
             pointerDown(event) {
                 if (!event.isPrimary) return;
-                const hit = hitBar(event.clientX, event.clientY);
+                const hit = hitScorePosition(event.clientX, event.clientY);
                 if (!hit) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -472,10 +480,10 @@
                 }
                 if (pointer.mode === "select") {
                     event.preventDefault();
-                    const hit = hitBar(event.clientX, event.clientY);
-                    if (hit && hit.index !== pointer.hit.index) {
+                    const hit = hitScorePosition(event.clientX, event.clientY);
+                    if (hit && hit.bar.index !== pointer.hit.bar.index) {
                         pointer.hit = hit;
-                        post("pointerMove", hit);
+                        post("pointerMove", hit.bar);
                     }
                     scrollToward(event.clientY);
                 }
@@ -490,13 +498,13 @@
                 pointer = null;
                 clearInteractionFeedback();
                 if (mode === "select") {
-                    post("pointerMove", lastHit);
+                    post("pointerMove", lastHit.bar);
                     post("pointerUp");
                     return;
                 }
                 if (mode === "pending") {
-                    const hit = hitBar(event.clientX, event.clientY) || lastHit;
-                    if (hit) post("barHit", hit);
+                    const hit = hitScorePosition(event.clientX, event.clientY) || lastHit;
+                    if (hit) post("barHit", { ...hit.bar, seekTick: hit.seekTick });
                 }
             },
             pointerCancel(event) {
@@ -513,7 +521,7 @@
     const pointerSelection = createPointerSelection({
         element: scoreElement,
         viewport: document.getElementById("viewport"),
-        hitBar,
+        hitScorePosition,
         post,
         scheduleLongPress: (callback) => setTimeout(callback, LONG_PRESS_MILLISECONDS),
         cancelLongPress: clearTimeout

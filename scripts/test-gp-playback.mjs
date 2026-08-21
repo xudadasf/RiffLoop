@@ -192,6 +192,55 @@ const source = readFileSync(
 }
 
 {
+    const startMarker = "    const hitScorePosition = (clientX, clientY) => {";
+    const endMarker = "\n    const createPointerSelection = (deps) => {";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "hitScorePosition implementation is missing");
+    assert.notEqual(end, -1, "hitScorePosition boundary is missing");
+    const implementation = source.slice(start, end);
+    const masterBar = { index: 2 };
+    const beats = [
+        { id: "first", voice: { bar: { masterBar } } },
+        { id: "third", voice: { bar: { masterBar } } },
+    ];
+    const api = {
+        score: { masterBars: [{}, {}, masterBar] },
+        renderer: {
+            boundsLookup: {
+                getBeatAtPos: (x) => (x < 200 ? beats[0] : beats[1]),
+                findMasterBarByIndex: () => null,
+            },
+        },
+        tickCache: {
+            getBeatStart: (beat) => (beat.id === "first" ? 2_040 : 2_520),
+        },
+    };
+    const scoreElement = {
+        getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    };
+    const barPayload = () => ({ index: 2, startTick: 1_920, endTick: 2_880 });
+    const execute = new Function(
+        "api",
+        "scoreElement",
+        "barPayload",
+        `${implementation}\nreturn hitScorePosition;`
+    );
+    const hitScorePosition = execute(api, scoreElement, barPayload);
+
+    assert.deepEqual(
+        hitScorePosition(100, 100),
+        { bar: barPayload(), seekTick: 2_040 },
+        "a tap must preserve the first beat tick instead of reducing it to the bar start"
+    );
+    assert.deepEqual(
+        hitScorePosition(300, 100),
+        { bar: barPayload(), seekTick: 2_520 },
+        "different beats in one bar must produce different seek ticks"
+    );
+}
+
+{
     const startMarker = "    const createPointerSelection = (deps) => {";
     const endMarker = "\n    const pointerSelection = createPointerSelection({";
     const start = source.indexOf(startMarker);
@@ -201,6 +250,7 @@ const source = readFileSync(
     const implementation = source.slice(start, end);
 
     const bar = (index) => ({ index, startTick: index * 960, endTick: (index + 1) * 960 });
+    const scoreHit = (index, seekTick = index * 960) => ({ bar: bar(index), seekTick });
 
     function makeHarness(barAt) {
         const posted = [];
@@ -228,16 +278,19 @@ const source = readFileSync(
             timerFns.length = 0;
         };
         const execute = new Function(
-            "hitBar",
+            "hitScorePosition",
             "post",
             "viewport",
             "element",
             "scheduleLongPress",
             "cancelLongPress",
-            `${implementation}\nreturn createPointerSelection({ element, viewport, hitBar, post, scheduleLongPress, cancelLongPress });`
+            `${implementation}\nreturn createPointerSelection({ element, viewport, hitScorePosition, post, scheduleLongPress, cancelLongPress });`
         );
         const selection = execute(
-            barAt,
+            (x, y) => {
+                const hit = barAt(x, y);
+                return hit && "bar" in hit ? hit : (hit ? { bar: hit, seekTick: hit.startTick } : null);
+            },
             (event, payload) => posted.push(payload === undefined ? [event] : [event, payload]),
             viewport,
             element,
@@ -270,20 +323,26 @@ const source = readFileSync(
     }
 
     {
-        const h = makeHarness((x, y) => bar(x < 400 ? 2 : 8));
+        const h = makeHarness((x, y) => (
+            x < 400 ? scoreHit(2, 2_160) : scoreHit(8, 8_160)
+        ));
         h.pointerDown(100, 100);
         h.pointerUp(100, 100);
-        assert.deepEqual(h.posted, [["barHit", bar(2)]], "a plain tap must seek via barHit");
+        assert.deepEqual(
+            h.posted,
+            [["barHit", { ...bar(2), seekTick: 2_160 }]],
+            "a plain tap must seek via barHit at the precise beat tick"
+        );
     }
 
     {
-        const h = makeHarness((x, y) => bar(x < 400 ? 2 : 8));
+        const h = makeHarness((x, y) => scoreHit(x < 400 ? 2 : 8));
         h.pointerDown(100, 100);
         h.pointerMove(104, 103);
         h.pointerUp(104, 103);
         assert.deepEqual(
             h.posted,
-            [["barHit", bar(2)]],
+            [["barHit", { ...bar(2), seekTick: bar(2).startTick }]],
             "jitter under the slop threshold must still count as a tap"
         );
     }
@@ -382,7 +441,7 @@ const source = readFileSync(
         h.pointerUp(420, 100);
         assert.deepEqual(
             h.posted,
-            [["barHit", bar(8)]],
+            [["barHit", { ...bar(8), seekTick: bar(8).startTick }]],
             "a tap that slides under the slop must seek the bar at the release position"
         );
     }

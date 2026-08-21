@@ -52,6 +52,21 @@ final class GpBridgeEventTests: XCTestCase {
         )
     }
 
+    func testDecodesPreciseBeatTickForTapSeeking() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: [
+                "event": "barHit",
+                "payload": [
+                    "index": 8,
+                    "startTick": 7_680,
+                    "endTick": 8_640,
+                    "seekTick": 8_160,
+                ],
+            ]),
+            .barHit(GpBarHit(index: 8, startTick: 7_680, endTick: 8_640, seekTick: 8_160))
+        )
+    }
+
     func testDecodesPointerHitsForLongPressDragSelection() throws {
         let hit = GpBarHit(index: 8, startTick: 7_680, endTick: 8_640)
         XCTAssertEqual(

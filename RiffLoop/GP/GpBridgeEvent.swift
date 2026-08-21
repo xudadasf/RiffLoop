@@ -73,6 +73,14 @@ struct GpBarHit: Codable, Equatable, Sendable {
     let index: Int
     let startTick: Double
     let endTick: Double
+    let seekTick: Double?
+
+    init(index: Int, startTick: Double, endTick: Double, seekTick: Double? = nil) {
+        self.index = index
+        self.startTick = startTick
+        self.endTick = endTick
+        self.seekTick = seekTick
+    }
 }
 
 enum GpBridgeEvent: Equatable, Sendable {

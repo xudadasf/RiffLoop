@@ -396,7 +396,7 @@ final class GpWebViewModel: ObservableObject {
             break
         case let .seek(bar):
             selectedBar = bar
-            seek(to: bar.startTick)
+            seek(to: bar.seekTick ?? bar.startTick)
         case let .selectStart(range):
             pause()
             loopRange = nil
