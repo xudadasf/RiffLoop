@@ -61,25 +61,52 @@ final class GpBridgeEventTests: XCTestCase {
                     "startTick": 7_680,
                     "endTick": 8_640,
                     "seekTick": 8_160,
+                    "seekEndTick": 8_400,
                 ],
             ]),
-            .barHit(GpBarHit(index: 8, startTick: 7_680, endTick: 8_640, seekTick: 8_160))
+            .barHit(
+                GpBarHit(
+                    index: 8,
+                    startTick: 7_680,
+                    endTick: 8_640,
+                    seekTick: 8_160,
+                    seekEndTick: 8_400
+                )
+            )
         )
     }
 
     func testDecodesPointerHitsForLongPressDragSelection() throws {
-        let hit = GpBarHit(index: 8, startTick: 7_680, endTick: 8_640)
+        let hit = GpBarHit(
+            index: 8,
+            startTick: 7_680,
+            endTick: 8_640,
+            seekTick: 8_160,
+            seekEndTick: 8_400
+        )
         XCTAssertEqual(
             try GpBridgeEvent.decode(messageBody: [
                 "event": "pointerDown",
-                "payload": ["index": 8, "startTick": 7_680, "endTick": 8_640],
+                "payload": [
+                    "index": 8,
+                    "startTick": 7_680,
+                    "endTick": 8_640,
+                    "seekTick": 8_160,
+                    "seekEndTick": 8_400,
+                ],
             ]),
             .pointerDown(hit)
         )
         XCTAssertEqual(
             try GpBridgeEvent.decode(messageBody: [
                 "event": "pointerMove",
-                "payload": ["index": 8, "startTick": 7_680, "endTick": 8_640],
+                "payload": [
+                    "index": 8,
+                    "startTick": 7_680,
+                    "endTick": 8_640,
+                    "seekTick": 8_160,
+                    "seekEndTick": 8_400,
+                ],
             ]),
             .pointerMove(hit)
         )

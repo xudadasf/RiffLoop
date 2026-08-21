@@ -62,5 +62,15 @@ assert.match(
     /const refreshPendingRangeHighlight[\s\S]*?try\s*\{[\s\S]*?highlightPlaybackRange[\s\S]*?catch/,
     "range highlighting must tolerate a render that has not produced bounds yet"
 );
+assert.match(
+    script,
+    /const closestRangeBeat[\s\S]*?pendingRangeHighlight\.startTick[\s\S]*?pendingRangeHighlight\.endTick/,
+    "range highlighting must resolve the selected start and end beats instead of whole bars"
+);
+assert.match(
+    script,
+    /previewRange\(firstBar, lastBar, startTick, endTick\)/,
+    "native range previews must include precise note ticks"
+);
 
 console.log("GP playback display policy passed");

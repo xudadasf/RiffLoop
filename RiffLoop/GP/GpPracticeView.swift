@@ -261,7 +261,7 @@ struct GpPracticeView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("A/B 区间循环")
                 .font(.headline)
-            Text("长按谱面并拖动选择循环范围，松手确认；靠近上下边缘可继续滚动选择。轻点谱面跳转播放位置。")
+            Text("长按音符并拖动选择循环范围，松手确认；起点和终点都精确到音符。靠近上下边缘可继续滚动选择。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let message = viewModel.loopSelectionMessage {
@@ -270,10 +270,10 @@ struct GpPracticeView: View {
                     .foregroundStyle(.orange)
             }
             if let range = viewModel.loopPreview {
-                Text("选择中：第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节 · 松手确认")
+                Text("选择中：第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节内音符范围 · 松手确认")
                     .font(.caption)
             } else if let range = viewModel.loopRange {
-                Text("A：第 \(range.firstBar + 1) 小节 · B：第 \(range.lastBar + 1) 小节末")
+                Text("A：第 \(range.firstBar + 1) 小节内音符 · B：第 \(range.lastBar + 1) 小节内音符结束")
                     .font(.caption)
             }
             Toggle("A/B 循环", isOn: Binding(

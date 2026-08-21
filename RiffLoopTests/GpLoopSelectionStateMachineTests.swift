@@ -128,6 +128,28 @@ final class GpLoopSelectionStateMachineTests: XCTestCase {
         XCTAssertGreaterThan(range.endTick, range.startTick)
     }
 
+    func testSameBarDragUsesSelectedBeatBoundaries() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBeat(bar: 7, startTick: 7_200, endTick: 7_440))
+        machine.dragUpdate(to: makeBeat(bar: 7, startTick: 7_680, endTick: 7_920))
+
+        XCTAssertEqual(
+            machine.dragEnd(),
+            .commit(GpLoopBarRange(firstBar: 7, lastBar: 7, startTick: 7_200, endTick: 7_920))
+        )
+    }
+
+    func testBackwardSameBarDragNormalizesSelectedBeatBoundaries() {
+        var machine = GpLoopSelectionStateMachine()
+        machine.dragStart(on: makeBeat(bar: 7, startTick: 7_680, endTick: 7_920))
+        machine.dragUpdate(to: makeBeat(bar: 7, startTick: 7_200, endTick: 7_440))
+
+        XCTAssertEqual(
+            machine.dragEnd(),
+            .commit(GpLoopBarRange(firstBar: 7, lastBar: 7, startTick: 7_200, endTick: 7_920))
+        )
+    }
+
     func testDragCancelKeepsTheOldRangeAndClearsState() {
         var machine = GpLoopSelectionStateMachine()
         machine.dragStart(on: makeBar(2))
@@ -156,6 +178,16 @@ final class GpLoopSelectionStateMachineTests: XCTestCase {
             index: index,
             startTick: Double(index * 960),
             endTick: Double((index + 1) * 960)
+        )
+    }
+
+    private func makeBeat(bar: Int, startTick: Double, endTick: Double) -> GpBarHit {
+        GpBarHit(
+            index: bar,
+            startTick: Double(bar * 960),
+            endTick: Double((bar + 1) * 960),
+            seekTick: startTick,
+            seekEndTick: endTick
         )
     }
 }

@@ -82,19 +82,23 @@ struct GpLoopSelectionStateMachine: Sendable {
     }
 
     private func normalizedRange(from first: GpBarHit, to last: GpBarHit) -> GpLoopBarRange? {
-        let lowerHit = first.index <= last.index ? first : last
-        let upperHit = first.index <= last.index ? last : first
+        let firstSelectionStart = first.seekTick ?? first.startTick
+        let lastSelectionStart = last.seekTick ?? last.startTick
+        let lowerHit = firstSelectionStart <= lastSelectionStart ? first : last
+        let upperHit = firstSelectionStart <= lastSelectionStart ? last : first
+        let lowerTick = lowerHit.seekTick ?? lowerHit.startTick
+        let upperTick = upperHit.seekEndTick ?? upperHit.endTick
         guard
             lowerHit.index >= 0,
-            lowerHit.startTick.isFinite,
-            upperHit.endTick.isFinite,
-            upperHit.endTick > lowerHit.startTick
+            lowerTick.isFinite,
+            upperTick.isFinite,
+            upperTick > lowerTick
         else { return nil }
         return GpLoopBarRange(
-            firstBar: lowerHit.index,
-            lastBar: upperHit.index,
-            startTick: lowerHit.startTick,
-            endTick: upperHit.endTick
+            firstBar: min(lowerHit.index, upperHit.index),
+            lastBar: max(lowerHit.index, upperHit.index),
+            startTick: lowerTick,
+            endTick: upperTick
         )
     }
 }

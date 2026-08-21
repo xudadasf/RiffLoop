@@ -74,12 +74,20 @@ struct GpBarHit: Codable, Equatable, Sendable {
     let startTick: Double
     let endTick: Double
     let seekTick: Double?
+    let seekEndTick: Double?
 
-    init(index: Int, startTick: Double, endTick: Double, seekTick: Double? = nil) {
+    init(
+        index: Int,
+        startTick: Double,
+        endTick: Double,
+        seekTick: Double? = nil,
+        seekEndTick: Double? = nil
+    ) {
         self.index = index
         self.startTick = startTick
         self.endTick = endTick
         self.seekTick = seekTick
+        self.seekEndTick = seekEndTick
     }
 }
 

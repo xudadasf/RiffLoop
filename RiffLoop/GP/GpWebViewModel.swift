@@ -404,12 +404,18 @@ final class GpWebViewModel: ObservableObject {
             rangeLoopingEnabled = false
             wholeSongLoopingEnabled = false
             completedLoops = 0
-            loopSelectionMessage = "已选第 \(range.firstBar + 1) 小节 · 拖动选择终止小节，松手确认"
-            call("previewRange", arguments: [range.firstBar, range.lastBar])
+            loopSelectionMessage = "已选起始音符 · 拖动选择终止音符，松手确认"
+            call(
+                "previewRange",
+                arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
+            )
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case let .updatePreview(range):
             loopPreview = range
-            call("previewRange", arguments: [range.firstBar, range.lastBar])
+            call(
+                "previewRange",
+                arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
+            )
         case let .commit(range):
             loopPreview = nil
             loopRange = range
@@ -420,7 +426,7 @@ final class GpWebViewModel: ObservableObject {
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
             )
-            loopSelectionMessage = "已循环第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节"
+            loopSelectionMessage = "已按音符循环第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节内选定范围"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             saveProfile()
         case .cancelSelection:

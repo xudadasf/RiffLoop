@@ -47,8 +47,15 @@ for (const expected of [
 ]) {
     assert.match(metronome, expected, "native strong, secondary and normal clicks must be clearly separated");
 }
-assert.match(gpWeb, /if \(accent === "subAccent"\) return 0\.32;/);
-assert.match(gpWeb, /return 0\.10;/);
+for (const expected of [
+    /strong: \{ frequency: 2_600, amplitude: 0\.95, decay: 65 \}/,
+    /subAccent: \{ frequency: 1_800, amplitude: 0\.66, decay: 85 \}/,
+    /normal: \{ frequency: 1_100, amplitude: 0\.44, decay: 105 \}/,
+]) {
+    assert.match(gpWeb, expected, "GP mode must reuse the PDF metronome click voices");
+}
+assert.match(gpWeb, /api\.metronomeVolume = 0;/, "the old one-timbre alphaTab click must be muted");
+assert.match(gpWeb, /pdfClickMetronome\.play\(accent, metronomeMasterVolume\)/);
 assert.match(
     gpPage,
     /\.at-cursor-beat\s*\{[\s\S]*?background: transparent !important;[\s\S]*?\.at-cursor-beat::after\s*\{[\s\S]*?width: 70%;[\s\S]*?background: rgba\(0, 122, 255, 0\.28\);/,
@@ -56,7 +63,7 @@ assert.match(
 );
 assert.match(
     gpWeb,
-    /setBackingEnabled\(enabled\) \{[\s\S]*?transport\.pause\(\);[\s\S]*?backingSynchronizer\.align\(api\.timePosition\)/,
+    /setBackingEnabled\(enabled\) \{[\s\S]*?transport\.pause\(\);[\s\S]*?backingAligner\.align\(api\.timePosition\)/,
     "enabling embedded backing mid-score must pause and align it to the current score time"
 );
 

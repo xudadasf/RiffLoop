@@ -74,19 +74,56 @@
     let didNotifyPlayerReady = false;
     let pendingRangeHighlight = null;
     let lastPositionPostTime = Number.NEGATIVE_INFINITY;
-    const metronomeGain = (pulse) => {
+    const PDF_CLICK_VOICES = Object.freeze({
+        strong: { frequency: 2_600, amplitude: 0.95, decay: 65 },
+        subAccent: { frequency: 1_800, amplitude: 0.66, decay: 85 },
+        normal: { frequency: 1_100, amplitude: 0.44, decay: 105 },
+        subdivision: { frequency: 1_150, amplitude: 0.30, decay: 110 }
+    });
+    const metronomeAccent = (pulse) => {
         const factor = Math.max(1, metronomeSubdivisionFactor);
-        if (pulse % factor !== 0) return 0.07;
-        const accent = beatAccents[Math.floor(pulse / factor)]
+        if (pulse % factor !== 0) return "subdivision";
+        return beatAccents[Math.floor(pulse / factor)]
             || (pulse === 0 ? "strong" : "normal");
-        if (accent === "strong") return 1;
-        if (accent === "subAccent") return 0.32;
-        if (accent === "muted") return 0;
-        return 0.10;
     };
-    const applyMetronomePulse = (pulse) => {
-        const volume = metronomeMasterVolume * metronomeGain(pulse);
-        api.metronomeVolume = volume;
+    const createPdfClickMetronome = () => {
+        let context = null;
+        const audioContext = () => {
+            if (context) return context;
+            const Context = window.AudioContext || window.webkitAudioContext;
+            if (!Context) return null;
+            context = new Context();
+            return context;
+        };
+        const play = (accent, volume) => {
+            if (accent === "muted" || volume <= 0) return false;
+            const voice = PDF_CLICK_VOICES[accent] || PDF_CLICK_VOICES.normal;
+            const output = audioContext();
+            if (!output) return false;
+            if (output.state === "suspended") output.resume().catch(() => {});
+            const start = output.currentTime;
+            const duration = 0.035;
+            const oscillator = output.createOscillator();
+            const gain = output.createGain();
+            const curve = new Float32Array(64);
+            for (let index = 0; index < curve.length; index += 1) {
+                const seconds = duration * index / (curve.length - 1);
+                curve[index] = volume * voice.amplitude * Math.exp(-seconds * voice.decay);
+            }
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(voice.frequency, start);
+            gain.gain.setValueCurveAtTime(curve, start, duration);
+            oscillator.connect(gain);
+            gain.connect(output.destination);
+            oscillator.start(start);
+            oscillator.stop(start + duration);
+            return true;
+        };
+        return { play };
+    };
+    const pdfClickMetronome = createPdfClickMetronome();
+    const silenceBuiltInMetronome = () => {
+        api.metronomeVolume = 0;
         synthApi.metronomeVolume = 0;
     };
     const configureMetronomeEvents = (playerApi) => {
@@ -107,42 +144,23 @@
             const current = metronomeEvents[metronomeEvents.length - 1];
             if (!current) return;
             const pulseCount = Math.max(1, beatAccents.length * metronomeSubdivisionFactor);
-            applyMetronomePulse((Number(current.metronomeNumerator) + 1) % pulseCount);
+            const pulse = Number(current.metronomeNumerator) % pulseCount;
+            const accent = metronomeAccent(pulse);
+            pdfClickMetronome.play(accent, metronomeMasterVolume);
         });
     };
     configureMetronomeEvents(api);
+    silenceBuiltInMetronome();
     const canUseBacking = () => Boolean(api.score?.backingTrack);
-    const BACKING_DRIFT_TOLERANCE_MILLISECONDS = 120;
-    const BACKING_CORRECTION_INTERVAL_MILLISECONDS = 400;
-    const createBackingSynchronizer = (deps) => {
-        const { synthApi, canUseBacking, now } = deps;
-        let lastCorrectionTime = Number.NEGATIVE_INFINITY;
+    const createBackingAligner = (deps) => {
+        const { synthApi, canUseBacking } = deps;
         const align = (scoreTime) => {
             const target = Number(scoreTime);
             if (!canUseBacking() || !Number.isFinite(target)) return false;
             synthApi.timePosition = Math.max(0, target);
-            lastCorrectionTime = now();
             return true;
         };
-        const correct = (scoreTime, shouldResume) => {
-            const target = Number(scoreTime);
-            const backingTime = Number(synthApi.timePosition);
-            const timestamp = now();
-            if (
-                !canUseBacking()
-                || !Number.isFinite(target)
-                || !Number.isFinite(backingTime)
-                || Math.abs(backingTime - target) < BACKING_DRIFT_TOLERANCE_MILLISECONDS
-                || timestamp - lastCorrectionTime < BACKING_CORRECTION_INTERVAL_MILLISECONDS
-            ) return false;
-            synthApi.pause();
-            synthApi.timePosition = Math.max(0, target);
-            if (shouldResume) synthApi.play();
-            lastCorrectionTime = timestamp;
-            return true;
-        };
-        const reset = () => { lastCorrectionTime = Number.NEGATIVE_INFINITY; };
-        return { align, correct, reset };
+        return { align };
     };
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
@@ -194,16 +212,15 @@
         const isPlayingIntent = () => wantsPlayback;
         return { play, pause, toggle, stop, markStopped, isPlayingIntent };
     };
-    const backingSynchronizer = createBackingSynchronizer({
+    const backingAligner = createBackingAligner({
         synthApi,
-        canUseBacking: () => canUseBacking() && backingEnabled,
-        now: () => performance.now()
+        canUseBacking: () => canUseBacking() && backingEnabled
     });
     const transport = createTransportController({
         api,
         synthApi,
         canUseBacking,
-        alignBacking: () => backingSynchronizer.align(api.timePosition),
+        alignBacking: () => backingAligner.align(api.timePosition),
         schedule: window.setTimeout.bind(window),
         reportState: (playing, stopped) => post("playerStateChanged", {
             state: playing ? 1 : 0,
@@ -398,7 +415,6 @@
         // alphaTab's native range can be lost when its internal player is rebuilt.
         // Keep the visible synth and embedded backing transport inside the committed range.
         if (enforceCommittedRange(position)) return;
-        backingSynchronizer.correct(position.currentTime, transport.isPlayingIntent());
         const now = performance.now();
         if (!position.isSeek && now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS) return;
         lastPositionPostTime = now;
@@ -435,10 +451,39 @@
         return beats[beats.length - 1] || null;
     };
 
+    const beatTickRange = (beat) => {
+        const startTick = Number(api.tickCache?.getBeatStart(beat) ?? beat.absolutePlaybackStart);
+        const duration = Math.max(1, Number(beat.playbackDuration || beat.displayDuration || 0));
+        return { startTick, endTick: startTick + duration };
+    };
+
+    const closestRangeBeat = (barIndex, tick, useEnd) => {
+        let closest = null;
+        let closestDistance = Number.POSITIVE_INFINITY;
+        for (const beat of playbackRangeBeats(barIndex)) {
+            const range = beatTickRange(beat);
+            const value = useEnd ? range.endTick : range.startTick;
+            const distance = Math.abs(value - Number(tick));
+            if (distance < closestDistance) {
+                closest = beat;
+                closestDistance = distance;
+            }
+        }
+        return closest;
+    };
+
     const refreshPendingRangeHighlight = () => {
         if (!pendingRangeHighlight) return;
-        const startBeat = firstBeatInBar(pendingRangeHighlight.firstBar);
-        const endBeat = lastBeatInBar(pendingRangeHighlight.lastBar);
+        const startBeat = closestRangeBeat(
+            pendingRangeHighlight.firstBar,
+            pendingRangeHighlight.startTick,
+            false
+        ) || firstBeatInBar(pendingRangeHighlight.firstBar);
+        const endBeat = closestRangeBeat(
+            pendingRangeHighlight.lastBar,
+            pendingRangeHighlight.endTick,
+            true
+        ) || lastBeatInBar(pendingRangeHighlight.lastBar);
         if (!startBeat || !endBeat) return;
         try {
             api.highlightPlaybackRange(startBeat, endBeat);
@@ -461,9 +506,11 @@
             const bar = barPayload(beatIndex);
             if (!bar) return null;
             const beatTick = Number(api.tickCache?.getBeatStart(beat) ?? beat.absolutePlaybackStart);
+            const beatDuration = Math.max(1, Number(beat.playbackDuration || beat.displayDuration || 0));
             return {
                 bar,
-                seekTick: Number.isFinite(beatTick) ? beatTick : bar.startTick
+                seekTick: Number.isFinite(beatTick) ? beatTick : bar.startTick,
+                seekEndTick: Number.isFinite(beatTick) ? beatTick + beatDuration : bar.endTick
             };
         }
 
@@ -480,7 +527,11 @@
                 nearest = barPayload(index);
             }
         }
-        return nearest ? { bar: nearest, seekTick: nearest.startTick } : null;
+        return nearest ? {
+            bar: nearest,
+            seekTick: nearest.startTick,
+            seekEndTick: nearest.endTick
+        } : null;
     };
 
     const createPointerSelection = (deps) => {
@@ -489,6 +540,11 @@
         const EDGE_SCROLL_STEP_PIXELS = 12;
 
         const { element, viewport, hitScorePosition, post, scheduleLongPress, cancelLongPress } = deps;
+        const bridgeHitPayload = (hit) => ({
+            ...hit.bar,
+            seekTick: hit.seekTick,
+            seekEndTick: hit.seekEndTick
+        });
         let pointer = null;
         let longPressTimer = null;
 
@@ -504,7 +560,7 @@
             pointer.mode = "select";
             element.classList.remove("range-press-pending");
             element.classList.add("range-selecting");
-            post("pointerDown", pointer.hit.bar);
+            post("pointerDown", bridgeHitPayload(pointer.hit));
         };
         const clearInteractionFeedback = () => {
             element.classList.remove("range-press-pending", "range-selecting");
@@ -565,9 +621,9 @@
                 if (pointer.mode === "select") {
                     event.preventDefault();
                     const hit = hitScorePosition(event.clientX, event.clientY);
-                    if (hit && hit.bar.index !== pointer.hit.bar.index) {
+                    if (hit && hit.seekTick !== pointer.hit.seekTick) {
                         pointer.hit = hit;
-                        post("pointerMove", hit.bar);
+                        post("pointerMove", bridgeHitPayload(hit));
                     }
                     scrollToward(event.clientY);
                 }
@@ -582,13 +638,13 @@
                 pointer = null;
                 clearInteractionFeedback();
                 if (mode === "select") {
-                    post("pointerMove", lastHit.bar);
+                    post("pointerMove", bridgeHitPayload(lastHit));
                     post("pointerUp");
                     return;
                 }
                 if (mode === "pending") {
                     const hit = hitScorePosition(event.clientX, event.clientY) || lastHit;
-                    if (hit) post("barHit", { ...hit.bar, seekTick: hit.seekTick });
+                    if (hit) post("barHit", bridgeHitPayload(hit));
                 }
             },
             pointerCancel(event) {
@@ -645,7 +701,6 @@
                 committedRange = null;
                 rangeLoopingEnabled = false;
                 wholeSongLoopingEnabled = false;
-                backingSynchronizer.reset();
                 restoreScoreScrollPolicy();
                 loadedScoreBytes = decodeBase64(base64);
                 api.load(loadedScoreBytes.slice());
@@ -678,14 +733,14 @@
             if (canUseBacking()) {
                 if (backingEnabled && !wasEnabled) {
                     transport.pause();
-                    backingSynchronizer.align(api.timePosition);
+                    backingAligner.align(api.timePosition);
                 }
                 synthApi.masterVolume = backingEnabled ? backingVolume : 0;
             }
         },
         setMetronomeVolume(volume) {
             metronomeMasterVolume = Number(volume);
-            applyMetronomePulse(0);
+            silenceBuiltInMetronome();
         },
         prepareMetronomeSubdivision(factor) {
             const value = Number(factor);
@@ -695,7 +750,7 @@
             const value = Number(factor);
             if (![1, 2, 4, 8].includes(value) || value === metronomeSubdivisionFactor) return;
             metronomeSubdivisionFactor = value;
-            applyMetronomePulse(0);
+            silenceBuiltInMetronome();
             if (loadedScoreBytes) {
                 transport.pause();
                 resetPlaybackReadiness();
@@ -707,7 +762,7 @@
             beatAccents = Array.isArray(accents) && accents.length > 0
                 ? accents.map(String)
                 : ["strong", "normal", "normal", "normal"];
-            applyMetronomePulse(0);
+            silenceBuiltInMetronome();
         },
         setCountInVolume(volume) {
             const value = Number(volume);
@@ -754,10 +809,12 @@
             restoreScoreScrollPolicy();
             api.clearPlaybackRangeHighlight();
         },
-        previewRange(firstBar, lastBar) {
+        previewRange(firstBar, lastBar, startTick, endTick) {
             pendingRangeHighlight = {
                 firstBar: Number(firstBar),
-                lastBar: Number(lastBar)
+                lastBar: Number(lastBar),
+                startTick: Number(startTick),
+                endTick: Number(endTick)
             };
             refreshPendingRangeHighlight();
         },
@@ -773,8 +830,13 @@
             wholeSongLoopingEnabled = false;
             applyLoopMode();
             seekBoth(rangeStartTick, { reveal: false });
-            window.riffloop.previewRange(firstBar, lastBar);
-            window.riffloopCommittedBars = [Number(firstBar), Number(lastBar)];
+            window.riffloop.previewRange(firstBar, lastBar, rangeStartTick, endTick);
+            window.riffloopCommittedBars = [
+                Number(firstBar),
+                Number(lastBar),
+                rangeStartTick,
+                Number(endTick)
+            ];
             window.setTimeout(() => applyRangeScrollPolicy(firstBar, lastBar), 50);
         },
         setRangeLoopingEnabled(enabled) {
@@ -802,7 +864,7 @@
         },
         cancelRangePreview() {
             const bars = window.riffloopCommittedBars;
-            if (bars) window.riffloop.previewRange(bars[0], bars[1]);
+            if (bars) window.riffloop.previewRange(bars[0], bars[1], bars[2], bars[3]);
             else api.clearPlaybackRangeHighlight();
         },
         lifecycle(active) {

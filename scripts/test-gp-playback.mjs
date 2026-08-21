@@ -6,6 +6,12 @@ const source = readFileSync(
     "utf8"
 );
 
+assert.match(
+    source,
+    /setPlaybackSpeed\(speed\) \{ api\.playbackSpeed = Number\(speed\); synthApi\.playbackSpeed = Number\(speed\); \}/,
+    "score synth and embedded backing must always use the same playback speed"
+);
+
 {
     assert.match(
         source,
@@ -126,41 +132,40 @@ const source = readFileSync(
 }
 
 {
-    const startMarker = "    const BACKING_DRIFT_TOLERANCE_MILLISECONDS";
+    const startMarker = "    const createBackingAligner = (deps) => {";
     const endMarker = "\n    const createTransportController";
     const start = source.indexOf(startMarker);
     const end = source.indexOf(endMarker, start);
-    assert.notEqual(start, -1, "backing synchronizer is missing");
-    assert.notEqual(end, -1, "backing synchronizer boundary is missing");
+    assert.notEqual(start, -1, "backing aligner is missing");
+    assert.notEqual(end, -1, "backing aligner boundary is missing");
     const implementation = source.slice(start, end);
-    const execute = new Function(`${implementation}\nreturn createBackingSynchronizer;`);
-    const createBackingSynchronizer = execute();
-    let now = 0;
+    const execute = new Function(`${implementation}\nreturn createBackingAligner;`);
+    const createBackingAligner = execute();
     const backing = {
         timePosition: 0,
-        isPlaying: true,
         pauseCalls: 0,
         playCalls: 0,
         pause() { this.pauseCalls += 1; this.isPlaying = false; },
         play() { this.playCalls += 1; this.isPlaying = true; },
     };
-    const synchronizer = createBackingSynchronizer({
+    const aligner = createBackingAligner({
         synthApi: backing,
         canUseBacking: () => true,
-        now: () => now,
     });
 
-    assert.equal(synchronizer.align(9_200), true);
+    assert.equal(aligner.align(9_200), true);
     assert.equal(backing.timePosition, 9_200, "enabling backing must seek it to the score time");
-    now = 500;
-    backing.timePosition = 10_150;
-    assert.equal(synchronizer.correct(10_000, true), true);
-    assert.equal(backing.timePosition, 10_000, "a noticeable backing drift must be corrected in milliseconds");
-    assert.equal(backing.pauseCalls, 1);
-    assert.equal(backing.playCalls, 1, "a correction during playback must resume the backing transport");
-    now = 700;
-    backing.timePosition = 10_300;
-    assert.equal(synchronizer.correct(10_000, true), false, "drift correction must be rate limited");
+    assert.equal(backing.pauseCalls, 0, "alignment itself must not inject an audible pause");
+    assert.equal(backing.playCalls, 0, "alignment itself must not restart audio");
+    const positionHandler = source.slice(
+        source.indexOf("    api.playerPositionChanged.on"),
+        source.indexOf("    api.playerStateChanged.on")
+    );
+    assert.doesNotMatch(
+        positionHandler,
+        /playerPositionChanged[\s\S]*?backingAligner\.(?:correct|align)/,
+        "ordinary position updates must never hard-seek the backing while it is playing"
+    );
 }
 
 {
@@ -178,7 +183,7 @@ const source = readFileSync(
 
 {
     const startMarker = "    const createTransportController = (deps) => {";
-    const endMarker = "\n    const backingSynchronizer = createBackingSynchronizer";
+    const endMarker = "\n    const backingAligner = createBackingAligner";
     const start = source.indexOf(startMarker);
     const end = source.indexOf(endMarker, start);
     assert.notEqual(start, -1, "coordinated transport implementation is missing");
@@ -267,8 +272,8 @@ const source = readFileSync(
     const implementation = source.slice(start, end);
     const masterBar = { index: 2 };
     const beats = [
-        { id: "first", voice: { bar: { masterBar } } },
-        { id: "third", voice: { bar: { masterBar } } },
+        { id: "first", playbackDuration: 240, voice: { bar: { masterBar } } },
+        { id: "third", playbackDuration: 120, voice: { bar: { masterBar } } },
     ];
     const api = {
         score: { masterBars: [{}, {}, masterBar] },
@@ -296,12 +301,12 @@ const source = readFileSync(
 
     assert.deepEqual(
         hitScorePosition(100, 100),
-        { bar: barPayload(), seekTick: 2_040 },
+        { bar: barPayload(), seekTick: 2_040, seekEndTick: 2_280 },
         "a tap must preserve the first beat tick instead of reducing it to the bar start"
     );
     assert.deepEqual(
         hitScorePosition(300, 100),
-        { bar: barPayload(), seekTick: 2_520 },
+        { bar: barPayload(), seekTick: 2_520, seekEndTick: 2_640 },
         "different beats in one bar must produce different seek ticks"
     );
 }
@@ -316,7 +321,12 @@ const source = readFileSync(
     const implementation = source.slice(start, end);
 
     const bar = (index) => ({ index, startTick: index * 960, endTick: (index + 1) * 960 });
-    const scoreHit = (index, seekTick = index * 960) => ({ bar: bar(index), seekTick });
+    const scoreHit = (index, seekTick = index * 960, seekEndTick = seekTick + 240) => ({
+        bar: bar(index),
+        seekTick,
+        seekEndTick,
+    });
+    const payload = (hit) => ({ ...hit.bar, seekTick: hit.seekTick, seekEndTick: hit.seekEndTick });
 
     function makeHarness(barAt) {
         const posted = [];
@@ -355,7 +365,9 @@ const source = readFileSync(
         const selection = execute(
             (x, y) => {
                 const hit = barAt(x, y);
-                return hit && "bar" in hit ? hit : (hit ? { bar: hit, seekTick: hit.startTick } : null);
+                return hit && "bar" in hit
+                    ? hit
+                    : (hit ? { bar: hit, seekTick: hit.startTick, seekEndTick: hit.endTick } : null);
             },
             (event, payload) => posted.push(payload === undefined ? [event] : [event, payload]),
             viewport,
@@ -396,7 +408,7 @@ const source = readFileSync(
         h.pointerUp(100, 100);
         assert.deepEqual(
             h.posted,
-            [["barHit", { ...bar(2), seekTick: 2_160 }]],
+            [["barHit", payload(scoreHit(2, 2_160))]],
             "a plain tap must seek via barHit at the precise beat tick"
         );
     }
@@ -408,7 +420,7 @@ const source = readFileSync(
         h.pointerUp(104, 103);
         assert.deepEqual(
             h.posted,
-            [["barHit", { ...bar(2), seekTick: bar(2).startTick }]],
+            [["barHit", payload(scoreHit(2))]],
             "jitter under the slop threshold must still count as a tap"
         );
     }
@@ -425,12 +437,32 @@ const source = readFileSync(
         assert.deepEqual(
             h.posted,
             [
-                ["pointerDown", bar(2)],
-                ["pointerMove", bar(5)],
-                ["pointerMove", bar(5)],
+                ["pointerDown", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerMove", payload(scoreHit(5, 5 * 960, 6 * 960))],
+                ["pointerMove", payload(scoreHit(5, 5 * 960, 6 * 960))],
                 ["pointerUp"],
             ],
             "long press, drag, and release must report selection start, move, final bar, and commit"
+        );
+    }
+
+    {
+        const firstBeat = scoreHit(2, 2_160, 2_400);
+        const laterBeat = scoreHit(2, 2_640, 2_880);
+        const h = makeHarness((x) => (x < 200 ? firstBeat : laterBeat));
+        h.pointerDown(100, 100);
+        h.fireLongPress();
+        h.pointerMove(300, 100);
+        h.pointerUp(300, 100);
+        assert.deepEqual(
+            h.posted,
+            [
+                ["pointerDown", payload(firstBeat)],
+                ["pointerMove", payload(laterBeat)],
+                ["pointerMove", payload(laterBeat)],
+                ["pointerUp"],
+            ],
+            "dragging between beats in one bar must preserve note-level loop endpoints"
         );
     }
 
@@ -442,7 +474,11 @@ const source = readFileSync(
         h.pointerCancel(100, 300);
         assert.deepEqual(
             h.posted,
-            [["pointerDown", bar(2)], ["pointerMove", bar(5)], ["pointerCancel"]],
+            [
+                ["pointerDown", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerMove", payload(scoreHit(5, 5 * 960, 6 * 960))],
+                ["pointerCancel"],
+            ],
             "a cancelled gesture must report pointerCancel after the start"
         );
     }
@@ -474,7 +510,11 @@ const source = readFileSync(
         h.pointerUp(100, 100);
         assert.deepEqual(
             h.posted,
-            [["pointerDown", bar(2)], ["pointerMove", bar(2)], ["pointerUp"]],
+            [
+                ["pointerDown", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerMove", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerUp"],
+            ],
             "a long press released without moving must commit a single-bar range"
         );
     }
@@ -495,7 +535,11 @@ const source = readFileSync(
         h.pointerUp(100, 900);
         assert.deepEqual(
             h.posted,
-            [["pointerDown", bar(2)], ["pointerMove", bar(2)], ["pointerUp"]],
+            [
+                ["pointerDown", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerMove", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerUp"],
+            ],
             "dragging outside the score must keep the last hit bar and still commit"
         );
     }
@@ -507,7 +551,7 @@ const source = readFileSync(
         h.pointerUp(420, 100);
         assert.deepEqual(
             h.posted,
-            [["barHit", { ...bar(8), seekTick: bar(8).startTick }]],
+            [["barHit", payload(scoreHit(8, bar(8).startTick, bar(8).endTick))]],
             "a tap that slides under the slop must seek the bar at the release position"
         );
     }
@@ -522,10 +566,10 @@ const source = readFileSync(
         assert.deepEqual(
             h.posted,
             [
-                ["pointerDown", bar(2)],
-                ["pointerMove", bar(5)],
-                ["pointerMove", bar(2)],
-                ["pointerMove", bar(2)],
+                ["pointerDown", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerMove", payload(scoreHit(5, 5 * 960, 6 * 960))],
+                ["pointerMove", payload(scoreHit(2, 2 * 960, 3 * 960))],
+                ["pointerMove", payload(scoreHit(2, 2 * 960, 3 * 960))],
                 ["pointerUp"],
             ],
             "dragging back over the start bar must shrink the selection to a single bar"
