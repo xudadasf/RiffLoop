@@ -361,11 +361,14 @@ final class GpWebViewModel: ObservableObject {
             let routes = session.currentRoute.outputs
                 .map { $0.portType.rawValue }
                 .joined(separator: ",")
+            let diagnosticLine = "\(ISO8601DateFormatter().string(from: Date())) js=\(message) "
+                + "category=\(session.category.rawValue) mode=\(session.mode.rawValue) "
+                + "outputVolume=\(session.outputVolume) "
+                + "secondarySilenced=\(session.secondaryAudioShouldBeSilencedHint) routes=\(routes)"
+            persistBackingDiagnostic(diagnosticLine, reset: message.contains("\"stage\":\"synth-score-loaded\""))
             NSLog(
                 "%@",
-                "[DEBUG-gp-audio-55] js=\(message) category=\(session.category.rawValue) "
-                    + "mode=\(session.mode.rawValue) outputVolume=\(session.outputVolume) "
-                    + "secondarySilenced=\(session.secondaryAudioShouldBeSilencedHint) routes=\(routes)"
+                "[DEBUG-gp-audio-56] \(diagnosticLine)"
             )
         case let .error(message):
             errorMessage = message
@@ -374,6 +377,24 @@ final class GpWebViewModel: ObservableObject {
 
     func receiveBridgeFailure(_ error: Error) {
         errorMessage = "GP 消息解析失败：\(error.localizedDescription)"
+    }
+
+    private func persistBackingDiagnostic(_ line: String, reset: Bool) {
+        do {
+            let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let fileURL = directory.appendingPathComponent("gp-audio-diagnostic.log")
+            let data = Data((line + "\n").utf8)
+            if reset || !FileManager.default.fileExists(atPath: fileURL.path) {
+                try data.write(to: fileURL, options: .atomic)
+                return
+            }
+            let handle = try FileHandle(forWritingTo: fileURL)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+            try handle.close()
+        } catch {
+            NSLog("%@", "[DEBUG-gp-audio-56] log-write-failed=\(error.localizedDescription)")
+        }
     }
 
     private func sendScore(_ data: Data) {
