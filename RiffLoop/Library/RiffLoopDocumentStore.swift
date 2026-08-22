@@ -90,6 +90,31 @@ struct RiffLoopDocumentStore {
         return destination
     }
 
+    func deleteFile(_ fileURL: URL, for kind: PracticeKind) throws {
+        let expectedFolder = folderURL(for: kind)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let target = fileURL
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let isSupported = kind.supportedExtensions.contains(
+            target.pathExtension.lowercased()
+        )
+        let isRegularFile = try? target.resourceValues(
+            forKeys: [.isRegularFileKey]
+        ).isRegularFile
+
+        guard
+            target.deletingLastPathComponent() == expectedFolder,
+            isSupported,
+            isRegularFile == true
+        else {
+            throw RiffLoopDocumentStoreError.invalidDeletionTarget
+        }
+
+        try fileManager.removeItem(at: target)
+    }
+
     private func availableDestination(in folder: URL, fileName: String) -> URL {
         let proposed = folder.appendingPathComponent(fileName)
         guard fileManager.fileExists(atPath: proposed.path) else { return proposed }
@@ -115,6 +140,7 @@ struct RiffLoopDocumentStore {
 enum RiffLoopDocumentStoreError: LocalizedError {
     case unsupportedFile(PracticeKind)
     case unsupportedPdfAudio
+    case invalidDeletionTarget
 
     var errorDescription: String? {
         switch self {
@@ -122,6 +148,8 @@ enum RiffLoopDocumentStoreError: LocalizedError {
             "所选文件不是受支持的\(kind.title)格式。"
         case .unsupportedPdfAudio:
             "请选择 MP3、M4A、WAV、AAC 或 FLAC 伴奏。"
+        case .invalidDeletionTarget:
+            "只能删除当前 RiffLoop 文件夹内受支持的文件。"
         }
     }
 }

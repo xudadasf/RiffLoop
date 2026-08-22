@@ -528,13 +528,6 @@
             isSeek: Boolean(position.isSeek)
         });
     });
-    api.playerStateChanged.on((state) => {
-        refreshPendingRangeHighlight();
-        post("playerStateChanged", {
-            state: transport.isPlayingIntent() ? 1 : 0,
-            stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
-        });
-    });
     api.playerFinished.on(() => {
         if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;
         transport.markStopped();
@@ -597,6 +590,13 @@
             api.clearPlaybackRangeHighlight();
         }
     };
+    api.playerStateChanged.on((state) => {
+        refreshPendingRangeHighlight();
+        post("playerStateChanged", {
+            state: transport.isPlayingIntent() ? 1 : 0,
+            stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
+        });
+    });
 
     const hitScorePosition = (clientX, clientY) => {
         const lookup = api.renderer?.boundsLookup;

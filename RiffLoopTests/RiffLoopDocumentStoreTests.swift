@@ -66,4 +66,27 @@ final class RiffLoopDocumentStoreTests: XCTestCase {
         XCTAssertEqual(second.lastPathComponent, "practice (2).mp4")
         XCTAssertEqual(try Data(contentsOf: first), Data([1, 2, 3]))
     }
+
+    func testDeleteFileRemovesAFileInsideTheRequestedLibrary() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+        try store.prepareDirectories()
+        let file = store.folderURL(for: .guitarPro)
+            .appendingPathComponent("待删除.gp")
+        try Data([1, 2, 3]).write(to: file)
+
+        try store.deleteFile(file, for: .guitarPro)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func testDeleteFileRejectsAFileOutsideTheRequestedLibrary() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+        try store.prepareDirectories()
+        let video = store.folderURL(for: .video)
+            .appendingPathComponent("不要误删.mp4")
+        try Data([4, 5, 6]).write(to: video)
+
+        XCTAssertThrowsError(try store.deleteFile(video, for: .guitarPro))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: video.path))
+    }
 }

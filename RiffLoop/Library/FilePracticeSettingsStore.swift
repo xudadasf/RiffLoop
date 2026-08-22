@@ -27,6 +27,10 @@ struct FilePracticeSettingsStore {
         return try JSONDecoder().decode(type, from: data)
     }
 
+    func remove(kind: PracticeKind, fileName: String) {
+        defaults.removeObject(forKey: key(kind: kind, fileName: fileName))
+    }
+
     private func key(kind: PracticeKind, fileName: String) -> String {
         let identity = Data("\(kind.rawValue):\(fileName)".utf8)
         let digest = SHA256.hash(data: identity)

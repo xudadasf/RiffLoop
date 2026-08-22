@@ -88,6 +88,11 @@ assert.match(
     /api\.playerStateChanged\.on\(\(state\) => \{[\s\S]*?refreshPendingRangeHighlight\(\);[\s\S]*?post\("playerStateChanged"/,
     "play and pause state changes must restore the active loop highlight"
 );
+assert.ok(
+    script.indexOf("    const refreshPendingRangeHighlight = () => {")
+        < script.indexOf("    api.playerStateChanged.on((state) => {"),
+    "the range highlight refresher must be initialized before playerStateChanged can fire synchronously"
+);
 assert.match(
     script,
     /cancelRangePreview\(\) \{[\s\S]*?if \(bars\)[\s\S]*?else \{[\s\S]*?pendingRangeHighlight = null;[\s\S]*?clearPlaybackRangeHighlight\(\)/,
