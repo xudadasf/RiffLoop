@@ -6,6 +6,12 @@ const source = readFileSync(
     "utf8"
 );
 
+assert.doesNotMatch(
+    source,
+    /\.isPlaying\b/,
+    "alphaTab 1.8.4 exposes playerState, not an isPlaying property"
+);
+
 assert.match(
     source,
     /setPlaybackSpeed\(speed\) \{ api\.playbackSpeed = Number\(speed\); synthApi\.playbackSpeed = Number\(speed\); \}/,
@@ -249,8 +255,8 @@ assert.doesNotMatch(
     assert.notEqual(start, -1, "coordinated transport implementation is missing");
     assert.notEqual(end, -1, "coordinated transport implementation boundary is missing");
     const implementation = source.slice(start, end);
-    const execute = new Function(`${implementation}\nreturn createTransportController;`);
-    const createTransportController = execute();
+    const execute = new Function("alphaTab", `${implementation}\nreturn createTransportController;`);
+    const createTransportController = execute({ synth: { PlayerState: { Playing: 1 } } });
 
     function player(isPlaying, tickPosition, timePosition = tickPosition) {
         return {
@@ -375,11 +381,12 @@ assert.doesNotMatch(
         });
 
         transport.play();
-        assert.equal(synthApi.isPlaying, true);
+        delete synthApi.isPlaying;
+        synthApi.playerState = 1;
         assert.equal(
             transport.startDeferredBacking(2_480),
             true,
-            "score progress must finish priming when the backing is already playing even if its state event is missing"
+            "score progress must use alphaTab playerState to finish priming when its state event is missing"
         );
         assert.deepEqual(
             backingAudibility,

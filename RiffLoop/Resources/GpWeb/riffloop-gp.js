@@ -186,6 +186,9 @@
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
         const reportState = deps.reportState || (() => {});
+        const playerIsPlaying = (player) => (
+            player.playerState === alphaTab.synth.PlayerState.Playing
+        );
         const alignBacking = deps.alignBacking || (() => {
             synthApi.timePosition = api.timePosition;
         });
@@ -253,7 +256,7 @@
             ) return false;
             scoreAdvanced = true;
             latestScoreTime = target;
-            if (synthApi.isPlaying) backingStarted = true;
+            if (playerIsPlaying(synthApi)) backingStarted = true;
             return finishBackingPriming();
         };
         const markBackingStarted = (scoreTime) => {
@@ -264,7 +267,7 @@
             return finishBackingPriming();
         };
         const toggle = () => {
-            if (wantsPlayback || api.isPlaying || synthApi.isPlaying) pause();
+            if (wantsPlayback || playerIsPlaying(api) || playerIsPlaying(synthApi)) pause();
             else play();
         };
         const stop = () => {
@@ -508,7 +511,10 @@
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
     synthApi.playerStateChanged.on((state) => {
-        if (synthApi.isPlaying || state?.state === 1) {
+        if (
+            synthApi.playerState === alphaTab.synth.PlayerState.Playing
+            || state?.state === alphaTab.synth.PlayerState.Playing
+        ) {
             transport.markBackingStarted(api.timePosition);
         }
     });
