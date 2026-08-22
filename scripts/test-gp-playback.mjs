@@ -392,6 +392,45 @@ assert.doesNotMatch(
 
     {
         const api = player(false, 2400);
+        const synthApi = player(false, 2400);
+        let mediaPaused = true;
+        let resumeCalls = 0;
+        let directPauseCalls = 0;
+        const transport = createTransportController({
+            api,
+            synthApi,
+            canUseBacking: () => true,
+            alignBacking: (scoreTime) => { synthApi.timePosition = scoreTime; },
+            setBackingAudible: () => {},
+            resumeBacking: () => {
+                resumeCalls += 1;
+                mediaPaused = false;
+                return true;
+            },
+            pauseBacking: () => {
+                directPauseCalls += 1;
+                mediaPaused = true;
+                return true;
+            },
+            schedule: () => {},
+        });
+
+        transport.play();
+        assert.equal(mediaPaused, false, "the first backing start must verify the media element is running");
+        transport.pause();
+        assert.equal(mediaPaused, true, "pause must also stop a stale iOS media element directly");
+        transport.play();
+        assert.equal(
+            mediaPaused,
+            false,
+            "resume must restart the media element when alphaTab's player state and WKWebView diverge"
+        );
+        assert.equal(resumeCalls, 2, "every backing start must verify the underlying media state");
+        assert.equal(directPauseCalls, 1);
+    }
+
+    {
+        const api = player(false, 2400);
         const synthApi = player(false, 0);
         const backingAudibility = [];
         const transport = createTransportController({

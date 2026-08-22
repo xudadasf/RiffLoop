@@ -272,6 +272,24 @@
     configureMetronomeEvents(api);
     applyMetronomePulse(0);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
+    const backingMediaElement = () => document.querySelector("audio");
+    const resumeBackingMedia = () => {
+        const media = backingMediaElement();
+        if (!media || !media.paused) return false;
+        const result = media.play();
+        if (result && typeof result.catch === "function") {
+            result.catch((error) => postBackingDiagnostic("media-resume-rejected", media, {
+                rejection: errorMessage(error)
+            }));
+        }
+        return true;
+    };
+    const pauseBackingMedia = () => {
+        const media = backingMediaElement();
+        if (!media || media.paused) return false;
+        media.pause();
+        return true;
+    };
     const createBackingAligner = (deps) => {
         const { synthApi, canUseBacking } = deps;
         const align = (scoreTime) => {
@@ -292,6 +310,8 @@
             synthApi.timePosition = api.timePosition;
         });
         const setBackingAudible = deps.setBackingAudible || (() => {});
+        const resumeBacking = deps.resumeBacking || (() => false);
+        const pauseBacking = deps.pauseBacking || (() => false);
         let wantsPlayback = false;
         let backingPriming = false;
         let backingStarted = false;
@@ -315,6 +335,7 @@
         const pauseNow = () => {
             api.pause();
             synthApi.pause();
+            pauseBacking();
         };
         const pause = () => {
             wantsPlayback = false;
@@ -340,6 +361,10 @@
                 alignBacking(playbackAnchorTime);
                 setBackingAudible(false);
                 synthApi.play();
+                // alphaTab can remain in Playing while its HTMLMediaElement stays
+                // paused after the first pause on iOS WKWebView. Nudge only that
+                // stale media state; ordinary starts are already unpaused here.
+                resumeBacking();
             }
             api.play();
             reportState(true, false);
@@ -375,6 +400,7 @@
             pauseGeneration += 1;
             api.stop();
             synthApi.stop();
+            pauseBacking();
             reportState(false, true);
         };
         const markStopped = () => {
@@ -406,6 +432,8 @@
         synthApi,
         canUseBacking,
         alignBacking: (scoreTime = api.timePosition) => backingAligner.align(scoreTime),
+        resumeBacking: resumeBackingMedia,
+        pauseBacking: pauseBackingMedia,
         setBackingAudible: (audible) => {
             if (canUseBacking()) {
                 synthApi.masterVolume = audible && backingEnabled ? backingVolume : 0;
@@ -627,6 +655,10 @@
             transport.markBackingStarted(api.timePosition);
         }
     });
+    document.addEventListener("playing", (event) => {
+        if (event.target !== backingMediaElement()) return;
+        transport.markBackingStarted(api.timePosition);
+    }, true);
     api.playerPositionChanged.on((position) => {
         if (!position.isSeek) transport.startDeferredBacking(position.currentTime);
         // alphaTab's native range can be lost when its internal player is rebuilt.
