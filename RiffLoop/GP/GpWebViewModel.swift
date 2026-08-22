@@ -49,6 +49,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var totalCompletedLoops = 0
     @Published private(set) var highestPracticeSpeed = 1.0
     @Published private(set) var errorMessage: String?
+    @Published private(set) var backingDiagnosticLines: [String] = []
 
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
@@ -97,6 +98,7 @@ final class GpWebViewModel: ObservableObject {
         loopPreview = nil
         loopSelectionMessage = nil
         errorMessage = nil
+        backingDiagnosticLines = []
 
         guard rendererReady else {
             pendingScoreData = data
@@ -357,6 +359,10 @@ final class GpWebViewModel: ObservableObject {
         case .pointerCancel:
             handle(loopSelection.dragCancel())
         case let .diagnostic(message):
+            backingDiagnosticLines.append(compactBackingDiagnostic(message))
+            if backingDiagnosticLines.count > 12 {
+                backingDiagnosticLines.removeFirst(backingDiagnosticLines.count - 12)
+            }
             let session = AVAudioSession.sharedInstance()
             let routes = session.currentRoute.outputs
                 .map { $0.portType.rawValue }
@@ -395,6 +401,39 @@ final class GpWebViewModel: ObservableObject {
         } catch {
             NSLog("%@", "[DEBUG-gp-audio-56] log-write-failed=\(error.localizedDescription)")
         }
+    }
+
+    private func compactBackingDiagnostic(_ message: String) -> String {
+        guard
+            let data = message.data(using: .utf8),
+            let decoded = try? JSONSerialization.jsonObject(with: data),
+            let object = decoded as? [String: Any]
+        else {
+            return message
+        }
+
+        let stage = object["stage"] as? String ?? "unknown"
+        let paused = object["paused"].map { String(describing: $0) } ?? "-"
+        let time = (object["currentTime"] as? NSNumber)?.doubleValue ?? 0
+        let readyState = object["readyState"].map { String(describing: $0) } ?? "-"
+        let volume = object["volume"].map { String(describing: $0) } ?? "-"
+        let muted = object["muted"].map { String(describing: $0) } ?? "-"
+        let masterVolume = object["masterVolume"].map { String(describing: $0) } ?? "-"
+        let failure = object["rejection"] ?? object["thrown"] ?? object["error"]
+        let failureText = failure.flatMap { value in
+            value is NSNull ? nil : " err=\(String(describing: value))"
+        } ?? ""
+        return String(
+            format: "%@ p=%@ t=%.2f rs=%@ v=%@ m=%@ mv=%@%@",
+            stage,
+            paused,
+            time,
+            readyState,
+            volume,
+            muted,
+            masterVolume,
+            failureText
+        )
     }
 
     private func sendScore(_ data: Data) {

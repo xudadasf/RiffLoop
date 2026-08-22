@@ -157,6 +157,16 @@ struct GpPracticeView: View {
                         get: { viewModel.backingEnabled },
                         set: { viewModel.setBackingEnabled($0) }
                     ))
+
+                    if !viewModel.backingDiagnosticLines.isEmpty {
+                        Text("临时伴奏诊断 0.25.15")
+                            .font(.caption.bold())
+                            .foregroundStyle(.orange)
+                        Text(viewModel.backingDiagnosticLines.joined(separator: "\n"))
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                 }
                 if let score = viewModel.score {
                     Divider()
