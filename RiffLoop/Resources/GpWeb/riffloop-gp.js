@@ -89,6 +89,60 @@
             message: JSON.stringify({ stage, ...mediaSnapshot(media), ...extra })
         });
     };
+    const backingAudioMimeType = (bytes) => {
+        if (!bytes || bytes.length < 4) return null;
+        if (
+            (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33)
+            || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)
+        ) return "audio/mpeg";
+        if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+            return "audio/wav";
+        }
+        if (bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+            return "audio/ogg";
+        }
+        if (bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43) {
+            return "audio/flac";
+        }
+        if (
+            bytes.length >= 8
+            && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70
+        ) return "audio/mp4";
+        return null;
+    };
+    let ownedTypedBackingUrl = null;
+    const applyTypedBackingSource = (score, media, dependencies = {}) => {
+        const bytes = score?.backingTrack?.rawAudioFile;
+        const mimeType = backingAudioMimeType(bytes);
+        if (!media || !mimeType) return false;
+
+        const createBlob = dependencies.createBlob
+            || ((parts, options) => new Blob(parts, options));
+        const createObjectURL = dependencies.createObjectURL
+            || URL.createObjectURL.bind(URL);
+        const revokeObjectURL = dependencies.revokeObjectURL
+            || URL.revokeObjectURL.bind(URL);
+        const previousUrl = media.src;
+        const previousTime = Number(media.currentTime) || 0;
+        const previousRate = Number(media.playbackRate) || 1;
+        const previousVolume = Number(media.volume);
+
+        if (ownedTypedBackingUrl) revokeObjectURL(ownedTypedBackingUrl);
+        ownedTypedBackingUrl = createObjectURL(createBlob([bytes], { type: mimeType }));
+        media.src = ownedTypedBackingUrl;
+        media.playbackRate = previousRate;
+        if (Number.isFinite(previousVolume)) media.volume = previousVolume;
+        if (previousTime > 0) {
+            media.addEventListener("loadedmetadata", () => {
+                media.currentTime = Math.min(previousTime, Number(media.duration) || previousTime);
+            }, { once: true });
+        }
+        media.load();
+        if (previousUrl?.startsWith("blob:") && previousUrl !== ownedTypedBackingUrl) {
+            revokeObjectURL(previousUrl);
+        }
+        return true;
+    };
     const probeTypedBackingMetadata = (score) => {
         const bytes = score?.backingTrack?.rawAudioFile;
         if (!bytes?.length) return;
@@ -683,10 +737,13 @@
     synthApi.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(() => postBackingDiagnostic("synth-player-ready"));
     synthApi.scoreLoaded.on((score) => {
+        const typedBackingApplied = Boolean(window.webkit?.messageHandlers?.riffloop)
+            && applyTypedBackingSource(score, backingMediaElement());
         postBackingDiagnostic("synth-score-loaded", undefined, {
             hasBackingTrack: Boolean(score.backingTrack),
             rawAudioBytes: Number(score.backingTrack?.rawAudioFile?.length ?? 0),
             syncPointCount: Number(score.backingTrack?.syncPoints?.length ?? 0),
+            typedBackingApplied,
             userAgent: navigator.userAgent
         });
         probeTypedBackingMetadata(score);

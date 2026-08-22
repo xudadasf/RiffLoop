@@ -92,6 +92,62 @@ assert.doesNotMatch(
 );
 
 {
+    const startMarker = "    const backingAudioMimeType = (bytes) => {";
+    const endMarker = "\n    const probeTypedBackingMetadata";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "iPad backing MIME compatibility layer is missing");
+    assert.notEqual(end, -1, "iPad backing MIME compatibility boundary is missing");
+    const implementation = source.slice(start, end);
+    const execute = new Function(
+        `${implementation}\nreturn { backingAudioMimeType, applyTypedBackingSource };`
+    );
+    const { backingAudioMimeType, applyTypedBackingSource } = execute();
+
+    const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
+    assert.equal(backingAudioMimeType(mp3), "audio/mpeg");
+    assert.equal(backingAudioMimeType(new Uint8Array([0x52, 0x49, 0x46, 0x46])), "audio/wav");
+
+    let metadataHandler = null;
+    const revoked = [];
+    const media = {
+        src: "blob:untyped-alphaTab-source",
+        currentTime: 16.59,
+        duration: 136.68,
+        playbackRate: 1.25,
+        volume: 0.75,
+        loadCalls: 0,
+        addEventListener(name, handler) {
+            if (name === "loadedmetadata") metadataHandler = handler;
+        },
+        load() { this.loadCalls += 1; },
+    };
+    let createdBlob = null;
+    assert.equal(applyTypedBackingSource(
+        { backingTrack: { rawAudioFile: mp3 } },
+        media,
+        {
+            createBlob(parts, options) {
+                createdBlob = { parts, type: options.type };
+                return createdBlob;
+            },
+            createObjectURL() { return "blob:typed-riffloop-source"; },
+            revokeObjectURL(url) { revoked.push(url); },
+        }
+    ), true);
+    assert.equal(createdBlob.type, "audio/mpeg");
+    assert.equal(createdBlob.parts[0], mp3);
+    assert.equal(media.src, "blob:typed-riffloop-source");
+    assert.equal(media.playbackRate, 1.25);
+    assert.equal(media.volume, 0.75);
+    assert.equal(media.loadCalls, 1);
+    assert.deepEqual(revoked, ["blob:untyped-alphaTab-source"]);
+    media.currentTime = 0;
+    metadataHandler();
+    assert.equal(media.currentTime, 16.59, "typed reload must preserve the pending backing position");
+}
+
+{
     const startMarker = "    const createSynthOutputController = (playerApi) => {";
     const endMarker = "\n    const synthOutput = createSynthOutputController(api);";
     const start = source.indexOf(startMarker);
