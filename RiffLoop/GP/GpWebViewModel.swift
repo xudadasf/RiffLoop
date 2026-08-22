@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import AVFAudio
 import UIKit
 import WebKit
 
@@ -355,6 +356,17 @@ final class GpWebViewModel: ObservableObject {
             handle(loopSelection.dragEnd())
         case .pointerCancel:
             handle(loopSelection.dragCancel())
+        case let .diagnostic(message):
+            let session = AVAudioSession.sharedInstance()
+            let routes = session.currentRoute.outputs
+                .map { $0.portType.rawValue }
+                .joined(separator: ",")
+            NSLog(
+                "%@",
+                "[DEBUG-gp-audio-55] js=\(message) category=\(session.category.rawValue) "
+                    + "mode=\(session.mode.rawValue) outputVolume=\(session.outputVolume) "
+                    + "secondarySilenced=\(session.secondaryAudioShouldBeSilencedHint) routes=\(routes)"
+            )
         case let .error(message):
             errorMessage = message
         }

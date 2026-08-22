@@ -104,6 +104,7 @@ enum GpBridgeEvent: Equatable, Sendable {
     case pointerMove(GpBarHit)
     case pointerUp
     case pointerCancel
+    case diagnostic(String)
     case error(String)
 
     static func decode(messageBody: Any) throws -> Self {
@@ -140,6 +141,8 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .pointerUp
         case "pointerCancel":
             return .pointerCancel
+        case "diagnostic":
+            return .diagnostic(try decoder.decode(ErrorPayload.self, from: envelope.payloadData).message)
         case "error":
             return .error(try decoder.decode(ErrorPayload.self, from: envelope.payloadData).message)
         default:

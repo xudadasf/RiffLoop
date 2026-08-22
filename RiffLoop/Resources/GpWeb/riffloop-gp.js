@@ -58,6 +58,65 @@
             enableUserInteraction: false
         }
     });
+    // Temporary diagnostics for GP backing audio on a physical iPad. Remove after
+    // the WebKit/native output breakpoint has been identified.
+    const mediaSnapshot = (media) => ({
+        hasMedia: Boolean(media),
+        paused: media?.paused ?? null,
+        currentTime: Number(media?.currentTime ?? 0),
+        duration: Number(media?.duration ?? 0),
+        readyState: media?.readyState ?? null,
+        networkState: media?.networkState ?? null,
+        muted: media?.muted ?? null,
+        volume: media?.volume ?? null,
+        playbackRate: media?.playbackRate ?? null,
+        errorCode: media?.error?.code ?? null,
+        errorMessage: media?.error?.message ?? null,
+        actualPlayerMode: Number(synthApi.actualPlayerMode),
+        playerState: Number(synthApi.playerState),
+        apiTime: Number(synthApi.timePosition),
+        masterVolume: Number(synthApi.masterVolume),
+        visibility: document.visibilityState
+    });
+    const postBackingDiagnostic = (stage, media = document.querySelector("audio"), extra = {}) => {
+        post("diagnostic", {
+            message: JSON.stringify({ stage, ...mediaSnapshot(media), ...extra })
+        });
+    };
+    const originalMediaPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (...argumentsList) {
+        const media = this;
+        postBackingDiagnostic("media-play-called", media);
+        let result;
+        try {
+            result = originalMediaPlay.apply(media, argumentsList);
+        } catch (error) {
+            postBackingDiagnostic("media-play-threw", media, { thrown: errorMessage(error) });
+            throw error;
+        }
+        if (result && typeof result.then === "function") {
+            result.then(
+                () => {
+                    postBackingDiagnostic("media-play-resolved", media);
+                    window.setTimeout(() => postBackingDiagnostic("media-after-500ms", media), 500);
+                    window.setTimeout(() => postBackingDiagnostic("media-after-2000ms", media), 2000);
+                },
+                (error) => postBackingDiagnostic("media-play-rejected", media, {
+                    rejection: errorMessage(error)
+                })
+            );
+        }
+        return result;
+    };
+    for (const eventName of [
+        "loadedmetadata", "canplay", "play", "playing", "pause", "waiting",
+        "stalled", "suspend", "emptied", "ended", "error"
+    ]) {
+        document.addEventListener(eventName, (event) => {
+            if (!(event.target instanceof HTMLMediaElement)) return;
+            postBackingDiagnostic(`media-event-${eventName}`, event.target);
+        }, true);
+    }
     const createSynthOutputController = (playerApi) => {
         const tracks = new Map();
         const requestedVolumes = new Map();
@@ -550,7 +609,17 @@
     });
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
+    synthApi.playerReady.on(() => postBackingDiagnostic("synth-player-ready"));
+    synthApi.scoreLoaded.on((score) => postBackingDiagnostic("synth-score-loaded", undefined, {
+        hasBackingTrack: Boolean(score.backingTrack),
+        rawAudioBytes: Number(score.backingTrack?.rawAudioFile?.length ?? 0),
+        syncPointCount: Number(score.backingTrack?.syncPoints?.length ?? 0),
+        userAgent: navigator.userAgent
+    }));
     synthApi.playerStateChanged.on((state) => {
+        postBackingDiagnostic("synth-player-state", undefined, {
+            eventState: Number(state?.state)
+        });
         if (
             synthApi.playerState === alphaTab.synth.PlayerState.Playing
             || state?.state === alphaTab.synth.PlayerState.Playing

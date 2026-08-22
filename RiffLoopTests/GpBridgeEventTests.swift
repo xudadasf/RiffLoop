@@ -123,6 +123,16 @@ final class GpBridgeEventTests: XCTestCase {
         )
     }
 
+    func testDecodesTemporaryBackingAudioDiagnostic() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: [
+                "event": "diagnostic",
+                "payload": ["message": "{\"stage\":\"media-playing\"}"],
+            ]),
+            .diagnostic("{\"stage\":\"media-playing\"}")
+        )
+    }
+
     func testDecodesSeekFlagUsedToRejectFalseLoopCompletions() throws {
         XCTAssertEqual(
             try GpBridgeEvent.decode(messageBody: [
