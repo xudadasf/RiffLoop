@@ -60,9 +60,14 @@
     });
     // Temporary diagnostics for GP backing audio on a physical iPad. Remove after
     // the WebKit/native output breakpoint has been identified.
-    const mediaSnapshot = (media) => ({
+    const mediaSnapshot = (media) => {
+        const mediaElements = Array.from(document.querySelectorAll("audio"));
+        return ({
         hasMedia: Boolean(media),
+        mediaIndex: media ? mediaElements.indexOf(media) : -1,
+        mediaCount: mediaElements.length,
         paused: media?.paused ?? null,
+        ended: media?.ended ?? null,
         currentTime: Number(media?.currentTime ?? 0),
         duration: Number(media?.duration ?? 0),
         readyState: media?.readyState ?? null,
@@ -77,11 +82,49 @@
         apiTime: Number(synthApi.timePosition),
         masterVolume: Number(synthApi.masterVolume),
         visibility: document.visibilityState
-    });
+        });
+    };
     const postBackingDiagnostic = (stage, media = document.querySelector("audio"), extra = {}) => {
         post("diagnostic", {
             message: JSON.stringify({ stage, ...mediaSnapshot(media), ...extra })
         });
+    };
+    const probeTypedBackingMetadata = (score) => {
+        const bytes = score?.backingTrack?.rawAudioFile;
+        if (!bytes?.length) return;
+
+        const isMp3 = (
+            (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33)
+            || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)
+        );
+        if (!isMp3) {
+            postBackingDiagnostic("typed-probe-skipped", undefined, { reason: "not-mp3" });
+            return;
+        }
+
+        const probe = document.createElement("audio");
+        probe.dataset.riffloopDiagnosticProbe = "true";
+        probe.preload = "metadata";
+        probe.style.display = "none";
+        document.body.appendChild(probe);
+        const probeUrl = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+        let finished = false;
+        const finish = (stage) => {
+            if (finished) return;
+            finished = true;
+            postBackingDiagnostic(stage, probe, { probeMime: "audio/mpeg" });
+            window.setTimeout(() => {
+                probe.removeAttribute("src");
+                probe.load();
+                probe.remove();
+                URL.revokeObjectURL(probeUrl);
+            }, 0);
+        };
+        probe.addEventListener("loadedmetadata", () => finish("typed-probe-loadedmetadata"), { once: true });
+        probe.addEventListener("error", () => finish("typed-probe-error"), { once: true });
+        window.setTimeout(() => finish("typed-probe-timeout"), 3000);
+        probe.src = probeUrl;
+        probe.load();
     };
     const originalMediaPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function (...argumentsList) {
@@ -114,6 +157,7 @@
     ]) {
         document.addEventListener(eventName, (event) => {
             if (!(event.target instanceof HTMLMediaElement)) return;
+            if (event.target.dataset.riffloopDiagnosticProbe === "true") return;
             postBackingDiagnostic(`media-event-${eventName}`, event.target);
         }, true);
     }
@@ -638,12 +682,15 @@
     api.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(() => postBackingDiagnostic("synth-player-ready"));
-    synthApi.scoreLoaded.on((score) => postBackingDiagnostic("synth-score-loaded", undefined, {
-        hasBackingTrack: Boolean(score.backingTrack),
-        rawAudioBytes: Number(score.backingTrack?.rawAudioFile?.length ?? 0),
-        syncPointCount: Number(score.backingTrack?.syncPoints?.length ?? 0),
-        userAgent: navigator.userAgent
-    }));
+    synthApi.scoreLoaded.on((score) => {
+        postBackingDiagnostic("synth-score-loaded", undefined, {
+            hasBackingTrack: Boolean(score.backingTrack),
+            rawAudioBytes: Number(score.backingTrack?.rawAudioFile?.length ?? 0),
+            syncPointCount: Number(score.backingTrack?.syncPoints?.length ?? 0),
+            userAgent: navigator.userAgent
+        });
+        probeTypedBackingMetadata(score);
+    });
     synthApi.playerStateChanged.on((state) => {
         postBackingDiagnostic("synth-player-state", undefined, {
             eventState: Number(state?.state)

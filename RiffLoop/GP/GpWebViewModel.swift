@@ -50,6 +50,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var highestPracticeSpeed = 1.0
     @Published private(set) var errorMessage: String?
     @Published private(set) var backingDiagnosticLines: [String] = []
+    @Published private(set) var backingProbeDiagnostic: String?
 
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
@@ -99,6 +100,7 @@ final class GpWebViewModel: ObservableObject {
         loopSelectionMessage = nil
         errorMessage = nil
         backingDiagnosticLines = []
+        backingProbeDiagnostic = nil
 
         guard rendererReady else {
             pendingScoreData = data
@@ -359,7 +361,11 @@ final class GpWebViewModel: ObservableObject {
         case .pointerCancel:
             handle(loopSelection.dragCancel())
         case let .diagnostic(message):
-            backingDiagnosticLines.append(compactBackingDiagnostic(message))
+            let compactDiagnostic = compactBackingDiagnostic(message)
+            if message.contains("\"stage\":\"typed-probe-") {
+                backingProbeDiagnostic = compactDiagnostic
+            }
+            backingDiagnosticLines.append(compactDiagnostic)
             if backingDiagnosticLines.count > 12 {
                 backingDiagnosticLines.removeFirst(backingDiagnosticLines.count - 12)
             }
@@ -414,8 +420,13 @@ final class GpWebViewModel: ObservableObject {
 
         let stage = object["stage"] as? String ?? "unknown"
         let paused = object["paused"].map { String(describing: $0) } ?? "-"
+        let ended = object["ended"].map { String(describing: $0) } ?? "-"
         let time = (object["currentTime"] as? NSNumber)?.doubleValue ?? 0
+        let duration = (object["duration"] as? NSNumber)?.doubleValue ?? 0
         let readyState = object["readyState"].map { String(describing: $0) } ?? "-"
+        let networkState = object["networkState"].map { String(describing: $0) } ?? "-"
+        let mediaIndex = object["mediaIndex"].map { String(describing: $0) } ?? "-"
+        let mediaCount = object["mediaCount"].map { String(describing: $0) } ?? "-"
         let volume = object["volume"].map { String(describing: $0) } ?? "-"
         let muted = object["muted"].map { String(describing: $0) } ?? "-"
         let masterVolume = object["masterVolume"].map { String(describing: $0) } ?? "-"
@@ -424,11 +435,16 @@ final class GpWebViewModel: ObservableObject {
             value is NSNull ? nil : " err=\(String(describing: value))"
         } ?? ""
         return String(
-            format: "%@ p=%@ t=%.2f rs=%@ v=%@ m=%@ mv=%@%@",
+            format: "%@ i=%@/%@ p=%@ e=%@ t=%.2f d=%.2f rs=%@ ns=%@ v=%@ m=%@ mv=%@%@",
             stage,
+            mediaIndex,
+            mediaCount,
             paused,
+            ended,
             time,
+            duration,
             readyState,
+            networkState,
             volume,
             muted,
             masterVolume,

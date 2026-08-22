@@ -159,9 +159,15 @@ struct GpPracticeView: View {
                     ))
 
                     if !viewModel.backingDiagnosticLines.isEmpty {
-                        Text("临时伴奏诊断 0.25.15")
+                        Text("临时伴奏诊断 0.25.16")
                             .font(.caption.bold())
                             .foregroundStyle(.orange)
+                        if let probe = viewModel.backingProbeDiagnostic {
+                            Text("MIME：\(probe)")
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundStyle(.orange)
+                                .textSelection(.enabled)
+                        }
                         Text(viewModel.backingDiagnosticLines.joined(separator: "\n"))
                             .font(.system(size: 8, design: .monospaced))
                             .foregroundStyle(.secondary)
