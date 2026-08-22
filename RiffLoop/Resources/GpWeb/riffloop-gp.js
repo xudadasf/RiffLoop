@@ -58,9 +58,64 @@
             enableUserInteraction: false
         }
     });
-    let synthEnabled = true;
+    const createSynthOutputController = (playerApi) => {
+        const tracks = new Map();
+        const requestedVolumes = new Map();
+        const requestedMutes = new Map();
+        let enabled = true;
+        let masterVolume = 0.75;
+        const clampVolume = (value) => Math.min(1, Math.max(0, Number(value) || 0));
+        const applyVolume = (track) => {
+            const requested = requestedVolumes.get(track.index) ?? 1;
+            playerApi.changeTrackVolume([track], requested * masterVolume);
+        };
+        const applyMute = (track) => {
+            playerApi.changeTrackMute(
+                [track],
+                !enabled || Boolean(requestedMutes.get(track.index))
+            );
+        };
+        const applyTrack = (track) => {
+            applyVolume(track);
+            applyMute(track);
+        };
+        const reset = (scoreTracks) => {
+            tracks.clear();
+            requestedVolumes.clear();
+            requestedMutes.clear();
+            playerApi.masterVolume = 1;
+            for (const track of scoreTracks || []) {
+                tracks.set(track.index, track);
+                requestedVolumes.set(
+                    track.index,
+                    clampVolume(Number(track.playbackInfo?.volume ?? 16) / 16)
+                );
+                requestedMutes.set(track.index, Boolean(track.playbackInfo?.isMute));
+                applyTrack(track);
+            }
+        };
+        const setMasterVolume = (volume) => {
+            masterVolume = clampVolume(volume);
+            for (const track of tracks.values()) applyVolume(track);
+        };
+        const setEnabled = (value) => {
+            enabled = Boolean(value);
+            for (const track of tracks.values()) applyMute(track);
+        };
+        const setTrackVolume = (index, volume) => {
+            requestedVolumes.set(Number(index), clampVolume(volume));
+            const track = tracks.get(Number(index));
+            if (track) applyTrack(track);
+        };
+        const setTrackMute = (index, muted) => {
+            requestedMutes.set(Number(index), Boolean(muted));
+            const track = tracks.get(Number(index));
+            if (track) applyTrack(track);
+        };
+        return { reset, setMasterVolume, setEnabled, setTrackVolume, setTrackMute };
+    };
+    const synthOutput = createSynthOutputController(api);
     let backingEnabled = true;
-    let synthVolume = 0.75;
     let backingVolume = 0.75;
     let soundFontBytes = null;
     let committedRange = null;
@@ -75,56 +130,22 @@
     let didNotifyPlayerReady = false;
     let pendingRangeHighlight = null;
     let lastPositionPostTime = Number.NEGATIVE_INFINITY;
-    const PDF_CLICK_VOICES = Object.freeze({
-        strong: { frequency: 2_600, amplitude: 0.95, decay: 65 },
-        subAccent: { frequency: 1_800, amplitude: 0.66, decay: 85 },
-        normal: { frequency: 1_100, amplitude: 0.44, decay: 105 },
-        subdivision: { frequency: 1_150, amplitude: 0.30, decay: 110 }
-    });
     const metronomeAccent = (pulse) => {
         const factor = Math.max(1, metronomeSubdivisionFactor);
         if (pulse % factor !== 0) return "subdivision";
         return beatAccents[Math.floor(pulse / factor)]
             || (pulse === 0 ? "strong" : "normal");
     };
-    const createPdfClickMetronome = () => {
-        let context = null;
-        const audioContext = () => {
-            if (context) return context;
-            const Context = window.AudioContext || window.webkitAudioContext;
-            if (!Context) return null;
-            context = new Context();
-            return context;
-        };
-        const play = (accent, volume) => {
-            if (accent === "muted" || volume <= 0) return false;
-            const voice = PDF_CLICK_VOICES[accent] || PDF_CLICK_VOICES.normal;
-            const output = audioContext();
-            if (!output) return false;
-            if (output.state === "suspended") output.resume().catch(() => {});
-            const start = output.currentTime;
-            const duration = 0.035;
-            const oscillator = output.createOscillator();
-            const gain = output.createGain();
-            const curve = new Float32Array(64);
-            for (let index = 0; index < curve.length; index += 1) {
-                const seconds = duration * index / (curve.length - 1);
-                curve[index] = volume * voice.amplitude * Math.exp(-seconds * voice.decay);
-            }
-            oscillator.type = "sine";
-            oscillator.frequency.setValueAtTime(voice.frequency, start);
-            gain.gain.setValueCurveAtTime(curve, start, duration);
-            oscillator.connect(gain);
-            gain.connect(output.destination);
-            oscillator.start(start);
-            oscillator.stop(start + duration);
-            return true;
-        };
-        return { play };
+    const metronomeGain = (pulse) => {
+        const accent = metronomeAccent(pulse);
+        if (accent === "strong") return 0.95;
+        if (accent === "subAccent") return 0.66;
+        if (accent === "normal") return 0.44;
+        if (accent === "subdivision") return 0.30;
+        return 0;
     };
-    const pdfClickMetronome = createPdfClickMetronome();
-    const silenceBuiltInMetronome = () => {
-        api.metronomeVolume = 0;
+    const applyMetronomePulse = (pulse) => {
+        api.metronomeVolume = metronomeMasterVolume * metronomeGain(pulse);
         synthApi.metronomeVolume = 0;
     };
     const configureMetronomeEvents = (playerApi) => {
@@ -145,13 +166,12 @@
             const current = metronomeEvents[metronomeEvents.length - 1];
             if (!current) return;
             const pulseCount = Math.max(1, beatAccents.length * metronomeSubdivisionFactor);
-            const pulse = Number(current.metronomeNumerator) % pulseCount;
-            const accent = metronomeAccent(pulse);
-            pdfClickMetronome.play(accent, metronomeMasterVolume);
+            const nextPulse = (Number(current.metronomeNumerator) + 1) % pulseCount;
+            applyMetronomePulse(nextPulse);
         });
     };
     configureMetronomeEvents(api);
-    silenceBuiltInMetronome();
+    applyMetronomePulse(0);
     const canUseBacking = () => Boolean(api.score?.backingTrack);
     const createBackingAligner = (deps) => {
         const { synthApi, canUseBacking } = deps;
@@ -233,6 +253,7 @@
             ) return false;
             scoreAdvanced = true;
             latestScoreTime = target;
+            if (synthApi.isPlaying) backingStarted = true;
             return finishBackingPriming();
         };
         const markBackingStarted = (scoreTime) => {
@@ -331,7 +352,7 @@
                 targetTop: Math.max(0, Math.round(Number(rangeTop) - (visibleHeight - rangeHeight) / 2))
             };
         }
-        return { mode: "offscreen", targetTop: null };
+        return { mode: "smooth", targetTop: null };
     };
     const applyRangeScrollPolicy = (firstBar, lastBar) => {
         const lookup = api.renderer?.boundsLookup;
@@ -345,11 +366,16 @@
         );
         const scrollMode = plan.mode === "locked"
             ? alphaTab.ScrollMode.Off
-            : alphaTab.ScrollMode.OffScreen;
+            : alphaTab.ScrollMode.Smooth;
         if (api.settings.player.scrollMode !== scrollMode) {
             api.settings.player.scrollMode = scrollMode;
             api.settings.player.scrollSpeed = 450;
             api.settings.player.nativeBrowserSmoothScroll = false;
+            if (plan.mode === "smooth") {
+                api.settings.player.scrollOffsetY = scoreFollowOffset(
+                    viewportElement.clientHeight || window.innerHeight
+                );
+            }
             api.updateSettings();
         }
         if (plan.targetTop !== null && Math.abs(viewportElement.scrollTop - plan.targetTop) > 2) {
@@ -415,6 +441,7 @@
     }));
     api.scoreLoaded.on((score) => {
         scoreHasLoaded = true;
+        synthOutput.reset(score.tracks);
         if (soundFontBytes) {
             api.loadSoundFont(soundFontBytes.slice(), false);
         }
@@ -501,10 +528,13 @@
             isSeek: Boolean(position.isSeek)
         });
     });
-    api.playerStateChanged.on((state) => post("playerStateChanged", {
-        state: transport.isPlayingIntent() ? 1 : 0,
-        stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
-    }));
+    api.playerStateChanged.on((state) => {
+        refreshPendingRangeHighlight();
+        post("playerStateChanged", {
+            state: transport.isPlayingIntent() ? 1 : 0,
+            stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
+        });
+    });
     api.playerFinished.on(() => {
         if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;
         transport.markStopped();
@@ -562,7 +592,6 @@
         if (!startBeat || !endBeat) return;
         try {
             api.highlightPlaybackRange(startBeat, endBeat);
-            pendingRangeHighlight = null;
         } catch {
             // Bounds can be unavailable during the frame that replaces a rendered track.
             api.clearPlaybackRangeHighlight();
@@ -790,17 +819,14 @@
         seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
-            const value = Number(volume);
-            synthVolume = value;
-            api.masterVolume = synthEnabled ? synthVolume : 0;
+            synthOutput.setMasterVolume(volume);
         },
         setBackingVolume(volume) {
             backingVolume = Number(volume);
             transport.applyBackingOutput();
         },
         setSynthEnabled(enabled) {
-            synthEnabled = Boolean(enabled);
-            api.masterVolume = synthEnabled ? synthVolume : 0;
+            synthOutput.setEnabled(enabled);
         },
         setBackingEnabled(enabled) {
             const wasEnabled = backingEnabled;
@@ -815,7 +841,7 @@
         },
         setMetronomeVolume(volume) {
             metronomeMasterVolume = Number(volume);
-            silenceBuiltInMetronome();
+            applyMetronomePulse(0);
         },
         prepareMetronomeSubdivision(factor) {
             const value = Number(factor);
@@ -825,7 +851,7 @@
             const value = Number(factor);
             if (![1, 2, 4, 8].includes(value) || value === metronomeSubdivisionFactor) return;
             metronomeSubdivisionFactor = value;
-            silenceBuiltInMetronome();
+            applyMetronomePulse(0);
             if (loadedScoreBytes) {
                 transport.pause();
                 resetPlaybackReadiness();
@@ -837,7 +863,7 @@
             beatAccents = Array.isArray(accents) && accents.length > 0
                 ? accents.map(String)
                 : ["strong", "normal", "normal", "normal"];
-            silenceBuiltInMetronome();
+            applyMetronomePulse(0);
         },
         setCountInVolume(volume) {
             const value = Number(volume);
@@ -853,8 +879,7 @@
             if (tracks.length > 0) api.renderTracks(tracks);
         },
         setTrackMute(index, mute) {
-            const track = api.score?.tracks[index];
-            if (track) api.changeTrackMute([track], Boolean(mute));
+            synthOutput.setTrackMute(index, mute);
             const synthTrack = synthApi.score?.tracks[index];
             if (synthTrack) synthApi.changeTrackMute([synthTrack], Boolean(mute));
         },
@@ -865,8 +890,7 @@
             if (synthTrack) synthApi.changeTrackSolo([synthTrack], Boolean(solo));
         },
         setTrackVolume(index, volume) {
-            const track = api.score?.tracks[index];
-            if (track) api.changeTrackVolume([track], Number(volume));
+            synthOutput.setTrackVolume(index, volume);
             const synthTrack = synthApi.score?.tracks[index];
             if (synthTrack) synthApi.changeTrackVolume([synthTrack], Number(volume));
         },
@@ -941,7 +965,10 @@
         cancelRangePreview() {
             const bars = window.riffloopCommittedBars;
             if (bars) window.riffloop.previewRange(bars[0], bars[1], bars[2], bars[3]);
-            else api.clearPlaybackRangeHighlight();
+            else {
+                pendingRangeHighlight = null;
+                api.clearPlaybackRangeHighlight();
+            }
         },
         lifecycle(active) {
             if (!active) transport.pause();

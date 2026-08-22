@@ -11,6 +11,66 @@ assert.match(
     /setPlaybackSpeed\(speed\) \{ api\.playbackSpeed = Number\(speed\); synthApi\.playbackSpeed = Number\(speed\); \}/,
     "score synth and embedded backing must always use the same playback speed"
 );
+assert.doesNotMatch(
+    source,
+    /midiEventsPlayed[\s\S]*?pdfClickMetronome\.play/,
+    "the audible metronome must share alphaTab's buffered playback clock at every speed"
+);
+
+{
+    const startMarker = "    const createSynthOutputController = (playerApi) => {";
+    const endMarker = "\n    const synthOutput = createSynthOutputController(api);";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "independent GP synth output controller is missing");
+    assert.notEqual(end, -1, "independent GP synth output controller boundary is missing");
+    const implementation = source.slice(start, end);
+    const createSynthOutputController = new Function(
+        `${implementation}\nreturn createSynthOutputController;`
+    )();
+    const calls = [];
+    const api = {
+        masterVolume: 0,
+        changeTrackVolume(tracks, volume) { calls.push(["volume", tracks[0].index, volume]); },
+        changeTrackMute(tracks, muted) { calls.push(["mute", tracks[0].index, muted]); },
+    };
+    const tracks = [
+        { index: 0, playbackInfo: { volume: 16, isMute: false } },
+        { index: 1, playbackInfo: { volume: 8, isMute: true } },
+    ];
+    const output = createSynthOutputController(api);
+
+    output.reset(tracks);
+    assert.equal(api.masterVolume, 1, "the alphaTab master must stay audible for the independent metronome");
+    assert.deepEqual(calls.slice(-4), [
+        ["volume", 0, 0.75],
+        ["mute", 0, false],
+        ["volume", 1, 0.375],
+        ["mute", 1, true],
+    ]);
+
+    output.setEnabled(false);
+    assert.equal(api.masterVolume, 1);
+    assert.deepEqual(calls.slice(-2), [["mute", 0, true], ["mute", 1, true]]);
+
+    output.setMasterVolume(0.4);
+    output.setEnabled(true);
+    assert.deepEqual(calls.slice(-4), [
+        ["volume", 0, 0.4],
+        ["volume", 1, 0.2],
+        ["mute", 0, false],
+        ["mute", 1, true],
+    ]);
+
+    output.setTrackVolume(1, 0.9);
+    output.setTrackMute(0, true);
+    assert.deepEqual(calls.slice(-4), [
+        ["volume", 1, 0.9 * 0.4],
+        ["mute", 1, true],
+        ["volume", 0, 0.4],
+        ["mute", 0, true],
+    ]);
+}
 
 {
     assert.match(
@@ -126,8 +186,8 @@ assert.match(
     );
     assert.deepEqual(
         loopScrollPlan(100, 1300, 900),
-        { mode: "offscreen", targetTop: null },
-        "a loop taller than the viewport must scroll only when the cursor leaves the display"
+        { mode: "smooth", targetTop: null },
+        "a loop taller than the viewport must keep the current playback row centered with smooth following"
     );
 }
 
@@ -208,6 +268,7 @@ assert.match(
     {
         const api = player(false, 2400);
         const synthApi = player(false, 0);
+        synthApi.play = function () { this.playCalls += 1; };
         const scheduled = [];
         const reportedStates = [];
         const backingAudibility = [];
@@ -303,6 +364,33 @@ assert.match(
     {
         const api = player(false, 2400);
         const synthApi = player(false, 0);
+        const backingAudibility = [];
+        const transport = createTransportController({
+            api,
+            synthApi,
+            canUseBacking: () => true,
+            alignBacking: (scoreTime) => { synthApi.timePosition = scoreTime; },
+            setBackingAudible: (audible) => backingAudibility.push(audible),
+            schedule: () => {},
+        });
+
+        transport.play();
+        assert.equal(synthApi.isPlaying, true);
+        assert.equal(
+            transport.startDeferredBacking(2_480),
+            true,
+            "score progress must finish priming when the backing is already playing even if its state event is missing"
+        );
+        assert.deepEqual(
+            backingAudibility,
+            [false, true],
+            "a missing backing state event must not leave embedded audio muted forever"
+        );
+    }
+
+    {
+        const api = player(false, 2400);
+        const synthApi = player(false, 0);
         const transport = createTransportController({
             api,
             synthApi,
@@ -319,6 +407,9 @@ assert.match(
             for (const backingStartsFirst of [false, true]) {
                 const api = player(false, anchor, anchor);
                 const synthApi = player(false, 0, 0);
+                if (!backingStartsFirst) {
+                    synthApi.play = function () { this.playCalls += 1; };
+                }
                 api.playbackSpeed = speed;
                 synthApi.playbackSpeed = speed;
                 const backingAudibility = [];

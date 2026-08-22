@@ -62,6 +62,17 @@ assert.match(
     /const refreshPendingRangeHighlight[\s\S]*?try\s*\{[\s\S]*?highlightPlaybackRange[\s\S]*?catch/,
     "range highlighting must tolerate a render that has not produced bounds yet"
 );
+{
+    const start = script.indexOf("    const refreshPendingRangeHighlight = () => {");
+    const end = script.indexOf("\n    const hitScorePosition", start);
+    assert.notEqual(start, -1, "range highlight refresh implementation is missing");
+    assert.notEqual(end, -1, "range highlight refresh boundary is missing");
+    assert.doesNotMatch(
+        script.slice(start, end),
+        /pendingRangeHighlight\s*=\s*null/,
+        "a successful redraw must retain the committed range so later interactions can restore its highlight"
+    );
+}
 assert.match(
     script,
     /const closestRangeBeat[\s\S]*?pendingRangeHighlight\.startTick[\s\S]*?pendingRangeHighlight\.endTick/,
@@ -71,6 +82,16 @@ assert.match(
     script,
     /previewRange\(firstBar, lastBar, startTick, endTick\)/,
     "native range previews must include precise note ticks"
+);
+assert.match(
+    script,
+    /api\.playerStateChanged\.on\(\(state\) => \{[\s\S]*?refreshPendingRangeHighlight\(\);[\s\S]*?post\("playerStateChanged"/,
+    "play and pause state changes must restore the active loop highlight"
+);
+assert.match(
+    script,
+    /cancelRangePreview\(\) \{[\s\S]*?if \(bars\)[\s\S]*?else \{[\s\S]*?pendingRangeHighlight = null;[\s\S]*?clearPlaybackRangeHighlight\(\)/,
+    "cancelling an uncommitted selection must not let a later state change restore it"
 );
 {
     const start = script.indexOf("    const seekBoth = (tick, options = {}) => {");

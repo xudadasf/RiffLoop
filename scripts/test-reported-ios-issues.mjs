@@ -35,7 +35,7 @@ assert.match(
 );
 assert.match(
     gpWeb,
-    /api\.playerStateChanged\.on\(\(state\) => post\("playerStateChanged", \{[\s\S]*?state: transport\.isPlayingIntent\(\) \? 1 : 0/,
+    /api\.playerStateChanged\.on\(\(state\) => \{[\s\S]*?post\("playerStateChanged", \{[\s\S]*?state: transport\.isPlayingIntent\(\) \? 1 : 0/,
     "late alphaTab state events must not overwrite the coordinated GP transport state"
 );
 assert.match(
@@ -52,14 +52,22 @@ for (const expected of [
     assert.match(metronome, expected, "native strong, secondary and normal clicks must be clearly separated");
 }
 for (const expected of [
-    /strong: \{ frequency: 2_600, amplitude: 0\.95, decay: 65 \}/,
-    /subAccent: \{ frequency: 1_800, amplitude: 0\.66, decay: 85 \}/,
-    /normal: \{ frequency: 1_100, amplitude: 0\.44, decay: 105 \}/,
+    /accent === "strong"\) return 0\.95/,
+    /accent === "subAccent"\) return 0\.66/,
+    /accent === "normal"\) return 0\.44/,
 ]) {
-    assert.match(gpWeb, expected, "GP mode must reuse the PDF metronome click voices");
+    assert.match(gpWeb, expected, "GP strong, secondary and normal beats must remain audibly distinct");
 }
-assert.match(gpWeb, /api\.metronomeVolume = 0;/, "the old one-timbre alphaTab click must be muted");
-assert.match(gpWeb, /pdfClickMetronome\.play\(accent, metronomeMasterVolume\)/);
+assert.doesNotMatch(
+    gpWeb,
+    /midiEventsPlayed[\s\S]*?pdfClickMetronome\.play/,
+    "a delayed MIDI callback must never generate the audible GP metronome click"
+);
+assert.match(
+    gpWeb,
+    /const nextPulse = \(Number\(current\.metronomeNumerator\) \+ 1\) % pulseCount;[\s\S]*?applyMetronomePulse\(nextPulse\)/,
+    "the alphaTab-scheduled metronome must prepare the next accent before its audio buffer plays"
+);
 assert.match(
     gpPage,
     /\.at-cursor-beat\s*\{[\s\S]*?background: transparent !important;[\s\S]*?\.at-cursor-beat::after\s*\{[\s\S]*?width: 70%;[\s\S]*?background: rgba\(0, 122, 255, 0\.28\);/,
