@@ -110,26 +110,25 @@
         ) return "audio/mp4";
         return null;
     };
-    let ownedTypedBackingUrl = null;
-    const applyTypedBackingSource = (score, media, dependencies = {}) => {
+    const bytesToBase64 = (bytes) => {
+        let binary = "";
+        const chunkSize = 0x8000;
+        for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+        }
+        return btoa(binary);
+    };
+    const applyDataBackingSource = (score, media) => {
         const bytes = score?.backingTrack?.rawAudioFile;
         const mimeType = backingAudioMimeType(bytes);
         if (!media || !mimeType) return false;
 
-        const createBlob = dependencies.createBlob
-            || ((parts, options) => new Blob(parts, options));
-        const createObjectURL = dependencies.createObjectURL
-            || URL.createObjectURL.bind(URL);
-        const revokeObjectURL = dependencies.revokeObjectURL
-            || URL.revokeObjectURL.bind(URL);
         const previousUrl = media.src;
         const previousTime = Number(media.currentTime) || 0;
         const previousRate = Number(media.playbackRate) || 1;
         const previousVolume = Number(media.volume);
 
-        if (ownedTypedBackingUrl) revokeObjectURL(ownedTypedBackingUrl);
-        ownedTypedBackingUrl = createObjectURL(createBlob([bytes], { type: mimeType }));
-        media.src = ownedTypedBackingUrl;
+        media.src = `data:${mimeType};base64,${bytesToBase64(bytes)}`;
         media.playbackRate = previousRate;
         if (Number.isFinite(previousVolume)) media.volume = previousVolume;
         if (previousTime > 0) {
@@ -138,8 +137,8 @@
             }, { once: true });
         }
         media.load();
-        if (previousUrl?.startsWith("blob:") && previousUrl !== ownedTypedBackingUrl) {
-            revokeObjectURL(previousUrl);
+        if (previousUrl?.startsWith("blob:")) {
+            URL.revokeObjectURL(previousUrl);
         }
         return true;
     };
@@ -737,13 +736,13 @@
     synthApi.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(() => postBackingDiagnostic("synth-player-ready"));
     synthApi.scoreLoaded.on((score) => {
-        const typedBackingApplied = Boolean(window.webkit?.messageHandlers?.riffloop)
-            && applyTypedBackingSource(score, backingMediaElement());
+        const dataBackingApplied = Boolean(window.webkit?.messageHandlers?.riffloop)
+            && applyDataBackingSource(score, backingMediaElement());
         postBackingDiagnostic("synth-score-loaded", undefined, {
             hasBackingTrack: Boolean(score.backingTrack),
             rawAudioBytes: Number(score.backingTrack?.rawAudioFile?.length ?? 0),
             syncPointCount: Number(score.backingTrack?.syncPoints?.length ?? 0),
-            typedBackingApplied,
+            dataBackingApplied,
             userAgent: navigator.userAgent
         });
         probeTypedBackingMetadata(score);

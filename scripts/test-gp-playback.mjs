@@ -100,16 +100,15 @@ assert.doesNotMatch(
     assert.notEqual(end, -1, "iPad backing MIME compatibility boundary is missing");
     const implementation = source.slice(start, end);
     const execute = new Function(
-        `${implementation}\nreturn { backingAudioMimeType, applyTypedBackingSource };`
+        `${implementation}\nreturn { backingAudioMimeType, applyDataBackingSource };`
     );
-    const { backingAudioMimeType, applyTypedBackingSource } = execute();
+    const { backingAudioMimeType, applyDataBackingSource } = execute();
 
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
     assert.equal(backingAudioMimeType(mp3), "audio/mpeg");
     assert.equal(backingAudioMimeType(new Uint8Array([0x52, 0x49, 0x46, 0x46])), "audio/wav");
 
     let metadataHandler = null;
-    const revoked = [];
     const media = {
         src: "blob:untyped-alphaTab-source",
         currentTime: 16.59,
@@ -122,29 +121,17 @@ assert.doesNotMatch(
         },
         load() { this.loadCalls += 1; },
     };
-    let createdBlob = null;
-    assert.equal(applyTypedBackingSource(
+    assert.equal(applyDataBackingSource(
         { backingTrack: { rawAudioFile: mp3 } },
-        media,
-        {
-            createBlob(parts, options) {
-                createdBlob = { parts, type: options.type };
-                return createdBlob;
-            },
-            createObjectURL() { return "blob:typed-riffloop-source"; },
-            revokeObjectURL(url) { revoked.push(url); },
-        }
+        media
     ), true);
-    assert.equal(createdBlob.type, "audio/mpeg");
-    assert.equal(createdBlob.parts[0], mp3);
-    assert.equal(media.src, "blob:typed-riffloop-source");
+    assert.equal(media.src, "data:audio/mpeg;base64,SUQzBA==");
     assert.equal(media.playbackRate, 1.25);
     assert.equal(media.volume, 0.75);
     assert.equal(media.loadCalls, 1);
-    assert.deepEqual(revoked, ["blob:untyped-alphaTab-source"]);
     media.currentTime = 0;
     metadataHandler();
-    assert.equal(media.currentTime, 16.59, "typed reload must preserve the pending backing position");
+    assert.equal(media.currentTime, 16.59, "data URL reload must preserve the pending backing position");
 }
 
 {
