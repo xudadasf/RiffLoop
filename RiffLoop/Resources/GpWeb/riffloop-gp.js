@@ -148,17 +148,57 @@
         api.metronomeVolume = metronomeMasterVolume * metronomeGain(pulse);
         synthApi.metronomeVolume = 0;
     };
+    const reinforceLongLegatoTargets = (midiFile, score) => {
+        if (!score) return 0;
+        let reinforcedCount = 0;
+        for (const track of score.tracks) {
+            for (const staff of track.staves) {
+                for (const bar of staff.bars) {
+                    for (const voice of bar.voices) {
+                        for (const beat of voice.beats) {
+                            for (const note of beat.notes) {
+                                const origin = note.slideOrigin;
+                                if (
+                                    origin?.slideOutType !== alphaTab.model.SlideOutType.Legato
+                                    || origin.slideOrigin?.slideOutType !== alphaTab.model.SlideOutType.Legato
+                                ) continue;
+                                const tick = Number(beat.absolutePlaybackStart) + Number(midiFile.tickShift || 0);
+                                const duration = Math.max(2, Number(beat.playbackDuration) || 0);
+                                const noteKey = Number(note.realValue);
+                                const trackIndex = Number(track.index);
+                                const channel = Number(track.playbackInfo?.primaryChannel) || 0;
+                                const velocity = Math.max(32, Math.min(72, Number(note.dynamics ?? 4) * 16 - 9));
+                                midiFile.addEvent(new alphaTab.midi.NoteBendEvent(
+                                    trackIndex, tick, channel, noteKey, 0x80000000
+                                ));
+                                midiFile.addEvent(new alphaTab.midi.NoteOnEvent(
+                                    trackIndex, tick, channel, noteKey, velocity
+                                ));
+                                midiFile.addEvent(new alphaTab.midi.NoteOffEvent(
+                                    trackIndex, tick + duration - 1, channel, noteKey, velocity
+                                ));
+                                reinforcedCount += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return reinforcedCount;
+    };
     const configureMetronomeEvents = (playerApi) => {
         playerApi.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
         playerApi.midiLoad.on((midiFile) => {
-            if (metronomeSubdivisionFactor === 1) return;
-            const denominatorOffset = Math.log2(metronomeSubdivisionFactor);
-            for (const event of midiFile.events) {
-                if (event instanceof alphaTab.midi.TimeSignatureEvent) {
-                    event.numerator *= metronomeSubdivisionFactor;
-                    event.denominatorIndex += denominatorOffset;
+            if (metronomeSubdivisionFactor !== 1) {
+                const denominatorOffset = Math.log2(metronomeSubdivisionFactor);
+                for (const event of midiFile.events) {
+                    if (event instanceof alphaTab.midi.TimeSignatureEvent) {
+                        event.numerator *= metronomeSubdivisionFactor;
+                        event.denominatorIndex += denominatorOffset;
+                    }
                 }
             }
+            reinforceLongLegatoTargets(midiFile, api.score);
         });
         playerApi.midiEventsPlayed.on((event) => {
             const metronomeEvents = Array.from(event.events)

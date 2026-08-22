@@ -12,6 +12,74 @@ assert.doesNotMatch(
     "alphaTab 1.8.4 exposes playerState, not an isPlaying property"
 );
 
+{
+    const startMarker = "    const reinforceLongLegatoTargets = (midiFile, score) => {";
+    const endMarker = "\n    const configureMetronomeEvents";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "long legato target reinforcement is missing");
+    assert.notEqual(end, -1, "long legato target reinforcement boundary is missing");
+    const implementation = source.slice(start, end);
+
+    class NoteBendEvent {
+        constructor(track, tick, channel, noteKey, value) {
+            Object.assign(this, { kind: "bend", track, tick, channel, noteKey, value });
+        }
+    }
+    class NoteOnEvent {
+        constructor(track, tick, channel, noteKey, noteVelocity) {
+            Object.assign(this, { kind: "on", track, tick, channel, noteKey, noteVelocity });
+        }
+    }
+    class NoteOffEvent {
+        constructor(track, tick, channel, noteKey, noteVelocity) {
+            Object.assign(this, { kind: "off", track, tick, channel, noteKey, noteVelocity });
+        }
+    }
+    const alphaTab = {
+        model: { SlideOutType: { Legato: 2 } },
+        midi: { NoteBendEvent, NoteOnEvent, NoteOffEvent },
+    };
+    const reinforceLongLegatoTargets = new Function(
+        "alphaTab",
+        `${implementation}\nreturn reinforceLongLegatoTargets;`
+    )(alphaTab);
+    const firstOrigin = { slideOutType: 2, slideOrigin: null };
+    const secondOrigin = { slideOutType: 2, slideOrigin: firstOrigin };
+    const singleOrigin = { slideOutType: 2, slideOrigin: null };
+    const targetBeat = { absolutePlaybackStart: 36_480, playbackDuration: 1_440 };
+    const singleBeat = { absolutePlaybackStart: 50_000, playbackDuration: 480 };
+    const score = {
+        tracks: [{
+            index: 0,
+            playbackInfo: { primaryChannel: 0 },
+            staves: [{ bars: [{ voices: [{ beats: [
+                { ...targetBeat, notes: [{
+                    beat: targetBeat,
+                    realValue: 58,
+                    dynamics: 4,
+                    slideOrigin: secondOrigin,
+                }] },
+                { ...singleBeat, notes: [{
+                    beat: singleBeat,
+                    realValue: 62,
+                    dynamics: 4,
+                    slideOrigin: singleOrigin,
+                }] },
+            ] }] }] }],
+        }],
+    };
+    const events = [];
+    const midiFile = { tickShift: 0, addEvent(event) { events.push(event); } };
+
+    assert.equal(reinforceLongLegatoTargets(midiFile, score), 1);
+    assert.deepEqual(events.map((event) => ({ ...event })), [
+        { kind: "bend", track: 0, tick: 36_480, channel: 0, noteKey: 58, value: 0x80000000 },
+        { kind: "on", track: 0, tick: 36_480, channel: 0, noteKey: 58, noteVelocity: 55 },
+        { kind: "off", track: 0, tick: 37_919, channel: 0, noteKey: 58, noteVelocity: 55 },
+    ]);
+}
+
 assert.match(
     source,
     /setPlaybackSpeed\(speed\) \{ api\.playbackSpeed = Number\(speed\); synthApi\.playbackSpeed = Number\(speed\); \}/,
