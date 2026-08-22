@@ -100,38 +100,18 @@ assert.doesNotMatch(
     assert.notEqual(end, -1, "iPad backing MIME compatibility boundary is missing");
     const implementation = source.slice(start, end);
     const execute = new Function(
-        `${implementation}\nreturn { backingAudioMimeType, applyDataBackingSource };`
+        `${implementation}\nreturn { backingAudioMimeType, nativeBackingPayload };`
     );
-    const { backingAudioMimeType, applyDataBackingSource } = execute();
+    const { backingAudioMimeType, nativeBackingPayload } = execute();
 
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
     assert.equal(backingAudioMimeType(mp3), "audio/mpeg");
     assert.equal(backingAudioMimeType(new Uint8Array([0x52, 0x49, 0x46, 0x46])), "audio/wav");
-
-    let metadataHandler = null;
-    const media = {
-        src: "blob:untyped-alphaTab-source",
-        currentTime: 16.59,
-        duration: 136.68,
-        playbackRate: 1.25,
-        volume: 0.75,
-        loadCalls: 0,
-        addEventListener(name, handler) {
-            if (name === "loadedmetadata") metadataHandler = handler;
-        },
-        load() { this.loadCalls += 1; },
-    };
-    assert.equal(applyDataBackingSource(
-        { backingTrack: { rawAudioFile: mp3 } },
-        media
-    ), true);
-    assert.equal(media.src, "data:audio/mpeg;base64,SUQzBA==");
-    assert.equal(media.playbackRate, 1.25);
-    assert.equal(media.volume, 0.75);
-    assert.equal(media.loadCalls, 1);
-    media.currentTime = 0;
-    metadataHandler();
-    assert.equal(media.currentTime, 16.59, "data URL reload must preserve the pending backing position");
+    assert.deepEqual(
+        nativeBackingPayload({ backingTrack: { rawAudioFile: mp3 } }),
+        { mimeType: "audio/mpeg", data: "SUQzBA==" },
+        "WKWebView must hand embedded audio bytes to the native player"
+    );
 }
 
 {
@@ -431,6 +411,26 @@ assert.doesNotMatch(
         assert.equal(synthApi.isPlaying, false, "a late backing-player start must be paused again");
         assert.equal(api.pauseCalls, 2);
         assert.equal(synthApi.pauseCalls, 2);
+    }
+
+    {
+        const api = player(false, 2400);
+        const synthApi = player(false, 0);
+        let resumeCalls = 0;
+        const transport = createTransportController({
+            api,
+            synthApi,
+            canUseBacking: () => true,
+            usesNativeBacking: true,
+            resumeBacking: () => { resumeCalls += 1; },
+            setBackingAudible: () => {},
+            schedule: () => {},
+        });
+
+        transport.play();
+        assert.equal(api.playCalls, 1);
+        assert.equal(synthApi.playCalls, 0, "native backing mode must not start WKWebView media");
+        assert.equal(resumeCalls, 0, "native backing mode must not resume WKWebView media directly");
     }
 
     {

@@ -13,6 +13,7 @@
         }
     };
     const errorMessage = (error) => error?.message || String(error);
+    const usesNativeBacking = Boolean(window.webkit?.messageHandlers?.riffloop);
 
     const api = new alphaTab.AlphaTabApi(scoreElement, {
         core: {
@@ -118,29 +119,11 @@
         }
         return btoa(binary);
     };
-    const applyDataBackingSource = (score, media) => {
+    const nativeBackingPayload = (score) => {
         const bytes = score?.backingTrack?.rawAudioFile;
         const mimeType = backingAudioMimeType(bytes);
-        if (!media || !mimeType) return false;
-
-        const previousUrl = media.src;
-        const previousTime = Number(media.currentTime) || 0;
-        const previousRate = Number(media.playbackRate) || 1;
-        const previousVolume = Number(media.volume);
-
-        media.src = `data:${mimeType};base64,${bytesToBase64(bytes)}`;
-        media.playbackRate = previousRate;
-        if (Number.isFinite(previousVolume)) media.volume = previousVolume;
-        if (previousTime > 0) {
-            media.addEventListener("loadedmetadata", () => {
-                media.currentTime = Math.min(previousTime, Number(media.duration) || previousTime);
-            }, { once: true });
-        }
-        media.load();
-        if (previousUrl?.startsWith("blob:")) {
-            URL.revokeObjectURL(previousUrl);
-        }
-        return true;
+        if (!mimeType) return null;
+        return { mimeType, data: bytesToBase64(bytes) };
     };
     const probeTypedBackingMetadata = (score) => {
         const bytes = score?.backingTrack?.rawAudioFile;
@@ -399,6 +382,7 @@
     };
     const createTransportController = (deps) => {
         const { api, synthApi, canUseBacking, schedule } = deps;
+        const usesNativeBacking = Boolean(deps.usesNativeBacking);
         const reportState = deps.reportState || (() => {});
         const playerIsPlaying = (player) => (
             player.playerState === alphaTab.synth.PlayerState.Playing
@@ -457,11 +441,15 @@
             if (backingPriming) {
                 alignBacking(playbackAnchorTime);
                 setBackingAudible(false);
-                synthApi.play();
-                // alphaTab can remain in Playing while its HTMLMediaElement stays
-                // paused after the first pause on iOS WKWebView. Nudge only that
-                // stale media state; ordinary starts are already unpaused here.
-                resumeBacking();
+                if (usesNativeBacking) {
+                    backingStarted = true;
+                } else {
+                    synthApi.play();
+                    // alphaTab can remain in Playing while its HTMLMediaElement stays
+                    // paused after the first pause on iOS WKWebView. Nudge only that
+                    // stale media state; ordinary starts are already unpaused here.
+                    resumeBacking();
+                }
             }
             api.play();
             reportState(true, false);
@@ -528,12 +516,15 @@
         api,
         synthApi,
         canUseBacking,
+        usesNativeBacking,
         alignBacking: (scoreTime = api.timePosition) => backingAligner.align(scoreTime),
         resumeBacking: resumeBackingMedia,
         pauseBacking: pauseBackingMedia,
         setBackingAudible: (audible) => {
             if (canUseBacking()) {
-                synthApi.masterVolume = audible && backingEnabled ? backingVolume : 0;
+                synthApi.masterVolume = !usesNativeBacking && audible && backingEnabled
+                    ? backingVolume
+                    : 0;
             }
         },
         schedule: window.setTimeout.bind(window),
@@ -672,6 +663,10 @@
         if (soundFontBytes) {
             api.loadSoundFont(soundFontBytes.slice(), false);
         }
+        if (usesNativeBacking) {
+            const payload = nativeBackingPayload(score);
+            if (payload) post("backingAudioLoaded", payload);
+        }
         post("scoreLoaded", {
             title: score.title || "未命名乐谱",
             artist: score.artist || "",
@@ -736,13 +731,11 @@
     synthApi.playerReady.on(notifyPlayerReady);
     synthApi.playerReady.on(() => postBackingDiagnostic("synth-player-ready"));
     synthApi.scoreLoaded.on((score) => {
-        const dataBackingApplied = Boolean(window.webkit?.messageHandlers?.riffloop)
-            && applyDataBackingSource(score, backingMediaElement());
         postBackingDiagnostic("synth-score-loaded", undefined, {
             hasBackingTrack: Boolean(score.backingTrack),
             rawAudioBytes: Number(score.backingTrack?.rawAudioFile?.length ?? 0),
             syncPointCount: Number(score.backingTrack?.syncPoints?.length ?? 0),
-            dataBackingApplied,
+            usesNativeBacking,
             userAgent: navigator.userAgent
         });
         probeTypedBackingMetadata(score);

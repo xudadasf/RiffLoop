@@ -64,12 +64,19 @@ final class GpWebViewModel: ObservableObject {
     private var playbackStartedAt: Date?
     private var pendingResumeTick: Double?
     private var lastProfileSaveDate = Date.distantPast
+    private let nativeBackingPlayer = GpNativeBackingPlayer()
+    private var nativeBackingPlaybackRequested = false
+    private var nativeBackingStarted = false
+    private var nativeBackingAnchorMilliseconds = 0.0
 
     func attach(webView: WKWebView) {
         self.webView = webView
     }
 
     func loadScore(data: Data, fileName: String) {
+        nativeBackingPlayer.reset()
+        nativeBackingPlaybackRequested = false
+        nativeBackingStarted = false
         currentFileName = fileName
         pendingProfile = (try? settingsStore.load(
             GpPracticeProfile.self,
@@ -114,10 +121,16 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func pause() {
+        nativeBackingPlayer.pause()
+        nativeBackingPlaybackRequested = false
+        nativeBackingStarted = false
         call("pause")
     }
 
     func stop() {
+        nativeBackingPlayer.pause()
+        nativeBackingPlaybackRequested = false
+        nativeBackingStarted = false
         call("stop")
     }
 
@@ -127,6 +140,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setPlaybackSpeed(_ speed: Double) {
         playbackSpeed = min(max(speed, 0.5), 1.5)
+        nativeBackingPlayer.setRate(playbackSpeed)
         highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
         call("setPlaybackSpeed", arguments: [playbackSpeed])
         saveProfile()
@@ -171,6 +185,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setBackingVolume(_ volume: Double) {
         backingVolume = min(max(volume, 0), 1)
+        nativeBackingPlayer.setVolume(backingVolume)
         call("setBackingVolume", arguments: [backingVolume])
         saveProfile()
     }
@@ -183,6 +198,11 @@ final class GpWebViewModel: ObservableObject {
 
     func setBackingEnabled(_ enabled: Bool) {
         backingEnabled = enabled
+        if !enabled {
+            nativeBackingPlayer.pause()
+            nativeBackingPlaybackRequested = false
+            nativeBackingStarted = false
+        }
         call("setBackingEnabled", arguments: [enabled])
         saveProfile()
     }
@@ -287,6 +307,9 @@ final class GpWebViewModel: ObservableObject {
 
     func setSceneActive(_ isActive: Bool) {
         if !isActive {
+            nativeBackingPlayer.pause()
+            nativeBackingPlaybackRequested = false
+            nativeBackingStarted = false
             isPlaying = false
             updatePracticeClock(isPlaying: false)
             saveProfile()
@@ -336,6 +359,7 @@ final class GpWebViewModel: ObservableObject {
         case let .positionChanged(position):
             recordLoopCompletionIfNeeded(position)
             self.position = position
+            synchronizeNativeBacking(to: position)
             previousPositionTick = position.currentTick
             if
                 pendingResumeTick == nil,
@@ -346,10 +370,41 @@ final class GpWebViewModel: ObservableObject {
             }
         case let .playerStateChanged(state):
             isPlaying = state.state == 1
+            if isPlaying {
+                if !nativeBackingPlaybackRequested {
+                    nativeBackingAnchorMilliseconds = position.currentTime
+                    nativeBackingStarted = false
+                }
+                nativeBackingPlaybackRequested = true
+            } else {
+                nativeBackingPlaybackRequested = false
+                nativeBackingStarted = false
+                nativeBackingPlayer.pause()
+            }
             updatePracticeClock(isPlaying: isPlaying)
         case .playerFinished:
             isPlaying = false
+            nativeBackingPlaybackRequested = false
+            nativeBackingStarted = false
+            nativeBackingPlayer.pause()
             updatePracticeClock(isPlaying: false)
+        case let .backingAudioLoaded(audio):
+            do {
+                try nativeBackingPlayer.load(data: audio.data)
+                nativeBackingPlayer.setRate(playbackSpeed)
+                nativeBackingPlayer.setVolume(backingVolume)
+                appendNativeBackingDiagnostic(
+                    String(
+                        format: "native-loaded %@ bytes=%ld d=%.2f",
+                        audio.mimeType,
+                        audio.data.count,
+                        nativeBackingPlayer.durationMilliseconds / 1_000
+                    )
+                )
+            } catch {
+                errorMessage = "内嵌伴奏原生加载失败：\(error.localizedDescription)"
+                appendNativeBackingDiagnostic("native-load-failed \(error.localizedDescription)")
+            }
         case let .barHit(bar):
             handle(loopSelection.tap(on: bar))
         case let .pointerDown(bar):
@@ -407,6 +462,57 @@ final class GpWebViewModel: ObservableObject {
         } catch {
             NSLog("%@", "[DEBUG-gp-audio-56] log-write-failed=\(error.localizedDescription)")
         }
+    }
+
+    private func synchronizeNativeBacking(to position: GpPlaybackPosition) {
+        guard nativeBackingPlayer.isLoaded else { return }
+
+        if position.isSeek == true {
+            nativeBackingPlayer.seek(to: position.currentTime)
+        }
+        guard nativeBackingPlaybackRequested, backingEnabled else { return }
+
+        if !nativeBackingStarted {
+            guard abs(position.currentTime - nativeBackingAnchorMilliseconds) >= 10 else { return }
+            do {
+                nativeBackingStarted = try nativeBackingPlayer.play(
+                    at: position.currentTime,
+                    rate: playbackSpeed,
+                    volume: backingVolume
+                )
+                appendNativeBackingDiagnostic(
+                    String(
+                        format: "native-play ok=%@ t=%.2f rate=%.2f volume=%.2f",
+                        nativeBackingStarted ? "true" : "false",
+                        position.currentTime / 1_000,
+                        playbackSpeed,
+                        backingVolume
+                    )
+                )
+            } catch {
+                nativeBackingPlaybackRequested = false
+                errorMessage = "内嵌伴奏原生播放失败：\(error.localizedDescription)"
+                appendNativeBackingDiagnostic("native-play-failed \(error.localizedDescription)")
+            }
+            return
+        }
+
+        nativeBackingPlayer.setRate(playbackSpeed)
+        nativeBackingPlayer.setVolume(backingVolume)
+        if
+            position.isSeek == true
+            || abs(nativeBackingPlayer.currentTimeMilliseconds - position.currentTime) > 250
+        {
+            nativeBackingPlayer.seek(to: position.currentTime)
+        }
+    }
+
+    private func appendNativeBackingDiagnostic(_ line: String) {
+        backingDiagnosticLines.append(line)
+        if backingDiagnosticLines.count > 12 {
+            backingDiagnosticLines.removeFirst(backingDiagnosticLines.count - 12)
+        }
+        NSLog("%@", "[DEBUG-gp-native-backing] \(line)")
     }
 
     private func compactBackingDiagnostic(_ message: String) -> String {

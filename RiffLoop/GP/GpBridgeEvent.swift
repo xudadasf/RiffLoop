@@ -69,6 +69,11 @@ struct GpPlaybackState: Codable, Equatable, Sendable {
     let stopped: Bool
 }
 
+struct GpBackingAudio: Codable, Equatable, Sendable {
+    let mimeType: String
+    let data: Data
+}
+
 struct GpBarHit: Codable, Equatable, Sendable {
     let index: Int
     let startTick: Double
@@ -99,6 +104,7 @@ enum GpBridgeEvent: Equatable, Sendable {
     case positionChanged(GpPlaybackPosition)
     case playerStateChanged(GpPlaybackState)
     case playerFinished
+    case backingAudioLoaded(GpBackingAudio)
     case barHit(GpBarHit)
     case pointerDown(GpBarHit)
     case pointerMove(GpBarHit)
@@ -131,6 +137,10 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .playerStateChanged(try decoder.decode(GpPlaybackState.self, from: envelope.payloadData))
         case "playerFinished":
             return .playerFinished
+        case "backingAudioLoaded":
+            return .backingAudioLoaded(
+                try decoder.decode(GpBackingAudio.self, from: envelope.payloadData)
+            )
         case "barHit":
             return .barHit(try decoder.decode(GpBarHit.self, from: envelope.payloadData))
         case "pointerDown":

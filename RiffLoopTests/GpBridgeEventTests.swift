@@ -133,6 +133,21 @@ final class GpBridgeEventTests: XCTestCase {
         )
     }
 
+    func testDecodesEmbeddedBackingAudioForTheNativePlayer() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: [
+                "event": "backingAudioLoaded",
+                "payload": [
+                    "mimeType": "audio/mpeg",
+                    "data": Data([0x49, 0x44, 0x33]).base64EncodedString(),
+                ],
+            ]),
+            .backingAudioLoaded(
+                GpBackingAudio(mimeType: "audio/mpeg", data: Data([0x49, 0x44, 0x33]))
+            )
+        )
+    }
+
     func testDecodesSeekFlagUsedToRejectFalseLoopCompletions() throws {
         XCTAssertEqual(
             try GpBridgeEvent.decode(messageBody: [
