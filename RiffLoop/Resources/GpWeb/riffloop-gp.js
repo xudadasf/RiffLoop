@@ -703,6 +703,15 @@
         post("rangeLoopCompleted");
         return true;
     };
+    const handleCommittedRangeCompletion = () => {
+        if (!completeCommittedRangeLoop()) return false;
+        if (loopCountInEnabled) {
+            rangeCountInRestarter.prepare(committedRange.startTick);
+        } else {
+            seekBoth(committedRange.startTick, { reveal: false });
+        }
+        return true;
+    };
     const enforceCommittedRange = (position) => {
         if (!rangeLoopingEnabled || !committedRange) {
             rangeCompletionAwaitingReset = false;
@@ -719,40 +728,56 @@
             position.isSeek
             || Number(position.currentTick) < committedRange.endTick
         ) return false;
-        if (!completeCommittedRangeLoop()) return false;
-        if (!loopCountInEnabled) {
-            seekBoth(committedRange.startTick, { reveal: false });
-        }
-        return true;
+        return handleCommittedRangeCompletion();
     };
     const createRangeCountInRestarter = (deps) => {
         const { transport, seekBoth, schedule, isPaused } = deps;
         let generation = 0;
-        let waitingForPause = false;
+        let phase = "idle";
+        let resumeRequested = false;
         const cancel = () => {
             generation += 1;
-            waitingForPause = false;
+            phase = "idle";
+            resumeRequested = false;
         };
-        const handlePlayerState = (state) => {
-            if (!waitingForPause || !isPaused(state)) return false;
-            waitingForPause = false;
+        const scheduleRestartIfReady = () => {
+            if (phase !== "waitingForResume" || !resumeRequested) return false;
+            phase = "scheduled";
             const restartGeneration = generation;
             schedule(() => {
-                if (restartGeneration === generation) transport.play();
+                if (
+                    restartGeneration !== generation
+                    || phase !== "scheduled"
+                ) return;
+                phase = "idle";
+                resumeRequested = false;
+                transport.play();
             }, 0);
             return true;
         };
-        const restart = (tick) => {
+        const handlePlayerState = (state) => {
+            if (phase !== "waitingForPause" || !isPaused(state)) return false;
+            phase = "waitingForResume";
+            scheduleRestartIfReady();
+            return true;
+        };
+        const prepare = (tick) => {
             const target = Number(tick);
             if (!Number.isFinite(target)) return false;
             generation += 1;
-            waitingForPause = true;
+            phase = "waitingForPause";
+            resumeRequested = false;
             transport.pause();
             seekBoth(target, { reveal: false });
             handlePlayerState();
             return true;
         };
-        return { restart, cancel, handlePlayerState };
+        const resume = () => {
+            if (phase === "idle" || phase === "scheduled") return false;
+            resumeRequested = true;
+            return scheduleRestartIfReady();
+        };
+        return { prepare, resume, cancel, handlePlayerState };
     };
     const rangeCountInRestarter = createRangeCountInRestarter({
         transport,
@@ -918,7 +943,7 @@
     });
     api.playerFinished.on(() => {
         if (rangeLoopingEnabled && committedRange && transport.isPlayingIntent()) {
-            completeCommittedRangeLoop();
+            handleCommittedRangeCompletion();
             return;
         }
         if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;
@@ -1372,7 +1397,7 @@
         },
         restartRangeWithCountIn() {
             if (!committedRange || !loopCountInEnabled) return;
-            rangeCountInRestarter.restart(committedRange.startTick);
+            rangeCountInRestarter.resume();
         },
         cancelRangePreview() {
             const bars = window.riffloopCommittedBars;

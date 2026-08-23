@@ -370,7 +370,7 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
-        /api\.playerFinished\.on\(\(\) => \{[\s\S]*?rangeLoopingEnabled[\s\S]*?completeCommittedRangeLoop\(\)/,
+        /api\.playerFinished\.on\(\(\) => \{[\s\S]*?rangeLoopingEnabled[\s\S]*?handleCommittedRangeCompletion\(\)/,
         "alphaTab native playback-range finishes must feed the explicit loop completion state machine"
     );
     assert.match(
@@ -385,8 +385,8 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
-        /if \(!completeCommittedRangeLoop\(\)\) return false;[\s\S]*?if \(!loopCountInEnabled\)[\s\S]*?seekBoth\(committedRange\.startTick/,
-        "a count-in range boundary must wait for the acknowledged restart instead of seeking while alphaTab is finishing"
+        /const handleCommittedRangeCompletion = \(\) => \{[\s\S]*?if \(!completeCommittedRangeLoop\(\)\) return false;[\s\S]*?if \(loopCountInEnabled\)[\s\S]*?rangeCountInRestarter\.prepare\(committedRange\.startTick\)/,
+        "a count-in range boundary must immediately prepare A before waiting for the acknowledged restart"
     );
     assert.match(
         source,
@@ -417,7 +417,8 @@ assert.doesNotMatch(
         "rangeLoopingEnabled",
         "committedRange",
         "loopCountInEnabled",
-        `${loopImplementation}\nreturn { enforceCommittedRange, completeCommittedRangeLoop };`
+        "rangeCountInRestarter",
+        `${loopImplementation}\nreturn { enforceCommittedRange, completeCommittedRangeLoop, handleCommittedRangeCompletion };`
     );
     const seeks = [];
     const posts = [];
@@ -426,7 +427,8 @@ assert.doesNotMatch(
         (event) => posts.push(event),
         true,
         { startTick: 30720, endTick: 34560 },
-        false
+        false,
+        { prepare: () => assert.fail("ordinary range loops must not prepare count-in") }
     );
     assert.equal(enforceCommittedRange({ currentTick: 34559, isSeek: false }), false);
     assert.equal(enforceCommittedRange({ currentTick: 34560, isSeek: false }), true);
@@ -481,14 +483,21 @@ assert.doesNotMatch(
         (event) => countInBoundaryCalls.push(["post", event]),
         true,
         { startTick: 30720, endTick: 34560 },
-        true
+        true,
+        { prepare: (tick) => countInBoundaryCalls.push(["prepare", tick]) }
     );
     assert.equal(countInRange.enforceCommittedRange({ currentTick: 34563, isSeek: false }), true);
     assert.deepEqual(
         countInBoundaryCalls,
-        [["post", "rangeLoopCompleted"]],
-        "a count-in boundary must count once and wait for Swift to apply any ladder speed before restarting"
+        [["post", "rangeLoopCompleted"], ["prepare", 30720]],
+        "crossing B must immediately pause/seek through preparation before waiting for Swift's speed acknowledgement"
     );
+    assert.equal(
+        countInRange.handleCommittedRangeCompletion(),
+        false,
+        "a trailing playerFinished signal must not prepare or replay the same B boundary twice"
+    );
+    assert.deepEqual(countInBoundaryCalls, [["post", "rangeLoopCompleted"], ["prepare", 30720]]);
 
     const countInStartMarker = "    const createRangeCountInRestarter = (deps) => {";
     const countInEndMarker = "\n    const rangeCountInRestarter";
@@ -511,19 +520,45 @@ assert.doesNotMatch(
         schedule: (action) => scheduledRestarts.push(action),
         isPaused: (state) => state === "paused",
     });
-    countInRestarter.restart(30_720);
+    countInRestarter.prepare(30_720);
     assert.deepEqual(
         countInCalls,
         ["pause", ["seek", 30_720, { reveal: false }]],
         "per-loop count-in must pause and seek A without guessing when playback can resume"
     );
+    assert.equal(scheduledRestarts.length, 0, "preparation alone must not play before Swift updates speed");
+    assert.equal(countInRestarter.resume(), false, "an early acknowledgement must wait for Paused");
     assert.equal(countInRestarter.handlePlayerState("playing"), false);
     assert.equal(scheduledRestarts.length, 0, "a late Playing state must not restart count-in");
     assert.equal(countInRestarter.handlePlayerState("paused"), true);
     assert.equal(countInRestarter.handlePlayerState("paused"), false);
-    assert.equal(scheduledRestarts.length, 1, "one confirmed pause must schedule one restart");
+    assert.equal(scheduledRestarts.length, 1, "Paused plus one acknowledgement must schedule one restart");
     scheduledRestarts[0]();
     assert.deepEqual(countInCalls.at(-1), "play");
+    assert.equal(countInRestarter.resume(), false, "a duplicate acknowledgement must not replay the same round");
+
+    const pausedFirstCalls = [];
+    const pausedFirstSchedules = [];
+    const pausedFirstRestarter = createRangeCountInRestarter({
+        transport: {
+            pause: () => pausedFirstCalls.push("pause"),
+            play: () => pausedFirstCalls.push("play"),
+        },
+        seekBoth: (tick, options) => pausedFirstCalls.push(["seek", tick, options]),
+        schedule: (action) => pausedFirstSchedules.push(action),
+        isPaused: (state) => state === "paused",
+    });
+    pausedFirstRestarter.prepare(30_720);
+    assert.equal(pausedFirstRestarter.handlePlayerState("paused"), true);
+    assert.equal(pausedFirstSchedules.length, 0, "Paused must remain at A until Swift acknowledges speed");
+    assert.equal(pausedFirstRestarter.resume(), true);
+    assert.equal(pausedFirstSchedules.length, 1);
+    pausedFirstSchedules[0]();
+    assert.deepEqual(pausedFirstCalls, [
+        "pause",
+        ["seek", 30_720, { reveal: false }],
+        "play",
+    ]);
 
     const swiftViewModel = readFileSync(
         new URL("../RiffLoop/GP/GpWebViewModel.swift", import.meta.url),
@@ -536,7 +571,7 @@ assert.doesNotMatch(
     );
     assert.match(
         swiftViewModel,
-        /private func recordLoopCompletion\(\)[\s\S]*?call\("restartRangeWithCountIn"\)/,
+        /private func recordLoopCompletion\(\)[\s\S]*?applyEffectivePlaybackSpeed\(\)[\s\S]*?if loopCountInEnabled \{[\s\S]*?call\("restartRangeWithCountIn"\)/,
         "Swift must apply the completed-loop speed update before acknowledging one count-in restart"
     );
 
