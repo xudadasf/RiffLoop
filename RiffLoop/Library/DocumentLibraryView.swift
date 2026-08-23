@@ -113,7 +113,7 @@ struct DocumentLibraryView: View {
                             }
                             .buttonStyle(.plain)
 
-                            if model.kind == .guitarPro {
+                            if model.kind == .guitarPro || model.kind == .video {
                                 Button(role: .destructive) {
                                     filePendingDeletion = fileURL
                                 } label: {
@@ -150,7 +150,7 @@ struct DocumentLibraryView: View {
             }
         }
         .confirmationDialog(
-            "删除 GP 文件？",
+            "删除文件？",
             isPresented: Binding(
                 get: { filePendingDeletion != nil },
                 set: { if !$0 { filePendingDeletion = nil } }

@@ -232,6 +232,17 @@ final class PracticeViewModel: ObservableObject {
         saveProfile()
     }
 
+    func setSnapLoopPointsToBeat(_ enabled: Bool) {
+        snapLoopPointsToBeat = enabled
+        if enabled {
+            pointA = pointA.map { snapToNearestBeat($0, beatOffset: beatOffset, bpm: bpm) }
+            pointB = pointB.map { snapToNearestBeat($0, beatOffset: beatOffset, bpm: bpm) }
+            normalizeLoopPointsAfterSettingA()
+            rebuildLoopBoundaryObserver()
+        }
+        saveProfile()
+    }
+
     func setSpeedLadderEnabled(_ enabled: Bool) {
         speedLadderEnabled = enabled
         completedLoops = 0

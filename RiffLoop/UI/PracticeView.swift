@@ -31,7 +31,7 @@ struct PracticeView: View {
                     }
                 }
                 .overlay(alignment: .bottomLeading) {
-                    if viewModel.loopEnabled, !viewModel.isPlaying {
+                    if viewModel.loopEnabled {
                         Button(action: viewModel.clearLoop) {
                             Label("退出 A/B 循环", systemImage: "xmark.circle.fill")
                         }
@@ -168,7 +168,10 @@ struct PracticeView: View {
                 get: { viewModel.loopEnabled },
                 set: { viewModel.setLoopEnabled($0) }
             ))
-            Toggle("A/B 吸附最近拍点", isOn: $viewModel.snapLoopPointsToBeat)
+            Toggle("A/B 吸附最近拍点", isOn: Binding(
+                get: { viewModel.snapLoopPointsToBeat },
+                set: { viewModel.setSnapLoopPointsToBeat($0) }
+            ))
             Toggle("每轮预备 1 小节", isOn: Binding(
                 get: { viewModel.loopCountInEnabled },
                 set: { viewModel.setLoopCountInEnabled($0) }
@@ -590,7 +593,10 @@ struct PracticeView: View {
             Button("Tap Tempo", action: viewModel.recordTap)
                 .buttonStyle(.borderedProminent)
 
-            Toggle("拍点吸附", isOn: $viewModel.snapLoopPointsToBeat)
+            Toggle("拍点吸附", isOn: Binding(
+                get: { viewModel.snapLoopPointsToBeat },
+                set: { viewModel.setSnapLoopPointsToBeat($0) }
+            ))
                 .toggleStyle(.button)
             Toggle("预备 1 小节", isOn: $viewModel.loopCountInEnabled)
                 .toggleStyle(.button)

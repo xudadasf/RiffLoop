@@ -4,6 +4,7 @@ import fs from "node:fs";
 const viewModelSource = fs.readFileSync("RiffLoop/Media/PracticeViewModel.swift", "utf8");
 const viewSource = fs.readFileSync("RiffLoop/UI/PracticeView.swift", "utf8");
 const metronomeSource = fs.readFileSync("RiffLoop/Audio/MetronomeEngine.swift", "utf8");
+const librarySource = fs.readFileSync("RiffLoop/Library/DocumentLibraryView.swift", "utf8");
 
 const checks = [];
 
@@ -45,9 +46,24 @@ check("enabling A/B loop seeks to point A through the coordinated transport", ()
     assert.match(body, /seek\(to: loopEntryTarget\)/);
 });
 
-check("the paused video surface offers an explicit exit-loop button", () => {
+check("the video surface always offers an exit-loop button while looping", () => {
     assert.match(viewSource, /Label\("退出 A\/B 循环"/);
     assert.match(viewSource, /Button\(action: viewModel\.clearLoop\)/);
+    assert.match(viewSource, /if viewModel\.loopEnabled \{/);
+    assert.doesNotMatch(viewSource, /if viewModel\.loopEnabled, !viewModel\.isPlaying/);
+});
+
+check("enabling beat snap rewrites existing A/B values", () => {
+    const body = functionBody(viewModelSource, "func setSnapLoopPointsToBeat(_ enabled: Bool)");
+    assert.match(body, /pointA = pointA\.map \{ snapToNearestBeat/);
+    assert.match(body, /pointB = pointB\.map \{ snapToNearestBeat/);
+    assert.match(viewSource, /set: \{ viewModel\.setSnapLoopPointsToBeat\(\$0\) \}/);
+});
+
+check("the video library exposes the same deletion action as GP", () => {
+    assert.match(librarySource, /model\.kind == \.guitarPro \|\| model\.kind == \.video/);
+    assert.match(librarySource, /model\.deleteFile\(fileURL\)/);
+    assert.match(librarySource, /recentProjects\.remove\(/);
 });
 
 check("manual speed and speed-ladder controls explain their distinct roles", () => {
