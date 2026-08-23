@@ -77,4 +77,20 @@ final class GpBackingSyncTests: XCTestCase {
             10_000
         )
     }
+
+    func testNativeBackingSupportsTheFullTempoScalingRange() {
+        XCTAssertEqual(gpNativeBackingRate(0.125), 0.125, accuracy: 1e-12)
+        XCTAssertEqual(gpNativeBackingRate(8), 8, accuracy: 1e-12)
+    }
+
+    func testMapsBackingMillisecondsToSourceFrames() {
+        XCTAssertEqual(
+            gpBackingFramePosition(
+                milliseconds: 2_500,
+                sampleRate: 48_000,
+                frameLength: 480_000
+            ),
+            120_000
+        )
+    }
 }

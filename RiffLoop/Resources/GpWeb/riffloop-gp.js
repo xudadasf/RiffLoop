@@ -695,14 +695,30 @@
         }, 50);
     };
     const stopTick = () => rangeLoopingEnabled && committedRange ? committedRange.startTick : 0;
+    let rangeCompletionAwaitingReset = false;
+    const completeCommittedRangeLoop = () => {
+        if (!rangeLoopingEnabled || !committedRange || rangeCompletionAwaitingReset) return false;
+        rangeCompletionAwaitingReset = true;
+        post("rangeLoopCompleted");
+        return true;
+    };
     const enforceCommittedRange = (position) => {
+        if (!rangeLoopingEnabled || !committedRange) {
+            rangeCompletionAwaitingReset = false;
+            return false;
+        }
+        if (rangeCompletionAwaitingReset) {
+            if (
+                position.isSeek
+                && Number(position.currentTick) <= committedRange.startTick + 1
+            ) rangeCompletionAwaitingReset = false;
+            return false;
+        }
         if (
-            !rangeLoopingEnabled
-            || !committedRange
-            || position.isSeek
+            position.isSeek
             || Number(position.currentTick) < committedRange.endTick
         ) return false;
-        post("rangeLoopCompleted");
+        if (!completeCommittedRangeLoop()) return false;
         seekBoth(committedRange.startTick, { reveal: false });
         return true;
     };
@@ -738,6 +754,11 @@
     api.scoreLoaded.on((score) => {
         scoreHasLoaded = true;
         synthOutput.reset(score.tracks);
+        const scoreTempos = score.masterBars
+            .flatMap((bar) => Array.from(bar.tempoAutomations || []))
+            .map((automation) => Number(automation.value))
+            .filter((tempo) => Number.isFinite(tempo) && tempo > 0);
+        const initialBpm = Number(score.tempo) || 120;
         if (soundFontBytes) {
             api.loadSoundFont(soundFontBytes.slice(), false);
         }
@@ -752,7 +773,9 @@
             hasBackingTrack: Boolean(score.backingTrack),
             tracks: score.tracks.map(trackPayload),
             beatsPerMeasure: score.masterBars[0]?.timeSignatureNumerator || 4,
-            beatUnit: score.masterBars[0]?.timeSignatureDenominator || 4
+            beatUnit: score.masterBars[0]?.timeSignatureDenominator || 4,
+            initialBpm,
+            hasTempoChanges: scoreTempos.some((tempo) => Math.abs(tempo - initialBpm) > 0.001)
         });
         notifyPlayerReady();
     });
@@ -846,10 +869,16 @@
             totalTime: position.endTime,
             currentTick: position.currentTick,
             endTick: position.endTick,
-            isSeek: Boolean(position.isSeek)
+            isSeek: Boolean(position.isSeek),
+            originalTempo: Number(position.originalTempo),
+            modifiedTempo: Number(position.modifiedTempo)
         });
     });
     api.playerFinished.on(() => {
+        if (rangeLoopingEnabled && committedRange && transport.isPlayingIntent()) {
+            completeCommittedRangeLoop();
+            return;
+        }
         if (api.isLooping || rangeLoopingEnabled || wholeSongLoopingEnabled) return;
         transport.markStopped();
         post("playerFinished");
@@ -1231,6 +1260,7 @@
             pendingRangeHighlight = null;
             committedRange = null;
             rangeLoopingEnabled = false;
+            rangeCompletionAwaitingReset = false;
             window.riffloopCommittedBars = null;
             applyLoopMode();
             restoreScoreScrollPolicy();
@@ -1247,6 +1277,7 @@
         },
         commitRange(firstBar, lastBar, startTick, endTick) {
             const rangeStartTick = Number(startTick);
+            rangeCompletionAwaitingReset = false;
             committedRange = {
                 startTick: rangeStartTick,
                 endTick: Number(endTick),
@@ -1268,6 +1299,7 @@
         },
         setRangeLoopingEnabled(enabled) {
             rangeLoopingEnabled = Boolean(enabled) && Boolean(committedRange);
+            if (!rangeLoopingEnabled) rangeCompletionAwaitingReset = false;
             if (rangeLoopingEnabled) wholeSongLoopingEnabled = false;
             applyLoopMode();
             if (rangeLoopingEnabled) {

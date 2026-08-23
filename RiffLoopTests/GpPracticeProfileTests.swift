@@ -9,6 +9,7 @@ final class GpPracticeProfileTests: XCTestCase {
         let store = FilePracticeSettingsStore(defaults: defaults)
         let profile = GpPracticeProfile(
             playbackSpeed: 0.8,
+            baseBpm: 96,
             lastPositionTick: 12_345,
             displayedTrack: 2,
             mutedTracks: [0, 1],
@@ -41,5 +42,6 @@ final class GpPracticeProfileTests: XCTestCase {
         XCTAssertEqual(profile.lastPositionTick, 0)
         XCTAssertEqual(profile.loopsPerSpeedStep, 3)
         XCTAssertEqual(profile.speedLadderStep, 0.05)
+        XCTAssertNil(profile.baseBpm)
     }
 }

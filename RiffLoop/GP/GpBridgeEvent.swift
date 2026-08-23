@@ -17,6 +17,8 @@ struct GpScoreMetadata: Codable, Equatable, Sendable {
     let tracks: [GpTrackMetadata]
     let beatsPerMeasure: Int?
     let beatUnit: Int?
+    let initialBpm: Double?
+    let hasTempoChanges: Bool?
 
     init(
         title: String,
@@ -25,7 +27,9 @@ struct GpScoreMetadata: Codable, Equatable, Sendable {
         hasBackingTrack: Bool,
         tracks: [GpTrackMetadata],
         beatsPerMeasure: Int? = nil,
-        beatUnit: Int? = nil
+        beatUnit: Int? = nil,
+        initialBpm: Double? = nil,
+        hasTempoChanges: Bool? = nil
     ) {
         self.title = title
         self.artist = artist
@@ -34,6 +38,8 @@ struct GpScoreMetadata: Codable, Equatable, Sendable {
         self.tracks = tracks
         self.beatsPerMeasure = beatsPerMeasure
         self.beatUnit = beatUnit
+        self.initialBpm = initialBpm
+        self.hasTempoChanges = hasTempoChanges
     }
 }
 
@@ -48,19 +54,25 @@ struct GpPlaybackPosition: Codable, Equatable, Sendable {
     let currentTick: Double
     let endTick: Double
     let isSeek: Bool?
+    let originalTempo: Double?
+    let modifiedTempo: Double?
 
     init(
         currentTime: Double,
         totalTime: Double,
         currentTick: Double,
         endTick: Double,
-        isSeek: Bool? = nil
+        isSeek: Bool? = nil,
+        originalTempo: Double? = nil,
+        modifiedTempo: Double? = nil
     ) {
         self.currentTime = currentTime
         self.totalTime = totalTime
         self.currentTick = currentTick
         self.endTick = endTick
         self.isSeek = isSeek
+        self.originalTempo = originalTempo
+        self.modifiedTempo = modifiedTempo
     }
 }
 

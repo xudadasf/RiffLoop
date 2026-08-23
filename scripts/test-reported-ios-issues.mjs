@@ -115,13 +115,23 @@ assert.match(
 );
 assert.match(
     gpViewModel,
-    /private func recordLoopCompletion\(\) \{[\s\S]*?if update\.playbackSpeed != playbackSpeed \{[\s\S]*?nativeBackingPlayer\.setRate\(playbackSpeed\)[\s\S]*?call\("setPlaybackSpeed"/,
-    "a GP ladder speed increase must update native embedded backing before the web player"
+    /private func recordLoopCompletion\(\) \{[\s\S]*?if update\.playbackSpeed != playbackSpeed \{[\s\S]*?applyEffectivePlaybackSpeed\(\)/,
+    "a GP ladder speed increase must apply the user-base BPM scale"
+);
+assert.match(
+    gpViewModel,
+    /private func applyEffectivePlaybackSpeed\(\) \{[\s\S]*?nativeBackingPlayer\.setRate\(speed\)[\s\S]*?call\("setPlaybackSpeed", arguments: \[speed\]\)/,
+    "native backing and alphaTab must receive the same effective BPM multiplier"
 );
 assert.match(
     gpNativeBackingPlayer,
-    /func load\(data: Data\) throws \{[\s\S]*?AVAudioSession\.sharedInstance\(\)[\s\S]*?setActive\(true\)[\s\S]*?AVAudioPlayer\(data: data\)/,
-    "the audio session must be active before playback starts so delayed backing cannot interrupt the metronome"
+    /AVAudioEngine\(\)[\s\S]*?AVAudioUnitTimePitch\(\)[\s\S]*?func setRate\(_ rate: Double\)[\s\S]*?gpNativeBackingRate\(rate\)/,
+    "embedded backing must use a time-pitch audio chain that supports the full BPM scale"
+);
+assert.match(
+    gpNativeBackingPlayer,
+    /func load\(data: Data, mimeType: String\) throws \{[\s\S]*?AVAudioSession\.sharedInstance\(\)[\s\S]*?setActive\(true\)[\s\S]*?AVAudioFile\(forReading: url\)/,
+    "the audio session must be active before the native backing engine starts"
 );
 {
     const synchronizeStart = gpViewModel.indexOf("    private func synchronizeNativeBacking");
@@ -133,6 +143,20 @@ assert.match(
         "ordinary position callbacks must not repeatedly reconfigure the native backing player"
     );
 }
+
+assert.match(gpView, /基准 BPM：[\s\S]*?恢复导入 BPM/);
+assert.match(gpView, /1\.00× 以当前基准 BPM 为准/);
+assert.ok(gpView.includes('"当前 \\(Int(viewModel.currentBpm.rounded())) BPM · "'));
+assert.match(
+    gpWeb,
+    /initialBpm,[\s\S]*?hasTempoChanges:[\s\S]*?originalTempo: Number\(position\.originalTempo\)/,
+    "the bridge must expose the score base BPM and current tempo segment"
+);
+assert.doesNotMatch(
+    gpViewModel,
+    /recordLoopCompletionIfNeeded|previousPositionTick/,
+    "Swift must not infer loop completions from throttled position callbacks"
+);
 
 for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
     assert.match(source, /PracticeHistoryStore\.shared\.record\(/, "every practice mode must update daily history");

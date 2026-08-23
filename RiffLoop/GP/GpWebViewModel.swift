@@ -22,6 +22,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var loopPreview: GpLoopBarRange?
     @Published private(set) var loopSelectionMessage: String?
     @Published private(set) var playbackSpeed = 1.0
+    @Published private(set) var baseBpm = 120.0
     @Published private(set) var displayedTrack = 0
     @Published private(set) var mutedTracks = Set<Int>()
     @Published private(set) var soloTrack: Int?
@@ -59,6 +60,32 @@ final class GpWebViewModel: ObservableObject {
         )
     }
 
+    var originalBaseBpm: Double {
+        guard let bpm = score?.initialBpm, bpm.isFinite, bpm > 0 else { return 120 }
+        return bpm
+    }
+
+    var customBpmRange: ClosedRange<Double> {
+        gpCustomBaseBpmRange(originalBpm: originalBaseBpm)
+    }
+
+    var currentBpm: Double {
+        gpScaledCurrentBpm(
+            originalTempo: position.originalTempo ?? originalBaseBpm,
+            originalBaseBpm: originalBaseBpm,
+            baseBpm: baseBpm,
+            practiceMultiplier: playbackSpeed
+        )
+    }
+
+    private var effectivePlaybackSpeed: Double {
+        gpEffectivePlaybackSpeed(
+            originalBaseBpm: originalBaseBpm,
+            baseBpm: baseBpm,
+            practiceMultiplier: playbackSpeed
+        )
+    }
+
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
     private var didSendSoundFont = false
@@ -67,7 +94,6 @@ final class GpWebViewModel: ObservableObject {
     private var currentFileName: String?
     private var pendingProfile = GpPracticeProfile()
     private var didApplyPendingProfile = false
-    private var previousPositionTick: Double?
     private var playbackStartedAt: Date?
     private var pendingResumeTick: Double?
     private var lastProfileSaveDate = Date.distantPast
@@ -107,7 +133,7 @@ final class GpWebViewModel: ObservableObject {
         score = nil
         playerReady = false
         position = GpPlaybackPosition(currentTime: 0, totalTime: 0, currentTick: 0, endTick: 0)
-        previousPositionTick = nil
+        baseBpm = 120
         completedLoops = 0
         sessionPracticeMilliseconds = 0
         selectedBar = nil
@@ -151,9 +177,22 @@ final class GpWebViewModel: ObservableObject {
         playbackSpeed = min(max(speed, 0.5), 1.5)
         speedLadderTarget = max(speedLadderTarget, playbackSpeed)
         completedLoops = 0
-        nativeBackingPlayer.setRate(playbackSpeed)
         highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
-        call("setPlaybackSpeed", arguments: [playbackSpeed])
+        applyEffectivePlaybackSpeed()
+        saveProfile()
+    }
+
+    func setBaseBpm(_ bpm: Double) {
+        baseBpm = min(max(bpm.rounded(), customBpmRange.lowerBound), customBpmRange.upperBound)
+        completedLoops = 0
+        applyEffectivePlaybackSpeed()
+        saveProfile()
+    }
+
+    func resetBaseBpm() {
+        baseBpm = originalBaseBpm
+        completedLoops = 0
+        applyEffectivePlaybackSpeed()
         saveProfile()
     }
 
@@ -368,10 +407,8 @@ final class GpWebViewModel: ObservableObject {
                 )
             }
         case let .positionChanged(position):
-            recordLoopCompletionIfNeeded(position)
             self.position = position
             synchronizeNativeBacking(to: position)
-            previousPositionTick = position.currentTick
             if
                 pendingResumeTick == nil,
                 playerReady,
@@ -403,9 +440,9 @@ final class GpWebViewModel: ObservableObject {
             recordLoopCompletion()
         case let .backingAudioLoaded(audio):
             do {
-                try nativeBackingPlayer.load(data: audio.data)
+                try nativeBackingPlayer.load(data: audio.data, mimeType: audio.mimeType)
                 nativeBackingSyncPoints = audio.syncPoints
-                nativeBackingPlayer.setRate(playbackSpeed)
+                nativeBackingPlayer.setRate(effectivePlaybackSpeed)
                 nativeBackingPlayer.setVolume(backingVolume)
                 appendNativeBackingDiagnostic(
                     String(
@@ -482,7 +519,7 @@ final class GpWebViewModel: ObservableObject {
         guard nativeBackingPlayer.isLoaded else { return }
         guard let backingTime = gpBackingTime(
             forPlaybackTime: position.currentTime,
-            playbackSpeed: playbackSpeed,
+            playbackSpeed: effectivePlaybackSpeed,
             syncPoints: nativeBackingSyncPoints
         ) else { return }
         let isInsideBacking = backingTime >= 0
@@ -503,7 +540,7 @@ final class GpWebViewModel: ObservableObject {
             do {
                 nativeBackingStarted = try nativeBackingPlayer.play(
                     at: backingTime,
-                    rate: playbackSpeed,
+                    rate: effectivePlaybackSpeed,
                     volume: backingVolume
                 )
                 appendNativeBackingDiagnostic(
@@ -512,7 +549,7 @@ final class GpWebViewModel: ObservableObject {
                         nativeBackingStarted ? "true" : "false",
                         position.currentTime / 1_000,
                         backingTime / 1_000,
-                        playbackSpeed,
+                        effectivePlaybackSpeed,
                         backingVolume
                     )
                 )
@@ -664,6 +701,11 @@ final class GpWebViewModel: ObservableObject {
         soloTrack = pendingProfile.soloTrack.flatMap { validTrackIndices.contains($0) ? $0 : nil }
         trackVolumes = pendingProfile.trackVolumes.filter { validTrackIndices.contains($0.key) }
         playbackSpeed = min(max(pendingProfile.playbackSpeed, 0.5), 1.5)
+        let bpmRange = gpCustomBaseBpmRange(originalBpm: metadata.initialBpm ?? 120)
+        baseBpm = min(
+            max(pendingProfile.baseBpm ?? metadata.initialBpm ?? 120, bpmRange.lowerBound),
+            bpmRange.upperBound
+        )
         masterVolume = min(max(pendingProfile.masterVolume, 0), 1)
         backingVolume = min(max(pendingProfile.backingVolume, 0), 1)
         synthEnabled = pendingProfile.synthEnabled
@@ -705,7 +747,7 @@ final class GpWebViewModel: ObservableObject {
         }
         call("showTracks", arguments: [[displayedTrack]])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
-        call("setPlaybackSpeed", arguments: [playbackSpeed])
+        call("setPlaybackSpeed", arguments: [effectivePlaybackSpeed])
         call("setMasterVolume", arguments: [masterVolume])
         call("setBackingVolume", arguments: [backingVolume])
         call("setSynthEnabled", arguments: [synthEnabled])
@@ -733,22 +775,10 @@ final class GpWebViewModel: ObservableObject {
         countInEnabled || (rangeLoopingEnabled && loopCountInEnabled) ? countInVolume : 0
     }
 
-    private func recordLoopCompletionIfNeeded(_ newPosition: GpPlaybackPosition) {
-        guard
-            newPosition.isSeek != true,
-            rangeLoopingEnabled,
-            let range = loopRange,
-            let previousPositionTick
-        else { return }
-
-        let loopLength = range.endTick - range.startTick
-        guard
-            loopLength > 0,
-            previousPositionTick >= range.startTick + loopLength * 0.75,
-            newPosition.currentTick <= range.startTick + loopLength * 0.25
-        else { return }
-
-        recordLoopCompletion()
+    private func applyEffectivePlaybackSpeed() {
+        let speed = effectivePlaybackSpeed
+        nativeBackingPlayer.setRate(speed)
+        call("setPlaybackSpeed", arguments: [speed])
     }
 
     private func recordLoopCompletion() {
@@ -766,8 +796,7 @@ final class GpWebViewModel: ObservableObject {
         if update.playbackSpeed != playbackSpeed {
             playbackSpeed = update.playbackSpeed
             highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
-            nativeBackingPlayer.setRate(playbackSpeed)
-            call("setPlaybackSpeed", arguments: [playbackSpeed])
+            applyEffectivePlaybackSpeed()
         }
         if loopCountInEnabled {
             call("restartRangeWithCountIn")
@@ -794,6 +823,7 @@ final class GpWebViewModel: ObservableObject {
         try? settingsStore.save(
             GpPracticeProfile(
                 playbackSpeed: playbackSpeed,
+                baseBpm: baseBpm,
                 lastPositionTick: position.currentTick.isFinite ? max(0, position.currentTick) : 0,
                 displayedTrack: displayedTrack,
                 mutedTracks: mutedTracks,

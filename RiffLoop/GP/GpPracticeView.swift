@@ -258,6 +258,26 @@ struct GpPracticeView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("速度")
                 .font(.headline)
+            Stepper(
+                value: Binding(
+                    get: { viewModel.baseBpm },
+                    set: { viewModel.setBaseBpm($0) }
+                ),
+                in: viewModel.customBpmRange,
+                step: 1
+            ) {
+                Text("基准 BPM：\(Int(viewModel.baseBpm.rounded()))")
+            }
+            .disabled(!viewModel.playerReady || viewModel.customBpmRange.lowerBound == viewModel.customBpmRange.upperBound)
+            HStack {
+                Text("可调 \(Int(viewModel.customBpmRange.lowerBound))–\(Int(viewModel.customBpmRange.upperBound)) BPM")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("恢复导入 BPM", action: viewModel.resetBaseBpm)
+                    .font(.caption)
+                    .disabled(!viewModel.playerReady || abs(viewModel.baseBpm - viewModel.originalBaseBpm) < 0.5)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(speeds, id: \.self) { value in
@@ -270,6 +290,9 @@ struct GpPracticeView: View {
                 }
             }
             .disabled(!viewModel.playerReady)
+            Text("1.00× 以当前基准 BPM 为准；变速谱按原 tempo map 等比例缩放。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -423,6 +446,15 @@ struct GpPracticeView: View {
             }
             Text("\(format(viewModel.position.currentTime)) / \(format(viewModel.position.totalTime))")
                 .monospacedDigit()
+            if viewModel.score != nil {
+                Text(
+                    "基准 \(Int(viewModel.baseBpm.rounded())) BPM · "
+                        + "当前 \(Int(viewModel.currentBpm.rounded())) BPM · "
+                        + "\(viewModel.playbackSpeed, specifier: "%.2f")×"
+                )
+                .font(.caption.bold())
+                .foregroundStyle(.orange)
+            }
             if let selectedBar = viewModel.selectedBar {
                 Text("命中第 \(selectedBar.index + 1) 小节 · \(Int(selectedBar.startTick))–\(Int(selectedBar.endTick)) tick")
                     .font(.caption)

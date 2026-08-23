@@ -370,6 +370,11 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
+        /api\.playerFinished\.on\(\(\) => \{[\s\S]*?rangeLoopingEnabled[\s\S]*?completeCommittedRangeLoop\(\)/,
+        "alphaTab native playback-range finishes must feed the explicit loop completion state machine"
+    );
+    assert.match(
+        source,
         /api\.playerPositionChanged\.on\(\(position\) => \{[\s\S]*?if \(enforceCommittedRange\(position\)\) return;/,
         "every player position update must enforce the committed range before bridge throttling"
     );
@@ -384,7 +389,7 @@ assert.doesNotMatch(
         "stop must return to A while range looping is active and to the song start otherwise"
     );
 
-    const loopStartMarker = "    const enforceCommittedRange = (position) => {";
+    const loopStartMarker = "    let rangeCompletionAwaitingReset = false;";
     const loopEndMarker = "\n    const playPauseBoth";
     const loopStart = source.indexOf(loopStartMarker);
     const loopEnd = source.indexOf(loopEndMarker, loopStart);
@@ -396,11 +401,11 @@ assert.doesNotMatch(
         "post",
         "rangeLoopingEnabled",
         "committedRange",
-        `${loopImplementation}\nreturn enforceCommittedRange;`
+        `${loopImplementation}\nreturn { enforceCommittedRange, completeCommittedRangeLoop };`
     );
     const seeks = [];
     const posts = [];
-    const enforceCommittedRange = makeRangeEnforcer(
+    const { enforceCommittedRange, completeCommittedRangeLoop } = makeRangeEnforcer(
         (tick, options) => seeks.push({ tick, options }),
         (event) => posts.push(event),
         true,
@@ -428,6 +433,30 @@ assert.doesNotMatch(
         ["rangeLoopCompleted"],
         "the corrective seek notification must not count the same loop twice"
     );
+
+    assert.equal(
+        enforceCommittedRange({ currentTick: 34580, isSeek: false }),
+        false,
+        "queued worker positions beyond B must be ignored until the loop has returned to A"
+    );
+    assert.deepEqual(
+        posts,
+        ["rangeLoopCompleted"],
+        "multiple queued boundary positions from one physical loop must report one completion"
+    );
+
+    assert.equal(enforceCommittedRange({ currentTick: 30720, isSeek: true }), false);
+    assert.equal(
+        completeCommittedRangeLoop(),
+        true,
+        "alphaTab playerFinished must complete a native range loop even without an observed B position"
+    );
+    assert.equal(
+        completeCommittedRangeLoop(),
+        false,
+        "a late second completion signal for the same native loop must be ignored"
+    );
+    assert.deepEqual(posts, ["rangeLoopCompleted", "rangeLoopCompleted"]);
 
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";

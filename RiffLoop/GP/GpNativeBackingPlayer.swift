@@ -36,56 +36,174 @@ func gpBackingTime(
     )
 }
 
+func gpNativeBackingRate(_ rate: Double) -> Double {
+    guard rate.isFinite else { return 1 }
+    return min(max(rate, 1.0 / 32.0), 32)
+}
+
+func gpBackingFramePosition(
+    milliseconds: Double,
+    sampleRate: Double,
+    frameLength: AVAudioFramePosition
+) -> AVAudioFramePosition {
+    guard milliseconds.isFinite, sampleRate.isFinite, sampleRate > 0 else { return 0 }
+    let frame = AVAudioFramePosition((max(0, milliseconds) / 1_000 * sampleRate).rounded())
+    return min(max(frame, 0), max(0, frameLength - 1))
+}
+
 final class GpNativeBackingPlayer {
-    private var player: AVAudioPlayer?
+    private let engine = AVAudioEngine()
+    private let playerNode = AVAudioPlayerNode()
+    private let timePitch = AVAudioUnitTimePitch()
+    private var audioFile: AVAudioFile?
+    private var temporaryURL: URL?
+    private var anchorFrame: AVAudioFramePosition = 0
 
-    var isLoaded: Bool { player != nil }
-    var isPlaying: Bool { player?.isPlaying == true }
-    var currentTimeMilliseconds: Double { (player?.currentTime ?? 0) * 1_000 }
-    var durationMilliseconds: Double { (player?.duration ?? 0) * 1_000 }
+    init() {
+        engine.attach(playerNode)
+        engine.attach(timePitch)
+        engine.connect(playerNode, to: timePitch, format: nil)
+        engine.connect(timePitch, to: engine.mainMixerNode, format: nil)
+    }
 
-    func load(data: Data) throws {
+    deinit {
+        playerNode.stop()
+        engine.stop()
+        removeTemporaryFile()
+    }
+
+    var isLoaded: Bool { audioFile != nil }
+    var isPlaying: Bool { playerNode.isPlaying }
+    var currentTimeMilliseconds: Double {
+        guard let audioFile else { return 0 }
+        return Double(currentFrame(audioFile: audioFile)) / audioFile.processingFormat.sampleRate * 1_000
+    }
+    var durationMilliseconds: Double {
+        guard let audioFile else { return 0 }
+        return Double(audioFile.length) / audioFile.processingFormat.sampleRate * 1_000
+    }
+
+    func load(data: Data, mimeType: String) throws {
+        reset()
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try session.setActive(true)
-        player?.stop()
-        let player = try AVAudioPlayer(data: data)
-        player.enableRate = true
-        player.prepareToPlay()
-        self.player = player
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("riffloop-gp-backing-\(UUID().uuidString)")
+            .appendingPathExtension(fileExtension(for: mimeType))
+        do {
+            try data.write(to: url, options: .atomic)
+            let file = try AVAudioFile(forReading: url)
+            audioFile = file
+            temporaryURL = url
+            anchorFrame = 0
+            timePitch.rate = 1
+            engine.prepare()
+            try engine.start()
+            schedule(from: 0, audioFile: file)
+        } catch {
+            playerNode.stop()
+            engine.stop()
+            audioFile = nil
+            temporaryURL = nil
+            anchorFrame = 0
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
     }
 
     func setVolume(_ volume: Double) {
-        player?.volume = Float(min(max(volume, 0), 1))
+        playerNode.volume = Float(min(max(volume, 0), 1))
     }
 
     func setRate(_ rate: Double) {
-        player?.rate = Float(min(max(rate, 0.5), 1.5))
+        timePitch.rate = Float(gpNativeBackingRate(rate))
     }
 
     func seek(to milliseconds: Double) {
-        guard let player else { return }
-        player.currentTime = min(
-            max(milliseconds / 1_000, 0),
-            max(0, player.duration - 0.001)
+        guard let audioFile else { return }
+        let wasPlaying = playerNode.isPlaying
+        let frame = gpBackingFramePosition(
+            milliseconds: milliseconds,
+            sampleRate: audioFile.processingFormat.sampleRate,
+            frameLength: audioFile.length
         )
+        schedule(from: frame, audioFile: audioFile)
+        if wasPlaying { playerNode.play() }
     }
 
     @discardableResult
     func play(at milliseconds: Double, rate: Double, volume: Double) throws -> Bool {
-        guard let player else { return false }
+        guard let audioFile else { return false }
+        if !engine.isRunning {
+            engine.prepare()
+            try engine.start()
+        }
         setRate(rate)
         setVolume(volume)
-        seek(to: milliseconds)
-        return player.play()
+        let frame = gpBackingFramePosition(
+            milliseconds: milliseconds,
+            sampleRate: audioFile.processingFormat.sampleRate,
+            frameLength: audioFile.length
+        )
+        schedule(from: frame, audioFile: audioFile)
+        playerNode.play()
+        return playerNode.isPlaying
     }
 
     func pause() {
-        player?.pause()
+        guard let audioFile else { return }
+        anchorFrame = currentFrame(audioFile: audioFile)
+        playerNode.stop()
     }
 
     func reset() {
-        player?.stop()
-        player = nil
+        playerNode.stop()
+        engine.stop()
+        audioFile = nil
+        anchorFrame = 0
+        removeTemporaryFile()
+    }
+
+    private func schedule(from frame: AVAudioFramePosition, audioFile: AVAudioFile) {
+        playerNode.stop()
+        anchorFrame = min(max(frame, 0), max(0, audioFile.length - 1))
+        let remaining = AVAudioFrameCount(max(0, audioFile.length - anchorFrame))
+        guard remaining > 0 else { return }
+        playerNode.scheduleSegment(
+            audioFile,
+            startingFrame: anchorFrame,
+            frameCount: remaining,
+            at: nil
+        )
+    }
+
+    private func currentFrame(audioFile: AVAudioFile) -> AVAudioFramePosition {
+        guard
+            playerNode.isPlaying,
+            let nodeTime = playerNode.lastRenderTime,
+            let playerTime = playerNode.playerTime(forNodeTime: nodeTime)
+        else { return anchorFrame }
+        return min(
+            anchorFrame + max(0, playerTime.sampleTime),
+            max(0, audioFile.length - 1)
+        )
+    }
+
+    private func fileExtension(for mimeType: String) -> String {
+        switch mimeType.lowercased() {
+        case "audio/wav", "audio/x-wav": "wav"
+        case "audio/ogg": "ogg"
+        case "audio/flac": "flac"
+        case "audio/mp4", "audio/aac": "m4a"
+        default: "mp3"
+        }
+    }
+
+    private func removeTemporaryFile() {
+        guard let temporaryURL else { return }
+        try? FileManager.default.removeItem(at: temporaryURL)
+        self.temporaryURL = nil
     }
 }
