@@ -101,6 +101,25 @@ check("disabling the speed ladder restores its latest manual base speed", () => 
     assert.match(viewSource, /关闭阶梯时恢复到最后一次手动选择的速度/);
 });
 
+check("the speed ladder target never falls below its manual base speed", () => {
+    assert.match(
+        viewModelSource,
+        /var minimumSpeedLadderTarget: Float \{ speedLadderBaseRate \?\? playbackRate \}/
+    );
+
+    const rateBody = functionBody(viewModelSource, "func setPlaybackRate(_ rate: Float)");
+    assert.match(rateBody, /speedLadderTarget = max\(speedLadderTarget, playbackRate\)/);
+
+    const targetBody = functionBody(viewModelSource, "func setSpeedLadderTarget(_ target: Float)");
+    assert.match(targetBody, /max\(target, minimumSpeedLadderTarget\)/);
+
+    assert.match(
+        viewSource,
+        /\.filter \{ \$0 >= viewModel\.minimumSpeedLadderTarget \}/
+    );
+    assert.match(viewSource, /目标速度不会低于手动起始速度，阶梯只递增/);
+});
+
 check("the video surface cannot bypass RiffLoop transport controls", () => {
     assert.doesNotMatch(viewSource, /VideoPlayer\(player:/);
     assert.match(viewSource, /VideoSurface\(player:/);

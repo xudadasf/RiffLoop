@@ -51,6 +51,8 @@ final class PracticeViewModel: ObservableObject {
     private var lastPracticeSampleDate: Date?
     private var lastProfileSaveDate = Date.distantPast
 
+    var minimumSpeedLadderTarget: Float { speedLadderBaseRate ?? playbackRate }
+
     init() {
         player.automaticallyWaitsToMinimizeStalling = false
         player.volume = mediaVolume
@@ -213,6 +215,7 @@ final class PracticeViewModel: ObservableObject {
         if speedLadderEnabled {
             speedLadderBaseRate = playbackRate
         }
+        speedLadderTarget = max(speedLadderTarget, playbackRate)
         completedLoops = 0
         highestPlaybackRate = max(highestPlaybackRate, playbackRate)
         saveProfile()
@@ -251,6 +254,7 @@ final class PracticeViewModel: ObservableObject {
         guard speedLadderEnabled != enabled else { return }
         if enabled {
             speedLadderBaseRate = playbackRate
+            speedLadderTarget = max(speedLadderTarget, playbackRate)
         } else {
             playbackRate = speedLadderBaseRate ?? playbackRate
             speedLadderBaseRate = nil
@@ -264,7 +268,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setSpeedLadderTarget(_ target: Float) {
-        speedLadderTarget = min(max(target, 0.25), 1.5)
+        speedLadderTarget = min(max(target, minimumSpeedLadderTarget), 1.5)
         completedLoops = 0
         saveProfile()
     }
@@ -652,7 +656,10 @@ final class PracticeViewModel: ObservableObject {
         loopCountInEnabled = profile.loopCountInEnabled
         speedLadderEnabled = profile.speedLadderEnabled
         speedLadderBaseRate = speedLadderEnabled ? playbackRate : nil
-        speedLadderTarget = min(max(profile.speedLadderTarget, 0.5), 1.5)
+        speedLadderTarget = min(
+            max(profile.speedLadderTarget, minimumSpeedLadderTarget),
+            1.5
+        )
         loopsPerSpeedStep = min(max(profile.loopsPerSpeedStep, 1), 10)
         speedLadderStep = min(max(profile.speedLadderStep, 0.01), 0.25)
         accumulatedPracticeTime = max(0, profile.accumulatedPracticeTime)

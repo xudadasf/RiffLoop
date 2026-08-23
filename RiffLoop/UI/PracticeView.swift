@@ -199,7 +199,11 @@ struct PracticeView: View {
                     get: { viewModel.speedLadderTarget },
                     set: { viewModel.setSpeedLadderTarget($0) }
                 )) {
-                    ForEach([Float(0.8), 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
+                    ForEach(
+                        [Float(0.8), 0.9, 1, 1.1, 1.25, 1.5]
+                            .filter { $0 >= viewModel.minimumSpeedLadderTarget },
+                        id: \.self
+                    ) {
                         Text("目标 \(Int(($0 * 100).rounded()))%（\(rateLabel($0))）").tag($0)
                     }
                 }
@@ -208,6 +212,7 @@ struct PracticeView: View {
                         + "增加 \(Int((viewModel.speedLadderStep * 100).rounded())) 个百分点，"
                         + "直到 \(Int((viewModel.speedLadderTarget * 100).rounded()))%；"
                         + "当前已达到目标时不会改变速度；"
+                        + "目标速度不会低于手动起始速度，阶梯只递增；"
                         + "关闭阶梯时恢复到最后一次手动选择的速度。"
                 )
                 .font(.caption)
