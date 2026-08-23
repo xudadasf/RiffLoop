@@ -88,6 +88,19 @@ check("manual speed and speed-ladder controls explain their distinct roles", () 
     assert.match(viewSource, /String\(format: "%\.2f×", rate\)/);
 });
 
+check("disabling the speed ladder restores its latest manual base speed", () => {
+    assert.match(viewModelSource, /private var speedLadderBaseRate: Float\?/);
+
+    const toggleBody = functionBody(viewModelSource, "func setSpeedLadderEnabled(_ enabled: Bool)");
+    assert.match(toggleBody, /speedLadderBaseRate = playbackRate/);
+    assert.match(toggleBody, /playbackRate = speedLadderBaseRate \?\? playbackRate/);
+    assert.match(toggleBody, /restartAfterTimingChange\(\)/);
+
+    const rateBody = functionBody(viewModelSource, "func setPlaybackRate(_ rate: Float)");
+    assert.match(rateBody, /if speedLadderEnabled \{[\s\S]*?speedLadderBaseRate = playbackRate/);
+    assert.match(viewSource, /关闭阶梯时恢复到最后一次手动选择的速度/);
+});
+
 check("the video surface cannot bypass RiffLoop transport controls", () => {
     assert.doesNotMatch(viewSource, /VideoPlayer\(player:/);
     assert.match(viewSource, /VideoSurface\(player:/);

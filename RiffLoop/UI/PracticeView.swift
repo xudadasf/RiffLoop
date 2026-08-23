@@ -207,7 +207,8 @@ struct PracticeView: View {
                     "阶梯说明：从当前手动速度开始，每完成 \(viewModel.loopsPerSpeedStep) 轮，"
                         + "增加 \(Int((viewModel.speedLadderStep * 100).rounded())) 个百分点，"
                         + "直到 \(Int((viewModel.speedLadderTarget * 100).rounded()))%；"
-                        + "当前已达到目标时不会改变速度。"
+                        + "当前已达到目标时不会改变速度；"
+                        + "关闭阶梯时恢复到最后一次手动选择的速度。"
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

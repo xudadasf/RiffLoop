@@ -46,6 +46,7 @@ final class PracticeViewModel: ObservableObject {
     private var isLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
     private var currentFileName: String?
+    private var speedLadderBaseRate: Float?
     private var tapTempoTracker = TapTempoTracker()
     private var lastPracticeSampleDate: Date?
     private var lastProfileSaveDate = Date.distantPast
@@ -209,6 +210,9 @@ final class PracticeViewModel: ObservableObject {
 
     func setPlaybackRate(_ rate: Float) {
         playbackRate = min(max(rate, 0.25), 1.5)
+        if speedLadderEnabled {
+            speedLadderBaseRate = playbackRate
+        }
         completedLoops = 0
         highestPlaybackRate = max(highestPlaybackRate, playbackRate)
         saveProfile()
@@ -244,9 +248,19 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
+        guard speedLadderEnabled != enabled else { return }
+        if enabled {
+            speedLadderBaseRate = playbackRate
+        } else {
+            playbackRate = speedLadderBaseRate ?? playbackRate
+            speedLadderBaseRate = nil
+        }
         speedLadderEnabled = enabled
         completedLoops = 0
         saveProfile()
+        if !enabled {
+            restartAfterTimingChange()
+        }
     }
 
     func setSpeedLadderTarget(_ target: Float) {
@@ -637,6 +651,7 @@ final class PracticeViewModel: ObservableObject {
         playbackRate = min(max(profile.playbackRate, 0.25), 1.5)
         loopCountInEnabled = profile.loopCountInEnabled
         speedLadderEnabled = profile.speedLadderEnabled
+        speedLadderBaseRate = speedLadderEnabled ? playbackRate : nil
         speedLadderTarget = min(max(profile.speedLadderTarget, 0.5), 1.5)
         loopsPerSpeedStep = min(max(profile.loopsPerSpeedStep, 1), 10)
         speedLadderStep = min(max(profile.speedLadderStep, 0.01), 0.25)
