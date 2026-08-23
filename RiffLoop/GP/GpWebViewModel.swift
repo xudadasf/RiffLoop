@@ -102,6 +102,7 @@ final class GpWebViewModel: ObservableObject {
     private var nativeBackingStarted = false
     private var nativeBackingAnchorMilliseconds = 0.0
     private var nativeBackingSyncPoints: [GpBackingSyncPoint] = []
+    private var speedLadderBaseSpeed: Double?
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -112,6 +113,7 @@ final class GpWebViewModel: ObservableObject {
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
         nativeBackingSyncPoints = []
+        speedLadderBaseSpeed = nil
         currentFileName = fileName
         pendingProfile = (try? settingsStore.load(
             GpPracticeProfile.self,
@@ -175,6 +177,9 @@ final class GpWebViewModel: ObservableObject {
 
     func setPlaybackSpeed(_ speed: Double) {
         playbackSpeed = min(max(speed, 0.5), 1.5)
+        if speedLadderEnabled {
+            speedLadderBaseSpeed = playbackSpeed
+        }
         speedLadderTarget = max(speedLadderTarget, playbackSpeed)
         completedLoops = 0
         highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
@@ -300,6 +305,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setRangeLoopingEnabled(_ enabled: Bool) {
         guard loopRange != nil else { return }
+        if !enabled { restoreSpeedBeforeLadder() }
         rangeLoopingEnabled = enabled
         if enabled { wholeSongLoopingEnabled = false }
         completedLoops = 0
@@ -308,6 +314,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setWholeSongLoopingEnabled(_ enabled: Bool) {
+        if enabled { restoreSpeedBeforeLadder() }
         wholeSongLoopingEnabled = enabled
         if enabled { rangeLoopingEnabled = false }
         completedLoops = 0
@@ -322,7 +329,14 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
-        speedLadderEnabled = enabled
+        guard speedLadderEnabled != enabled else { return }
+        if enabled {
+            speedLadderBaseSpeed = playbackSpeed
+            speedLadderTarget = max(speedLadderTarget, playbackSpeed)
+            speedLadderEnabled = true
+        } else {
+            restoreSpeedBeforeLadder()
+        }
         completedLoops = 0
         saveProfile()
     }
@@ -346,6 +360,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func clearLoop() {
+        restoreSpeedBeforeLadder()
         loopRange = nil
         loopPreview = nil
         loopSelectionMessage = nil
@@ -525,9 +540,6 @@ final class GpWebViewModel: ObservableObject {
         let isInsideBacking = backingTime >= 0
             && backingTime < nativeBackingPlayer.durationMilliseconds
 
-        if position.isSeek == true {
-            nativeBackingPlayer.seek(to: max(0, backingTime))
-        }
         if !isInsideBacking {
             nativeBackingPlayer.pause()
             nativeBackingStarted = false
@@ -561,10 +573,7 @@ final class GpWebViewModel: ObservableObject {
             return
         }
 
-        if
-            position.isSeek == true
-            || abs(nativeBackingPlayer.currentTimeMilliseconds - backingTime) > 250
-        {
+        if position.isSeek == true {
             nativeBackingPlayer.seek(to: backingTime)
         }
     }
@@ -655,6 +664,7 @@ final class GpWebViewModel: ObservableObject {
             seek(to: bar.seekTick ?? bar.startTick)
         case let .selectStart(range):
             pause()
+            restoreSpeedBeforeLadder()
             loopRange = nil
             loopPreview = range
             rangeLoopingEnabled = false
@@ -737,6 +747,12 @@ final class GpWebViewModel: ObservableObject {
         rangeLoopingEnabled = loopRange != nil
             && pendingProfile.rangeLoopingEnabled
             && !wholeSongLoopingEnabled
+        if speedLadderEnabled, rangeLoopingEnabled {
+            speedLadderBaseSpeed = playbackSpeed
+        } else {
+            speedLadderEnabled = false
+            speedLadderBaseSpeed = nil
+        }
 
         applyCurrentSettings(to: metadata)
     }
@@ -779,6 +795,15 @@ final class GpWebViewModel: ObservableObject {
         let speed = effectivePlaybackSpeed
         nativeBackingPlayer.setRate(speed)
         call("setPlaybackSpeed", arguments: [speed])
+    }
+
+    private func restoreSpeedBeforeLadder() {
+        let restoredSpeed = speedLadderBaseSpeed ?? playbackSpeed
+        speedLadderEnabled = false
+        speedLadderBaseSpeed = nil
+        guard restoredSpeed != playbackSpeed else { return }
+        playbackSpeed = restoredSpeed
+        applyEffectivePlaybackSpeed()
     }
 
     private func recordLoopCompletion() {

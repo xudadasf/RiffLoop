@@ -263,6 +263,55 @@ final class GpBridgeEventTests: XCTestCase {
     }
 
     @MainActor
+    func testLeavingRangeLoopRestoresTheSpeedFromBeforeTheLadder() {
+        let viewModel = GpWebViewModel()
+        let rangeHit = GpBarHit(
+            index: 0,
+            startTick: 0,
+            endTick: 960,
+            seekTick: 0,
+            seekEndTick: 960
+        )
+        viewModel.receive(.pointerDown(rangeHit))
+        viewModel.receive(.pointerUp)
+        viewModel.setPlaybackSpeed(0.75)
+        viewModel.setSpeedLadderEnabled(true)
+
+        for _ in 0..<3 {
+            viewModel.receive(.rangeLoopCompleted)
+        }
+        XCTAssertEqual(viewModel.playbackSpeed, 0.8, accuracy: 1e-12)
+
+        viewModel.clearLoop()
+
+        XCTAssertEqual(viewModel.playbackSpeed, 0.75, accuracy: 1e-12)
+        XCTAssertFalse(viewModel.speedLadderEnabled)
+    }
+
+    @MainActor
+    func testDisablingTheLadderRestoresItsManualStartingSpeed() {
+        let viewModel = GpWebViewModel()
+        let rangeHit = GpBarHit(
+            index: 0,
+            startTick: 0,
+            endTick: 960,
+            seekTick: 0,
+            seekEndTick: 960
+        )
+        viewModel.receive(.pointerDown(rangeHit))
+        viewModel.receive(.pointerUp)
+        viewModel.setPlaybackSpeed(0.75)
+        viewModel.setSpeedLadderEnabled(true)
+
+        for _ in 0..<3 {
+            viewModel.receive(.rangeLoopCompleted)
+        }
+        viewModel.setSpeedLadderEnabled(false)
+
+        XCTAssertEqual(viewModel.playbackSpeed, 0.75, accuracy: 1e-12)
+    }
+
+    @MainActor
     func testCurrentBpmScalesTheOriginalTempoMapFromTheUsersBase() {
         let viewModel = GpWebViewModel()
         viewModel.receive(.scoreLoaded(GpScoreMetadata(

@@ -74,10 +74,6 @@ final class GpNativeBackingPlayer {
 
     var isLoaded: Bool { audioFile != nil }
     var isPlaying: Bool { playerNode.isPlaying }
-    var currentTimeMilliseconds: Double {
-        guard let audioFile else { return 0 }
-        return Double(currentFrame(audioFile: audioFile)) / audioFile.processingFormat.sampleRate * 1_000
-    }
     var durationMilliseconds: Double {
         guard let audioFile else { return 0 }
         return Double(audioFile.length) / audioFile.processingFormat.sampleRate * 1_000

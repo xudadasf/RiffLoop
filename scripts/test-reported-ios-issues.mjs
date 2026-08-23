@@ -142,6 +142,16 @@ assert.match(
         /nativeBackingPlayer\.set(?:Rate|Volume)/,
         "ordinary position callbacks must not repeatedly reconfigure the native backing player"
     );
+    assert.equal(
+        synchronizeBody.match(/nativeBackingPlayer\.seek\(/g)?.length ?? 0,
+        1,
+        "one alphaTab seek event must reschedule native backing at most once"
+    );
+    assert.doesNotMatch(
+        synchronizeBody,
+        /currentTimeMilliseconds[\s\S]*?> 250[\s\S]*?nativeBackingPlayer\.seek/,
+        "steady playback drift checks must not stop and reschedule audible backing"
+    );
 }
 
 assert.match(gpView, /基准 BPM：[\s\S]*?恢复导入 BPM/);
