@@ -308,7 +308,7 @@ struct GpPracticeView: View {
 
     private var loopPanel: some View {
         Form {
-            Section("循环范围") {
+            Section {
                 Text(loopRangeDescription)
                 if let message = viewModel.loopSelectionMessage {
                     Text(message)
@@ -330,6 +330,8 @@ struct GpPracticeView: View {
                     set: { viewModel.setWholeSongLoopingEnabled($0) }
                 ))
                 .disabled(viewModel.rangeLoopingEnabled)
+            } header: {
+                Text("循环范围")
             } footer: {
                 Text("轻点谱面跳转；长按音符并拖动选择 A/B，松手确认。")
             }
@@ -433,7 +435,7 @@ struct GpPracticeView: View {
                 }
             }
 
-            Section("节拍细分") {
+            Section {
                 Picker("细分", selection: Binding(
                     get: { viewModel.metronomeSubdivisionFactor },
                     set: { viewModel.setMetronomeSubdivisionFactor($0) }
@@ -443,11 +445,13 @@ struct GpPracticeView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            } header: {
+                Text("节拍细分")
             } footer: {
                 Text("细分跟随当前谱面的拍号。")
             }
 
-            Section("每拍强度") {
+            Section {
                 ForEach(viewModel.beatAccents.indices, id: \.self) { index in
                     Button {
                         viewModel.cycleBeatAccent(at: index)
@@ -455,6 +459,8 @@ struct GpPracticeView: View {
                         LabeledContent("第 \(index + 1) 拍", value: viewModel.beatAccents[index].label)
                     }
                 }
+            } header: {
+                Text("每拍强度")
             } footer: {
                 Text("点击每一拍，依次切换强、次强、普通和静音。")
             }
@@ -500,7 +506,7 @@ struct GpPracticeView: View {
             }
 
             if viewModel.score?.hasBackingTrack == true {
-                Section("内嵌伴奏") {
+                Section {
                     Toggle("内嵌伴奏", isOn: Binding(
                         get: { viewModel.backingEnabled },
                         set: { viewModel.setBackingEnabled($0) }
@@ -515,6 +521,8 @@ struct GpPracticeView: View {
                         Text("伴奏音量")
                     }
                     LabeledContent("伴奏音量", value: percent(viewModel.backingVolume))
+                } header: {
+                    Text("内嵌伴奏")
                 } footer: {
                     Text("伴奏由 iOS 原生播放器输出，谱面合成器继续负责音符声音。")
                 }
