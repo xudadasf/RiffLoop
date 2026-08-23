@@ -297,6 +297,18 @@
     const metronomeControlValue = (pulse) => Math.round(
         Math.cbrt(Math.max(0, metronomeGain(pulse))) * 127
     );
+    const metronomePitchRange = 12;
+    const metronomePitchSemitones = (pulse) => {
+        const accent = metronomeAccent(pulse);
+        if (accent === "strong") return 7;
+        if (accent === "subAccent") return 2;
+        if (accent === "normal") return -3;
+        if (accent === "subdivision") return -7;
+        return 0;
+    };
+    const metronomePitchWheel = (pulse) => Math.round(
+        8_192 + (metronomePitchSemitones(pulse) / metronomePitchRange) * 8_191
+    );
     const addMetronomeAccentControls = (midiFile) => {
         const events = Array.from(midiFile.events).sort((left, right) => left.tick - right.tick);
         const maxChannel = events.reduce((maximum, event) => (
@@ -314,12 +326,32 @@
             : 0;
         let added = 0;
 
+        for (const [controller, value] of [
+            [alphaTab.midi.ControllerType.RegisteredParameterCourse, 0],
+            [alphaTab.midi.ControllerType.RegisteredParameterFine, 0],
+            [alphaTab.midi.ControllerType.DataEntryCoarse, metronomePitchRange],
+        ]) {
+            midiFile.addEvent(new alphaTab.midi.ControlChangeEvent(
+                0,
+                metronomeTick,
+                metronomeChannel,
+                controller,
+                value
+            ));
+        }
+
         for (const event of events) {
             const eventTick = Number(event.tick);
             if (!Number.isFinite(eventTick)) continue;
             while (metronomeLengthInTicks > 0 && metronomeTick < eventTick) {
                 const pulse = Math.floor(metronomeTick / metronomeLengthInTicks)
                     % Math.max(1, metronomeCount);
+                midiFile.addEvent(new alphaTab.midi.PitchBendEvent(
+                    0,
+                    metronomeTick,
+                    metronomeChannel,
+                    metronomePitchWheel(pulse)
+                ));
                 midiFile.addEvent(new alphaTab.midi.ControlChangeEvent(
                     0,
                     metronomeTick,

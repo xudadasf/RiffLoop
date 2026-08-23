@@ -110,6 +110,11 @@ assert.doesNotMatch(
             Object.assign(this, { track, tick, channel, controller, value });
         }
     }
+    class PitchBendEvent {
+        constructor(track, tick, channel, value) {
+            Object.assign(this, { track, tick, channel, value });
+        }
+    }
     class NoteOnEvent {
         constructor(tick, channel) {
             Object.assign(this, { tick, channel });
@@ -120,18 +125,24 @@ assert.doesNotMatch(
         midi: {
             TimeSignatureEvent,
             ControlChangeEvent,
+            PitchBendEvent,
             NoteOnEvent,
             ProgramChangeEvent,
-            ControllerType: { VolumeCoarse: 7 },
+            ControllerType: {
+                DataEntryCoarse: 6,
+                VolumeCoarse: 7,
+                RegisteredParameterFine: 100,
+                RegisteredParameterCourse: 101,
+            },
         },
     };
     const execute = new Function(
         "alphaTab",
         "metronomeSubdivisionFactor",
         "beatAccents",
-        `${implementation}\nreturn { addMetronomeAccentControls, metronomeControlValue };`
+        `${implementation}\nreturn { addMetronomeAccentControls, metronomeControlValue, metronomePitchWheel };`
     );
-    const { addMetronomeAccentControls, metronomeControlValue } = execute(
+    const { addMetronomeAccentControls, metronomeControlValue, metronomePitchWheel } = execute(
         alphaTab,
         1,
         ["strong", "normal", "subAccent", "muted"]
@@ -148,7 +159,9 @@ assert.doesNotMatch(
     };
 
     assert.equal(addMetronomeAccentControls(midiFile), 4);
-    const controls = midiFile.events.filter((event) => event instanceof ControlChangeEvent);
+    const controls = midiFile.events.filter((event) => (
+        event instanceof ControlChangeEvent && event.controller === 7
+    ));
     assert.deepEqual(
         controls.map(({ tick, channel, controller, value }) => ({ tick, channel, controller, value })),
         [
@@ -162,6 +175,29 @@ assert.doesNotMatch(
     assert.equal(controls[0].value > controls[2].value, true);
     assert.equal(controls[2].value > controls[1].value, true);
     assert.equal(controls[3].value, 0);
+    assert.deepEqual(
+        midiFile.events
+            .filter((event) => event instanceof ControlChangeEvent && event.controller !== 7)
+            .map(({ tick, channel, controller, value }) => ({ tick, channel, controller, value })),
+        [
+            { tick: 0, channel: 2, controller: 101, value: 0 },
+            { tick: 0, channel: 2, controller: 100, value: 0 },
+            { tick: 0, channel: 2, controller: 6, value: 12 },
+        ],
+        "the dedicated GP metronome channel must use a wide pitch range"
+    );
+    const pitchBends = midiFile.events.filter((event) => event instanceof PitchBendEvent);
+    assert.deepEqual(
+        pitchBends.map(({ tick, channel, value }) => ({ tick, channel, value })),
+        [
+            { tick: 0, channel: 2, value: metronomePitchWheel(0) },
+            { tick: 960, channel: 2, value: metronomePitchWheel(1) },
+            { tick: 1_920, channel: 2, value: metronomePitchWheel(2) },
+            { tick: 2_880, channel: 2, value: metronomePitchWheel(3) },
+        ],
+        "GP downbeat, ordinary beat and secondary accent need distinct buffered timbres"
+    );
+    assert.equal(new Set(pitchBends.map((event) => event.value)).size, 4);
 
     const pickupMidiFile = {
         division: 960,
@@ -176,7 +212,7 @@ assert.doesNotMatch(
     assert.equal(addMetronomeAccentControls(pickupMidiFile), 2);
     assert.deepEqual(
         pickupMidiFile.events
-            .filter((event) => event instanceof ControlChangeEvent)
+            .filter((event) => event instanceof ControlChangeEvent && event.controller === 7)
             .map(({ tick, channel }) => ({ tick, channel })),
         [
             { tick: 480, channel: 1 },
@@ -197,7 +233,7 @@ assert.doesNotMatch(
     };
     assert.equal(addMetronomeAccentControls(fullSongMidiFile), 38 * 8);
     const fullSongControls = fullSongMidiFile.events
-        .filter((event) => event instanceof ControlChangeEvent);
+        .filter((event) => event instanceof ControlChangeEvent && event.controller === 7);
     assert.equal(
         fullSongControls.at(-1)?.tick,
         38 * 3_840 - 480,
