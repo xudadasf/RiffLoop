@@ -181,10 +181,10 @@ assert.match(homeView, /if minutes == 0 \{ return \.white \}/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
 assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");
 
-assert.match(pdfView, /Button\("控制", action: openPracticePanel\)/);
-assert.match(pdfView, /Button\("返回 PDF"\)[\s\S]*?closePracticePanel\(\)/);
-assert.match(pdfView, /\.background\(\.black\.opacity\(0\.82\)\)/);
-assert.match(pdfView, /\.zIndex\(3\)/);
+assert.match(pdfView, /\.safeAreaInset\(edge: \.bottom, spacing: 0\)[\s\S]*?controlDeck/);
+assert.match(pdfView, /toolButton\(\.sound,[\s\S]*?toolButton\(\.follow,/);
+assert.match(pdfView, /\.background\(\.ultraThinMaterial\)/);
+assert.match(pdfView, /\.popover\(isPresented: panelBinding\(for: panel\), arrowEdge: \.bottom\)/);
 assert.match(pdfView, /暂停伴奏|播放伴奏/);
 assert.match(pdfView, /暂停节拍器|启动节拍器/);
 assert.match(pdfView, /伴奏开头＝第1拍/);

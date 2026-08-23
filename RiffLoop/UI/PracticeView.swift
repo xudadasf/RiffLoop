@@ -2,6 +2,30 @@ import AVKit
 import Foundation
 import SwiftUI
 
+private enum VideoControlPanel: String, Identifiable {
+    case loop
+    case metronome
+    case sound
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .loop: "循环"
+        case .metronome: "节拍器"
+        case .sound: "声音"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .loop: "repeat"
+        case .metronome: "metronome"
+        case .sound: "speaker.wave.2.fill"
+        }
+    }
+}
+
 struct PracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var recentProjects: RecentProjectsStore
@@ -11,8 +35,7 @@ struct PracticeView: View {
     @State private var isScrubbing = false
     @State private var didOpenInitialURL = false
     @State private var groupingInput = "4"
-    @State private var controlsVisible = true
-    @State private var metronomeSettingsVisible = false
+    @State private var activePanel: VideoControlPanel?
 
     let initialURL: URL?
 
@@ -21,137 +44,227 @@ struct PracticeView: View {
     }
 
     private let rates: [Float] = [0.25, 0.5, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
+    private let quickRates: [Float] = [0.5, 0.75, 0.9, 1.0, 1.25]
 
     var body: some View {
-        HStack(spacing: 0) {
-            videoArea
-                .overlay(alignment: .topTrailing) {
-                    if !controlsVisible {
-                        compactControls.padding(12)
-                    }
+        videoArea
+            .overlay(alignment: .topTrailing) {
+                if viewModel.hasMedia {
+                    playbackStateBadge
+                        .padding()
                 }
-                .overlay(alignment: .bottomLeading) {
-                    if viewModel.loopEnabled {
-                        Button(action: viewModel.clearLoop) {
-                            Label("退出 A/B 循环", systemImage: "xmark.circle.fill")
+            }
+            .overlay(alignment: .bottomLeading) {
+                if viewModel.loopEnabled {
+                    Button(action: viewModel.clearLoop) {
+                        Label("退出 A/B 循环", systemImage: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .padding()
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                controlDeck
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle("视频练习")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("选择文件") { isLibraryPresented = true }
+                    Menu {
+                        if viewModel.loopEnabled {
+                            Button("退出 A/B 循环", role: .destructive, action: viewModel.clearLoop)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.blue)
-                        .padding(16)
+                        Button("循环设置") { activePanel = .loop }
+                        Button("节拍器设置") { activePanel = .metronome }
+                        Button("声音与记录") { activePanel = .sound }
+                    } label: {
+                        Label("更多", systemImage: "ellipsis")
                     }
                 }
-            if controlsVisible {
-                sideControls
-                    .frame(width: 360)
-                    .background(Color(white: 0.08))
             }
-        }
-        .background(Color.black.ignoresSafeArea())
-        .navigationTitle("视频练习")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("选择文件") { isLibraryPresented = true }
+            .sheet(isPresented: $isLibraryPresented) {
+                DocumentLibraryView(kind: .video) { url in
+                    open(url)
+                }
             }
-        }
-        .sheet(isPresented: $isLibraryPresented) {
-            DocumentLibraryView(kind: .video) { url in
-                open(url)
+            .alert(
+                "RiffLoop",
+                isPresented: Binding(
+                    get: { viewModel.errorMessage != nil },
+                    set: { if !$0 { viewModel.dismissError() } }
+                )
+            ) {
+                Button("好", role: .cancel) { viewModel.dismissError() }
+            } message: {
+                Text(viewModel.errorMessage ?? "")
             }
-        }
-        .alert(
-            "RiffLoop",
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.dismissError() } }
-            )
-        ) {
-            Button("好", role: .cancel) { viewModel.dismissError() }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
-        }
-        .onChange(of: viewModel.currentTime) { _, newValue in
-            if !isScrubbing {
-                scrubTime = newValue
+            .onChange(of: viewModel.currentTime) { _, newValue in
+                if !isScrubbing {
+                    scrubTime = newValue
+                }
             }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active { viewModel.pause() }
-        }
-        .onAppear {
-            guard !didOpenInitialURL, let initialURL else { return }
-            didOpenInitialURL = true
-            open(initialURL)
-        }
-        .onDisappear(perform: viewModel.pause)
-    }
-
-    private var compactControls: some View {
-        VStack(spacing: 10) {
-            Button("设置调整") { controlsVisible = true }
-                .buttonStyle(.borderedProminent)
-            Button(action: viewModel.togglePlayback) {
-                Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title2)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .disabled(!viewModel.hasMedia)
-        }
-        .padding(10)
-        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private var sideControls: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                sideHeader
-                timeline
-                compactTransportSection
-                Divider()
-                compactLoopSection
-                Divider()
-                compactMetronomeSection
-                Divider()
-                compactSoundSection
-            }
-            .padding(16)
             .onChange(of: viewModel.beatGrouping) { _, grouping in
                 groupingInput = grouping.map(String.init).joined(separator: "+")
             }
-        }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { viewModel.pause() }
+            }
+            .onAppear {
+                guard !didOpenInitialURL, let initialURL else { return }
+                didOpenInitialURL = true
+                open(initialURL)
+            }
+            .onDisappear(perform: viewModel.pause)
     }
 
-    private var sideHeader: some View {
-        HStack {
-            Text("视频练习").font(.title3.bold())
-            Spacer()
-            Button("收起") { controlsVisible = false }
+    private var playbackStateBadge: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(viewModel.isPlaying ? Color.green : Color.orange)
+                .frame(width: 8, height: 8)
+            Text(viewModel.isPlaying ? "播放中 · \(rateLabel(viewModel.playbackRate))" : "已暂停")
+                .lineLimit(1)
         }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
     }
 
-    private var compactTransportSection: some View {
-        HStack(spacing: 10) {
-            Button { viewModel.skip(by: -5) } label: { Image(systemName: "gobackward.5") }
+    private var controlDeck: some View {
+        HStack(spacing: 12) {
+            deckTransportControls
+                .frame(width: 212)
+
+            VStack(spacing: 8) {
+                timeline
+                HStack(spacing: 6) {
+                    ForEach(quickRates, id: \.self) { rate in
+                        Button("手动 \(rateLabel(rate))") { viewModel.setPlaybackRate(rate) }
+                            .buttonStyle(.bordered)
+                            .tint(viewModel.playbackRate == rate ? .accentColor : .secondary)
+                    }
+                }
+                .controlSize(.small)
+            }
+            .frame(minWidth: 340, maxWidth: .infinity)
+
+            Rectangle()
+                .fill(Color(.separator))
+                .frame(width: 1, height: 78)
+
+            HStack(spacing: 8) {
+                toolButton(.loop, summary: loopSummary, detail: loopDetail)
+                toolButton(.metronome, summary: metronomeSummary, detail: metronomeDetail)
+                toolButton(.sound, summary: soundSummary, detail: soundDetail)
+            }
+            .frame(maxWidth: 390)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private var deckTransportControls: some View {
+        HStack(spacing: 8) {
+            Button { viewModel.skip(by: -5) } label: {
+                Label("后退 5 秒", systemImage: "gobackward.5")
+                    .labelStyle(.iconOnly)
+                    .frame(minWidth: 30, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+
             Button(action: viewModel.togglePlayback) {
                 Label(
                     viewModel.isPlaying ? "暂停" : "播放",
                     systemImage: viewModel.isPlaying ? "pause.fill" : "play.fill"
                 )
-                .frame(maxWidth: .infinity)
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
-            Button { viewModel.skip(by: 5) } label: { Image(systemName: "goforward.5") }
-            Picker("速度", selection: Binding(
-                get: { viewModel.playbackRate },
-                set: { viewModel.setPlaybackRate($0) }
-            )) {
-                ForEach(rates, id: \.self) { Text("手动 \(rateLabel($0))").tag($0) }
+
+            Button { viewModel.skip(by: 5) } label: {
+                Label("前进 5 秒", systemImage: "goforward.5")
+                    .labelStyle(.iconOnly)
+                    .frame(minWidth: 30, minHeight: 44)
             }
-            .pickerStyle(.menu)
+            .buttonStyle(.bordered)
         }
         .disabled(!viewModel.hasMedia)
+    }
+
+    private func toolButton(
+        _ panel: VideoControlPanel,
+        summary: String,
+        detail: String
+    ) -> some View {
+        Button {
+            activePanel = activePanel == panel ? nil : panel
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Label(panel.title, systemImage: panel.systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(activePanel == panel ? Color.accentColor : .primary)
+                Text(summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                activePanel == panel ? Color.accentColor.opacity(0.17) : Color(.secondarySystemFill),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(activePanel == panel ? Color.accentColor.opacity(0.8) : Color(.separator))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: panelBinding(for: panel), arrowEdge: .bottom) {
+            panelContent(panel)
+                .frame(width: 420, height: 540)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    @ViewBuilder
+    private func panelContent(_ panel: VideoControlPanel) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label(panel.title, systemImage: panel.systemImage)
+                    .font(.title2.bold())
+                Spacer()
+                Button("完成") { activePanel = nil }
+                    .buttonStyle(.bordered)
+            }
+            .padding()
+
+            ScrollView {
+                Group {
+                    switch panel {
+                    case .loop: compactLoopSection
+                    case .metronome: compactMetronomeSection
+                    case .sound: compactSoundSection
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding([.horizontal, .bottom])
+            }
+        }
+        .background(Color(.systemGroupedBackground))
     }
 
     private var compactLoopSection: some View {
@@ -224,23 +337,12 @@ struct PracticeView: View {
     private var compactMetronomeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("节拍器").font(.headline)
-            HStack {
-                Toggle("开启节拍器", isOn: $viewModel.metronomeEnabled)
-                    .onChange(of: viewModel.metronomeEnabled) { _, _ in
-                        viewModel.applyTimingSettings()
-                    }
-                Button {
-                    withAnimation { metronomeSettingsVisible.toggle() }
-                } label: {
-                    Label(
-                        metronomeSettingsVisible ? "收起设置" : "设置调整",
-                        systemImage: "gearshape"
-                    )
+            Toggle("开启节拍器", isOn: $viewModel.metronomeEnabled)
+                .onChange(of: viewModel.metronomeEnabled) { _, _ in
+                    viewModel.applyTimingSettings()
                 }
-                .buttonStyle(.bordered)
-            }
 
-            if metronomeSettingsVisible {
+            Group {
                 HStack {
                     Text("BPM")
                     TextField("120", value: $viewModel.bpm, format: .number.precision(.fractionLength(0)))
@@ -324,6 +426,14 @@ struct PracticeView: View {
     private var compactSoundSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("视频声音与练习记录").font(.headline)
+            Picker("手动速度", selection: Binding(
+                get: { viewModel.playbackRate },
+                set: { viewModel.setPlaybackRate($0) }
+            )) {
+                ForEach(rates, id: \.self) { rate in
+                    Text("手动 \(rateLabel(rate))").tag(rate)
+                }
+            }
             volumeSlider("视频音量", value: Double(viewModel.mediaVolume)) {
                 viewModel.setMediaVolume(Float($0))
             }
@@ -637,6 +747,45 @@ struct PracticeView: View {
                 .monospacedDigit()
         }
         .frame(minWidth: 108, alignment: .leading)
+    }
+
+    private func panelBinding(for panel: VideoControlPanel) -> Binding<Bool> {
+        Binding(
+            get: { activePanel == panel },
+            set: { isPresented in
+                if isPresented {
+                    activePanel = panel
+                } else if activePanel == panel {
+                    activePanel = nil
+                }
+            }
+        )
+    }
+
+    private var loopSummary: String {
+        viewModel.loopEnabled ? "A/B 循环已开启" : "A/B 循环关闭"
+    }
+
+    private var loopDetail: String {
+        let a = viewModel.pointA.map(formatTime) ?? "未设 A"
+        let b = viewModel.pointB.map(formatTime) ?? "未设 B"
+        return "\(a) → \(b)"
+    }
+
+    private var metronomeSummary: String {
+        viewModel.metronomeEnabled ? "\(Int(viewModel.bpm.rounded())) BPM" : "节拍器关闭"
+    }
+
+    private var metronomeDetail: String {
+        "\(viewModel.beatsPerMeasure)/\(viewModel.beatUnit) · \(viewModel.rhythmMode.label)"
+    }
+
+    private var soundSummary: String {
+        "视频 \(Int((viewModel.mediaVolume * 100).rounded()))%"
+    }
+
+    private var soundDetail: String {
+        "循环 \(viewModel.completedLoops) 轮 · 最高 \(Int((viewModel.highestPlaybackRate * 100).rounded()))%"
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {

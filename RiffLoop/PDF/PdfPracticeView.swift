@@ -1,16 +1,42 @@
 import Foundation
 import SwiftUI
 
+private enum PdfControlPanel: String, Identifiable {
+    case loop
+    case metronome
+    case sound
+    case follow
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .loop: "循环"
+        case .metronome: "节拍器"
+        case .sound: "伴奏"
+        case .follow: "跟谱"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .loop: "repeat"
+        case .metronome: "metronome"
+        case .sound: "waveform"
+        case .follow: "text.viewfinder"
+        }
+    }
+}
+
 struct PdfPracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = PdfPracticeViewModel()
     @State private var pdfLibraryPresented = false
     @State private var audioLibraryPresented = false
-    @State private var controlsVisible = true
-    @State private var expandedControls = false
     @State private var didOpenInitialURL = false
     @State private var groupingInput = "4"
+    @State private var activePanel: PdfControlPanel?
 
     let initialURL: URL?
 
@@ -32,7 +58,6 @@ struct PdfPracticeView: View {
                     onProgressChanged: viewModel.setVerticalProgress,
                     onScaleChanged: viewModel.setScale,
                     onManualInteraction: {
-                        revealControls()
                         viewModel.manualViewportInteraction()
                     }
                 )
@@ -49,35 +74,43 @@ struct PdfPracticeView: View {
             }
 
             if viewModel.document != nil {
-                if controlsVisible {
-                    overlayControls
-                        .transition(.opacity)
-                        .zIndex(2)
-                } else {
-                    Button("控制", action: openPracticePanel)
-                        .buttonStyle(.borderedProminent)
-                        .tint(.black.opacity(0.72))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                        .padding(8)
-                        .zIndex(2)
+                playbackStateBadge
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding()
+
+                if viewModel.loopEnabled {
+                    Button(action: { setLoopEnabled(false) }) {
+                        Label("退出 A/B 循环", systemImage: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding()
                 }
             }
-
-            if expandedControls {
-                practicePanel
-                    .frame(width: 340)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .background(.black.opacity(0.82))
-                    .transition(.move(edge: .trailing))
-                    .zIndex(3)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if viewModel.document != nil {
+                controlDeck
             }
         }
         .navigationTitle(viewModel.pdfFileName ?? "PDF 谱面")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { pdfLibraryPresented = true } label: {
                     Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
+                }
+                Menu {
+                    if viewModel.loopEnabled {
+                        Button("退出 A/B 循环", role: .destructive) { setLoopEnabled(false) }
+                    }
+                    Button("循环设置") { activePanel = .loop }
+                    Button("节拍器设置") { activePanel = .metronome }
+                    Button("伴奏设置") { activePanel = .sound }
+                    Button("自动跟谱") { activePanel = .follow }
+                } label: {
+                    Label("更多", systemImage: "ellipsis")
                 }
             }
         }
@@ -99,11 +132,8 @@ struct PdfPracticeView: View {
         } message: {
             Text(viewModel.message ?? "")
         }
-        .task(id: controlsVisible) {
-            guard controlsVisible, !expandedControls, viewModel.document != nil else { return }
-            try? await Task.sleep(for: .seconds(4.5))
-            guard !Task.isCancelled, !expandedControls else { return }
-            withAnimation { controlsVisible = false }
+        .onChange(of: viewModel.beatGrouping) { _, grouping in
+            groupingInput = grouping.map(String.init).joined(separator: "+")
         }
         .onAppear {
             guard !didOpenInitialURL, let initialURL else { return }
@@ -116,84 +146,201 @@ struct PdfPracticeView: View {
         .onDisappear(perform: viewModel.pause)
     }
 
-    private var overlayControls: some View {
-        VStack {
-            HStack {
-                Button("更换 PDF") { pdfLibraryPresented = true }
-                Spacer()
-                Button("控制", action: openPracticePanel)
+    private var playbackStateBadge: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(viewModel.isPlaying ? Color.green : Color.orange)
+                .frame(width: 8, height: 8)
+            Text(viewModel.isPlaying ? "练习中 · \(speedLabel(viewModel.playbackRate))" : "已暂停")
+                .lineLimit(1)
+        }
+        .font(.caption.weight(.semibold))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+    }
+
+    private var controlDeck: some View {
+        HStack(spacing: 12) {
+            deckTransportControls
+                .frame(width: 172)
+
+            pageAndProgressControls
+                .frame(minWidth: 300, maxWidth: .infinity)
+
+            Rectangle()
+                .fill(Color(.separator))
+                .frame(width: 1, height: 78)
+
+            HStack(spacing: 8) {
+                toolButton(.loop, summary: loopSummary, detail: loopDetail)
+                toolButton(.metronome, summary: metronomeSummary, detail: metronomeDetail)
+                toolButton(.sound, summary: soundSummary, detail: soundDetail)
+                toolButton(.follow, summary: followSummary, detail: followDetail)
             }
-            Spacer()
-            HStack(spacing: 10) {
-                Button("上一页") {
-                    viewModel.manualViewportInteraction()
-                    viewModel.setPage(viewModel.pageIndex - 1)
+            .frame(maxWidth: 488)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private var deckTransportControls: some View {
+        HStack(spacing: 8) {
+            Button(action: viewModel.togglePlayback) {
+                Label(
+                    viewModel.isPlaying ? "暂停" : "播放",
+                    systemImage: viewModel.isPlaying ? "pause.fill" : "play.fill"
+                )
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+
+            Button(action: viewModel.stop) {
+                Label("停止", systemImage: "stop.fill")
+                    .labelStyle(.iconOnly)
+                    .frame(minWidth: 32, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private var pageAndProgressControls: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Button { changePage(by: -1) } label: {
+                    Label("上一页", systemImage: "chevron.left")
+                        .labelStyle(.iconOnly)
                 }
-                    .disabled(viewModel.pageIndex == 0)
-                Button("−") {
-                    viewModel.manualViewportInteraction()
-                    viewModel.setScale(viewModel.scaleFactor - 0.25)
+                .disabled(viewModel.pageIndex == 0)
+
+                Text("第 \(viewModel.pageIndex + 1) / \(max(1, viewModel.pageCount)) 页")
+                    .font(.caption.monospacedDigit().weight(.semibold))
+
+                Button { changePage(by: 1) } label: {
+                    Label("下一页", systemImage: "chevron.right")
+                        .labelStyle(.iconOnly)
                 }
-                Text("\(viewModel.pageIndex + 1)/\(max(1, viewModel.pageCount)) · \(Int(viewModel.scaleFactor * 100))%")
-                    .monospacedDigit()
-                Button("+") {
-                    viewModel.manualViewportInteraction()
-                    viewModel.setScale(viewModel.scaleFactor + 0.25)
-                }
-                Button("下一页") {
-                    viewModel.manualViewportInteraction()
-                    viewModel.setPage(viewModel.pageIndex + 1)
-                }
-                    .disabled(viewModel.pageIndex + 1 >= viewModel.pageCount)
+                .disabled(viewModel.pageIndex + 1 >= viewModel.pageCount)
+
                 Spacer()
-                Button(readingButtonTitle, action: handleReadingButton)
-                if viewModel.audioFileName != nil {
-                    Button(viewModel.isAudioPlaying ? "暂停伴奏" : "播放伴奏") {
-                        viewModel.toggleAudioPlayback()
+
+                Button { changeScale(by: -0.25) } label: {
+                    Label("缩小", systemImage: "minus.magnifyingglass")
+                        .labelStyle(.iconOnly)
+                }
+                Text("\(Int((viewModel.scaleFactor * 100).rounded()))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Button { changeScale(by: 0.25) } label: {
+                    Label("放大", systemImage: "plus.magnifyingglass")
+                        .labelStyle(.iconOnly)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            if viewModel.audioFileName != nil {
+                HStack(spacing: 8) {
+                    Text(format(viewModel.currentTime))
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.currentTime },
+                            set: { viewModel.seek(to: $0) }
+                        ),
+                        in: 0...max(viewModel.duration, 0.01)
+                    )
+                    Text(format(viewModel.duration))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("未绑定伴奏 · 可单独使用节拍器")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func toolButton(
+        _ panel: PdfControlPanel,
+        summary: String,
+        detail: String
+    ) -> some View {
+        Button {
+            activePanel = activePanel == panel ? nil : panel
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Label(panel.title, systemImage: panel.systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(activePanel == panel ? Color.accentColor : .primary)
+                Text(summary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                activePanel == panel ? Color.accentColor.opacity(0.17) : Color(.secondarySystemFill),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(activePanel == panel ? Color.accentColor.opacity(0.8) : Color(.separator))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: panelBinding(for: panel), arrowEdge: .bottom) {
+            panelContent(panel)
+                .frame(width: 420, height: 540)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    @ViewBuilder
+    private func panelContent(_ panel: PdfControlPanel) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label(panel.title, systemImage: panel.systemImage)
+                    .font(.title2.bold())
+                Spacer()
+                Button("完成") { activePanel = nil }
+                    .buttonStyle(.bordered)
+            }
+            .padding()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    switch panel {
+                    case .loop:
+                        pdfLoopSection
+                        Divider()
+                        pdfSoundAndStatsSection
+                    case .metronome:
+                        pdfMetronomeSection
+                        Divider()
+                        pdfAlignmentSection
+                    case .sound:
+                        pdfTransportSection
+                    case .follow:
+                        autoFollowSection
                     }
                 }
-                Button(viewModel.isMetronomePlaying ? "暂停节拍器" : "启动节拍器") {
-                    viewModel.toggleMetronomePlayback()
-                }
-                Button("伴奏") { audioLibraryPresented = true }
-                if viewModel.audioFileName != nil {
-                    Button("移除", action: viewModel.removeAudio)
-                }
-            }
-            .padding(.bottom, 24)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(.black.opacity(0.72))
-        .padding(8)
-    }
-
-    private var practicePanel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                practiceHeader
-                pdfTransportSection
-                pdfLoopSection
-                pdfMetronomeSection
-                pdfAlignmentSection
-                pdfSoundAndStatsSection
-                Divider()
-                autoFollowSection
-            }
-            .padding(18)
-            .onChange(of: viewModel.beatGrouping) { _, grouping in
-                groupingInput = grouping.map(String.init).joined(separator: "+")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding([.horizontal, .bottom])
             }
         }
-    }
-
-    private var practiceHeader: some View {
-        HStack {
-            Text("练习控制").font(.title3.bold())
-            Spacer()
-            Button("返回 PDF") {
-                closePracticePanel()
-            }
-        }
+        .background(Color(.systemGroupedBackground))
     }
 
     private var pdfTransportSection: some View {
@@ -416,22 +563,9 @@ struct PdfPracticeView: View {
         return "跟谱"
     }
 
-    private func handleReadingButton() {
-        if viewModel.isRecordingReadingTrack {
-            viewModel.finishReadingTrackRecording()
-        } else if viewModel.autoFollowSuspended {
-            viewModel.resumeAutoFollow()
-        } else if viewModel.readingPoints.isEmpty {
-            viewModel.startReadingTrackRecording()
-        } else {
-            viewModel.toggleAutoFollow()
-        }
-    }
-
     private func openPdf(_ url: URL) {
         if viewModel.openPdf(at: url) {
             recentProjects.opened(kind: .pdf, fileName: url.lastPathComponent)
-            revealControls()
         } else {
             recentProjects.remove(kind: .pdf, fileName: url.lastPathComponent)
         }
@@ -439,28 +573,73 @@ struct PdfPracticeView: View {
 
     private func handleDeletedPdf(_ url: URL) {
         guard viewModel.pdfWasDeleted(at: url) else { return }
-        withAnimation {
-            expandedControls = false
-            controlsVisible = true
-        }
+        activePanel = nil
     }
 
-    private func revealControls() {
-        withAnimation { controlsVisible = true }
+    private func changePage(by offset: Int) {
+        viewModel.manualViewportInteraction()
+        viewModel.setPage(viewModel.pageIndex + offset)
     }
 
-    private func openPracticePanel() {
-        withAnimation {
-            controlsVisible = false
-            expandedControls = true
-        }
+    private func changeScale(by offset: Double) {
+        viewModel.manualViewportInteraction()
+        viewModel.setScale(viewModel.scaleFactor + offset)
     }
 
-    private func closePracticePanel() {
-        withAnimation {
-            expandedControls = false
-            controlsVisible = true
-        }
+    private func setLoopEnabled(_ enabled: Bool) {
+        viewModel.loopEnabled = enabled
+        viewModel.updateAudioSettings()
+    }
+
+    private func panelBinding(for panel: PdfControlPanel) -> Binding<Bool> {
+        Binding(
+            get: { activePanel == panel },
+            set: { isPresented in
+                if isPresented {
+                    activePanel = panel
+                } else if activePanel == panel {
+                    activePanel = nil
+                }
+            }
+        )
+    }
+
+    private var loopSummary: String {
+        viewModel.loopEnabled ? "A/B 循环已开启" : "A/B 循环关闭"
+    }
+
+    private var loopDetail: String {
+        let a = viewModel.pointA.map(format) ?? "未设 A"
+        let b = viewModel.pointB.map(format) ?? "未设 B"
+        return "\(a) → \(b)"
+    }
+
+    private var metronomeSummary: String {
+        viewModel.metronomeEnabled ? "\(Int(viewModel.bpm.rounded())) BPM" : "节拍器关闭"
+    }
+
+    private var metronomeDetail: String {
+        "\(viewModel.beatsPerMeasure)/4 · \(viewModel.rhythmMode.label)"
+    }
+
+    private var soundSummary: String {
+        viewModel.audioFileName ?? "未绑定伴奏"
+    }
+
+    private var soundDetail: String {
+        viewModel.audioFileName == nil
+            ? "节拍器可独立练习"
+            : "\(speedLabel(viewModel.playbackRate)) · 音量 \(Int((viewModel.audioVolume * 100).rounded()))%"
+    }
+
+    private var followSummary: String { readingButtonTitle }
+
+    private var followDetail: String {
+        "已保存 \(viewModel.readingPoints.count) 个位置点"
+    }
+
+    private func speedLabel(_ rate: Float) -> String {
+        String(format: "%.2f×", rate)
     }
 
     private func format(_ seconds: TimeInterval) -> String {

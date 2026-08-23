@@ -82,5 +82,25 @@ assert.match(
     /func setSpeedLadderTarget\(_ target: Float\) \{[\s\S]*?min\(max\(target, playbackRate\), 1\.5\)/,
     "the PDF speed ladder target must not be lower than the manual speed"
 );
+assert.match(
+    pdfView,
+    /\.safeAreaInset\(edge: \.bottom, spacing: 0\) \{[\s\S]*?controlDeck/,
+    "the PDF score must use the shared bottom practice deck"
+);
+assert.match(
+    pdfView,
+    /private enum PdfControlPanel[\s\S]*?case loop[\s\S]*?case metronome[\s\S]*?case sound[\s\S]*?case follow/,
+    "PDF tools must keep loop, metronome, backing, and following in separate cards"
+);
+assert.match(
+    pdfView,
+    /\.popover\(isPresented: panelBinding\(for: panel\), arrowEdge: \.bottom\)/,
+    "PDF tool cards must open native iPad popovers"
+);
+assert.doesNotMatch(
+    pdfView,
+    /\.task\(id: controlsVisible\)|practicePanel\s*\.frame\(width: 340\)/,
+    "PDF controls must not auto-hide or cover the score with the legacy side panel"
+);
 
 console.log("PDF mode policies passed");

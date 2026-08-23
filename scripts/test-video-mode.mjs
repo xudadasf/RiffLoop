@@ -126,6 +126,13 @@ check("the video surface cannot bypass RiffLoop transport controls", () => {
     assert.match(viewSource, /showsPlaybackControls = false/);
 });
 
+check("the video page keeps the content full-width with GP-style bottom tools", () => {
+    assert.match(viewSource, /\.safeAreaInset\(edge: \.bottom, spacing: 0\) \{[\s\S]*?controlDeck/);
+    assert.match(viewSource, /private enum VideoControlPanel[\s\S]*?case loop[\s\S]*?case metronome[\s\S]*?case sound/);
+    assert.match(viewSource, /\.popover\(isPresented: panelBinding\(for: panel\), arrowEdge: \.bottom\)/);
+    assert.doesNotMatch(viewSource, /sideControls\s*\.frame\(width: 360\)/);
+});
+
 for (const result of checks) {
     console.log(`${result.passed ? "PASS" : "FAIL"}: ${result.name}`);
     if (!result.passed) console.log(`  ${result.message}`);
