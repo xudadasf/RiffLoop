@@ -423,6 +423,11 @@ assert.doesNotMatch(
         false,
         "the corrective seek notification must not recursively seek"
     );
+    assert.deepEqual(
+        posts,
+        ["rangeLoopCompleted"],
+        "the corrective seek notification must not count the same loop twice"
+    );
 
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";

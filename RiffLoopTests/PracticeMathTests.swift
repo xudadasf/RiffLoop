@@ -28,4 +28,11 @@ final class PracticeMathTests: XCTestCase {
             accuracy: 1e-12
         )
     }
+
+    func testSpeedLadderRoundRepresentsTheLoopCurrentlyInProgress() {
+        XCTAssertEqual(speedLadderRoundInProgress(completedLoops: 0, loopsPerStep: 3), 1)
+        XCTAssertEqual(speedLadderRoundInProgress(completedLoops: 1, loopsPerStep: 3), 2)
+        XCTAssertEqual(speedLadderRoundInProgress(completedLoops: 2, loopsPerStep: 3), 3)
+        XCTAssertEqual(speedLadderRoundInProgress(completedLoops: 3, loopsPerStep: 3), 1)
+    }
 }

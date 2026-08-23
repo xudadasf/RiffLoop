@@ -331,7 +331,7 @@ struct GpPracticeView: View {
                         Text("\(Int(($0 * 100).rounded()))%").tag($0)
                     }
                 }
-                Text("已完成 \(viewModel.completedLoops) 轮")
+                Text("当前第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮 · \(viewModel.playbackSpeed, specifier: "%.2f")×")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

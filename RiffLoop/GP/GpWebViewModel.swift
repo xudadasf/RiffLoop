@@ -52,6 +52,13 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var backingDiagnosticLines: [String] = []
     @Published private(set) var backingProbeDiagnostic: String?
 
+    var currentSpeedLadderRound: Int {
+        speedLadderRoundInProgress(
+            completedLoops: completedLoops,
+            loopsPerStep: loopsPerSpeedStep
+        )
+    }
+
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
     private var didSendSoundFont = false

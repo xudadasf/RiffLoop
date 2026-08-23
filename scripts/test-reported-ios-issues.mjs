@@ -49,6 +49,10 @@ assert.match(
     /Picker\("目标速度"[\s\S]*?ForEach\(speeds\.filter \{ \$0 >= viewModel\.playbackSpeed \}/,
     "GP ladder target choices must not include speeds below the current manual speed"
 );
+assert.ok(
+    gpView.includes('Text("当前第 \\(viewModel.currentSpeedLadderRound)/\\(viewModel.loopsPerSpeedStep) 轮 · \\(viewModel.playbackSpeed, specifier: "%.2f")×")'),
+    "the GP ladder status must show the round currently in progress and its actual speed"
+);
 
 for (const expected of [
     /frequency: 2_600,[\s\S]*?amplitude: 0\.95,[\s\S]*?decay: 65/,

@@ -52,6 +52,10 @@ struct SpeedLadderUpdate: Equatable, Sendable {
     let playbackSpeed: Double
 }
 
+func speedLadderRoundInProgress(completedLoops: Int, loopsPerStep: Int) -> Int {
+    max(0, completedLoops) % max(1, loopsPerStep) + 1
+}
+
 func speedAfterCompletedLoop(
     currentSpeed: Double,
     targetSpeed: Double,
