@@ -65,8 +65,13 @@ assert.doesNotMatch(
 );
 assert.match(
     gpWeb,
-    /const nextPulse = \(Number\(current\.metronomeNumerator\) \+ 1\) % pulseCount;[\s\S]*?applyMetronomePulse\(nextPulse\)/,
-    "the alphaTab-scheduled metronome must prepare the next accent before its audio buffer plays"
+    /midiFile\.addEvent\(new alphaTab\.midi\.ControlChangeEvent\([\s\S]*?metronomeControlValue\(pulse\)/,
+    "GP beat accents must be inserted into alphaTab's MIDI buffer before playback"
+);
+assert.doesNotMatch(
+    gpWeb,
+    /midiEventsPlayed\.on\([\s\S]*?metronomeVolume/,
+    "an already-played MIDI callback must not change the audible metronome volume"
 );
 assert.match(
     gpPage,

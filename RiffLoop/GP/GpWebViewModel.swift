@@ -246,7 +246,7 @@ final class GpWebViewModel: ObservableObject {
     func cycleBeatAccent(at index: Int) {
         guard beatAccents.indices.contains(index) else { return }
         beatAccents[index] = beatAccents[index].next
-        call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
+        call("setBeatAccents", arguments: [beatAccents.map(\.rawValue), true])
         saveProfile()
     }
 

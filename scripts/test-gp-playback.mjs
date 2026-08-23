@@ -92,6 +92,101 @@ assert.doesNotMatch(
 );
 
 {
+    const startMarker = "    const metronomeAccent = (pulse) => {";
+    const endMarker = "\n    const reinforceLongLegatoTargets";
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(start, -1, "GP metronome accent implementation is missing");
+    assert.notEqual(end, -1, "GP metronome accent boundary is missing");
+    const implementation = source.slice(start, end);
+
+    class TimeSignatureEvent {
+        constructor(tick, numerator, denominatorIndex) {
+            Object.assign(this, { tick, numerator, denominatorIndex });
+        }
+    }
+    class ControlChangeEvent {
+        constructor(track, tick, channel, controller, value) {
+            Object.assign(this, { track, tick, channel, controller, value });
+        }
+    }
+    class NoteOnEvent {
+        constructor(tick, channel) {
+            Object.assign(this, { tick, channel });
+        }
+    }
+    class ProgramChangeEvent {}
+    const alphaTab = {
+        midi: {
+            TimeSignatureEvent,
+            ControlChangeEvent,
+            NoteOnEvent,
+            ProgramChangeEvent,
+            ControllerType: { VolumeCoarse: 7 },
+        },
+    };
+    const execute = new Function(
+        "alphaTab",
+        "metronomeSubdivisionFactor",
+        "beatAccents",
+        `${implementation}\nreturn { addMetronomeAccentControls, metronomeControlValue };`
+    );
+    const { addMetronomeAccentControls, metronomeControlValue } = execute(
+        alphaTab,
+        1,
+        ["strong", "normal", "subAccent", "muted"]
+    );
+    const midiFile = {
+        division: 960,
+        tickShift: 0,
+        events: [
+            new TimeSignatureEvent(0, 4, 2),
+            new NoteOnEvent(0, 1),
+            { tick: 3_840 },
+        ],
+        addEvent(event) { this.events.push(event); },
+    };
+
+    assert.equal(addMetronomeAccentControls(midiFile), 4);
+    const controls = midiFile.events.filter((event) => event instanceof ControlChangeEvent);
+    assert.deepEqual(
+        controls.map(({ tick, channel, controller, value }) => ({ tick, channel, controller, value })),
+        [
+            { tick: 0, channel: 2, controller: 7, value: metronomeControlValue(0) },
+            { tick: 960, channel: 2, controller: 7, value: metronomeControlValue(1) },
+            { tick: 1_920, channel: 2, controller: 7, value: metronomeControlValue(2) },
+            { tick: 2_880, channel: 2, controller: 7, value: metronomeControlValue(3) },
+        ],
+        "all four opening beats must be scheduled in the synth buffer before playback"
+    );
+    assert.equal(controls[0].value > controls[2].value, true);
+    assert.equal(controls[2].value > controls[1].value, true);
+    assert.equal(controls[3].value, 0);
+
+    const pickupMidiFile = {
+        division: 960,
+        tickShift: 480,
+        events: [
+            new TimeSignatureEvent(0, 4, 2),
+            new NoteOnEvent(480, 0),
+            { tick: 2_400 },
+        ],
+        addEvent(event) { this.events.push(event); },
+    };
+    assert.equal(addMetronomeAccentControls(pickupMidiFile), 2);
+    assert.deepEqual(
+        pickupMidiFile.events
+            .filter((event) => event instanceof ControlChangeEvent)
+            .map(({ tick, channel }) => ({ tick, channel })),
+        [
+            { tick: 480, channel: 1 },
+            { tick: 1_440, channel: 1 },
+        ],
+        "opening metronome controls must follow alphaTab's pickup tick shift and channel"
+    );
+}
+
+{
     const startMarker = "    const backingAudioMimeType = (bytes) => {";
     const endMarker = "\n    const probeTypedBackingMetadata";
     const start = source.indexOf(startMarker);

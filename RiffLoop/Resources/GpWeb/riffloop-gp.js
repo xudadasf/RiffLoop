@@ -290,9 +290,56 @@
         if (accent === "subdivision") return 0.30;
         return 0;
     };
-    const applyMetronomePulse = (pulse) => {
-        api.metronomeVolume = metronomeMasterVolume * metronomeGain(pulse);
+    const applyMetronomeVolume = () => {
+        api.metronomeVolume = metronomeMasterVolume;
         synthApi.metronomeVolume = 0;
+    };
+    const metronomeControlValue = (pulse) => Math.round(
+        Math.cbrt(Math.max(0, metronomeGain(pulse))) * 127
+    );
+    const addMetronomeAccentControls = (midiFile) => {
+        const events = Array.from(midiFile.events).sort((left, right) => left.tick - right.tick);
+        const maxChannel = events.reduce((maximum, event) => (
+            Number.isFinite(event.channel)
+            && (event instanceof alphaTab.midi.NoteOnEvent
+                || event instanceof alphaTab.midi.ProgramChangeEvent)
+                ? Math.max(maximum, Number(event.channel))
+                : maximum
+        ), 0);
+        const metronomeChannel = maxChannel + 1;
+        let metronomeLengthInTicks = 0;
+        let metronomeCount = 0;
+        let metronomeTick = Number.isFinite(Number(midiFile.tickShift))
+            ? Number(midiFile.tickShift)
+            : 0;
+        let added = 0;
+
+        for (const event of events) {
+            const eventTick = Number(event.tick);
+            if (!Number.isFinite(eventTick)) continue;
+            while (metronomeLengthInTicks > 0 && metronomeTick < eventTick) {
+                const pulse = Math.floor(metronomeTick / metronomeLengthInTicks)
+                    % Math.max(1, metronomeCount);
+                midiFile.addEvent(new alphaTab.midi.ControlChangeEvent(
+                    0,
+                    metronomeTick,
+                    metronomeChannel,
+                    alphaTab.midi.ControllerType.VolumeCoarse,
+                    metronomeControlValue(pulse)
+                ));
+                metronomeTick += metronomeLengthInTicks;
+                added += 1;
+            }
+            if (event instanceof alphaTab.midi.TimeSignatureEvent) {
+                metronomeCount = Math.max(1, Number(event.numerator) || 1);
+                const denominator = Math.pow(2, Number(event.denominatorIndex));
+                metronomeLengthInTicks = Math.max(
+                    1,
+                    Math.floor(Number(midiFile.division) * (4 / denominator))
+                );
+            }
+        }
+        return added;
     };
     const reinforceLongLegatoTargets = (midiFile, score) => {
         if (!score) return 0;
@@ -333,7 +380,6 @@
         return reinforcedCount;
     };
     const configureMetronomeEvents = (playerApi) => {
-        playerApi.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
         playerApi.midiLoad.on((midiFile) => {
             if (metronomeSubdivisionFactor !== 1) {
                 const denominatorOffset = Math.log2(metronomeSubdivisionFactor);
@@ -344,20 +390,12 @@
                     }
                 }
             }
+            addMetronomeAccentControls(midiFile);
             reinforceLongLegatoTargets(midiFile, api.score);
-        });
-        playerApi.midiEventsPlayed.on((event) => {
-            const metronomeEvents = Array.from(event.events)
-                .filter((item) => item instanceof alphaTab.midi.AlphaTabMetronomeEvent);
-            const current = metronomeEvents[metronomeEvents.length - 1];
-            if (!current) return;
-            const pulseCount = Math.max(1, beatAccents.length * metronomeSubdivisionFactor);
-            const nextPulse = (Number(current.metronomeNumerator) + 1) % pulseCount;
-            applyMetronomePulse(nextPulse);
         });
     };
     configureMetronomeEvents(api);
-    applyMetronomePulse(0);
+    applyMetronomeVolume();
     const canUseBacking = () => Boolean(api.score?.backingTrack);
     const backingMediaElement = () => document.querySelector("audio");
     const resumeBackingMedia = () => {
@@ -1091,7 +1129,7 @@
         },
         setMetronomeVolume(volume) {
             metronomeMasterVolume = Number(volume);
-            applyMetronomePulse(0);
+            applyMetronomeVolume();
         },
         prepareMetronomeSubdivision(factor) {
             const value = Number(factor);
@@ -1101,7 +1139,7 @@
             const value = Number(factor);
             if (![1, 2, 4, 8].includes(value) || value === metronomeSubdivisionFactor) return;
             metronomeSubdivisionFactor = value;
-            applyMetronomePulse(0);
+            applyMetronomeVolume();
             if (loadedScoreBytes) {
                 transport.pause();
                 resetPlaybackReadiness();
@@ -1109,11 +1147,17 @@
                 synthApi.load(loadedScoreBytes.slice());
             }
         },
-        setBeatAccents(accents) {
+        setBeatAccents(accents, reloadPlayer = false) {
             beatAccents = Array.isArray(accents) && accents.length > 0
                 ? accents.map(String)
                 : ["strong", "normal", "normal", "normal"];
-            applyMetronomePulse(0);
+            applyMetronomeVolume();
+            if (reloadPlayer && loadedScoreBytes) {
+                transport.pause();
+                resetPlaybackReadiness();
+                api.load(loadedScoreBytes.slice());
+                synthApi.load(loadedScoreBytes.slice());
+            }
         },
         setCountInVolume(volume) {
             const value = Number(volume);
