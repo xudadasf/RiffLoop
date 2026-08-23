@@ -400,6 +400,11 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
+        /const scheduleAfterCursorPaint = \(action\) => \{[\s\S]*?window\.requestAnimationFrame\(\(\) => \{[\s\S]*?window\.requestAnimationFrame\(action\);[\s\S]*?\}\);[\s\S]*?\};[\s\S]*?schedule: scheduleAfterCursorPaint/,
+        "count-in must wait for alphaTab's two animation-frame cursor paint before restarting"
+    );
+    assert.match(
+        source,
         /const stopTick = \(\) => rangeLoopingEnabled && committedRange \? committedRange\.startTick : 0;[\s\S]*?stop\(\) \{[\s\S]*?transport\.stop\(\); seekBoth\(stopTick\(\)\); \}/,
         "stop must return to A while range looping is active and to the song start otherwise"
     );

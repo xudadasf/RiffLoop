@@ -794,10 +794,15 @@
         };
         return { prepare, resume, cancel, handlePlayerState, handlePlayerPosition };
     };
+    const scheduleAfterCursorPaint = (action) => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(action);
+        });
+    };
     const rangeCountInRestarter = createRangeCountInRestarter({
         transport,
         seekBoth,
-        schedule: window.setTimeout.bind(window),
+        schedule: scheduleAfterCursorPaint,
         isPaused: (state) => (
             state?.state === alphaTab.synth.PlayerState.Paused
             || api.playerState === alphaTab.synth.PlayerState.Paused
