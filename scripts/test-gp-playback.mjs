@@ -385,12 +385,12 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
-        /const stopTick = \(\) => rangeLoopingEnabled && committedRange \? committedRange\.startTick : 0;[\s\S]*?stop\(\) \{ transport\.stop\(\); seekBoth\(stopTick\(\)\); \}/,
+        /const stopTick = \(\) => rangeLoopingEnabled && committedRange \? committedRange\.startTick : 0;[\s\S]*?stop\(\) \{[\s\S]*?transport\.stop\(\); seekBoth\(stopTick\(\)\); \}/,
         "stop must return to A while range looping is active and to the song start otherwise"
     );
 
     const loopStartMarker = "    let rangeCompletionAwaitingReset = false;";
-    const loopEndMarker = "\n    const playPauseBoth";
+    const loopEndMarker = "\n    const createRangeCountInRestarter";
     const loopStart = source.indexOf(loopStartMarker);
     const loopEnd = source.indexOf(loopEndMarker, loopStart);
     assert.notEqual(loopStart, -1, "range enforcement implementation is missing");
@@ -457,6 +457,41 @@ assert.doesNotMatch(
         "a late second completion signal for the same native loop must be ignored"
     );
     assert.deepEqual(posts, ["rangeLoopCompleted", "rangeLoopCompleted"]);
+
+    const countInStartMarker = "    const createRangeCountInRestarter = (deps) => {";
+    const countInEndMarker = "\n    const rangeCountInRestarter";
+    const countInStart = source.indexOf(countInStartMarker);
+    const countInEnd = source.indexOf(countInEndMarker, countInStart);
+    assert.notEqual(countInStart, -1, "per-loop count-in restart state machine is missing");
+    assert.notEqual(countInEnd, -1, "per-loop count-in restart boundary is missing");
+    const countInImplementation = source.slice(countInStart, countInEnd);
+    const createRangeCountInRestarter = new Function(
+        `${countInImplementation}\nreturn createRangeCountInRestarter;`
+    )();
+    const countInCalls = [];
+    const scheduledRestarts = [];
+    const countInRestarter = createRangeCountInRestarter({
+        transport: {
+            pause: () => countInCalls.push("pause"),
+            play: () => countInCalls.push("play"),
+        },
+        seekBoth: (tick, options) => countInCalls.push(["seek", tick, options]),
+        schedule: (action) => scheduledRestarts.push(action),
+        isPaused: (state) => state === "paused",
+    });
+    countInRestarter.restart(30_720);
+    assert.deepEqual(
+        countInCalls,
+        ["pause", ["seek", 30_720, { reveal: false }]],
+        "per-loop count-in must pause and seek A without guessing when playback can resume"
+    );
+    assert.equal(countInRestarter.handlePlayerState("playing"), false);
+    assert.equal(scheduledRestarts.length, 0, "a late Playing state must not restart count-in");
+    assert.equal(countInRestarter.handlePlayerState("paused"), true);
+    assert.equal(countInRestarter.handlePlayerState("paused"), false);
+    assert.equal(scheduledRestarts.length, 1, "one confirmed pause must schedule one restart");
+    scheduledRestarts[0]();
+    assert.deepEqual(countInCalls.at(-1), "play");
 
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";

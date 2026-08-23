@@ -722,7 +722,46 @@
         seekBoth(committedRange.startTick, { reveal: false });
         return true;
     };
+    const createRangeCountInRestarter = (deps) => {
+        const { transport, seekBoth, schedule, isPaused } = deps;
+        let generation = 0;
+        let waitingForPause = false;
+        const cancel = () => {
+            generation += 1;
+            waitingForPause = false;
+        };
+        const handlePlayerState = (state) => {
+            if (!waitingForPause || !isPaused(state)) return false;
+            waitingForPause = false;
+            const restartGeneration = generation;
+            schedule(() => {
+                if (restartGeneration === generation) transport.play();
+            }, 0);
+            return true;
+        };
+        const restart = (tick) => {
+            const target = Number(tick);
+            if (!Number.isFinite(target)) return false;
+            generation += 1;
+            waitingForPause = true;
+            transport.pause();
+            seekBoth(target, { reveal: false });
+            handlePlayerState();
+            return true;
+        };
+        return { restart, cancel, handlePlayerState };
+    };
+    const rangeCountInRestarter = createRangeCountInRestarter({
+        transport,
+        seekBoth,
+        schedule: window.setTimeout.bind(window),
+        isPaused: (state) => (
+            state?.state === alphaTab.synth.PlayerState.Paused
+            || api.playerState === alphaTab.synth.PlayerState.Paused
+        )
+    });
     const playPauseBoth = () => {
+        rangeCountInRestarter.cancel();
         transport.toggle();
     };
 
@@ -942,6 +981,7 @@
     };
     api.playerStateChanged.on((state) => {
         refreshPendingRangeHighlight();
+        rangeCountInRestarter.handlePlayerState(state);
         post("playerStateChanged", {
             state: transport.isPlayingIntent() ? 1 : 0,
             stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
@@ -1148,6 +1188,7 @@
         },
         loadScore(base64) {
             try {
+                rangeCountInRestarter.cancel();
                 transport.pause();
                 resetPlaybackReadiness();
                 window.riffloopCommittedBars = null;
@@ -1164,8 +1205,8 @@
             }
         },
         playPause() { playPauseBoth(); },
-        pause() { transport.pause(); },
-        stop() { transport.stop(); seekBoth(stopTick()); },
+        pause() { rangeCountInRestarter.cancel(); transport.pause(); },
+        stop() { rangeCountInRestarter.cancel(); transport.stop(); seekBoth(stopTick()); },
         seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
@@ -1257,6 +1298,7 @@
             };
         },
         clearPlaybackRange() {
+            rangeCountInRestarter.cancel();
             pendingRangeHighlight = null;
             committedRange = null;
             rangeLoopingEnabled = false;
@@ -1299,7 +1341,10 @@
         },
         setRangeLoopingEnabled(enabled) {
             rangeLoopingEnabled = Boolean(enabled) && Boolean(committedRange);
-            if (!rangeLoopingEnabled) rangeCompletionAwaitingReset = false;
+            if (!rangeLoopingEnabled) {
+                rangeCompletionAwaitingReset = false;
+                rangeCountInRestarter.cancel();
+            }
             if (rangeLoopingEnabled) wholeSongLoopingEnabled = false;
             applyLoopMode();
             if (rangeLoopingEnabled) {
@@ -1310,16 +1355,16 @@
         },
         setWholeSongLoopingEnabled(enabled) {
             wholeSongLoopingEnabled = Boolean(enabled);
-            if (wholeSongLoopingEnabled) rangeLoopingEnabled = false;
+            if (wholeSongLoopingEnabled) {
+                rangeLoopingEnabled = false;
+                rangeCountInRestarter.cancel();
+            }
             applyLoopMode();
             if (wholeSongLoopingEnabled) restoreScoreScrollPolicy();
         },
         restartRangeWithCountIn() {
             if (!committedRange) return;
-            transport.pause();
-            api.tickPosition = committedRange.startTick;
-            synthApi.tickPosition = committedRange.startTick;
-            setTimeout(transport.play, 50);
+            rangeCountInRestarter.restart(committedRange.startTick);
         },
         cancelRangePreview() {
             const bars = window.riffloopCommittedBars;
@@ -1330,7 +1375,10 @@
             }
         },
         lifecycle(active) {
-            if (!active) transport.pause();
+            if (!active) {
+                rangeCountInRestarter.cancel();
+                transport.pause();
+            }
         }
     };
 

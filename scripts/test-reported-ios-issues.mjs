@@ -26,7 +26,7 @@ assert.match(
 );
 assert.match(
     gpWeb,
-    /pause\(\) \{ transport\.pause\(\); \}/,
+    /pause\(\) \{[\s\S]*?rangeCountInRestarter\.cancel\(\); transport\.pause\(\); \}/,
     "every native pause command must use the coordinated GP transport"
 );
 assert.match(
