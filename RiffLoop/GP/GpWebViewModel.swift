@@ -324,6 +324,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setLoopCountInEnabled(_ enabled: Bool) {
         loopCountInEnabled = enabled
+        call("setLoopCountInEnabled", arguments: [enabled])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -769,6 +770,7 @@ final class GpWebViewModel: ObservableObject {
         call("setSynthEnabled", arguments: [synthEnabled])
         call("setBackingEnabled", arguments: [backingEnabled])
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
+        call("setLoopCountInEnabled", arguments: [loopCountInEnabled])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         for index in mutedTracks { call("setTrackMute", arguments: [index, true]) }
         if let soloTrack { call("setTrackSolo", arguments: [soloTrack, true]) }

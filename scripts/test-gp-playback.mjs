@@ -375,6 +375,21 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
+        /let loopCountInEnabled = false;[\s\S]*?api\.isLooping = Boolean\(\(useRange && !loopCountInEnabled\) \|\| wholeSongLoopingEnabled\)/,
+        "per-loop count-in must disable alphaTab native range wrapping so only one owner can restart at A"
+    );
+    assert.match(
+        source,
+        /setLoopCountInEnabled\(enabled\) \{[\s\S]*?loopCountInEnabled = Boolean\(enabled\);[\s\S]*?applyLoopMode\(\)/,
+        "changing per-loop count-in must immediately switch range-loop ownership"
+    );
+    assert.match(
+        source,
+        /if \(!completeCommittedRangeLoop\(\)\) return false;[\s\S]*?if \(!loopCountInEnabled\)[\s\S]*?seekBoth\(committedRange\.startTick/,
+        "a count-in range boundary must wait for the acknowledged restart instead of seeking while alphaTab is finishing"
+    );
+    assert.match(
+        source,
         /api\.playerPositionChanged\.on\(\(position\) => \{[\s\S]*?if \(enforceCommittedRange\(position\)\) return;/,
         "every player position update must enforce the committed range before bridge throttling"
     );
@@ -401,6 +416,7 @@ assert.doesNotMatch(
         "post",
         "rangeLoopingEnabled",
         "committedRange",
+        "loopCountInEnabled",
         `${loopImplementation}\nreturn { enforceCommittedRange, completeCommittedRangeLoop };`
     );
     const seeks = [];
@@ -409,7 +425,8 @@ assert.doesNotMatch(
         (tick, options) => seeks.push({ tick, options }),
         (event) => posts.push(event),
         true,
-        { startTick: 30720, endTick: 34560 }
+        { startTick: 30720, endTick: 34560 },
+        false
     );
     assert.equal(enforceCommittedRange({ currentTick: 34559, isSeek: false }), false);
     assert.equal(enforceCommittedRange({ currentTick: 34560, isSeek: false }), true);
@@ -458,6 +475,21 @@ assert.doesNotMatch(
     );
     assert.deepEqual(posts, ["rangeLoopCompleted", "rangeLoopCompleted"]);
 
+    const countInBoundaryCalls = [];
+    const countInRange = makeRangeEnforcer(
+        (tick, options) => countInBoundaryCalls.push(["seek", tick, options]),
+        (event) => countInBoundaryCalls.push(["post", event]),
+        true,
+        { startTick: 30720, endTick: 34560 },
+        true
+    );
+    assert.equal(countInRange.enforceCommittedRange({ currentTick: 34563, isSeek: false }), true);
+    assert.deepEqual(
+        countInBoundaryCalls,
+        [["post", "rangeLoopCompleted"]],
+        "a count-in boundary must count once and wait for Swift to apply any ladder speed before restarting"
+    );
+
     const countInStartMarker = "    const createRangeCountInRestarter = (deps) => {";
     const countInEndMarker = "\n    const rangeCountInRestarter";
     const countInStart = source.indexOf(countInStartMarker);
@@ -492,6 +524,21 @@ assert.doesNotMatch(
     assert.equal(scheduledRestarts.length, 1, "one confirmed pause must schedule one restart");
     scheduledRestarts[0]();
     assert.deepEqual(countInCalls.at(-1), "play");
+
+    const swiftViewModel = readFileSync(
+        new URL("../RiffLoop/GP/GpWebViewModel.swift", import.meta.url),
+        "utf8"
+    );
+    assert.match(
+        swiftViewModel,
+        /func setLoopCountInEnabled\(_ enabled: Bool\)[\s\S]*?call\("setLoopCountInEnabled", arguments: \[enabled\]\)/,
+        "Swift must send loop ownership to the local JS player"
+    );
+    assert.match(
+        swiftViewModel,
+        /private func recordLoopCompletion\(\)[\s\S]*?call\("restartRangeWithCountIn"\)/,
+        "Swift must apply the completed-loop speed update before acknowledging one count-in restart"
+    );
 
     const startMarker = "    const isPlaybackReady = (state) =>";
     const endMarker = "\n    const notifyPlayerReady";

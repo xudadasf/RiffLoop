@@ -267,6 +267,7 @@
     let committedRange = null;
     let rangeLoopingEnabled = false;
     let wholeSongLoopingEnabled = false;
+    let loopCountInEnabled = false;
     let loadedScoreBytes = null;
     let metronomeSubdivisionFactor = 1;
     let metronomeMasterVolume = 0;
@@ -635,8 +636,8 @@
         } : null;
         api.playbackRange = range;
         synthApi.playbackRange = range ? { ...range } : null;
-        api.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
-        synthApi.isLooping = Boolean(useRange || wholeSongLoopingEnabled);
+        api.isLooping = Boolean((useRange && !loopCountInEnabled) || wholeSongLoopingEnabled);
+        synthApi.isLooping = Boolean((useRange && !loopCountInEnabled) || wholeSongLoopingEnabled);
     };
     const loopScrollPlan = (rangeTop, rangeBottom, viewportHeight) => {
         const rangeHeight = Math.max(0, Number(rangeBottom) - Number(rangeTop));
@@ -719,7 +720,9 @@
             || Number(position.currentTick) < committedRange.endTick
         ) return false;
         if (!completeCommittedRangeLoop()) return false;
-        seekBoth(committedRange.startTick, { reveal: false });
+        if (!loopCountInEnabled) {
+            seekBoth(committedRange.startTick, { reveal: false });
+        }
         return true;
     };
     const createRangeCountInRestarter = (deps) => {
@@ -1268,6 +1271,11 @@
             api.countInVolume = countInMasterVolume;
             synthApi.countInVolume = 0;
         },
+        setLoopCountInEnabled(enabled) {
+            loopCountInEnabled = Boolean(enabled);
+            if (!loopCountInEnabled) rangeCountInRestarter.cancel();
+            applyLoopMode();
+        },
         showTracks(indices) {
             if (!api.score) return;
             const tracks = indices
@@ -1363,7 +1371,7 @@
             if (wholeSongLoopingEnabled) restoreScoreScrollPolicy();
         },
         restartRangeWithCountIn() {
-            if (!committedRange) return;
+            if (!committedRange || !loopCountInEnabled) return;
             rangeCountInRestarter.restart(committedRange.startTick);
         },
         cancelRangePreview() {
