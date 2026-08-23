@@ -175,9 +175,14 @@ final class PracticeViewModel: ObservableObject {
             loopEnabled = false
             return
         }
+        let loopEntryTarget = enabled ? pointA : nil
         loopEnabled = enabled
+        completedLoops = 0
         rebuildLoopBoundaryObserver()
         saveProfile()
+        if let loopEntryTarget {
+            seek(to: loopEntryTarget)
+        }
     }
 
     func applyTimingSettings() {
@@ -204,6 +209,7 @@ final class PracticeViewModel: ObservableObject {
 
     func setPlaybackRate(_ rate: Float) {
         playbackRate = min(max(rate, 0.25), 1.5)
+        completedLoops = 0
         highestPlaybackRate = max(highestPlaybackRate, playbackRate)
         saveProfile()
         restartAfterTimingChange()

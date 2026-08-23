@@ -25,10 +25,11 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Test embedded GP playback policy
+      - name: Test playback policies
         run: |
           node scripts/test-gp-playback.mjs
           node scripts/test-gp-display.mjs
+          node scripts/test-video-mode.mjs
 
       - name: Build unsigned arm64 device app
         run: >-

@@ -10,6 +10,7 @@ on:
       - "scripts/test-gp-playback.mjs"
       - "scripts/test-gp-display.mjs"
       - "scripts/test-reported-ios-issues.mjs"
+      - "scripts/test-video-mode.mjs"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   pull_request:
@@ -20,6 +21,7 @@ on:
       - "scripts/test-gp-playback.mjs"
       - "scripts/test-gp-display.mjs"
       - "scripts/test-reported-ios-issues.mjs"
+      - "scripts/test-video-mode.mjs"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
@@ -46,11 +48,12 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Test embedded GP playback policy
+      - name: Test playback policies
         run: |
           node scripts/test-gp-playback.mjs
           node scripts/test-gp-display.mjs
           node scripts/test-reported-ios-issues.mjs
+          node scripts/test-video-mode.mjs
 
       - name: Show tool versions
         run: |

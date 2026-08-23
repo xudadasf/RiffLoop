@@ -30,6 +30,16 @@ struct PracticeView: View {
                         compactControls.padding(12)
                     }
                 }
+                .overlay(alignment: .bottomLeading) {
+                    if viewModel.loopEnabled, !viewModel.isPlaying {
+                        Button(action: viewModel.clearLoop) {
+                            Label("退出 A/B 循环", systemImage: "xmark.circle.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                        .padding(16)
+                    }
+                }
             if controlsVisible {
                 sideControls
                     .frame(width: 360)
@@ -137,7 +147,7 @@ struct PracticeView: View {
                 get: { viewModel.playbackRate },
                 set: { viewModel.setPlaybackRate($0) }
             )) {
-                ForEach(rates, id: \.self) { Text(rateLabel($0)).tag($0) }
+                ForEach(rates, id: \.self) { Text("手动 \(rateLabel($0))").tag($0) }
             }
             .pickerStyle(.menu)
         }
@@ -179,7 +189,7 @@ struct PracticeView: View {
                     set: { viewModel.setSpeedLadderStep($0) }
                 )) {
                     ForEach([Float(0.02), 0.05, 0.1], id: \.self) {
-                        Text("+\(Int(($0 * 100).rounded()))%").tag($0)
+                        Text("每次 +\(Int(($0 * 100).rounded())) 个百分点").tag($0)
                     }
                 }
                 Picker("目标速度", selection: Binding(
@@ -187,9 +197,17 @@ struct PracticeView: View {
                     set: { viewModel.setSpeedLadderTarget($0) }
                 )) {
                     ForEach([Float(0.8), 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
-                        Text("\(Int(($0 * 100).rounded()))%").tag($0)
+                        Text("目标 \(Int(($0 * 100).rounded()))%（\(rateLabel($0))）").tag($0)
                     }
                 }
+                Text(
+                    "阶梯说明：从当前手动速度开始，每完成 \(viewModel.loopsPerSpeedStep) 轮，"
+                        + "增加 \(Int((viewModel.speedLadderStep * 100).rounded())) 个百分点，"
+                        + "直到 \(Int((viewModel.speedLadderTarget * 100).rounded()))%；"
+                        + "当前已达到目标时不会改变速度。"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -619,7 +637,7 @@ struct PracticeView: View {
     }
 
     private func rateLabel(_ rate: Float) -> String {
-        String(format: "%.2g×", rate)
+        String(format: "%.2f×", rate)
     }
 
     private func open(_ url: URL) {

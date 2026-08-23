@@ -53,6 +53,7 @@ final class MetronomeEngine {
     private var kickClick: AVAudioPCMBuffer!
     private var snareClick: AVAudioPCMBuffer!
     private var scheduler: DispatchSourceTimer?
+    private var schedulerGeneration: UInt64?
     private var timeline: BeatTimeline?
     private var anchor: TransportAnchor?
     private var rhythmMode: RhythmMode = .click
@@ -114,18 +115,22 @@ final class MetronomeEngine {
             playerNode.stop()
             scheduler?.cancel()
             scheduler = nil
+            schedulerGeneration = nil
         }
     }
 
     private func startSchedulerIfNeeded() {
-        guard scheduler == nil else { return }
+        guard scheduler == nil || schedulerGeneration != generation else { return }
 
-        let schedulerGeneration = generation
+        scheduler?.cancel()
+        scheduler = nil
+        schedulerGeneration = generation
+        let expectedGeneration = generation
         let timer = DispatchSource.makeTimerSource(queue: schedulingQueue)
         timer.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
         timer.setEventHandler { [weak self] in
             guard let self else { return }
-            self.scheduleAvailableEvents(generation: schedulerGeneration)
+            self.scheduleAvailableEvents(generation: expectedGeneration)
         }
         timer.resume()
         scheduler = timer
