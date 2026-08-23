@@ -12,6 +12,12 @@ final class TransportAnchorTests: XCTestCase {
         XCTAssertEqual(anchor.hostTime(forMediaTime: 12.5), 105, accuracy: 1e-12)
     }
 
+    func testHostClockCanAdvanceAMetronomeOnlyMediaTimeline() {
+        let anchor = TransportAnchor(mediaTime: 10, hostTime: 100, mediaRate: 0.5)
+
+        XCTAssertEqual(anchor.mediaTime(forHostTime: 105), 12.5, accuracy: 1e-12)
+    }
+
     func testLoopReanchorDoesNotCarryPreviousLoopError() {
         let firstLoop = TransportAnchor(mediaTime: 20, hostTime: 100, mediaRate: 1)
         let nextLoop = TransportAnchor(mediaTime: 20, hostTime: 110.125, mediaRate: 1)

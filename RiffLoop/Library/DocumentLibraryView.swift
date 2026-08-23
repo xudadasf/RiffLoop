@@ -69,10 +69,16 @@ struct DocumentLibraryView: View {
     @State private var isImporterPresented = false
     @State private var filePendingDeletion: URL?
     let onSelect: (URL) -> Void
+    let onDelete: (URL) -> Void
 
-    init(kind: PracticeKind, onSelect: @escaping (URL) -> Void) {
+    init(
+        kind: PracticeKind,
+        onSelect: @escaping (URL) -> Void,
+        onDelete: @escaping (URL) -> Void = { _ in }
+    ) {
         _model = StateObject(wrappedValue: DocumentLibraryModel(kind: kind))
         self.onSelect = onSelect
+        self.onDelete = onDelete
     }
 
     var body: some View {
@@ -113,17 +119,15 @@ struct DocumentLibraryView: View {
                             }
                             .buttonStyle(.plain)
 
-                            if model.kind == .guitarPro || model.kind == .video {
-                                Button(role: .destructive) {
-                                    filePendingDeletion = fileURL
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                        .labelStyle(.iconOnly)
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(.red)
-                                .accessibilityLabel("删除 \(fileURL.lastPathComponent)")
+                            Button(role: .destructive) {
+                                filePendingDeletion = fileURL
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                                    .labelStyle(.iconOnly)
                             }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                            .accessibilityLabel("删除 \(fileURL.lastPathComponent)")
                         }
                     }
                 }
@@ -164,6 +168,7 @@ struct DocumentLibraryView: View {
                             kind: model.kind,
                             fileName: fileURL.lastPathComponent
                         )
+                        onDelete(fileURL)
                     }
                     filePendingDeletion = nil
                 }

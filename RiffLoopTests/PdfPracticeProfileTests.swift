@@ -14,6 +14,14 @@ final class PdfPracticeProfileTests: XCTestCase {
         XCTAssertEqual(profile.speedLadderStep, 0.05)
     }
 
+    func testLegacyProfileWithoutBeatOffsetDefaultsBeatOneToAudioStart() throws {
+        let data = Data(#"{"pageIndex":0}"#.utf8)
+
+        let profile = try JSONDecoder().decode(PdfPracticeProfile.self, from: data)
+
+        XCTAssertEqual(profile.beatOffset, 0)
+    }
+
     func testExtendedProfileRoundTrips() throws {
         let profile = PdfPracticeProfile(
             loopEnabled: true,

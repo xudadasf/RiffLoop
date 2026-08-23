@@ -55,7 +55,10 @@ struct RiffLoopDocumentStore {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-        .filter { extensions.contains($0.pathExtension.lowercased()) }
+        .filter { url in
+            extensions.contains(url.pathExtension.lowercased())
+                && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
         .sorted {
             $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
         }

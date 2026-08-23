@@ -103,7 +103,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         playbackRate = try values.decodeIfPresent(Float.self, forKey: .playbackRate) ?? 1
         audioVolume = try values.decodeIfPresent(Float.self, forKey: .audioVolume) ?? 0.75
         bpm = try values.decodeIfPresent(Double.self, forKey: .bpm) ?? 120
-        beatOffset = try values.decodeIfPresent(TimeInterval.self, forKey: .beatOffset)
+        beatOffset = try values.decodeIfPresent(TimeInterval.self, forKey: .beatOffset) ?? 0
         synchronizationOffset = try values.decodeIfPresent(Double.self, forKey: .synchronizationOffset) ?? 0
         metronomeEnabled = try values.decodeIfPresent(Bool.self, forKey: .metronomeEnabled) ?? true
         metronomeVolume = try values.decodeIfPresent(Float.self, forKey: .metronomeVolume) ?? 1

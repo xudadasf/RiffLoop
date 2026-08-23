@@ -29,7 +29,9 @@ jobs:
         run: |
           node scripts/test-gp-playback.mjs
           node scripts/test-gp-display.mjs
+          node scripts/test-reported-ios-issues.mjs
           node scripts/test-video-mode.mjs
+          node scripts/test-pdf-mode.mjs
 
       - name: Build unsigned arm64 device app
         run: >-

@@ -314,11 +314,15 @@ struct HomeView: View {
     }
 
     private func mostRecentURL(for kind: PracticeKind) -> URL? {
-        guard let project = recentProjects.mostRecent(kind: kind) else { return nil }
-        let url = RiffLoopDocumentStore()
-            .folderURL(for: kind)
-            .appendingPathComponent(project.fileName)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        let folder = RiffLoopDocumentStore().folderURL(for: kind)
+        return recentProjects.projects
+            .lazy
+            .filter { $0.kind == kind }
+            .map { folder.appendingPathComponent($0.fileName) }
+            .first { url in
+                kind.supportedExtensions.contains(url.pathExtension.lowercased())
+                    && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            }
     }
 
     private func practiceCard<Destination: View>(

@@ -76,8 +76,8 @@ check("enabling beat snap rewrites existing A/B values", () => {
     assert.match(viewSource, /set: \{ viewModel\.setSnapLoopPointsToBeat\(\$0\) \}/);
 });
 
-check("the video library exposes the same deletion action as GP", () => {
-    assert.match(librarySource, /model\.kind == \.guitarPro \|\| model\.kind == \.video/);
+check("the shared library exposes deletion for every practice mode", () => {
+    assert.doesNotMatch(librarySource, /model\.kind == \.guitarPro \|\| model\.kind == \.video/);
     assert.match(librarySource, /model\.deleteFile\(fileURL\)/);
     assert.match(librarySource, /recentProjects\.remove\(/);
 });

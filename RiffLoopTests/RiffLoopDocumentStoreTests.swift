@@ -67,6 +67,17 @@ final class RiffLoopDocumentStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: first), Data([1, 2, 3]))
     }
 
+    func testPdfAudioLibraryIgnoresDirectoriesWithAudioExtensions() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+        try store.prepareDirectories()
+        try FileManager.default.createDirectory(
+            at: store.folderURL(for: .pdf).appendingPathComponent("不是伴奏.mp3"),
+            withIntermediateDirectories: false
+        )
+
+        XCTAssertTrue(try store.pdfAudioFiles().isEmpty)
+    }
+
     func testDeleteFileRemovesAFileInsideTheRequestedLibrary() throws {
         let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
         try store.prepareDirectories()
@@ -75,6 +86,18 @@ final class RiffLoopDocumentStoreTests: XCTestCase {
         try Data([1, 2, 3]).write(to: file)
 
         try store.deleteFile(file, for: .guitarPro)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func testDeleteFileSupportsPdfLibraryFiles() throws {
+        let store = RiffLoopDocumentStore(documentsURL: temporaryRoot)
+        try store.prepareDirectories()
+        let file = store.folderURL(for: .pdf)
+            .appendingPathComponent("待删除.pdf")
+        try Data([0x25, 0x50, 0x44, 0x46]).write(to: file)
+
+        try store.deleteFile(file, for: .pdf)
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }

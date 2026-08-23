@@ -26,9 +26,11 @@ struct PdfPracticeView: View {
                     document: document,
                     pageIndex: viewModel.pageIndex,
                     scaleFactor: viewModel.scaleFactor,
+                    verticalProgress: viewModel.verticalProgress,
                     requestedProgress: viewModel.requestedProgress,
                     onPageChanged: viewModel.setPage,
                     onProgressChanged: viewModel.setVerticalProgress,
+                    onScaleChanged: viewModel.setScale,
                     onManualInteraction: {
                         revealControls()
                         viewModel.manualViewportInteraction()
@@ -36,24 +38,29 @@ struct PdfPracticeView: View {
                 )
                 .ignoresSafeArea(edges: .bottom)
             } else {
-                ContentUnavailableView(
-                    "选择 PDF 开始练习",
-                    systemImage: "doc.richtext",
-                    description: Text("文件保存在“在我的 iPad/RiffLoop/PDF”中。")
-                )
+                ContentUnavailableView {
+                    Label("选择 PDF 开始练习", systemImage: "doc.richtext")
+                } description: {
+                    Text("从 RiffLoop 的 PDF 文件库选择，或从 Files 导入新文件。")
+                } actions: {
+                    Button("选择或导入 PDF") { pdfLibraryPresented = true }
+                        .buttonStyle(.borderedProminent)
+                }
             }
 
-            if controlsVisible {
-                overlayControls
-                    .transition(.opacity)
-                    .zIndex(2)
-            } else {
-                Button("控制", action: openPracticePanel)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.black.opacity(0.72))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(8)
-                    .zIndex(2)
+            if viewModel.document != nil {
+                if controlsVisible {
+                    overlayControls
+                        .transition(.opacity)
+                        .zIndex(2)
+                } else {
+                    Button("控制", action: openPracticePanel)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.black.opacity(0.72))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(8)
+                        .zIndex(2)
+                }
             }
 
             if expandedControls {
@@ -67,8 +74,19 @@ struct PdfPracticeView: View {
         }
         .navigationTitle(viewModel.pdfFileName ?? "PDF 谱面")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { pdfLibraryPresented = true } label: {
+                    Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
+                }
+            }
+        }
         .sheet(isPresented: $pdfLibraryPresented) {
-            DocumentLibraryView(kind: .pdf, onSelect: openPdf)
+            DocumentLibraryView(
+                kind: .pdf,
+                onSelect: openPdf,
+                onDelete: handleDeletedPdf
+            )
         }
         .sheet(isPresented: $audioLibraryPresented) {
             PdfAudioLibraryView { viewModel.bindAudio(at: $0) }
@@ -101,19 +119,31 @@ struct PdfPracticeView: View {
     private var overlayControls: some View {
         VStack {
             HStack {
-                Button("文件") { pdfLibraryPresented = true }
+                Button("更换 PDF") { pdfLibraryPresented = true }
                 Spacer()
                 Button("控制", action: openPracticePanel)
             }
             Spacer()
             HStack(spacing: 10) {
-                Button("上一页") { viewModel.setPage(viewModel.pageIndex - 1) }
+                Button("上一页") {
+                    viewModel.manualViewportInteraction()
+                    viewModel.setPage(viewModel.pageIndex - 1)
+                }
                     .disabled(viewModel.pageIndex == 0)
-                Button("−") { viewModel.setScale(viewModel.scaleFactor - 0.25) }
+                Button("−") {
+                    viewModel.manualViewportInteraction()
+                    viewModel.setScale(viewModel.scaleFactor - 0.25)
+                }
                 Text("\(viewModel.pageIndex + 1)/\(max(1, viewModel.pageCount)) · \(Int(viewModel.scaleFactor * 100))%")
                     .monospacedDigit()
-                Button("+") { viewModel.setScale(viewModel.scaleFactor + 0.25) }
-                Button("下一页") { viewModel.setPage(viewModel.pageIndex + 1) }
+                Button("+") {
+                    viewModel.manualViewportInteraction()
+                    viewModel.setScale(viewModel.scaleFactor + 0.25)
+                }
+                Button("下一页") {
+                    viewModel.manualViewportInteraction()
+                    viewModel.setPage(viewModel.pageIndex + 1)
+                }
                     .disabled(viewModel.pageIndex + 1 >= viewModel.pageCount)
                 Spacer()
                 Button(readingButtonTitle, action: handleReadingButton)
@@ -248,7 +278,11 @@ struct PdfPracticeView: View {
                     get: { viewModel.speedLadderTarget },
                     set: { viewModel.setSpeedLadderTarget($0) }
                 )) {
-                    ForEach([Float(0.8), 0.9, 1, 1.1, 1.25, 1.5], id: \.self) {
+                    ForEach(
+                        [Float(0.8), 0.9, 1, 1.1, 1.25, 1.5]
+                            .filter { $0 >= viewModel.playbackRate },
+                        id: \.self
+                    ) {
                         Text("\(Int(($0 * 100).rounded()))%").tag($0)
                     }
                 }
@@ -395,9 +429,20 @@ struct PdfPracticeView: View {
     }
 
     private func openPdf(_ url: URL) {
-        viewModel.openPdf(at: url)
-        recentProjects.opened(kind: .pdf, fileName: url.lastPathComponent)
-        revealControls()
+        if viewModel.openPdf(at: url) {
+            recentProjects.opened(kind: .pdf, fileName: url.lastPathComponent)
+            revealControls()
+        } else {
+            recentProjects.remove(kind: .pdf, fileName: url.lastPathComponent)
+        }
+    }
+
+    private func handleDeletedPdf(_ url: URL) {
+        guard viewModel.pdfWasDeleted(at: url) else { return }
+        withAnimation {
+            expandedControls = false
+            controlsVisible = true
+        }
     }
 
     private func revealControls() {

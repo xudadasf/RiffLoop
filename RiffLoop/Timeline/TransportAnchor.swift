@@ -9,5 +9,9 @@ struct TransportAnchor: Equatable, Sendable {
         precondition(mediaRate > 0)
         return hostTime + (targetMediaTime - mediaTime) / mediaRate
     }
-}
 
+    func mediaTime(forHostTime targetHostTime: TimeInterval) -> TimeInterval {
+        precondition(mediaRate > 0)
+        return mediaTime + (targetHostTime - hostTime) * mediaRate
+    }
+}

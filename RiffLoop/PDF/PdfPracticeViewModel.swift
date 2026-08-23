@@ -54,8 +54,18 @@ final class PdfPracticeViewModel: ObservableObject {
     private let metronome = MetronomeEngine()
     private var periodicObserver: Any?
     private var boundaryObserver: Any?
+    private var endObserver: NSObjectProtocol?
+    private var failureObserver: NSObjectProtocol?
+    private var interruptionObserver: NSObjectProtocol?
+    private var metronomeOnlyTimer: Timer?
+    private var countInStopTask: Task<Void, Never>?
+    private var viewportSaveTask: Task<Void, Never>?
+    private var activeTransportAnchor: TransportAnchor?
     private var lastPracticeSampleDate: Date?
+    private var lastProfileSaveDate = Date.distantPast
     private var isLoopTransitioning = false
+    private var transportGeneration: UInt64 = 0
+    private var speedLadderBaseRate: Float?
 
     var isPlaying: Bool { isAudioPlaying || isMetronomePlaying }
 
@@ -68,21 +78,41 @@ final class PdfPracticeViewModel: ObservableObject {
                 self?.timeChanged(time.seconds)
             }
         }
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard
+                let rawValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                AVAudioSession.InterruptionType(rawValue: rawValue) == .began
+            else { return }
+            Task { @MainActor [weak self] in self?.pause() }
+        }
     }
 
     deinit {
         MainActor.assumeIsolated {
             if let periodicObserver { player.removeTimeObserver(periodicObserver) }
             if let boundaryObserver { player.removeTimeObserver(boundaryObserver) }
+            removeItemObservers()
+            if let interruptionObserver {
+                NotificationCenter.default.removeObserver(interruptionObserver)
+            }
+            metronomeOnlyTimer?.invalidate()
+            countInStopTask?.cancel()
+            viewportSaveTask?.cancel()
         }
     }
 
-    func openPdf(at url: URL) {
-        guard let document = PDFDocument(url: url) else {
+    @discardableResult
+    func openPdf(at url: URL) -> Bool {
+        guard let document = PDFDocument(url: url), document.pageCount > 0 else {
             message = "PDF 无法打开，请重新选择文件。"
-            return
+            return false
         }
         pause()
+        resetAudioItem()
         self.document = document
         pdfFileName = url.lastPathComponent
         pageCount = document.pageCount
@@ -100,16 +130,22 @@ final class PdfPracticeViewModel: ObservableObject {
                 bindAudio(at: audioURL, restoringPosition: profile.audioPosition)
             } else {
                 self.audioFileName = nil
+                save()
             }
         }
         save()
+        return true
     }
 
     func bindAudio(at url: URL, restoringPosition: TimeInterval = 0) {
         pause()
+        removeItemObservers()
         audioFileName = url.lastPathComponent
-        player.replaceCurrentItem(with: AVPlayerItem(url: url))
+        let item = AVPlayerItem(url: url)
+        player.replaceCurrentItem(with: item)
+        observe(item)
         currentTime = max(0, restoringPosition)
+        duration = 0
         player.seek(to: cmTime(currentTime), toleranceBefore: .zero, toleranceAfter: .zero)
         player.volume = audioVolume
         rebuildBoundaryObserver()
@@ -118,14 +154,46 @@ final class PdfPracticeViewModel: ObservableObject {
 
     func removeAudio() {
         pause()
-        player.replaceCurrentItem(with: nil)
-        audioFileName = nil
-        currentTime = 0
-        duration = 0
+        resetAudioItem()
         pointA = nil
         pointB = nil
         loopEnabled = false
         save()
+    }
+
+    @discardableResult
+    func pdfWasDeleted(at url: URL) -> Bool {
+        guard pdfFileName == url.lastPathComponent else { return false }
+        transportGeneration &+= 1
+        recordPracticeTime()
+        pdfFileName = nil
+        player.pause()
+        metronome.stop()
+        stopMetronomeOnlyClock()
+        countInStopTask?.cancel()
+        countInStopTask = nil
+        viewportSaveTask?.cancel()
+        viewportSaveTask = nil
+        activeTransportAnchor = nil
+        isLoopTransitioning = false
+        isAudioPlaying = false
+        isMetronomePlaying = false
+        lastPracticeSampleDate = nil
+        resetAudioItem()
+        document = nil
+        pageCount = 0
+        pageIndex = 0
+        scaleFactor = 1
+        verticalProgress = 0
+        requestedProgress = nil
+        readingPoints = []
+        isRecordingReadingTrack = false
+        isAutoFollowing = false
+        autoFollowSuspended = false
+        pointA = nil
+        pointB = nil
+        loopEnabled = false
+        return true
     }
 
     func togglePlayback() {
@@ -158,9 +226,15 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        transportGeneration &+= 1
         recordPracticeTime()
         player.pause()
         metronome.stop()
+        stopMetronomeOnlyClock()
+        countInStopTask?.cancel()
+        countInStopTask = nil
+        activeTransportAnchor = nil
+        isLoopTransitioning = false
         isAudioPlaying = false
         isMetronomePlaying = false
         lastPracticeSampleDate = nil
@@ -168,16 +242,28 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pauseAudio() {
+        transportGeneration &+= 1
         recordPracticeTime()
+        countInStopTask?.cancel()
+        countInStopTask = nil
         player.pause()
+        isLoopTransitioning = false
         isAudioPlaying = false
+        if isMetronomePlaying, let activeTransportAnchor {
+            startMetronomeOnlyClock(anchor: activeTransportAnchor)
+        }
         lastPracticeSampleDate = isPlaying ? Date() : nil
         save()
     }
 
     func pauseMetronome() {
+        transportGeneration &+= 1
         recordPracticeTime()
+        countInStopTask?.cancel()
+        countInStopTask = nil
         metronome.stop()
+        stopMetronomeOnlyClock()
+        activeTransportAnchor = nil
         isMetronomePlaying = false
         lastPracticeSampleDate = isPlaying ? Date() : nil
         save()
@@ -185,10 +271,15 @@ final class PdfPracticeViewModel: ObservableObject {
 
     func stopAudio() {
         pauseAudio()
+        let generation = transportGeneration
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) {
             [weak self] finished in
             Task { @MainActor [weak self] in
-                guard let self, finished else { return }
+                guard
+                    let self,
+                    finished,
+                    self.transportGeneration == generation
+                else { return }
                 self.currentTime = 0
                 self.save()
             }
@@ -201,12 +292,19 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func seek(to seconds: TimeInterval) {
+        transportGeneration &+= 1
+        isLoopTransitioning = false
+        let generation = transportGeneration
         let target = duration > 0 ? min(max(seconds, 0), duration) : max(seconds, 0)
         let resumeAudio = isAudioPlaying
         let resumeMetronome = isMetronomePlaying
         recordPracticeTime()
         player.pause()
         metronome.stop()
+        stopMetronomeOnlyClock()
+        countInStopTask?.cancel()
+        countInStopTask = nil
+        activeTransportAnchor = nil
         isAudioPlaying = false
         isMetronomePlaying = false
         guard player.currentItem != nil else {
@@ -218,6 +316,7 @@ final class PdfPracticeViewModel: ObservableObject {
             [weak self] finished in
             Task { @MainActor [weak self] in
                 guard let self, finished else { return }
+                guard self.transportGeneration == generation else { return }
                 self.currentTime = target
                 if resumeAudio || resumeMetronome {
                     self.startPlayback(audio: resumeAudio, metronome: resumeMetronome)
@@ -277,6 +376,11 @@ final class PdfPracticeViewModel: ObservableObject {
 
     func setPlaybackRate(_ rate: Float) {
         playbackRate = min(max(rate, 0.25), 1.5)
+        if speedLadderEnabled {
+            speedLadderBaseRate = playbackRate
+        }
+        speedLadderTarget = max(speedLadderTarget, playbackRate)
+        completedLoops = 0
         highestPlaybackRate = max(highestPlaybackRate, playbackRate)
         updateAudioSettings()
     }
@@ -317,13 +421,21 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
+        guard speedLadderEnabled != enabled else { return }
+        if enabled {
+            speedLadderBaseRate = playbackRate
+            speedLadderTarget = max(speedLadderTarget, playbackRate)
+        } else {
+            playbackRate = speedLadderBaseRate ?? playbackRate
+            speedLadderBaseRate = nil
+        }
         speedLadderEnabled = enabled
         completedLoops = 0
-        save()
+        updateAudioSettings()
     }
 
     func setSpeedLadderTarget(_ target: Float) {
-        speedLadderTarget = min(max(target, 0.25), 1.5)
+        speedLadderTarget = min(max(target, playbackRate), 1.5)
         completedLoops = 0
         save()
     }
@@ -355,6 +467,7 @@ final class PdfPracticeViewModel: ObservableObject {
     func setVerticalProgress(_ progress: Double) {
         verticalProgress = min(max(progress, 0), 1)
         if isRecordingReadingTrack { captureReadingPoint() }
+        scheduleViewportSave()
     }
 
     func manualViewportInteraction() {
@@ -390,6 +503,7 @@ final class PdfPracticeViewModel: ObservableObject {
         isAutoFollowing.toggle()
         autoFollowSuspended = false
         message = isAutoFollowing ? "自动跟谱已开启。" : "自动跟谱已关闭。"
+        if isAutoFollowing { updateAutoFollow() }
     }
 
     func resumeAutoFollow() {
@@ -410,15 +524,22 @@ final class PdfPracticeViewModel: ObservableObject {
     private func startPlayback(
         audio shouldPlayAudio: Bool,
         metronome shouldPlayMetronome: Bool,
-        includeCountIn: Bool = false
+        includeCountIn: Bool = false,
+        stopMetronomeAfterCountIn: Bool = false
     ) {
         let startAudio = shouldPlayAudio && player.currentItem != nil
         let startMetronome = shouldPlayMetronome && metronomeEnabled && beatOffset != nil
         guard startAudio || startMetronome else { return }
 
+        transportGeneration &+= 1
+        let generation = transportGeneration
+        isLoopTransitioning = false
         recordPracticeTime()
+        player.currentItem?.cancelPendingSeeks()
         player.pause()
         metronome.stop()
+        stopMetronomeOnlyClock()
+        countInStopTask?.cancel()
 
         let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
         let countInMediaDuration = includeCountIn && startMetronome
@@ -467,17 +588,41 @@ final class PdfPracticeViewModel: ObservableObject {
 
         isAudioPlaying = startAudio
         isMetronomePlaying = metronomeStarted
+        activeTransportAnchor = metronomeStarted ? anchor : nil
+        if metronomeStarted, !startAudio {
+            startMetronomeOnlyClock(anchor: anchor)
+        }
+        if metronomeStarted, startAudio, includeCountIn, stopMetronomeAfterCountIn {
+            let delay = max(0, anchor.hostTime(forMediaTime: currentTime) - hostNow.seconds)
+            countInStopTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(delay))
+                guard
+                    !Task.isCancelled,
+                    let self,
+                    self.transportGeneration == generation,
+                    self.isAudioPlaying
+                else { return }
+                self.metronome.stop()
+                self.isMetronomePlaying = false
+                self.activeTransportAnchor = nil
+                self.lastPracticeSampleDate = self.isPlaying ? Date() : nil
+                self.save()
+            }
+        }
         lastPracticeSampleDate = isPlaying ? Date() : nil
         save()
     }
 
     private func timeChanged(_ seconds: TimeInterval) {
         recordPracticeTime()
-        if seconds.isFinite { currentTime = max(0, seconds) }
+        if isAudioPlaying, seconds.isFinite { currentTime = max(0, seconds) }
         if let item = player.currentItem, item.duration.seconds.isFinite {
             duration = max(0, item.duration.seconds)
         }
         updateAutoFollow()
+        if isPlaying, Date().timeIntervalSince(lastProfileSaveDate) >= 2 {
+            save()
+        }
     }
 
     private func updateAutoFollow() {
@@ -487,6 +632,7 @@ final class PdfPracticeViewModel: ObservableObject {
             let target = pdfReadingTarget(at: currentTime, points: readingPoints)
         else { return }
         pageIndex = min(max(target.pageIndex, 0), max(0, pageCount - 1))
+        verticalProgress = target.verticalProgress
         requestedProgress = target.verticalProgress
     }
 
@@ -528,6 +674,8 @@ final class PdfPracticeViewModel: ObservableObject {
         else { return }
 
         isLoopTransitioning = true
+        transportGeneration &+= 1
+        let generation = transportGeneration
         let update = speedAfterCompletedLoop(
             currentSpeed: Double(playbackRate),
             targetSpeed: Double(speedLadderTarget),
@@ -544,12 +692,17 @@ final class PdfPracticeViewModel: ObservableObject {
         let resumeMetronome = isMetronomePlaying
         player.pause()
         metronome.stop()
+        stopMetronomeOnlyClock()
+        countInStopTask?.cancel()
         isAudioPlaying = false
         isMetronomePlaying = false
         player.seek(to: cmTime(pointA), toleranceBefore: .zero, toleranceAfter: .zero) {
             [weak self] finished in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard
+                    let self,
+                    self.transportGeneration == generation
+                else { return }
                 self.isLoopTransitioning = false
                 guard finished, self.loopEnabled else {
                     self.pause()
@@ -558,8 +711,9 @@ final class PdfPracticeViewModel: ObservableObject {
                 self.currentTime = pointA
                 self.startPlayback(
                     audio: true,
-                    metronome: resumeMetronome,
-                    includeCountIn: self.loopCountInEnabled
+                    metronome: resumeMetronome || self.loopCountInEnabled,
+                    includeCountIn: self.loopCountInEnabled,
+                    stopMetronomeAfterCountIn: self.loopCountInEnabled && !resumeMetronome
                 )
             }
         }
@@ -580,13 +734,15 @@ final class PdfPracticeViewModel: ObservableObject {
         verticalProgress = min(max(profile.verticalProgress, 0), 1)
         requestedProgress = verticalProgress
         audioFileName = profile.audioFileName
-        playbackRate = profile.playbackRate
-        audioVolume = profile.audioVolume
-        bpm = profile.bpm
+        currentTime = max(0, profile.audioPosition)
+        duration = 0
+        playbackRate = min(max(profile.playbackRate, 0.25), 1.5)
+        audioVolume = min(max(profile.audioVolume, 0), 1)
+        bpm = min(max(profile.bpm, 30), 300)
         beatOffset = profile.beatOffset
-        synchronizationOffset = profile.synchronizationOffset
+        synchronizationOffset = min(max(profile.synchronizationOffset, -0.5), 0.5)
         metronomeEnabled = profile.metronomeEnabled
-        metronomeVolume = profile.metronomeVolume
+        metronomeVolume = min(max(profile.metronomeVolume, 0), 1)
         subdivision = profile.subdivision
         beatsPerMeasure = min(max(profile.beatsPerMeasure, 1), 16)
         beatGrouping = profile.beatGrouping.reduce(0, +) == beatsPerMeasure
@@ -603,7 +759,8 @@ final class PdfPracticeViewModel: ObservableObject {
             && profile.pointB.map { $0 > (profile.pointA ?? 0) } == true
         loopCountInEnabled = profile.loopCountInEnabled
         speedLadderEnabled = profile.speedLadderEnabled
-        speedLadderTarget = min(max(profile.speedLadderTarget, 0.25), 1.5)
+        speedLadderBaseRate = speedLadderEnabled ? playbackRate : nil
+        speedLadderTarget = min(max(profile.speedLadderTarget, playbackRate), 1.5)
         loopsPerSpeedStep = min(max(profile.loopsPerSpeedStep, 1), 10)
         speedLadderStep = min(max(profile.speedLadderStep, 0.01), 0.25)
         accumulatedPracticeTime = max(0, profile.accumulatedPracticeTime)
@@ -615,6 +772,7 @@ final class PdfPracticeViewModel: ObservableObject {
 
     private func save() {
         guard let pdfFileName else { return }
+        lastProfileSaveDate = Date()
         let profile = PdfPracticeProfile(
             pageIndex: pageIndex,
             scaleFactor: scaleFactor,
@@ -647,6 +805,92 @@ final class PdfPracticeViewModel: ObservableObject {
             readingPoints: readingPoints
         )
         try? settingsStore.save(profile, kind: .pdf, fileName: pdfFileName)
+    }
+
+    private func observe(_ item: AVPlayerItem) {
+        removeItemObservers()
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.handleAudioPlaybackEnded(item) }
+        }
+        failureObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] notification in
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            Task { @MainActor [weak self] in self?.handleAudioPlaybackFailed(error, item: item) }
+        }
+    }
+
+    private func removeItemObservers() {
+        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
+        endObserver = nil
+        failureObserver = nil
+    }
+
+    private func resetAudioItem() {
+        if let boundaryObserver {
+            player.removeTimeObserver(boundaryObserver)
+            self.boundaryObserver = nil
+        }
+        removeItemObservers()
+        player.replaceCurrentItem(with: nil)
+        audioFileName = nil
+        currentTime = 0
+        duration = 0
+        isAudioPlaying = false
+    }
+
+    private func handleAudioPlaybackEnded(_ item: AVPlayerItem) {
+        guard player.currentItem === item else { return }
+        let endPosition = duration
+        pause()
+        currentTime = endPosition
+        save()
+    }
+
+    private func handleAudioPlaybackFailed(_ error: Error?, item: AVPlayerItem) {
+        guard player.currentItem === item else { return }
+        pause()
+        message = error.map { "伴奏播放失败：\($0.localizedDescription)" }
+            ?? "伴奏播放失败，请重新选择文件。"
+    }
+
+    private func startMetronomeOnlyClock(anchor: TransportAnchor) {
+        metronomeOnlyTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isMetronomePlaying, !self.isAudioPlaying else { return }
+                let hostTime = CMClockGetTime(CMClockGetHostTimeClock()).seconds
+                self.currentTime = max(0, anchor.mediaTime(forHostTime: hostTime))
+                self.recordPracticeTime()
+                self.updateAutoFollow()
+                if Date().timeIntervalSince(self.lastProfileSaveDate) >= 2 {
+                    self.save()
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        metronomeOnlyTimer = timer
+    }
+
+    private func stopMetronomeOnlyClock() {
+        metronomeOnlyTimer?.invalidate()
+        metronomeOnlyTimer = nil
+    }
+
+    private func scheduleViewportSave() {
+        viewportSaveTask?.cancel()
+        viewportSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            self?.save()
+        }
     }
 
     private func cmTime(_ seconds: TimeInterval) -> CMTime {
