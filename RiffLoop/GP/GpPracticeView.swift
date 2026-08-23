@@ -447,11 +447,12 @@ struct GpPracticeView: View {
             Text("\(format(viewModel.position.currentTime)) / \(format(viewModel.position.totalTime))")
                 .monospacedDigit()
             if viewModel.score != nil {
-                Text(
-                    "基准 \(Int(viewModel.baseBpm.rounded())) BPM · "
-                        + "当前 \(Int(viewModel.currentBpm.rounded())) BPM · "
-                        + "\(viewModel.playbackSpeed, specifier: "%.2f")×"
-                )
+                Text(verbatim: String(
+                    format: "基准 %.0f BPM · 当前 %.0f BPM · %.2f×",
+                    viewModel.baseBpm,
+                    viewModel.currentBpm,
+                    viewModel.playbackSpeed
+                ))
                 .font(.caption.bold())
                 .foregroundStyle(.orange)
             }

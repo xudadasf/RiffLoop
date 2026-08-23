@@ -146,7 +146,11 @@ assert.match(
 
 assert.match(gpView, /基准 BPM：[\s\S]*?恢复导入 BPM/);
 assert.match(gpView, /1\.00× 以当前基准 BPM 为准/);
-assert.ok(gpView.includes('"当前 \\(Int(viewModel.currentBpm.rounded())) BPM · "'));
+assert.match(
+    gpView,
+    /format: "基准 %\.0f BPM · 当前 %\.0f BPM · %\.2f×",[\s\S]*?viewModel\.currentBpm/,
+    "the status must show the scaled BPM for the current tempo-map segment"
+);
 assert.match(
     gpWeb,
     /initialBpm,[\s\S]*?hasTempoChanges:[\s\S]*?originalTempo: Number\(position\.originalTempo\)/,
