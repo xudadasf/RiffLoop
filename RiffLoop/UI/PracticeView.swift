@@ -346,7 +346,7 @@ struct PracticeView: View {
                 .fill(Color(white: 0.08))
 
             if viewModel.hasMedia {
-                VideoPlayer(player: viewModel.player)
+                VideoSurface(player: viewModel.player)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             } else {
                 VStack(spacing: 12) {
@@ -643,6 +643,26 @@ struct PracticeView: View {
     private func open(_ url: URL) {
         viewModel.openMedia(at: url)
         recentProjects.opened(kind: .video, fileName: url.lastPathComponent)
+    }
+}
+
+private struct VideoSurface: UIViewControllerRepresentable {
+    let player: AVPlayer
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.showsPlaybackControls = false
+        controller.videoGravity = .resizeAspect
+        return controller
+    }
+
+    func updateUIViewController(
+        _ controller: AVPlayerViewController,
+        context: Context
+    ) {
+        controller.player = player
+        controller.showsPlaybackControls = false
     }
 }
 

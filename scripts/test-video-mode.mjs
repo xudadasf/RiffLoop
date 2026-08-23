@@ -56,6 +56,12 @@ check("manual speed and speed-ladder controls explain their distinct roles", () 
     assert.match(viewSource, /String\(format: "%\.2f×", rate\)/);
 });
 
+check("the video surface cannot bypass RiffLoop transport controls", () => {
+    assert.doesNotMatch(viewSource, /VideoPlayer\(player:/);
+    assert.match(viewSource, /VideoSurface\(player:/);
+    assert.match(viewSource, /showsPlaybackControls = false/);
+});
+
 for (const result of checks) {
     console.log(`${result.passed ? "PASS" : "FAIL"}: ${result.name}`);
     if (!result.passed) console.log(`  ${result.message}`);
