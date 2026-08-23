@@ -184,6 +184,25 @@ assert.doesNotMatch(
         ],
         "opening metronome controls must follow alphaTab's pickup tick shift and channel"
     );
+
+    const fullSongMidiFile = {
+        division: 960,
+        tickShift: 0,
+        events: [
+            new TimeSignatureEvent(0, 8, 3),
+            new NoteOnEvent(0, 0),
+            { tick: 38 * 3_840 },
+        ],
+        addEvent(event) { this.events.push(event); },
+    };
+    assert.equal(addMetronomeAccentControls(fullSongMidiFile), 38 * 8);
+    const fullSongControls = fullSongMidiFile.events
+        .filter((event) => event instanceof ControlChangeEvent);
+    assert.equal(
+        fullSongControls.at(-1)?.tick,
+        38 * 3_840 - 480,
+        "metronome accents must remain scheduled through the final subdivision of a long score"
+    );
 }
 
 {

@@ -470,7 +470,8 @@ final class GpWebViewModel: ObservableObject {
     private func synchronizeNativeBacking(to position: GpPlaybackPosition) {
         guard nativeBackingPlayer.isLoaded else { return }
         guard let backingTime = gpBackingTime(
-            forScoreTime: position.currentTime,
+            forPlaybackTime: position.currentTime,
+            playbackSpeed: playbackSpeed,
             syncPoints: nativeBackingSyncPoints
         ) else { return }
         let isInsideBacking = backingTime >= 0
@@ -512,8 +513,6 @@ final class GpWebViewModel: ObservableObject {
             return
         }
 
-        nativeBackingPlayer.setRate(playbackSpeed)
-        nativeBackingPlayer.setVolume(backingVolume)
         if
             position.isSeek == true
             || abs(nativeBackingPlayer.currentTimeMilliseconds - backingTime) > 250

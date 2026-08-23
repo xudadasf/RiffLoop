@@ -24,6 +24,18 @@ func gpBackingTime(
     return start.syncTime + (end.syncTime - start.syncTime) * ratio
 }
 
+func gpBackingTime(
+    forPlaybackTime playbackTime: Double,
+    playbackSpeed: Double,
+    syncPoints: [GpBackingSyncPoint]
+) -> Double? {
+    let speed = playbackSpeed.isFinite && playbackSpeed > 0 ? playbackSpeed : 1
+    return gpBackingTime(
+        forScoreTime: playbackTime * speed,
+        syncPoints: syncPoints
+    )
+}
+
 final class GpNativeBackingPlayer {
     private var player: AVAudioPlayer?
 
@@ -33,6 +45,9 @@ final class GpNativeBackingPlayer {
     var durationMilliseconds: Double { (player?.duration ?? 0) * 1_000 }
 
     func load(data: Data) throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try session.setActive(true)
         player?.stop()
         let player = try AVAudioPlayer(data: data)
         player.enableRate = true
@@ -59,9 +74,6 @@ final class GpNativeBackingPlayer {
     @discardableResult
     func play(at milliseconds: Double, rate: Double, volume: Double) throws -> Bool {
         guard let player else { return false }
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-        try session.setActive(true)
         setRate(rate)
         setVolume(volume)
         seek(to: milliseconds)

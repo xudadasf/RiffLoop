@@ -10,6 +10,7 @@ const pdfView = read("RiffLoop/PDF/PdfPracticeView.swift");
 const pdfViewModel = read("RiffLoop/PDF/PdfPracticeViewModel.swift");
 const mediaViewModel = read("RiffLoop/Media/PracticeViewModel.swift");
 const gpViewModel = read("RiffLoop/GP/GpWebViewModel.swift");
+const gpNativeBackingPlayer = read("RiffLoop/GP/GpNativeBackingPlayer.swift");
 const homeView = read("RiffLoop/UI/HomeView.swift");
 const practiceHistory = read("RiffLoop/Library/PracticeHistoryStore.swift");
 
@@ -88,6 +89,26 @@ assert.match(
     /setBackingAudible\(false\)[\s\S]*?synthApi\.play\(\)[\s\S]*?api\.play\(\)[\s\S]*?synthApi\.playerStateChanged\.on[\s\S]*?markBackingStarted\(api\.timePosition\)[\s\S]*?playerPositionChanged\.on\(\(position\) => \{[\s\S]*?startDeferredBacking\(position\.currentTime\)/,
     "embedded backing must prewarm silently and become audible only after both playback clocks are ready"
 );
+assert.match(
+    gpViewModel,
+    /gpBackingTime\([\s\S]*?forPlaybackTime: position\.currentTime,[\s\S]*?playbackSpeed: playbackSpeed/,
+    "speed-adjusted alphaTab time must be converted back to the source-audio timeline"
+);
+assert.match(
+    gpNativeBackingPlayer,
+    /func load\(data: Data\) throws \{[\s\S]*?AVAudioSession\.sharedInstance\(\)[\s\S]*?setActive\(true\)[\s\S]*?AVAudioPlayer\(data: data\)/,
+    "the audio session must be active before playback starts so delayed backing cannot interrupt the metronome"
+);
+{
+    const synchronizeStart = gpViewModel.indexOf("    private func synchronizeNativeBacking");
+    const synchronizeEnd = gpViewModel.indexOf("\n    private func appendNativeBackingDiagnostic", synchronizeStart);
+    const synchronizeBody = gpViewModel.slice(synchronizeStart, synchronizeEnd);
+    assert.doesNotMatch(
+        synchronizeBody,
+        /nativeBackingPlayer\.set(?:Rate|Volume)/,
+        "ordinary position callbacks must not repeatedly reconfigure the native backing player"
+    );
+}
 
 for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
     assert.match(source, /PracticeHistoryStore\.shared\.record\(/, "every practice mode must update daily history");

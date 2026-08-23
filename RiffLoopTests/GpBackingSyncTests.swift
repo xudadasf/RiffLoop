@@ -54,4 +54,27 @@ final class GpBackingSyncTests: XCTestCase {
             accuracy: 0.001
         )
     }
+
+    func testConvertsSpeedAdjustedPlaybackTimeBackToSourceAudioTime() {
+        XCTAssertEqual(
+            gpBackingTime(
+                forPlaybackTime: 10_000,
+                playbackSpeed: 1.5,
+                syncPoints: thisLifeUnchangedSyncPoints
+            )!,
+            12_201.360544217687,
+            accuracy: 0.001
+        )
+    }
+
+    func testUsesNormalSpeedForAnInvalidPlaybackRate() {
+        XCTAssertEqual(
+            gpBackingTime(
+                forPlaybackTime: 10_000,
+                playbackSpeed: .nan,
+                syncPoints: []
+            ),
+            10_000
+        )
+    }
 }
