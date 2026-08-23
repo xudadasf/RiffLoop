@@ -735,10 +735,12 @@
         let generation = 0;
         let phase = "idle";
         let resumeRequested = false;
+        let targetTick = null;
         const cancel = () => {
             generation += 1;
             phase = "idle";
             resumeRequested = false;
+            targetTick = null;
         };
         const scheduleRestartIfReady = () => {
             if (phase !== "waitingForResume" || !resumeRequested) return false;
@@ -751,12 +753,25 @@
                 ) return;
                 phase = "idle";
                 resumeRequested = false;
+                targetTick = null;
                 transport.play();
             }, 0);
             return true;
         };
         const handlePlayerState = (state) => {
             if (phase !== "waitingForPause" || !isPaused(state)) return false;
+            phase = "waitingForSeek";
+            seekBoth(targetTick, { reveal: false });
+            return true;
+        };
+        const handlePlayerPosition = (position) => {
+            const currentTick = Number(position?.currentTick);
+            if (
+                phase !== "waitingForSeek"
+                || !position?.isSeek
+                || !Number.isFinite(currentTick)
+                || Math.abs(currentTick - targetTick) > 2
+            ) return false;
             phase = "waitingForResume";
             scheduleRestartIfReady();
             return true;
@@ -767,8 +782,8 @@
             generation += 1;
             phase = "waitingForPause";
             resumeRequested = false;
+            targetTick = target;
             transport.pause();
-            seekBoth(target, { reveal: false });
             handlePlayerState();
             return true;
         };
@@ -777,7 +792,7 @@
             resumeRequested = true;
             return scheduleRestartIfReady();
         };
-        return { prepare, resume, cancel, handlePlayerState };
+        return { prepare, resume, cancel, handlePlayerState, handlePlayerPosition };
     };
     const rangeCountInRestarter = createRangeCountInRestarter({
         transport,
@@ -925,6 +940,7 @@
     }, true);
     api.playerPositionChanged.on((position) => {
         if (!position.isSeek) transport.startDeferredBacking(position.currentTime);
+        rangeCountInRestarter.handlePlayerPosition(position);
         // alphaTab's native range can be lost when its internal player is rebuilt.
         // Keep the visible synth and embedded backing transport inside the committed range.
         if (enforceCommittedRange(position)) return;

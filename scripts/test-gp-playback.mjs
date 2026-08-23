@@ -390,8 +390,8 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
-        /api\.playerPositionChanged\.on\(\(position\) => \{[\s\S]*?if \(enforceCommittedRange\(position\)\) return;/,
-        "every player position update must enforce the committed range before bridge throttling"
+        /api\.playerPositionChanged\.on\(\(position\) => \{[\s\S]*?rangeCountInRestarter\.handlePlayerPosition\(position\);[\s\S]*?if \(enforceCommittedRange\(position\)\) return;/,
+        "every player position update must confirm A seeks and enforce the committed range before bridge throttling"
     );
     assert.match(
         source,
@@ -523,8 +523,8 @@ assert.doesNotMatch(
     countInRestarter.prepare(30_720);
     assert.deepEqual(
         countInCalls,
-        ["pause", ["seek", 30_720, { reveal: false }]],
-        "per-loop count-in must pause and seek A without guessing when playback can resume"
+        ["pause"],
+        "per-loop count-in must not seek A until alphaTab confirms Paused"
     );
     assert.equal(scheduledRestarts.length, 0, "preparation alone must not play before Swift updates speed");
     assert.equal(countInRestarter.resume(), false, "an early acknowledgement must wait for Paused");
@@ -532,7 +532,24 @@ assert.doesNotMatch(
     assert.equal(scheduledRestarts.length, 0, "a late Playing state must not restart count-in");
     assert.equal(countInRestarter.handlePlayerState("paused"), true);
     assert.equal(countInRestarter.handlePlayerState("paused"), false);
-    assert.equal(scheduledRestarts.length, 1, "Paused plus one acknowledgement must schedule one restart");
+    assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: false }]]);
+    assert.equal(scheduledRestarts.length, 0, "Paused must seek A but wait for alphaTab's seek receipt");
+    assert.equal(
+        countInRestarter.handlePlayerPosition({ currentTick: 30_721, isSeek: false }),
+        false,
+        "ordinary position updates near A cannot acknowledge the seek"
+    );
+    assert.equal(
+        countInRestarter.handlePlayerPosition({ currentTick: 30_721, isSeek: true }),
+        true,
+        "the explicit A seek receipt must unlock the prepared count-in"
+    );
+    assert.equal(
+        countInRestarter.handlePlayerPosition({ currentTick: 30_720, isSeek: true }),
+        false,
+        "a duplicate A seek receipt must not schedule a second restart"
+    );
+    assert.equal(scheduledRestarts.length, 1, "Paused, A receipt, and one acknowledgement schedule one restart");
     scheduledRestarts[0]();
     assert.deepEqual(countInCalls.at(-1), "play");
     assert.equal(countInRestarter.resume(), false, "a duplicate acknowledgement must not replay the same round");
@@ -550,7 +567,11 @@ assert.doesNotMatch(
     });
     pausedFirstRestarter.prepare(30_720);
     assert.equal(pausedFirstRestarter.handlePlayerState("paused"), true);
-    assert.equal(pausedFirstSchedules.length, 0, "Paused must remain at A until Swift acknowledges speed");
+    assert.equal(
+        pausedFirstRestarter.handlePlayerPosition({ currentTick: 30_720, isSeek: true }),
+        true
+    );
+    assert.equal(pausedFirstSchedules.length, 0, "Paused at A must remain there until Swift acknowledges speed");
     assert.equal(pausedFirstRestarter.resume(), true);
     assert.equal(pausedFirstSchedules.length, 1);
     pausedFirstSchedules[0]();
