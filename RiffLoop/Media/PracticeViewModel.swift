@@ -99,7 +99,7 @@ final class PracticeViewModel: ObservableObject {
 
     func togglePlayback() {
         guard hasMedia else { return }
-        isPlaying ? pause() : coordinatedStart(at: currentTime)
+        isPlaying ? pause() : preparePlaybackAndStart(at: currentTime)
     }
 
     func pause() {
@@ -329,6 +329,48 @@ final class PracticeViewModel: ObservableObject {
     private var validLoopRange: (a: TimeInterval, b: TimeInterval)? {
         guard let pointA, let pointB, pointB > pointA else { return nil }
         return (pointA, pointB)
+    }
+
+    private func preparePlaybackAndStart(at mediaTime: TimeInterval) {
+        transportGeneration &+= 1
+        let generation = transportGeneration
+        let startTime = validLoopRange.map { range in
+            mediaTime >= range.b ? range.a : mediaTime
+        } ?? mediaTime
+
+        player.cancelPendingPrerolls()
+        player.currentItem?.cancelPendingSeeks()
+        player.pause()
+        metronome.stop()
+        isPlaying = false
+
+        player.seek(
+            to: cmTime(startTime),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        ) { [weak self] finished in
+            Task { @MainActor [weak self] in
+                guard let self, self.transportGeneration == generation else { return }
+                guard finished else {
+                    self.errorMessage = "无法准备视频播放。"
+                    return
+                }
+                self.currentTime = startTime
+                self.player.preroll(atRate: self.playbackRate) { [weak self] ready in
+                    Task { @MainActor [weak self] in
+                        guard
+                            let self,
+                            self.transportGeneration == generation
+                        else { return }
+                        guard ready else {
+                            self.errorMessage = "视频尚未准备好，请重试。"
+                            return
+                        }
+                        self.coordinatedStart(at: startTime)
+                    }
+                }
+            }
+        }
     }
 
     private func coordinatedStart(at mediaTime: TimeInterval, includeCountIn: Bool = false) {

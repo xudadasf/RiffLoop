@@ -40,6 +40,22 @@ check("speed resynchronization replaces the stale metronome scheduler", () => {
     assert.match(body, /schedulerGeneration = generation/);
 });
 
+check("the first manual play waits for seek and preroll before synchronized start", () => {
+    const toggleBody = functionBody(viewModelSource, "func togglePlayback()");
+    assert.match(toggleBody, /preparePlaybackAndStart\(at: currentTime\)/);
+
+    const body = functionBody(
+        viewModelSource,
+        "private func preparePlaybackAndStart(at mediaTime: TimeInterval)"
+    );
+    const seekIndex = body.indexOf("player.seek(");
+    const prerollIndex = body.indexOf("self.player.preroll(atRate:");
+    const startIndex = body.indexOf("self.coordinatedStart(at:");
+    assert.ok(seekIndex >= 0, "manual start must finish an exact seek first");
+    assert.ok(prerollIndex > seekIndex, "manual start must preroll after seeking");
+    assert.ok(startIndex > prerollIndex, "synchronized start must happen after preroll");
+});
+
 check("enabling A/B loop seeks to point A through the coordinated transport", () => {
     const body = functionBody(viewModelSource, "func setLoopEnabled(_ enabled: Bool)");
     assert.match(body, /let loopEntryTarget = enabled \? pointA : nil/);
