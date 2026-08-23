@@ -69,9 +69,15 @@ struct GpPlaybackState: Codable, Equatable, Sendable {
     let stopped: Bool
 }
 
+struct GpBackingSyncPoint: Codable, Equatable, Sendable {
+    let synthTime: Double
+    let syncTime: Double
+}
+
 struct GpBackingAudio: Codable, Equatable, Sendable {
     let mimeType: String
     let data: Data
+    let syncPoints: [GpBackingSyncPoint]
 }
 
 struct GpBarHit: Codable, Equatable, Sendable {

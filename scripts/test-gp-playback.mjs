@@ -100,17 +100,35 @@ assert.doesNotMatch(
     assert.notEqual(end, -1, "iPad backing MIME compatibility boundary is missing");
     const implementation = source.slice(start, end);
     const execute = new Function(
+        "alphaTab",
         `${implementation}\nreturn { backingAudioMimeType, nativeBackingPayload };`
     );
-    const { backingAudioMimeType, nativeBackingPayload } = execute();
+    const alphaTab = {
+        midi: {
+            MidiFileGenerator: {
+                generateSyncPoints: () => [
+                    { synthTime: 0, syncTime: -2798.639455782313 },
+                    { synthTime: 140307, syncTime: 137508.3605442177 },
+                ],
+            },
+        },
+    };
+    const { backingAudioMimeType, nativeBackingPayload } = execute(alphaTab);
 
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
     assert.equal(backingAudioMimeType(mp3), "audio/mpeg");
     assert.equal(backingAudioMimeType(new Uint8Array([0x52, 0x49, 0x46, 0x46])), "audio/wav");
     assert.deepEqual(
         nativeBackingPayload({ backingTrack: { rawAudioFile: mp3 } }),
-        { mimeType: "audio/mpeg", data: "SUQzBA==" },
-        "WKWebView must hand embedded audio bytes to the native player"
+        {
+            mimeType: "audio/mpeg",
+            data: "SUQzBA==",
+            syncPoints: [
+                { synthTime: 0, syncTime: -2798.639455782313 },
+                { synthTime: 140307, syncTime: 137508.3605442177 },
+            ],
+        },
+        "WKWebView must hand audio bytes and the GP timeline mapping to the native player"
     );
 }
 
@@ -431,6 +449,16 @@ assert.doesNotMatch(
         assert.equal(api.playCalls, 1);
         assert.equal(synthApi.playCalls, 0, "native backing mode must not start WKWebView media");
         assert.equal(resumeCalls, 0, "native backing mode must not resume WKWebView media directly");
+        assert.equal(
+            transport.startDeferredBacking(2_400),
+            false,
+            "a stationary score position must not end count-in priming"
+        );
+        assert.equal(
+            transport.startDeferredBacking(2_480),
+            true,
+            "native backing may start only after the score timeline advances"
+        );
     }
 
     {

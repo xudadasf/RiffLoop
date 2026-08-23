@@ -68,6 +68,7 @@ final class GpWebViewModel: ObservableObject {
     private var nativeBackingPlaybackRequested = false
     private var nativeBackingStarted = false
     private var nativeBackingAnchorMilliseconds = 0.0
+    private var nativeBackingSyncPoints: [GpBackingSyncPoint] = []
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -77,6 +78,7 @@ final class GpWebViewModel: ObservableObject {
         nativeBackingPlayer.reset()
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
+        nativeBackingSyncPoints = []
         currentFileName = fileName
         pendingProfile = (try? settingsStore.load(
             GpPracticeProfile.self,
@@ -391,6 +393,7 @@ final class GpWebViewModel: ObservableObject {
         case let .backingAudioLoaded(audio):
             do {
                 try nativeBackingPlayer.load(data: audio.data)
+                nativeBackingSyncPoints = audio.syncPoints
                 nativeBackingPlayer.setRate(playbackSpeed)
                 nativeBackingPlayer.setVolume(backingVolume)
                 appendNativeBackingDiagnostic(
@@ -466,9 +469,20 @@ final class GpWebViewModel: ObservableObject {
 
     private func synchronizeNativeBacking(to position: GpPlaybackPosition) {
         guard nativeBackingPlayer.isLoaded else { return }
+        guard let backingTime = gpBackingTime(
+            forScoreTime: position.currentTime,
+            syncPoints: nativeBackingSyncPoints
+        ) else { return }
+        let isInsideBacking = backingTime >= 0
+            && backingTime < nativeBackingPlayer.durationMilliseconds
 
         if position.isSeek == true {
-            nativeBackingPlayer.seek(to: position.currentTime)
+            nativeBackingPlayer.seek(to: max(0, backingTime))
+        }
+        if !isInsideBacking {
+            nativeBackingPlayer.pause()
+            nativeBackingStarted = false
+            return
         }
         guard nativeBackingPlaybackRequested, backingEnabled else { return }
 
@@ -476,15 +490,16 @@ final class GpWebViewModel: ObservableObject {
             guard abs(position.currentTime - nativeBackingAnchorMilliseconds) >= 10 else { return }
             do {
                 nativeBackingStarted = try nativeBackingPlayer.play(
-                    at: position.currentTime,
+                    at: backingTime,
                     rate: playbackSpeed,
                     volume: backingVolume
                 )
                 appendNativeBackingDiagnostic(
                     String(
-                        format: "native-play ok=%@ t=%.2f rate=%.2f volume=%.2f",
+                        format: "native-play ok=%@ score=%.2f audio=%.2f rate=%.2f volume=%.2f",
                         nativeBackingStarted ? "true" : "false",
                         position.currentTime / 1_000,
+                        backingTime / 1_000,
                         playbackSpeed,
                         backingVolume
                     )
@@ -501,9 +516,9 @@ final class GpWebViewModel: ObservableObject {
         nativeBackingPlayer.setVolume(backingVolume)
         if
             position.isSeek == true
-            || abs(nativeBackingPlayer.currentTimeMilliseconds - position.currentTime) > 250
+            || abs(nativeBackingPlayer.currentTimeMilliseconds - backingTime) > 250
         {
-            nativeBackingPlayer.seek(to: position.currentTime)
+            nativeBackingPlayer.seek(to: backingTime)
         }
     }
 

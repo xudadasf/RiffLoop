@@ -123,7 +123,14 @@
         const bytes = score?.backingTrack?.rawAudioFile;
         const mimeType = backingAudioMimeType(bytes);
         if (!mimeType) return null;
-        return { mimeType, data: bytesToBase64(bytes) };
+        const syncPoints = Array.from(
+            alphaTab.midi.MidiFileGenerator.generateSyncPoints(score, false),
+            (point) => ({
+                synthTime: Number(point.synthTime),
+                syncTime: Number(point.syncTime)
+            })
+        ).filter((point) => Number.isFinite(point.synthTime) && Number.isFinite(point.syncTime));
+        return { mimeType, data: bytesToBase64(bytes), syncPoints };
     };
     const probeTypedBackingMetadata = (score) => {
         const bytes = score?.backingTrack?.rawAudioFile;

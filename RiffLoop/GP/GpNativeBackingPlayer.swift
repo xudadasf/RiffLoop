@@ -1,6 +1,29 @@
 import AVFAudio
 import Foundation
 
+func gpBackingTime(
+    forScoreTime scoreTime: Double,
+    syncPoints: [GpBackingSyncPoint]
+) -> Double? {
+    guard scoreTime.isFinite else { return nil }
+    let sorted = syncPoints
+        .filter { $0.synthTime.isFinite && $0.syncTime.isFinite }
+        .sorted { $0.synthTime < $1.synthTime }
+    guard let first = sorted.first else { return scoreTime }
+    guard sorted.count > 1 else {
+        return first.syncTime + scoreTime - first.synthTime
+    }
+
+    let precedingIndex = sorted.lastIndex { $0.synthTime <= scoreTime } ?? 0
+    let segmentIndex = min(precedingIndex, sorted.count - 2)
+    let start = sorted[segmentIndex]
+    let end = sorted[segmentIndex + 1]
+    let scoreSpan = end.synthTime - start.synthTime
+    guard scoreSpan > 0 else { return start.syncTime }
+    let ratio = (scoreTime - start.synthTime) / scoreSpan
+    return start.syncTime + (end.syncTime - start.syncTime) * ratio
+}
+
 final class GpNativeBackingPlayer {
     private var player: AVAudioPlayer?
 

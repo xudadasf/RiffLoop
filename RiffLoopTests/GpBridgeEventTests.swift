@@ -140,10 +140,21 @@ final class GpBridgeEventTests: XCTestCase {
                 "payload": [
                     "mimeType": "audio/mpeg",
                     "data": Data([0x49, 0x44, 0x33]).base64EncodedString(),
+                    "syncPoints": [
+                        ["synthTime": 0, "syncTime": -2_798.639455782313],
+                        ["synthTime": 140_307, "syncTime": 137_508.3605442177],
+                    ],
                 ],
             ]),
             .backingAudioLoaded(
-                GpBackingAudio(mimeType: "audio/mpeg", data: Data([0x49, 0x44, 0x33]))
+                GpBackingAudio(
+                    mimeType: "audio/mpeg",
+                    data: Data([0x49, 0x44, 0x33]),
+                    syncPoints: [
+                        GpBackingSyncPoint(synthTime: 0, syncTime: -2_798.639455782313),
+                        GpBackingSyncPoint(synthTime: 140_307, syncTime: 137_508.3605442177),
+                    ]
+                )
             )
         )
     }
