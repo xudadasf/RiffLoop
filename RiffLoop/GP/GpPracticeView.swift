@@ -327,7 +327,7 @@ struct GpPracticeView: View {
                     get: { viewModel.speedLadderTarget },
                     set: { viewModel.setSpeedLadderTarget($0) }
                 )) {
-                    ForEach([0.8, 0.9, 1.0, 1.1, 1.25, 1.5], id: \.self) {
+                    ForEach(speeds.filter { $0 >= viewModel.playbackSpeed }, id: \.self) {
                         Text("\(Int(($0 * 100).rounded()))%").tag($0)
                     }
                 }

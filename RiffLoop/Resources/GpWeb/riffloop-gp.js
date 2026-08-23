@@ -702,6 +702,7 @@
             || position.isSeek
             || Number(position.currentTick) < committedRange.endTick
         ) return false;
+        post("rangeLoopCompleted");
         seekBoth(committedRange.startTick, { reveal: false });
         return true;
     };

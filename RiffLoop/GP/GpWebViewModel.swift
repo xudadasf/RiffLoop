@@ -142,6 +142,8 @@ final class GpWebViewModel: ObservableObject {
 
     func setPlaybackSpeed(_ speed: Double) {
         playbackSpeed = min(max(speed, 0.5), 1.5)
+        speedLadderTarget = max(speedLadderTarget, playbackSpeed)
+        completedLoops = 0
         nativeBackingPlayer.setRate(playbackSpeed)
         highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
         call("setPlaybackSpeed", arguments: [playbackSpeed])
@@ -280,7 +282,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSpeedLadderTarget(_ target: Double) {
-        speedLadderTarget = min(max(target, 0.5), 1.5)
+        speedLadderTarget = min(max(target, playbackSpeed), 1.5)
         completedLoops = 0
         saveProfile()
     }
@@ -390,6 +392,8 @@ final class GpWebViewModel: ObservableObject {
             nativeBackingStarted = false
             nativeBackingPlayer.pause()
             updatePracticeClock(isPlaying: false)
+        case .rangeLoopCompleted:
+            recordLoopCompletion()
         case let .backingAudioLoaded(audio):
             do {
                 try nativeBackingPlayer.load(data: audio.data)
@@ -670,7 +674,7 @@ final class GpWebViewModel: ObservableObject {
         wholeSongLoopingEnabled = pendingProfile.wholeSongLoopingEnabled
         loopCountInEnabled = pendingProfile.loopCountInEnabled
         speedLadderEnabled = pendingProfile.speedLadderEnabled
-        speedLadderTarget = min(max(pendingProfile.speedLadderTarget, 0.5), 1.5)
+        speedLadderTarget = min(max(pendingProfile.speedLadderTarget, playbackSpeed), 1.5)
         loopsPerSpeedStep = min(max(pendingProfile.loopsPerSpeedStep, 1), 10)
         speedLadderStep = min(max(pendingProfile.speedLadderStep, 0.01), 0.25)
         totalPracticeMilliseconds = max(0, pendingProfile.totalPracticeMilliseconds)
@@ -737,6 +741,11 @@ final class GpWebViewModel: ObservableObject {
             newPosition.currentTick <= range.startTick + loopLength * 0.25
         else { return }
 
+        recordLoopCompletion()
+    }
+
+    private func recordLoopCompletion() {
+        guard rangeLoopingEnabled, loopRange != nil else { return }
         let update = speedAfterCompletedLoop(
             currentSpeed: playbackSpeed,
             targetSpeed: speedLadderTarget,
@@ -750,6 +759,7 @@ final class GpWebViewModel: ObservableObject {
         if update.playbackSpeed != playbackSpeed {
             playbackSpeed = update.playbackSpeed
             highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
+            nativeBackingPlayer.setRate(playbackSpeed)
             call("setPlaybackSpeed", arguments: [playbackSpeed])
         }
         if loopCountInEnabled {

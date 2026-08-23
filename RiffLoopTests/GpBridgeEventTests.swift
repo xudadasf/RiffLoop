@@ -183,6 +183,13 @@ final class GpBridgeEventTests: XCTestCase {
         )
     }
 
+    func testDecodesExplicitRangeLoopCompletion() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: ["event": "rangeLoopCompleted"]),
+            .rangeLoopCompleted
+        )
+    }
+
     @MainActor
     func testLeavingForegroundImmediatelyClearsPlayingState() {
         let viewModel = GpWebViewModel()

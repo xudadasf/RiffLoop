@@ -44,6 +44,11 @@ assert.match(
     /\.overlay\(alignment: \.bottomLeading\) \{[\s\S]*?if viewModel\.loopRange != nil, !viewModel\.isPlaying \{[\s\S]*?Button\(action: viewModel\.clearLoop\)[\s\S]*?退出区间循环/,
     "the loop exit action must appear directly over the score while playback is paused"
 );
+assert.match(
+    gpView,
+    /Picker\("目标速度"[\s\S]*?ForEach\(speeds\.filter \{ \$0 >= viewModel\.playbackSpeed \}/,
+    "GP ladder target choices must not include speeds below the current manual speed"
+);
 
 for (const expected of [
     /frequency: 2_600,[\s\S]*?amplitude: 0\.95,[\s\S]*?decay: 65/,
@@ -93,6 +98,21 @@ assert.match(
     gpViewModel,
     /gpBackingTime\([\s\S]*?forPlaybackTime: position\.currentTime,[\s\S]*?playbackSpeed: playbackSpeed/,
     "speed-adjusted alphaTab time must be converted back to the source-audio timeline"
+);
+assert.match(
+    gpViewModel,
+    /func setPlaybackSpeed\(_ speed: Double\) \{[\s\S]*?speedLadderTarget = max\(speedLadderTarget, playbackSpeed\)[\s\S]*?completedLoops = 0/,
+    "manually raising GP speed must also raise the ladder target and restart its cadence"
+);
+assert.match(
+    gpViewModel,
+    /func setSpeedLadderTarget\(_ target: Double\) \{[\s\S]*?min\(max\(target, playbackSpeed\), 1\.5\)/,
+    "the GP speed ladder target must never be lower than the current manual speed"
+);
+assert.match(
+    gpViewModel,
+    /private func recordLoopCompletion\(\) \{[\s\S]*?if update\.playbackSpeed != playbackSpeed \{[\s\S]*?nativeBackingPlayer\.setRate\(playbackSpeed\)[\s\S]*?call\("setPlaybackSpeed"/,
+    "a GP ladder speed increase must update native embedded backing before the web player"
 );
 assert.match(
     gpNativeBackingPlayer,

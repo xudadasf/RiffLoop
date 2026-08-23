@@ -393,13 +393,16 @@ assert.doesNotMatch(
     const loopImplementation = source.slice(loopStart, loopEnd);
     const makeRangeEnforcer = new Function(
         "seekBoth",
+        "post",
         "rangeLoopingEnabled",
         "committedRange",
         `${loopImplementation}\nreturn enforceCommittedRange;`
     );
     const seeks = [];
+    const posts = [];
     const enforceCommittedRange = makeRangeEnforcer(
         (tick, options) => seeks.push({ tick, options }),
+        (event) => posts.push(event),
         true,
         { startTick: 30720, endTick: 34560 }
     );
@@ -409,6 +412,11 @@ assert.doesNotMatch(
         seeks,
         [{ tick: 30720, options: { reveal: false } }],
         "crossing B must return both transports to A without jumping the viewport"
+    );
+    assert.deepEqual(
+        posts,
+        ["rangeLoopCompleted"],
+        "crossing B must explicitly report one completed range loop before the corrective seek"
     );
     assert.equal(
         enforceCommittedRange({ currentTick: 40000, isSeek: true }),

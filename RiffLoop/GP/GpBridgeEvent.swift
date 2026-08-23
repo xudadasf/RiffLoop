@@ -110,6 +110,7 @@ enum GpBridgeEvent: Equatable, Sendable {
     case positionChanged(GpPlaybackPosition)
     case playerStateChanged(GpPlaybackState)
     case playerFinished
+    case rangeLoopCompleted
     case backingAudioLoaded(GpBackingAudio)
     case barHit(GpBarHit)
     case pointerDown(GpBarHit)
@@ -143,6 +144,8 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .playerStateChanged(try decoder.decode(GpPlaybackState.self, from: envelope.payloadData))
         case "playerFinished":
             return .playerFinished
+        case "rangeLoopCompleted":
+            return .rangeLoopCompleted
         case "backingAudioLoaded":
             return .backingAudioLoaded(
                 try decoder.decode(GpBackingAudio.self, from: envelope.payloadData)
