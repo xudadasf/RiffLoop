@@ -27,6 +27,7 @@ private enum PdfControlPanel: String, Identifiable {
 
 struct PdfPracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var displayNames: DocumentDisplayNameStore
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = PdfPracticeViewModel()
     @State private var pdfLibraryPresented = false
@@ -91,7 +92,7 @@ struct PdfPracticeView: View {
             }
         }
         .animation(.snappy, value: activePanel)
-        .navigationTitle(viewModel.pdfFileName ?? "PDF 谱面")
+        .navigationTitle(pdfTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -505,6 +506,11 @@ struct PdfPracticeView: View {
         if viewModel.autoFollowSuspended { return "继续跟谱" }
         if viewModel.isAutoFollowing { return "跟谱中" }
         return "跟谱"
+    }
+
+    private var pdfTitle: String {
+        guard let fileName = viewModel.pdfFileName else { return "PDF 谱面" }
+        return displayNames.displayName(for: .pdf, fileName: fileName)
     }
 
     private func openPdf(_ url: URL) {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var recentProjects: RecentProjectsStore
+    @EnvironmentObject private var displayNames: DocumentDisplayNameStore
     @StateObject private var practiceHistory = PracticeHistoryStore.shared
     @State private var signingStatus = SigningStatusSnapshot.current()
     @State private var isSigningHelpPresented = false
@@ -106,7 +107,7 @@ struct HomeView: View {
                             .font(.caption.bold())
                             .textCase(.uppercase)
                             .foregroundStyle(Color(.systemBackground).opacity(0.68))
-                        Text(project.fileName)
+                        Text(displayName(for: project))
                             .font(.title.bold())
                             .foregroundStyle(Color(.systemBackground))
                             .lineLimit(1)
@@ -264,7 +265,7 @@ struct HomeView: View {
                 } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(project.fileName)
+                            Text(displayName(for: project))
                             Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -332,6 +333,10 @@ struct HomeView: View {
         RiffLoopDocumentStore()
             .folderURL(for: project.kind)
             .appendingPathComponent(project.fileName)
+    }
+
+    private func displayName(for project: RecentProject) -> String {
+        displayNames.displayName(for: project.kind, fileName: project.fileName)
     }
 
     @ViewBuilder

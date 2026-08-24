@@ -12,6 +12,10 @@ const mediaViewModel = read("RiffLoop/Media/PracticeViewModel.swift");
 const gpViewModel = read("RiffLoop/GP/GpWebViewModel.swift");
 const gpNativeBackingPlayer = read("RiffLoop/GP/GpNativeBackingPlayer.swift");
 const homeView = read("RiffLoop/UI/HomeView.swift");
+const videoView = read("RiffLoop/UI/PracticeView.swift");
+const documentLibrary = read("RiffLoop/Library/DocumentLibraryView.swift");
+const displayNameStore = read("RiffLoop/Library/DocumentDisplayNameStore.swift");
+const app = read("RiffLoop/App/RiffLoopApp.swift");
 const practiceHistory = read("RiffLoop/Library/PracticeHistoryStore.swift");
 
 assert.match(
@@ -184,6 +188,19 @@ assert.doesNotMatch(homeView, /private var signingStatusCard/);
 assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
 assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");
+
+assert.match(
+    displayNameStore,
+    /func displayName[\s\S]*?customNames\[key\(kind: kind, fileName: fileName\)\] \?\? fileName/,
+    "an unset display name must fall back to the physical filename"
+);
+assert.match(app, /\.environmentObject\(displayNames\)/, "all screens must share one display-name store");
+assert.match(homeView, /Text\(displayName\(for: project\)\)/, "the home screen must show custom display names");
+assert.match(documentLibrary, /filePendingRename = model\.importExternalFile\(url\)/, "a successful import must offer display-name editing");
+assert.match(documentLibrary, /恢复原文件名/, "the library must allow resetting a custom display name");
+assert.match(videoView, /displayName\(for: \.video, fileName: currentFileName\)/, "the video page must show the shared display name");
+assert.match(gpView, /displayName\(for: \.guitarPro, fileName: currentFileName\)/, "the GP page must show the shared display name");
+assert.match(pdfView, /displayName\(for: \.pdf, fileName: fileName\)/, "the PDF page must show the shared display name");
 
 assert.match(pdfView, /\.safeAreaInset\(edge: \.bottom, spacing: 0\)[\s\S]*?controlDeck/);
 assert.match(pdfView, /toolButton\(\.sound,[\s\S]*?toolButton\(\.follow,/);

@@ -28,6 +28,7 @@ private enum VideoControlPanel: String, Identifiable {
 
 struct PracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var displayNames: DocumentDisplayNameStore
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = PracticeViewModel()
     @State private var isLibraryPresented = false
@@ -36,6 +37,7 @@ struct PracticeView: View {
     @State private var didOpenInitialURL = false
     @State private var groupingInput = "4"
     @State private var activePanel: VideoControlPanel?
+    @State private var currentFileName: String?
 
     let initialURL: URL?
 
@@ -82,7 +84,7 @@ struct PracticeView: View {
             }
             .animation(.snappy, value: activePanel)
             .background(Color.black.ignoresSafeArea())
-            .navigationTitle("视频练习")
+            .navigationTitle(videoTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -798,8 +800,14 @@ struct PracticeView: View {
     }
 
     private func open(_ url: URL) {
+        currentFileName = url.lastPathComponent
         viewModel.openMedia(at: url)
         recentProjects.opened(kind: .video, fileName: url.lastPathComponent)
+    }
+
+    private var videoTitle: String {
+        guard let currentFileName else { return "视频练习" }
+        return displayNames.displayName(for: .video, fileName: currentFileName)
     }
 }
 
@@ -825,6 +833,7 @@ private struct VideoSurface: UIViewControllerRepresentable {
 
 #Preview("iPad Landscape") {
     PracticeView()
+        .environmentObject(DocumentDisplayNameStore())
         .environmentObject(RecentProjectsStore())
         .frame(width: 1_180, height: 820)
 }

@@ -30,11 +30,13 @@ private enum GpControlPanel: String, Identifiable {
 
 struct GpPracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var displayNames: DocumentDisplayNameStore
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @StateObject private var viewModel = GpWebViewModel()
     @State private var isLibraryPresented = false
     @State private var didOpenInitialURL = false
     @State private var activePanel: GpControlPanel?
+    @State private var currentFileName: String?
 
     let initialURL: URL?
 
@@ -85,7 +87,7 @@ struct GpPracticeView: View {
                 controlDeck
             }
             .animation(.snappy, value: activePanel)
-            .navigationTitle(viewModel.score?.title ?? "Guitar Pro 练习")
+            .navigationTitle(gpTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -679,11 +681,17 @@ struct GpPracticeView: View {
 
     private func importScore(from url: URL) {
         do {
+            currentFileName = url.lastPathComponent
             viewModel.loadScore(data: try Data(contentsOf: url), fileName: url.lastPathComponent)
             recentProjects.opened(kind: .guitarPro, fileName: url.lastPathComponent)
         } catch {
             viewModel.reportImportError(error)
         }
+    }
+
+    private var gpTitle: String {
+        guard let currentFileName else { return "Guitar Pro 练习" }
+        return displayNames.displayName(for: .guitarPro, fileName: currentFileName)
     }
 
     private func format(_ milliseconds: Double) -> String {

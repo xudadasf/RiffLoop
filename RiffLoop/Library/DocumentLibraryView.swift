@@ -32,15 +32,18 @@ final class DocumentLibraryModel: ObservableObject {
         }
     }
 
-    func importExternalFile(_ sourceURL: URL) {
+    @discardableResult
+    func importExternalFile(_ sourceURL: URL) -> URL? {
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
 
         do {
-            _ = try store.importFile(from: sourceURL, for: kind)
+            let importedURL = try store.importFile(from: sourceURL, for: kind)
             refresh()
+            return importedURL
         } catch {
             errorMessage = "导入失败：\(error.localizedDescription)"
+            return nil
         }
     }
 
@@ -65,9 +68,11 @@ final class DocumentLibraryModel: ObservableObject {
 struct DocumentLibraryView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var recentProjects: RecentProjectsStore
+    @EnvironmentObject private var displayNames: DocumentDisplayNameStore
     @StateObject private var model: DocumentLibraryModel
     @State private var isImporterPresented = false
     @State private var filePendingDeletion: URL?
+    @State private var filePendingRename: URL?
     let onSelect: (URL) -> Void
     let onDelete: (URL) -> Void
 
@@ -105,7 +110,7 @@ struct DocumentLibraryView: View {
                                         .font(.title2)
                                         .foregroundStyle(.orange)
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(fileURL.deletingPathExtension().lastPathComponent)
+                                        Text(displayName(for: fileURL))
                                             .foregroundStyle(.primary)
                                         Text(fileURL.pathExtension.uppercased())
                                             .font(.caption)
@@ -118,6 +123,15 @@ struct DocumentLibraryView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+
+                            Button {
+                                filePendingRename = fileURL
+                            } label: {
+                                Label("修改显示名称", systemImage: "pencil")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("修改 \(displayName(for: fileURL)) 的显示名称")
 
                             Button(role: .destructive) {
                                 filePendingDeletion = fileURL
@@ -150,7 +164,20 @@ struct DocumentLibraryView: View {
             allowsMultipleSelection: false
         ) { result in
             if case let .success(urls) = result, let url = urls.first {
-                model.importExternalFile(url)
+                filePendingRename = model.importExternalFile(url)
+            }
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { filePendingRename != nil },
+                set: { if !$0 { filePendingRename = nil } }
+            )
+        ) {
+            if let fileURL = filePendingRename {
+                DocumentDisplayNameEditor(
+                    kind: model.kind,
+                    fileName: fileURL.lastPathComponent
+                )
             }
         }
         .confirmationDialog(
@@ -166,6 +193,10 @@ struct DocumentLibraryView: View {
                     if model.deleteFile(fileURL) {
                         recentProjects.remove(
                             kind: model.kind,
+                            fileName: fileURL.lastPathComponent
+                        )
+                        displayNames.removeName(
+                            for: model.kind,
                             fileName: fileURL.lastPathComponent
                         )
                         onDelete(fileURL)
@@ -202,5 +233,72 @@ struct DocumentLibraryView: View {
         case .guitarPro: "music.note.list"
         case .pdf: "doc.richtext"
         }
+    }
+
+    private func displayName(for url: URL) -> String {
+        displayNames.displayName(for: model.kind, fileName: url.lastPathComponent)
+    }
+}
+
+private struct DocumentDisplayNameEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var displayNames: DocumentDisplayNameStore
+    @State private var name: String
+
+    let kind: PracticeKind
+    let fileName: String
+
+    init(kind: PracticeKind, fileName: String) {
+        self.kind = kind
+        self.fileName = fileName
+        _name = State(initialValue: "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("显示名称") {
+                    TextField(fileName, text: $name)
+                    Text("留空时显示原文件名。这里只改变界面名称，不会重命名或移动真实文件。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("原文件") {
+                    Text(fileName)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+
+                if displayNames.customName(for: kind, fileName: fileName) != nil {
+                    Section {
+                        Button("恢复原文件名", role: .destructive) {
+                            displayNames.removeName(for: kind, fileName: fileName)
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("修改显示名称")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        displayNames.setDisplayName(name, for: kind, fileName: fileName)
+                        dismiss()
+                    } label: {
+                        Image(systemName: "checkmark")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .onAppear {
+                name = displayNames.customName(for: kind, fileName: fileName) ?? ""
+            }
+        }
+        .frame(minWidth: 440, minHeight: 340)
     }
 }
