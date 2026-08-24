@@ -68,6 +68,7 @@ final class PdfPracticeViewModel: ObservableObject {
     private var speedLadderBaseRate: Float?
 
     var isPlaying: Bool { isAudioPlaying || isMetronomePlaying }
+    var hasUsableReadingTrack: Bool { isUsablePdfReadingTrack(readingPoints) }
 
     init() {
         periodicObserver = player.addPeriodicTimeObserver(
@@ -474,7 +475,6 @@ final class PdfPracticeViewModel: ObservableObject {
         requestedProgress = nil
         if isAutoFollowing {
             autoFollowSuspended = true
-            message = "已暂停自动跟谱，点击“继续跟谱”恢复。"
         }
     }
 
@@ -484,30 +484,55 @@ final class PdfPracticeViewModel: ObservableObject {
         readingPoints = []
         isRecordingReadingTrack = true
         captureReadingPoint(force: true)
-        message = "正在记录：照常滚动和翻页即可。"
+        message = nil
     }
 
     func finishReadingTrackRecording() {
         captureReadingPoint(force: true)
         isRecordingReadingTrack = false
-        message = "轨迹已保存，共 \(readingPoints.count) 个位置点。"
+        message = hasUsableReadingTrack
+            ? nil
+            : "没有记录到时间变化。请先点击播放，让伴奏或节拍器时间轴开始推进，再滚动或翻页。"
         save()
     }
 
     func toggleAutoFollow() {
-        guard !readingPoints.isEmpty else {
-            message = "这份 PDF 还没有轨迹，请先录制一次。"
+        if isAutoFollowing {
+            isAutoFollowing = false
+            autoFollowSuspended = false
+            requestedProgress = nil
+            return
+        }
+        guard hasUsableReadingTrack else {
+            message = "这份 PDF 还没有可用轨迹，请先随播放时间录制一次。"
             return
         }
         isRecordingReadingTrack = false
-        isAutoFollowing.toggle()
+        isAutoFollowing = true
         autoFollowSuspended = false
-        message = isAutoFollowing ? "自动跟谱已开启。" : "自动跟谱已关闭。"
-        if isAutoFollowing { updateAutoFollow() }
+        message = nil
+        updateAutoFollow()
+    }
+
+    func startAutoFollowFromBeginning() {
+        guard
+            hasUsableReadingTrack,
+            let startTime = readingPoints.map(\.time).min()
+        else {
+            message = "这份 PDF 还没有可用轨迹，请先随播放时间录制一次。"
+            return
+        }
+        isRecordingReadingTrack = false
+        isAutoFollowing = true
+        autoFollowSuspended = false
+        message = nil
+        seek(to: startTime)
+        applyReadingTarget(at: startTime)
     }
 
     func resumeAutoFollow() {
         autoFollowSuspended = false
+        message = nil
         updateAutoFollow()
     }
 
@@ -626,11 +651,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     private func updateAutoFollow() {
-        guard
-            isAutoFollowing,
-            !autoFollowSuspended,
-            let target = pdfReadingTarget(at: currentTime, points: readingPoints)
-        else { return }
+        guard isAutoFollowing, !autoFollowSuspended else { return }
+        applyReadingTarget(at: currentTime)
+    }
+
+    private func applyReadingTarget(at time: TimeInterval) {
+        guard let target = pdfReadingTarget(at: time, points: readingPoints) else { return }
         pageIndex = min(max(target.pageIndex, 0), max(0, pageCount - 1))
         verticalProgress = target.verticalProgress
         requestedProgress = target.verticalProgress
@@ -752,14 +778,12 @@ final class PdfPracticeViewModel: ObservableObject {
             ? profile.beatAccents
             : defaultBeatAccents(beatsPerMeasure: beatsPerMeasure, grouping: beatGrouping)
         rhythmMode = profile.rhythmMode
-        pointA = profile.pointA
-        pointB = profile.pointB
-        loopEnabled = profile.loopEnabled
-            && profile.pointA != nil
-            && profile.pointB.map { $0 > (profile.pointA ?? 0) } == true
-        loopCountInEnabled = profile.loopCountInEnabled
-        speedLadderEnabled = profile.speedLadderEnabled
-        speedLadderBaseRate = speedLadderEnabled ? playbackRate : nil
+        pointA = nil
+        pointB = nil
+        loopEnabled = false
+        loopCountInEnabled = false
+        speedLadderEnabled = false
+        speedLadderBaseRate = nil
         speedLadderTarget = min(max(profile.speedLadderTarget, playbackRate), 1.5)
         loopsPerSpeedStep = min(max(profile.loopsPerSpeedStep, 1), 10)
         speedLadderStep = min(max(profile.speedLadderStep, 0.01), 0.25)
@@ -791,11 +815,11 @@ final class PdfPracticeViewModel: ObservableObject {
             beatGrouping: beatGrouping,
             beatAccents: beatAccents,
             rhythmMode: rhythmMode,
-            pointA: pointA,
-            pointB: pointB,
-            loopEnabled: loopEnabled,
-            loopCountInEnabled: loopCountInEnabled,
-            speedLadderEnabled: speedLadderEnabled,
+            pointA: nil,
+            pointB: nil,
+            loopEnabled: false,
+            loopCountInEnabled: false,
+            speedLadderEnabled: false,
             speedLadderTarget: speedLadderTarget,
             loopsPerSpeedStep: loopsPerSpeedStep,
             speedLadderStep: speedLadderStep,

@@ -2,6 +2,17 @@ import XCTest
 @testable import RiffLoop
 
 final class PdfReadingTrackTests: XCTestCase {
+    func testTrackNeedsTimeProgressionBeforeItCanAutoFollow() {
+        XCTAssertFalse(isUsablePdfReadingTrack([
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 1),
+        ]))
+        XCTAssertTrue(isUsablePdfReadingTrack([
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 1, pageIndex: 0, verticalProgress: 1),
+        ]))
+    }
+
     func testInterpolatesProgressWithinTheSamePage() {
         let points = [
             PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),

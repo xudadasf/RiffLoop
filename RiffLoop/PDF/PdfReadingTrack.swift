@@ -19,6 +19,14 @@ struct PdfReadingTarget: Equatable, Sendable {
     let verticalProgress: Double
 }
 
+func isUsablePdfReadingTrack(_ points: [PdfReadingPoint]) -> Bool {
+    guard
+        let firstTime = points.map(\.time).min(),
+        let lastTime = points.map(\.time).max()
+    else { return false }
+    return lastTime - firstTime >= 0.25
+}
+
 func pdfReadingTarget(
     at time: TimeInterval,
     points: [PdfReadingPoint]

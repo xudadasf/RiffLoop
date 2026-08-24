@@ -64,23 +64,13 @@ assert.match(
 );
 assert.match(
     pdfViewModel,
-    /private func handleLoopBoundary\(\)[\s\S]*?let generation = transportGeneration[\s\S]*?self\.transportGeneration == generation/,
-    "an obsolete loop seek must not restart PDF playback after the user pauses"
+    /private func apply\(_ profile: PdfPracticeProfile\) \{[\s\S]*?loopEnabled = false[\s\S]*?loopCountInEnabled = false[\s\S]*?speedLadderEnabled = false/,
+    "legacy PDF profiles must not silently restore removed loop behavior"
 );
 assert.match(
     pdfViewModel,
-    /resumeMetronome \|\| self\.loopCountInEnabled[\s\S]*?stopMetronomeAfterCountIn: self\.loopCountInEnabled && !resumeMetronome/,
-    "per-loop count-in must sound even when the continuous metronome was off"
-);
-assert.match(
-    pdfViewModel,
-    /func setPlaybackRate\(_ rate: Float\) \{[\s\S]*?speedLadderTarget = max\(speedLadderTarget, playbackRate\)/,
-    "manually raising PDF speed must keep the ladder target reachable"
-);
-assert.match(
-    pdfViewModel,
-    /func setSpeedLadderTarget\(_ target: Float\) \{[\s\S]*?min\(max\(target, playbackRate\), 1\.5\)/,
-    "the PDF speed ladder target must not be lower than the manual speed"
+    /pointA: nil,[\s\S]*?pointB: nil,[\s\S]*?loopEnabled: false,[\s\S]*?loopCountInEnabled: false,[\s\S]*?speedLadderEnabled: false/,
+    "saved PDF profiles must migrate removed loop settings to disabled values"
 );
 assert.match(
     pdfView,
@@ -89,8 +79,23 @@ assert.match(
 );
 assert.match(
     pdfView,
-    /private enum PdfControlPanel[\s\S]*?case loop[\s\S]*?case metronome[\s\S]*?case sound[\s\S]*?case follow/,
-    "PDF tools must keep loop, metronome, backing, and following in separate cards"
+    /private enum PdfControlPanel[\s\S]*?case metronome[\s\S]*?case sound[\s\S]*?case follow/,
+    "PDF tools must keep metronome, backing, and following in separate cards"
+);
+assert.doesNotMatch(
+    pdfView,
+    /case loop|\.loop|A\/B 循环|循环阶梯|每轮预备/,
+    "PDF practice must not expose loop controls"
+);
+assert.match(
+    pdfView,
+    /if viewModel\.autoFollowSuspended \{[\s\S]*?Button\("继续跟谱", action: viewModel\.resumeAutoFollow\)/,
+    "a manually suspended PDF reading track must expose a resume action"
+);
+assert.match(
+    pdfView,
+    /从轨迹起点开始[\s\S]*?startAutoFollowFromBeginning/,
+    "saved PDF reading tracks must have an obvious replay entry point"
 );
 assert.match(
     pdfView,

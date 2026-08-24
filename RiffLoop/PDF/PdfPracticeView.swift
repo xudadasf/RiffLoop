@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 
 private enum PdfControlPanel: String, Identifiable {
-    case loop
     case metronome
     case sound
     case follow
@@ -11,7 +10,6 @@ private enum PdfControlPanel: String, Identifiable {
 
     var title: String {
         switch self {
-        case .loop: "循环"
         case .metronome: "节拍器"
         case .sound: "伴奏"
         case .follow: "跟谱"
@@ -20,7 +18,6 @@ private enum PdfControlPanel: String, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .loop: "repeat"
         case .metronome: "metronome"
         case .sound: "waveform"
         case .follow: "text.viewfinder"
@@ -76,16 +73,6 @@ struct PdfPracticeView: View {
                 playbackStateBadge
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding()
-
-                if viewModel.loopEnabled {
-                    Button(action: { setLoopEnabled(false) }) {
-                        Label("退出 A/B 循环", systemImage: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .padding()
-                }
             }
         }
         .overlay(alignment: .bottomTrailing) {
@@ -112,10 +99,6 @@ struct PdfPracticeView: View {
                     Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
                 }
                 Menu {
-                    if viewModel.loopEnabled {
-                        Button("退出 A/B 循环", role: .destructive) { setLoopEnabled(false) }
-                    }
-                    Button("循环设置") { activePanel = .loop }
                     Button("节拍器设置") { activePanel = .metronome }
                     Button("伴奏设置") { activePanel = .sound }
                     Button("自动跟谱") { activePanel = .follow }
@@ -183,12 +166,11 @@ struct PdfPracticeView: View {
                 .frame(width: 1, height: 78)
 
             HStack(spacing: 8) {
-                toolButton(.loop, summary: loopSummary, detail: loopDetail)
                 toolButton(.metronome, summary: metronomeSummary, detail: metronomeDetail)
                 toolButton(.sound, summary: soundSummary, detail: soundDetail)
                 toolButton(.follow, summary: followSummary, detail: followDetail)
             }
-            .frame(maxWidth: 488)
+            .frame(maxWidth: 420)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -327,10 +309,6 @@ struct PdfPracticeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     switch panel {
-                    case .loop:
-                        pdfLoopSection
-                        Divider()
-                        pdfSoundAndStatsSection
                     case .metronome:
                         pdfMetronomeSection
                         Divider()
@@ -391,56 +369,6 @@ struct PdfPracticeView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("选择伴奏") { audioLibraryPresented = true }
-            }
-        }
-    }
-
-    private var pdfLoopSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Button("设 A", action: viewModel.setPointA)
-                Button("设 B", action: viewModel.setPointB)
-                Toggle("A/B 循环", isOn: $viewModel.loopEnabled)
-                    .onChange(of: viewModel.loopEnabled) { _, _ in viewModel.updateAudioSettings() }
-            }
-            Toggle("每轮预备 1 小节", isOn: Binding(
-                get: { viewModel.loopCountInEnabled },
-                set: { viewModel.setLoopCountInEnabled($0) }
-            ))
-            Toggle("循环阶梯", isOn: Binding(
-                get: { viewModel.speedLadderEnabled },
-                set: { viewModel.setSpeedLadderEnabled($0) }
-            ))
-            if viewModel.speedLadderEnabled {
-                Picker("每几轮提高", selection: Binding(
-                    get: { viewModel.loopsPerSpeedStep },
-                    set: { viewModel.setLoopsPerSpeedStep($0) }
-                )) {
-                    ForEach([1, 2, 3, 5], id: \.self) { Text("\($0) 轮").tag($0) }
-                }
-                Picker("每次提高", selection: Binding(
-                    get: { viewModel.speedLadderStep },
-                    set: { viewModel.setSpeedLadderStep($0) }
-                )) {
-                    ForEach([Float(0.02), 0.05, 0.1], id: \.self) {
-                        Text("+\(Int(($0 * 100).rounded()))%").tag($0)
-                    }
-                }
-                Picker("目标速度", selection: Binding(
-                    get: { viewModel.speedLadderTarget },
-                    set: { viewModel.setSpeedLadderTarget($0) }
-                )) {
-                    ForEach(
-                        [Float(0.8), 0.9, 1, 1.1, 1.25, 1.5]
-                            .filter { $0 >= viewModel.playbackRate },
-                        id: \.self
-                    ) {
-                        Text("\(Int(($0 * 100).rounded()))%").tag($0)
-                    }
-                }
-                Text("已完成 \(viewModel.completedLoops) 轮")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -526,37 +454,48 @@ struct PdfPracticeView: View {
         }
     }
 
-    private var pdfSoundAndStatsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(
-                "练习 \(Int(viewModel.accumulatedPracticeTime / 60)) 分钟 · "
-                    + "累计循环 \(viewModel.totalCompletedLoops) 轮 · "
-                    + "最高 \(Int((viewModel.highestPlaybackRate * 100).rounded()))%"
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-    }
-
     private var autoFollowSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("自动跟谱").font(.headline)
-            Text("已保存 \(viewModel.readingPoints.count) 个位置点")
+            Text("先开始记录，再点击下方播放；按演奏进度滚动和翻页，结束后即可按同一时间轴自动跟谱。")
+                .font(.callout)
                 .foregroundStyle(.secondary)
+
             if viewModel.isRecordingReadingTrack {
+                Label("正在记录 · \(viewModel.readingPoints.count) 个位置点", systemImage: "record.circle")
+                    .foregroundStyle(.red)
                 Button("结束并保存记录", action: viewModel.finishReadingTrackRecording)
+                    .buttonStyle(.borderedProminent)
             } else {
-                Button(
-                    viewModel.readingPoints.isEmpty ? "开始记录" : "重新记录",
-                    action: viewModel.startReadingTrackRecording
-                )
-            }
-            if !viewModel.readingPoints.isEmpty {
-                Button(
-                    viewModel.isAutoFollowing ? "关闭自动跟谱" : "启动自动跟谱",
-                    action: viewModel.toggleAutoFollow
-                )
-                Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
+                if viewModel.readingPoints.isEmpty {
+                    Button("开始记录", action: viewModel.startReadingTrackRecording)
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    Label(
+                        viewModel.hasUsableReadingTrack
+                            ? "轨迹已保存 · \(viewModel.readingPoints.count) 个位置点"
+                            : "轨迹没有有效的时间变化",
+                        systemImage: viewModel.hasUsableReadingTrack
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(viewModel.hasUsableReadingTrack ? Color.green : Color.orange)
+
+                    if viewModel.autoFollowSuspended {
+                        Button("继续跟谱", action: viewModel.resumeAutoFollow)
+                            .buttonStyle(.borderedProminent)
+                    } else if viewModel.isAutoFollowing {
+                        Button("关闭自动跟谱", action: viewModel.toggleAutoFollow)
+                    } else {
+                        Button("从轨迹起点开始", action: viewModel.startAutoFollowFromBeginning)
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!viewModel.hasUsableReadingTrack)
+                    }
+
+                    Divider()
+                    Button("重新记录", action: viewModel.startReadingTrackRecording)
+                    Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
+                }
             }
         }
     }
@@ -589,21 +528,6 @@ struct PdfPracticeView: View {
     private func changeScale(by offset: Double) {
         viewModel.manualViewportInteraction()
         viewModel.setScale(viewModel.scaleFactor + offset)
-    }
-
-    private func setLoopEnabled(_ enabled: Bool) {
-        viewModel.loopEnabled = enabled
-        viewModel.updateAudioSettings()
-    }
-
-    private var loopSummary: String {
-        viewModel.loopEnabled ? "A/B 循环已开启" : "A/B 循环关闭"
-    }
-
-    private var loopDetail: String {
-        let a = viewModel.pointA.map(format) ?? "未设 A"
-        let b = viewModel.pointB.map(format) ?? "未设 B"
-        return "\(a) → \(b)"
     }
 
     private var metronomeSummary: String {
