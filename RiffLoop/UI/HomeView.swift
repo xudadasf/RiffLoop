@@ -9,79 +9,57 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    HStack(spacing: 20) {
-                        practiceCard(
-                            title: "视频练习",
-                            subtitle: "播放、节拍器与 A/B 循环",
-                            systemImage: "play.rectangle.fill"
-                        ) {
-                            PracticeView(initialURL: mostRecentURL(for: .video))
+                VStack(alignment: .leading, spacing: 16) {
+                    welcomeHeader
+                    continuePracticeCard
+
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 16) {
+                            startPracticeCard
+                                .frame(minWidth: 520, maxWidth: .infinity)
+                            practiceSummaryCard
+                                .frame(width: 340)
                         }
 
-                        practiceCard(
-                            title: "Guitar Pro 乐谱",
-                            subtitle: "音符级循环与内嵌伴奏",
-                            systemImage: "music.note.list"
-                        ) {
-                            GpPracticeView(initialURL: mostRecentURL(for: .guitarPro))
-                        }
-
-                        practiceCard(
-                            title: "PDF 谱面",
-                            subtitle: "伴奏、轨迹与自动跟谱",
-                            systemImage: "doc.richtext.fill"
-                        ) {
-                            PdfPracticeView(initialURL: mostRecentURL(for: .pdf))
+                        VStack(spacing: 16) {
+                            startPracticeCard
+                            practiceSummaryCard
                         }
                     }
-
-                    practiceCalendarCard
-                    signingStatusCard
 
                     if !recentProjects.projects.isEmpty {
-                        Text("最近项目")
-                            .font(.title3.bold())
-                        LazyVStack(spacing: 8) {
-                            ForEach(recentProjects.projects) { project in
-                                HStack(spacing: 12) {
-                                    NavigationLink {
-                                        destination(for: project)
-                                    } label: {
-                                        Label(project.fileName, systemImage: iconName(for: project.kind))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    Button(role: .destructive) {
-                                        recentProjects.remove(
-                                            kind: project.kind,
-                                            fileName: project.fileName
-                                        )
-                                    } label: {
-                                        Label("移除记录", systemImage: "trash")
-                                            .labelStyle(.iconOnly)
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-                                .padding(14)
-                                .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                        HStack {
+                            Text("最近项目")
+                                .font(.headline)
+                            Spacer()
+                            NavigationLink {
+                                recentProjectsPage
+                            } label: {
+                                Label("查看全部", systemImage: "chevron.right")
+                                    .labelStyle(.titleAndIcon)
                             }
+                            .buttonStyle(.bordered)
                         }
+                        .padding(.top, 2)
                     }
                 }
-                .padding(28)
+                .frame(maxWidth: 1_180, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity)
             }
-            .background {
-                LinearGradient(
-                    colors: [Color(red: 0.08, green: 0.09, blue: 0.13), .black],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-            }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("RiffLoop")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isSigningHelpPresented = true
+                    } label: {
+                        Label(signingCompactTitle, systemImage: signingStatusIcon)
+                    }
+                    .tint(signingStatusColor)
+                }
+            }
             .onAppear(perform: refreshSigningStatus)
             .sheet(isPresented: $isSigningHelpPresented) {
                 signingHelp
@@ -89,67 +67,221 @@ struct HomeView: View {
         }
     }
 
-    private var practiceCalendarCard: some View {
-        let days = practiceHistory.calendarDays()
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
-
-        return HStack(alignment: .center, spacing: 28) {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("练习日历", systemImage: "calendar.badge.clock")
-                    .font(.title3.bold())
-                    .foregroundStyle(.orange)
-                Text("颜色越深，练习时间越长")
+    private var welcomeHeader: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(greeting)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                Text("继续今天的练习")
+                    .font(.largeTitle.bold())
+            }
 
-                HStack(spacing: 24) {
-                    practiceMetric("今天", seconds: practiceHistory.seconds(on: Date()))
-                    practiceMetric("本周", seconds: practiceHistory.secondsThisWeek())
-                    practiceMetric("累计", seconds: practiceHistory.totalSeconds)
+            Spacer()
+
+            Text("本周已练习 \(formatPracticeDuration(practiceHistory.secondsThisWeek()))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var continuePracticeCard: some View {
+        if let project = mostRecentProject {
+            ZStack(alignment: .trailing) {
+                LinearGradient(
+                    colors: [Color(.label), Color(.secondaryLabel)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Image(systemName: iconName(for: project.kind))
+                    .font(.system(size: 150, weight: .semibold))
+                    .foregroundStyle(Color(.systemBackground).opacity(0.08))
+                    .padding(.trailing, 54)
+
+                HStack(alignment: .bottom, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("最近练习 · \(project.kind.title)")
+                            .font(.caption.bold())
+                            .textCase(.uppercase)
+                            .foregroundStyle(Color(.systemBackground).opacity(0.68))
+                        Text(project.fileName)
+                            .font(.title.bold())
+                            .foregroundStyle(Color(.systemBackground))
+                            .lineLimit(1)
+                        Text("上次打开：\(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.subheadline)
+                            .foregroundStyle(Color(.systemBackground).opacity(0.68))
+
+                        HStack(spacing: 10) {
+                            NavigationLink {
+                                destination(for: project)
+                            } label: {
+                                Label("继续练习", systemImage: "play.fill")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color(.systemBackground))
+                            .foregroundStyle(Color(.label))
+
+                            NavigationLink {
+                                recentProjectsPage
+                            } label: {
+                                Text("打开其他文件")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(Color(.systemBackground))
+                        }
+                    }
+
+                    Spacer(minLength: 80)
+
+                    VStack(alignment: .trailing, spacing: 5) {
+                        Text("最近模式")
+                            .font(.caption)
+                            .foregroundStyle(Color(.systemBackground).opacity(0.62))
+                        Label(project.kind.folderName, systemImage: iconName(for: project.kind))
+                            .font(.headline)
+                            .foregroundStyle(Color(.systemBackground))
+                    }
                 }
+                .padding(26)
+            }
+            .frame(minHeight: 210)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("选择一个练习模式开始", systemImage: "music.note")
+                    .font(.title2.bold())
+                Text("打开过文件后，这里会显示“继续练习”入口。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 160, alignment: .leading)
+            .padding(24)
+            .cardSurface()
+        }
+    }
 
-                Text("按天统计从此版本开始，原有各文件累计时长保持不变。")
+    private var startPracticeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("开始新的练习")
+                    .font(.headline)
+                Spacer()
+                Text("从文件库选择")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Spacer(minLength: 12)
+            HStack(spacing: 10) {
+                modeButton(for: .video)
+                modeButton(for: .guitarPro)
+                modeButton(for: .pdf)
+            }
+        }
+        .padding(18)
+        .cardSurface()
+    }
+
+    private var practiceSummaryCard: some View {
+        let days = practiceHistory.calendarDays(weeks: 2)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("练习概览")
+                    .font(.headline)
+                Spacer()
+                Text("过去 14 天")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 24) {
+                practiceMetric("今天", seconds: practiceHistory.seconds(on: Date()))
+                practiceMetric("本周", seconds: practiceHistory.secondsThisWeek())
+                practiceMetric("累计", seconds: practiceHistory.totalSeconds)
+            }
 
             LazyVGrid(columns: columns, spacing: 5) {
-                ForEach(Array(practiceHistory.weekdaySymbols().enumerated()), id: \.offset) { _, symbol in
-                    Text(symbol)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
                 ForEach(days) { day in
                     RoundedRectangle(cornerRadius: 4)
                         .fill(practiceColor(for: day))
-                        .aspectRatio(1, contentMode: .fit)
+                        .frame(height: 12)
                         .overlay {
                             if Calendar.current.isDateInToday(day.date) {
                                 RoundedRectangle(cornerRadius: 4)
-                                    .stroke(.orange, lineWidth: 2)
+                                    .stroke(.orange, lineWidth: 1.5)
                             }
                         }
                         .accessibilityLabel(day.date.formatted(date: .abbreviated, time: .omitted))
                         .accessibilityValue(formatPracticeDuration(day.seconds))
                 }
             }
-            .frame(width: 240)
         }
-        .padding(20)
-        .background(
-            LinearGradient(
-                colors: [Color.orange.opacity(0.13), Color.white.opacity(0.06)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 18)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.orange.opacity(0.22), lineWidth: 1)
+        .padding(18)
+        .cardSurface()
+    }
+
+    private func modeButton(for kind: PracticeKind) -> some View {
+        NavigationLink {
+            modeDestination(for: kind)
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                Image(systemName: iconName(for: kind))
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(modeColor(for: kind))
+                    .frame(width: 42, height: 42)
+                    .background(modeColor(for: kind).opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                Text(kind.title)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(modeDetail(for: kind))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 94, alignment: .leading)
+            .padding(12)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color(.separator), lineWidth: 0.5)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
+        .buttonStyle(.plain)
+    }
+
+    private var recentProjectsPage: some View {
+        List {
+            ForEach(recentProjects.projects) { project in
+                NavigationLink {
+                    destination(for: project)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(project.fileName)
+                            Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: iconName(for: project.kind))
+                            .foregroundStyle(modeColor(for: project.kind))
+                    }
+                }
+                .swipeActions {
+                    Button("移除", role: .destructive) {
+                        recentProjects.remove(kind: project.kind, fileName: project.fileName)
+                    }
+                }
+            }
+        }
+        .navigationTitle("最近项目")
     }
 
     private func practiceMetric(_ title: String, seconds: TimeInterval) -> some View {
@@ -163,9 +295,9 @@ struct HomeView: View {
     }
 
     private func practiceColor(for day: PracticeDay) -> Color {
-        guard !day.isFuture else { return Color.white.opacity(0.08) }
+        guard !day.isFuture else { return Color(.quaternarySystemFill) }
         let minutes = day.seconds / 60
-        if minutes == 0 { return .white }
+        if minutes == 0 { return Color(.quaternarySystemFill) }
         if minutes < 5 { return Color.orange.opacity(0.3) }
         if minutes < 15 { return Color.orange.opacity(0.5) }
         if minutes < 30 { return Color.orange.opacity(0.7) }
@@ -180,29 +312,86 @@ struct HomeView: View {
         return minutes == 0 ? "\(hours) 小时" : "\(hours)小时 \(minutes)分"
     }
 
-    private var signingStatusCard: some View {
-        HStack(spacing: 16) {
-            Image(systemName: signingStatusIcon)
-                .font(.title2)
-                .foregroundStyle(signingStatusColor)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(signingStatusTitle)
-                    .font(.headline)
-                Text(signingStatusDetail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button("重新检测", action: refreshSigningStatus)
-                .buttonStyle(.bordered)
-            Button("无线续签步骤") { isSigningHelpPresented = true }
-                .buttonStyle(.borderedProminent)
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5 ..< 12: "上午好"
+        case 12 ..< 18: "下午好"
+        default: "晚上好"
         }
-        .padding(16)
-        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var mostRecentProject: RecentProject? {
+        recentProjects.projects.first { project in
+            let url = url(for: project)
+            return project.kind.supportedExtensions.contains(url.pathExtension.lowercased())
+                && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+    }
+
+    private func url(for project: RecentProject) -> URL {
+        RiffLoopDocumentStore()
+            .folderURL(for: project.kind)
+            .appendingPathComponent(project.fileName)
+    }
+
+    @ViewBuilder
+    private func destination(for project: RecentProject) -> some View {
+        let projectURL = url(for: project)
+        switch project.kind {
+        case .video:
+            PracticeView(initialURL: projectURL)
+        case .guitarPro:
+            GpPracticeView(initialURL: projectURL)
+        case .pdf:
+            PdfPracticeView(initialURL: projectURL)
+        }
+    }
+
+    @ViewBuilder
+    private func modeDestination(for kind: PracticeKind) -> some View {
+        switch kind {
+        case .video:
+            PracticeView(initialURL: nil)
+        case .guitarPro:
+            GpPracticeView(initialURL: nil)
+        case .pdf:
+            PdfPracticeView(initialURL: nil)
+        }
+    }
+
+    private func iconName(for kind: PracticeKind) -> String {
+        switch kind {
+        case .video: "play.rectangle.fill"
+        case .guitarPro: "music.note.list"
+        case .pdf: "doc.richtext.fill"
+        }
+    }
+
+    private func modeColor(for kind: PracticeKind) -> Color {
+        switch kind {
+        case .video: .blue
+        case .guitarPro: .orange
+        case .pdf: .red
+        }
+    }
+
+    private func modeDetail(for kind: PracticeKind) -> String {
+        switch kind {
+        case .video: "节拍器 · A/B 循环"
+        case .guitarPro: "音符跟谱 · 循环"
+        case .pdf: "节拍器 · 自动跟谱"
+        }
+    }
+
+    private var signingCompactTitle: String {
+        guard let expirationDate = signingStatus.expirationDate else { return signingStatusTitle }
+        let days = max(0, Int(ceil(expirationDate.timeIntervalSinceNow / (24 * 60 * 60))))
+        switch signingStatus.kind {
+        case .valid: "签名有效 · \(days) 天"
+        case .expiringSoon: "签名剩 \(days) 天"
+        case .expired: "签名已过期"
+        case .unavailable: signingStatusTitle
+        }
     }
 
     private var signingHelp: some View {
@@ -252,21 +441,6 @@ struct HomeView: View {
         }
     }
 
-    private var signingStatusDetail: String {
-        guard let expirationDate = signingStatus.expirationDate else {
-            return "模拟器、未签名构建或描述文件格式无法识别"
-        }
-        let remainingDays = max(
-            0,
-            Int(ceil(expirationDate.timeIntervalSinceNow / (24 * 60 * 60)))
-        )
-        let date = expirationDate.formatted(date: .abbreviated, time: .shortened)
-        if signingStatus.kind == .expired {
-            return "到期时间：\(date) · 请使用 Sideloadly 覆盖续签"
-        }
-        return "到期时间：\(date) · 约剩 \(remainingDays) 天 · 仅作提醒，以系统校验为准"
-    }
-
     private var signingStatusIcon: String {
         switch signingStatus.kind {
         case .valid: "checkmark.shield.fill"
@@ -288,78 +462,15 @@ struct HomeView: View {
     private func refreshSigningStatus() {
         signingStatus = .current()
     }
+}
 
-    @ViewBuilder
-    private func destination(for project: RecentProject) -> some View {
-        let url = RiffLoopDocumentStore()
-            .folderURL(for: project.kind)
-            .appendingPathComponent(project.fileName)
-
-        switch project.kind {
-        case .video:
-            PracticeView(initialURL: url)
-        case .guitarPro:
-            GpPracticeView(initialURL: url)
-        case .pdf:
-            PdfPracticeView(initialURL: url)
-        }
-    }
-
-    private func iconName(for kind: PracticeKind) -> String {
-        switch kind {
-        case .video: "film"
-        case .guitarPro: "music.note.list"
-        case .pdf: "doc.richtext"
-        }
-    }
-
-    private func mostRecentURL(for kind: PracticeKind) -> URL? {
-        let folder = RiffLoopDocumentStore().folderURL(for: kind)
-        return recentProjects.projects
-            .lazy
-            .filter { $0.kind == kind }
-            .map { folder.appendingPathComponent($0.fileName) }
-            .first { url in
-                kind.supportedExtensions.contains(url.pathExtension.lowercased())
-                    && (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-            }
-    }
-
-    private func practiceCard<Destination: View>(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        @ViewBuilder destination: () -> Destination
-    ) -> some View {
-        NavigationLink(destination: destination) {
-            VStack(alignment: .leading, spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 42, weight: .semibold))
-                    .foregroundStyle(.orange)
-                Spacer()
-                Text(title)
-                    .font(.title2.bold())
-                    .foregroundStyle(.primary)
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: 220, alignment: .leading)
-            .padding(22)
-            .background(
-                LinearGradient(
-                    colors: [Color.white.opacity(0.12), Color.white.opacity(0.06)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 18)
-            )
+private extension View {
+    func cardSurface() -> some View {
+        background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(Color(.separator), lineWidth: 0.5)
             }
-            .shadow(color: .black.opacity(0.22), radius: 12, y: 6)
-        }
-        .buttonStyle(.plain)
+            .shadow(color: .black.opacity(0.05), radius: 12, y: 5)
     }
 }

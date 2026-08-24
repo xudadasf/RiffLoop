@@ -175,9 +175,13 @@ assert.doesNotMatch(
 for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
     assert.match(source, /PracticeHistoryStore\.shared\.record\(/, "every practice mode must update daily history");
 }
-assert.match(homeView, /练习日历[\s\S]*?颜色越深，练习时间越长/);
+assert.match(homeView, /继续今天的练习[\s\S]*?continuePracticeCard/);
+assert.match(homeView, /开始新的练习[\s\S]*?modeButton\(for: \.video\)[\s\S]*?modeButton\(for: \.guitarPro\)[\s\S]*?modeButton\(for: \.pdf\)/);
+assert.match(homeView, /calendarDays\(weeks: 2\)[\s\S]*?练习概览/);
+assert.match(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signingCompactTitle/);
+assert.match(homeView, /最近项目[\s\S]*?recentProjectsPage/);
+assert.doesNotMatch(homeView, /private var signingStatusCard/);
 assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
-assert.match(homeView, /if minutes == 0 \{ return \.white \}/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
 assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");
 
