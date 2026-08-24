@@ -129,8 +129,18 @@ check("the video surface cannot bypass RiffLoop transport controls", () => {
 check("the video page keeps the content full-width with GP-style bottom tools", () => {
     assert.match(viewSource, /\.safeAreaInset\(edge: \.bottom, spacing: 0\) \{[\s\S]*?controlDeck/);
     assert.match(viewSource, /private enum VideoControlPanel[\s\S]*?case loop[\s\S]*?case metronome[\s\S]*?case sound/);
-    assert.match(viewSource, /\.popover\(isPresented: panelBinding\(for: panel\), arrowEdge: \.bottom\)/);
+    assert.match(viewSource, /\.overlay\(alignment: \.bottomTrailing\) \{[\s\S]*?if let panel = activePanel/);
     assert.doesNotMatch(viewSource, /sideControls\s*\.frame\(width: 360\)/);
+});
+
+check("video settings stay open while transport remains interactive", () => {
+    assert.doesNotMatch(viewSource, /\.popover\(isPresented: panelBinding\(for: panel\)/);
+    assert.match(
+        viewSource,
+        /videoArea[\s\S]*?simultaneousGesture\([\s\S]*?activePanel = nil/,
+        "tapping the video display must dismiss settings"
+    );
+    assert.match(viewSource, /if let panel = activePanel \{[\s\S]*?panelContent\(panel\)/);
 });
 
 for (const result of checks) {

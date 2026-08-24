@@ -47,6 +47,9 @@ struct GpPracticeView: View {
 
     var body: some View {
         GpWebView(viewModel: viewModel)
+            .simultaneousGesture(
+                TapGesture().onEnded { activePanel = nil }
+            )
             .overlay {
                 if viewModel.score == nil {
                     emptyScoreView
@@ -68,9 +71,20 @@ struct GpPracticeView: View {
                     .padding()
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if let panel = activePanel {
+                    panelContent(panel)
+                        .frame(width: 420, height: 540)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
+                        .padding(16)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 controlDeck
             }
+            .animation(.snappy, value: activePanel)
             .navigationTitle(viewModel.score?.title ?? "Guitar Pro 练习")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -272,11 +286,6 @@ struct GpPracticeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .popover(isPresented: panelBinding(for: panel), arrowEdge: .bottom) {
-            panelContent(panel)
-                .frame(width: 420, height: 540)
-                .presentationCompactAdaptation(.popover)
-        }
         .accessibilityHint("打开\(panel.title)设置")
     }
 
@@ -665,19 +674,6 @@ struct GpPracticeView: View {
             viewModel.baseBpm,
             viewModel.currentBpm,
             viewModel.playbackSpeed
-        )
-    }
-
-    private func panelBinding(for panel: GpControlPanel) -> Binding<Bool> {
-        Binding(
-            get: { activePanel == panel },
-            set: { isPresented in
-                if isPresented {
-                    activePanel = panel
-                } else if activePanel == panel {
-                    activePanel = nil
-                }
-            }
         )
     }
 

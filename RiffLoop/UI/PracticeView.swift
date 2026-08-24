@@ -48,6 +48,9 @@ struct PracticeView: View {
 
     var body: some View {
         videoArea
+            .simultaneousGesture(
+                TapGesture().onEnded { activePanel = nil }
+            )
             .overlay(alignment: .topTrailing) {
                 if viewModel.hasMedia {
                     playbackStateBadge
@@ -64,9 +67,20 @@ struct PracticeView: View {
                     .padding()
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if let panel = activePanel {
+                    panelContent(panel)
+                        .frame(width: 420, height: 540)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
+                        .padding(16)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 controlDeck
             }
+            .animation(.snappy, value: activePanel)
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("视频练习")
             .navigationBarTitleDisplayMode(.inline)
@@ -233,11 +247,6 @@ struct PracticeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .popover(isPresented: panelBinding(for: panel), arrowEdge: .bottom) {
-            panelContent(panel)
-                .frame(width: 420, height: 540)
-                .presentationCompactAdaptation(.popover)
-        }
     }
 
     @ViewBuilder
@@ -747,19 +756,6 @@ struct PracticeView: View {
                 .monospacedDigit()
         }
         .frame(minWidth: 108, alignment: .leading)
-    }
-
-    private func panelBinding(for panel: VideoControlPanel) -> Binding<Bool> {
-        Binding(
-            get: { activePanel == panel },
-            set: { isPresented in
-                if isPresented {
-                    activePanel = panel
-                } else if activePanel == panel {
-                    activePanel = nil
-                }
-            }
-        )
     }
 
     private var loopSummary: String {

@@ -184,7 +184,7 @@ assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossin
 assert.match(pdfView, /\.safeAreaInset\(edge: \.bottom, spacing: 0\)[\s\S]*?controlDeck/);
 assert.match(pdfView, /toolButton\(\.sound,[\s\S]*?toolButton\(\.follow,/);
 assert.match(pdfView, /\.background\(\.ultraThinMaterial\)/);
-assert.match(pdfView, /\.popover\(isPresented: panelBinding\(for: panel\), arrowEdge: \.bottom\)/);
+assert.match(pdfView, /\.overlay\(alignment: \.bottomTrailing\)[\s\S]*?if let panel = activePanel/);
 assert.match(pdfView, /暂停伴奏|播放伴奏/);
 assert.match(pdfView, /暂停节拍器|启动节拍器/);
 assert.match(pdfView, /伴奏开头＝第1拍/);

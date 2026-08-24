@@ -10,6 +10,7 @@ struct PdfKitView: UIViewRepresentable {
     let onPageChanged: (Int) -> Void
     let onProgressChanged: (Double) -> Void
     let onScaleChanged: (Double) -> Void
+    let onTap: () -> Void
     let onManualInteraction: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -34,6 +35,13 @@ struct PdfKitView: UIViewRepresentable {
         pan.cancelsTouchesInView = false
         pan.delegate = context.coordinator
         view.addGestureRecognizer(pan)
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.didTap(_:))
+        )
+        tap.cancelsTouchesInView = false
+        tap.delegate = context.coordinator
+        view.addGestureRecognizer(tap)
         NotificationCenter.default.addObserver(
             context.coordinator,
             selector: #selector(Coordinator.pageChanged(_:)),
@@ -132,6 +140,10 @@ struct PdfKitView: UIViewRepresentable {
 
         @objc func didPan(_ recognizer: UIPanGestureRecognizer) {
             if recognizer.state == .began { parent.onManualInteraction() }
+        }
+
+        @objc func didTap(_ recognizer: UITapGestureRecognizer) {
+            if recognizer.state == .ended { parent.onTap() }
         }
 
         @objc func pageChanged(_ notification: Notification) {

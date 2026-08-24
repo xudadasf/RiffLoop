@@ -9,6 +9,10 @@ const script = readFileSync(
     new URL("../RiffLoop/Resources/GpWeb/riffloop-gp.js", import.meta.url),
     "utf8"
 );
+const gpView = readFileSync(
+    new URL("../RiffLoop/GP/GpPracticeView.swift", import.meta.url),
+    "utf8"
+);
 
 const cssRule = (selector) => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -97,6 +101,21 @@ assert.match(
     script,
     /cancelRangePreview\(\) \{[\s\S]*?if \(bars\)[\s\S]*?else \{[\s\S]*?pendingRangeHighlight = null;[\s\S]*?clearPlaybackRangeHighlight\(\)/,
     "cancelling an uncommitted selection must not let a later state change restore it"
+);
+assert.doesNotMatch(
+    gpView,
+    /\.popover\(isPresented: panelBinding\(for: panel\)/,
+    "GP settings must stay non-modal so transport controls remain interactive"
+);
+assert.match(
+    gpView,
+    /GpWebView\(viewModel: viewModel\)[\s\S]*?simultaneousGesture\([\s\S]*?activePanel = nil/,
+    "tapping the GP score must dismiss the non-modal settings panel"
+);
+assert.match(
+    gpView,
+    /if let panel = activePanel \{[\s\S]*?panelContent\(panel\)/,
+    "the selected GP settings must render as an in-page overlay"
 );
 {
     const start = script.indexOf("    const seekBoth = (tick, options = {}) => {");

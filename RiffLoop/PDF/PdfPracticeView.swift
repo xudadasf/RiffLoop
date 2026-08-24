@@ -57,9 +57,8 @@ struct PdfPracticeView: View {
                     onPageChanged: viewModel.setPage,
                     onProgressChanged: viewModel.setVerticalProgress,
                     onScaleChanged: viewModel.setScale,
-                    onManualInteraction: {
-                        viewModel.manualViewportInteraction()
-                    }
+                    onTap: { activePanel = nil },
+                    onManualInteraction: viewModel.manualViewportInteraction
                 )
                 .ignoresSafeArea(edges: .bottom)
             } else {
@@ -89,11 +88,22 @@ struct PdfPracticeView: View {
                 }
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if let panel = activePanel {
+                panelContent(panel)
+                    .frame(width: 420, height: 540)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
+                    .padding(16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if viewModel.document != nil {
                 controlDeck
             }
         }
+        .animation(.snappy, value: activePanel)
         .navigationTitle(viewModel.pdfFileName ?? "PDF 谱面")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -300,11 +310,6 @@ struct PdfPracticeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .popover(isPresented: panelBinding(for: panel), arrowEdge: .bottom) {
-            panelContent(panel)
-                .frame(width: 420, height: 540)
-                .presentationCompactAdaptation(.popover)
-        }
     }
 
     @ViewBuilder
@@ -589,19 +594,6 @@ struct PdfPracticeView: View {
     private func setLoopEnabled(_ enabled: Bool) {
         viewModel.loopEnabled = enabled
         viewModel.updateAudioSettings()
-    }
-
-    private func panelBinding(for panel: PdfControlPanel) -> Binding<Bool> {
-        Binding(
-            get: { activePanel == panel },
-            set: { isPresented in
-                if isPresented {
-                    activePanel = panel
-                } else if activePanel == panel {
-                    activePanel = nil
-                }
-            }
-        )
     }
 
     private var loopSummary: String {

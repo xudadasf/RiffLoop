@@ -94,13 +94,33 @@ assert.match(
 );
 assert.match(
     pdfView,
-    /\.popover\(isPresented: panelBinding\(for: panel\), arrowEdge: \.bottom\)/,
-    "PDF tool cards must open native iPad popovers"
+    /\.overlay\(alignment: \.bottomTrailing\) \{[\s\S]*?if let panel = activePanel/,
+    "PDF tool cards must open an in-page iPad settings panel"
 );
 assert.doesNotMatch(
     pdfView,
     /\.task\(id: controlsVisible\)|practicePanel\s*\.frame\(width: 340\)/,
     "PDF controls must not auto-hide or cover the score with the legacy side panel"
+);
+assert.doesNotMatch(
+    pdfView,
+    /\.popover\(isPresented: panelBinding\(for: panel\)/,
+    "PDF settings must stay non-modal so transport controls remain interactive"
+);
+assert.match(
+    pdfView,
+    /onTap: \{ activePanel = nil \},[\s\S]*?onManualInteraction: viewModel\.manualViewportInteraction/,
+    "interacting with the PDF display must dismiss settings"
+);
+assert.match(
+    pdfKitView,
+    /UITapGestureRecognizer\([\s\S]*?didTap[\s\S]*?parent\.onTap\(\)/,
+    "PDF taps must be reported separately from scroll and zoom interactions"
+);
+assert.match(
+    pdfView,
+    /if let panel = activePanel \{[\s\S]*?panelContent\(panel\)/,
+    "the selected PDF settings must render as an in-page overlay"
 );
 
 console.log("PDF mode policies passed");
