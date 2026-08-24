@@ -387,10 +387,10 @@ struct HomeView: View {
         guard let expirationDate = signingStatus.expirationDate else { return signingStatusTitle }
         let days = max(0, Int(ceil(expirationDate.timeIntervalSinceNow / (24 * 60 * 60))))
         switch signingStatus.kind {
-        case .valid: "签名有效 · \(days) 天"
-        case .expiringSoon: "签名剩 \(days) 天"
-        case .expired: "签名已过期"
-        case .unavailable: signingStatusTitle
+        case .valid: return "签名有效 · \(days) 天"
+        case .expiringSoon: return "签名剩 \(days) 天"
+        case .expired: return "签名已过期"
+        case .unavailable: return signingStatusTitle
         }
     }
 
