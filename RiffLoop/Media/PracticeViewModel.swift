@@ -6,6 +6,7 @@ import Foundation
 final class PracticeViewModel: ObservableObject {
     @Published private(set) var player = AVPlayer()
     @Published private(set) var hasMedia = false
+    @Published private(set) var isMediaReady = false
     @Published private(set) var isPlaying = false
     @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
@@ -45,6 +46,7 @@ final class PracticeViewModel: ObservableObject {
     private var endObserver: NSObjectProtocol?
     private var isLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
+    private var pendingSeekTime: TimeInterval?
     private var currentFileName: String?
     private var speedLadderBaseRate: Float?
     private var tapTempoTracker = TapTempoTracker()
@@ -86,13 +88,32 @@ final class PracticeViewModel: ObservableObject {
         let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
         observeEnd(of: item)
+        isMediaReady = false
 
         currentTime = max(0, profile.lastPosition)
         duration = 0
         rebuildLoopBoundaryObserver()
         hasMedia = true
         errorMessage = nil
-        player.seek(to: cmTime(currentTime), toleranceBefore: .zero, toleranceAfter: .zero)
+        seek(to: currentTime)
+        Task { @MainActor [weak self] in
+            do {
+                let playable = try await item.asset.load(.isPlayable)
+                let length = try await item.asset.load(.duration).seconds
+                guard let self, self.player.currentItem === item else { return }
+                guard playable, length.isFinite, length > 0 else {
+                    self.hasMedia = false
+                    self.errorMessage = "视频无法播放，请重新选择文件。"
+                    return
+                }
+                self.duration = length
+                self.isMediaReady = true
+            } catch {
+                guard let self, self.player.currentItem === item else { return }
+                self.hasMedia = false
+                self.errorMessage = "视频无法打开：\(error.localizedDescription)"
+            }
+        }
         saveProfile()
     }
 
@@ -107,6 +128,10 @@ final class PracticeViewModel: ObservableObject {
 
     func pause() {
         recordPracticeTime()
+        if pendingSeekTime == nil, isPlaying {
+            let position = player.currentTime().seconds
+            if position.isFinite { currentTime = max(0, position) }
+        }
         transportGeneration &+= 1
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
@@ -114,22 +139,25 @@ final class PracticeViewModel: ObservableObject {
         metronome.stop()
         isPlaying = false
         isLoopTransitioning = false
+        pendingSeekTime = nil
         lastPracticeSampleDate = nil
         saveProfile()
     }
 
     func seek(to seconds: TimeInterval) {
         guard hasMedia else { return }
-        let target = min(max(seconds, 0), duration)
+        let target = duration > 0 ? min(max(seconds, 0), duration) : max(seconds, 0)
         let wasPlaying = isPlaying
         transportGeneration &+= 1
         let generation = transportGeneration
+        pendingSeekTime = target
+        currentTime = target
+        isLoopTransitioning = false
 
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
         player.pause()
         metronome.stop()
-        isPlaying = false
         player.seek(
             to: cmTime(target),
             toleranceBefore: .zero,
@@ -138,6 +166,8 @@ final class PracticeViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.transportGeneration == generation else { return }
                 guard finished else {
+                    self.pendingSeekTime = nil
+                    self.isPlaying = false
                     self.errorMessage = "无法跳转到所选时间。"
                     return
                 }
@@ -147,6 +177,7 @@ final class PracticeViewModel: ObservableObject {
                         Task { @MainActor [weak self] in
                             guard let self, self.transportGeneration == generation else { return }
                             guard ready else {
+                                self.pendingSeekTime = nil
                                 self.isPlaying = false
                                 self.errorMessage = "视频尚未准备好，请重试。"
                                 return
@@ -154,6 +185,9 @@ final class PracticeViewModel: ObservableObject {
                             self.coordinatedStart(at: target)
                         }
                     }
+                } else {
+                    self.pendingSeekTime = nil
+                    self.saveProfile()
                 }
             }
         }
@@ -370,15 +404,17 @@ final class PracticeViewModel: ObservableObject {
     private func preparePlaybackAndStart(at mediaTime: TimeInterval) {
         transportGeneration &+= 1
         let generation = transportGeneration
-        let startTime = validLoopRange.map { range in
+        let startTime = (loopEnabled ? validLoopRange : nil).map { range in
             mediaTime >= range.b ? range.a : mediaTime
         } ?? mediaTime
+        pendingSeekTime = startTime
+        currentTime = startTime
 
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
         player.pause()
         metronome.stop()
-        isPlaying = false
+        isPlaying = true
 
         player.seek(
             to: cmTime(startTime),
@@ -388,6 +424,8 @@ final class PracticeViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.transportGeneration == generation else { return }
                 guard finished else {
+                    self.pendingSeekTime = nil
+                    self.isPlaying = false
                     self.errorMessage = "无法准备视频播放。"
                     return
                 }
@@ -399,6 +437,8 @@ final class PracticeViewModel: ObservableObject {
                             self.transportGeneration == generation
                         else { return }
                         guard ready else {
+                            self.pendingSeekTime = nil
+                            self.isPlaying = false
                             self.errorMessage = "视频尚未准备好，请重试。"
                             return
                         }
@@ -414,7 +454,7 @@ final class PracticeViewModel: ObservableObject {
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
 
-        let startTime = validLoopRange.map { range in
+        let startTime = (loopEnabled ? validLoopRange : nil).map { range in
             mediaTime >= range.b ? range.a : mediaTime
         } ?? mediaTime
 
@@ -459,6 +499,7 @@ final class PracticeViewModel: ObservableObject {
             }
 
             isPlaying = true
+            pendingSeekTime = nil
             currentTime = startTime
             lastPracticeSampleDate = Date()
             errorMessage = nil
@@ -466,6 +507,7 @@ final class PracticeViewModel: ObservableObject {
             player.pause()
             metronome.stop()
             isPlaying = false
+            pendingSeekTime = nil
             errorMessage = "音频引擎启动失败：\(error.localizedDescription)"
         }
     }
@@ -574,8 +616,11 @@ final class PracticeViewModel: ObservableObject {
         ) { [weak self] time in
             guard let self else { return }
             Task { @MainActor in
-                let seconds = time.seconds
-                if seconds.isFinite {
+                // AVPlayer callbacks can be queued before a seek, then arrive after it.
+                // Only a running, settled transport may replace the user's seek target.
+                let seconds = self.player.currentTime().seconds
+                if self.isPlaying, self.pendingSeekTime == nil,
+                   !self.isLoopTransitioning, seconds.isFinite {
                     self.currentTime = max(0, seconds)
                     self.updateCurrentBeat()
                     self.recordPracticeTime()

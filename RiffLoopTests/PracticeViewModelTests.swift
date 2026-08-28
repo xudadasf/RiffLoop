@@ -5,7 +5,7 @@ import XCTest
 @MainActor
 final class PracticeViewModelTests: XCTestCase {
     func testPausedSeekThenPlayUsesNewPosition() async throws {
-        let url = try makeTransportAudioFixture()
+        let url = try await makeTransportVideoFixture()
         defer { try? FileManager.default.removeItem(at: url) }
         let model = PracticeViewModel()
         model.openMedia(at: url)
@@ -17,7 +17,7 @@ final class PracticeViewModelTests: XCTestCase {
         model.seek(to: 5)
         try await waitForTransport { abs(model.currentTime - 5) < 0.05 }
         model.togglePlayback()
-        try await waitForTransport { model.isPlaying }
+        try await waitForTransport { model.player.timeControlStatus == .playing }
         try await Task.sleep(for: .milliseconds(350))
         XCTAssertGreaterThan(model.player.currentTime().seconds, 5)
         XCTAssertLessThan(model.player.currentTime().seconds, 6)
@@ -36,7 +36,7 @@ final class PracticeViewModelTests: XCTestCase {
         model.seek(to: 2)
         model.seek(to: 5)
         model.togglePlayback()
-        try await waitForTransport { model.isPlaying }
+        try await waitForTransport { model.player.timeControlStatus == .playing }
         try await Task.sleep(for: .milliseconds(350))
         XCTAssertGreaterThan(model.player.currentTime().seconds, 5)
     }
@@ -57,9 +57,34 @@ final class PracticeViewModelTests: XCTestCase {
         model.seek(to: 5)
         try await waitForTransport { abs(model.currentTime - 5) < 0.05 }
         model.togglePlayback()
-        try await waitForTransport { model.isPlaying }
+        try await waitForTransport { model.player.timeControlStatus == .playing }
         try await Task.sleep(for: .milliseconds(350))
         XCTAssertGreaterThan(model.player.currentTime().seconds, 5)
+    }
+
+    func testRapidSkipsKeepPlayingAndPauseCancelsPendingResume() async throws {
+        let url = try makeTransportAudioFixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let model = PracticeViewModel()
+        model.openMedia(at: url)
+        defer { model.pause() }
+        model.togglePlayback()
+        try await waitForTransport { model.currentTime > 0.25 }
+        model.skip(by: 5)
+        model.skip(by: -5)
+        model.skip(by: 5)
+        try await waitForTransport { model.player.currentTime().seconds > 5 && model.player.rate > 0 }
+        XCTAssertTrue(model.isPlaying)
+        model.seek(to: 2)
+        model.pause()
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertEqual(model.player.rate, 0)
+        XCTAssertEqual(model.currentTime, 2, accuracy: 0.05)
+        model.togglePlayback()
+        try await waitForTransport { model.player.timeControlStatus == .playing }
+        XCTAssertGreaterThanOrEqual(model.player.currentTime().seconds, 1.95)
+        XCTAssertLessThan(model.player.currentTime().seconds, 3)
     }
 }
 
