@@ -10,10 +10,10 @@ final class PracticeViewModelTests: XCTestCase {
         let model = PracticeViewModel()
         model.openMedia(at: url)
         defer { model.pause() }
-        try await waitForTransport { model.duration > 7 }
         model.togglePlayback()
         try await waitForTransport { model.currentTime > 0.25 }
         model.pause()
+        XCTAssertGreaterThan(model.duration, 7)
         model.seek(to: 5)
         try await waitForTransport { abs(model.currentTime - 5) < 0.05 }
         model.togglePlayback()
@@ -29,7 +29,10 @@ final class PracticeViewModelTests: XCTestCase {
         let model = PracticeViewModel()
         model.openMedia(at: url)
         defer { model.pause() }
-        try await waitForTransport { model.duration > 7 }
+        model.togglePlayback()
+        try await waitForTransport { model.currentTime > 0.25 }
+        model.pause()
+        XCTAssertGreaterThan(model.duration, 7)
         model.seek(to: 2)
         model.seek(to: 5)
         model.togglePlayback()
@@ -44,7 +47,10 @@ final class PracticeViewModelTests: XCTestCase {
         let model = PracticeViewModel()
         model.openMedia(at: url)
         defer { model.pause() }
-        try await waitForTransport { model.duration > 7 }
+        model.togglePlayback()
+        try await waitForTransport { model.currentTime > 0.25 }
+        model.pause()
+        XCTAssertGreaterThan(model.duration, 7)
         model.pointA = 1
         model.pointB = 2
         model.loopEnabled = false

@@ -767,6 +767,7 @@ final class PdfPracticeViewModel: ObservableObject {
         }
         player.seek(to: cmTime(target), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
             Task { @MainActor in
+                guard self.transportGeneration == generation else { return }
                 guard finished else {
                     self.isReadingFollowLoopTransitioning = false
                     self.pause()
@@ -777,7 +778,8 @@ final class PdfPracticeViewModel: ObservableObject {
         }
     }
 
-    private func restartReadingFollowLoopIfNeeded() {
+    @discardableResult
+    private func restartReadingFollowLoopIfNeeded() -> Bool {
         guard
             followLoopEnabled,
             isAutoFollowing,
@@ -787,9 +789,10 @@ final class PdfPracticeViewModel: ObservableObject {
             let lastTime = readingPoints.map(\.time).max(),
             currentTime >= lastTime,
             lastTime > firstTime
-        else { return }
+        else { return false }
         isReadingFollowLoopTransitioning = true
         prepareReadingFollow(at: firstTime, startPlayback: true)
+        return true
     }
 
     private func rebuildBoundaryObserver() {
@@ -990,8 +993,13 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     private func handleAudioPlaybackEnded(_ item: AVPlayerItem) {
-        guard player.currentItem === item else { return }
-        let endPosition = duration
+        guard player.currentItem === item, isAudioPlaying else { return }
+        let endPosition = item.duration.seconds.isFinite ? item.duration.seconds : duration
+        // A queued end notification from the preceding round must not stop a new seek/start.
+        guard player.currentTime().seconds >= endPosition - 0.05 else { return }
+        currentTime = endPosition
+        updateAutoFollow()
+        if restartReadingFollowLoopIfNeeded() { return }
         pause()
         currentTime = endPosition
         save()
@@ -1006,13 +1014,16 @@ final class PdfPracticeViewModel: ObservableObject {
 
     private func startMetronomeOnlyClock(anchor: TransportAnchor) {
         metronomeOnlyTimer?.invalidate()
+        let generation = transportGeneration
         let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, self.isMetronomePlaying, !self.isAudioPlaying else { return }
+                guard let self, self.transportGeneration == generation,
+                    self.isMetronomePlaying, !self.isAudioPlaying else { return }
                 let hostTime = CMClockGetTime(CMClockGetHostTimeClock()).seconds
                 self.currentTime = max(0, anchor.mediaTime(forHostTime: hostTime))
                 self.recordPracticeTime()
                 self.updateAutoFollow()
+                self.restartReadingFollowLoopIfNeeded()
                 if Date().timeIntervalSince(self.lastProfileSaveDate) >= 2 {
                     self.save()
                 }
