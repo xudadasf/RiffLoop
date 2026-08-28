@@ -118,6 +118,11 @@ assert.match(
     "reaching the final reading point must return through the follow transport"
 );
 assert.match(
+    pdfViewModel,
+    /func pause\(\) \{[\s\S]*?isReadingFollowLoopTransitioning = false/,
+    "pausing during a follow-loop return must leave the next follow start available"
+);
+assert.match(
     pdfView,
     /Button\(action: viewModel\.toggleReadingFollowPlayback\)/,
     "the PDF bottom play button must operate the reading track"

@@ -180,6 +180,7 @@ final class PdfPracticeViewModel: ObservableObject {
         viewportSaveTask = nil
         activeTransportAnchor = nil
         isLoopTransitioning = false
+        isReadingFollowLoopTransitioning = false
         isAudioPlaying = false
         isMetronomePlaying = false
         lastPracticeSampleDate = nil
@@ -266,6 +267,7 @@ final class PdfPracticeViewModel: ObservableObject {
         countInStopTask = nil
         activeTransportAnchor = nil
         isLoopTransitioning = false
+        isReadingFollowLoopTransitioning = false
         isAudioPlaying = false
         isMetronomePlaying = false
         lastPracticeSampleDate = nil
@@ -568,6 +570,7 @@ final class PdfPracticeViewModel: ObservableObject {
         isAutoFollowing = false
         autoFollowSuspended = false
         followLoopEnabled = false
+        isReadingFollowLoopTransitioning = false
         save()
     }
 
