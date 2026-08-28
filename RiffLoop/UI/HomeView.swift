@@ -1,4 +1,6 @@
+import QuickLookThumbnailing
 import SwiftUI
+import UIKit
 
 struct HomeView: View {
     @EnvironmentObject private var recentProjects: RecentProjectsStore
@@ -17,32 +19,20 @@ struct HomeView: View {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: 16) {
                             startPracticeCard
-                                .frame(minWidth: 520, maxWidth: .infinity)
+                                .frame(minWidth: 520, maxWidth: .infinity, minHeight: 216, maxHeight: 216)
                             practiceSummaryCard
-                                .frame(width: 340)
+                                .frame(width: 340, height: 216)
                         }
 
                         VStack(spacing: 16) {
                             startPracticeCard
+                                .frame(minHeight: 216, maxHeight: 216)
                             practiceSummaryCard
+                                .frame(minHeight: 216, maxHeight: 216)
                         }
                     }
 
-                    if !recentProjects.projects.isEmpty {
-                        HStack {
-                            Text("最近项目")
-                                .font(.headline)
-                            Spacer()
-                            NavigationLink {
-                                recentProjectsPage
-                            } label: {
-                                Label("查看全部", systemImage: "chevron.right")
-                                    .labelStyle(.titleAndIcon)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(.top, 2)
-                    }
+                    if !recentProjects.projects.isEmpty { recentProjectsSection }
                 }
                 .frame(maxWidth: 1_180, alignment: .leading)
                 .padding(.horizontal, 28)
@@ -50,7 +40,6 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("RiffLoop")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -137,14 +126,7 @@ struct HomeView: View {
 
                     Spacer(minLength: 80)
 
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text("最近模式")
-                            .font(.caption)
-                            .foregroundStyle(Color(.systemBackground).opacity(0.62))
-                        Label(project.kind.folderName, systemImage: iconName(for: project.kind))
-                            .font(.headline)
-                            .foregroundStyle(Color(.systemBackground))
-                    }
+                    ProjectPreviewThumbnail(url: url(for: project), kind: project.kind)
                 }
                 .padding(26)
             }
@@ -187,7 +169,7 @@ struct HomeView: View {
     }
 
     private var practiceSummaryCard: some View {
-        let days = practiceHistory.calendarDays(weeks: 2)
+        let days = practiceHistory.calendarDays(weeks: 4)
         let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
 
         return VStack(alignment: .leading, spacing: 14) {
@@ -195,7 +177,7 @@ struct HomeView: View {
                 Text("练习概览")
                     .font(.headline)
                 Spacer()
-                Text("过去 14 天")
+                Text("最近一个月")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -224,6 +206,57 @@ struct HomeView: View {
         }
         .padding(18)
         .cardSurface()
+    }
+
+    private var recentProjectsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("最近项目")
+                    .font(.headline)
+                Spacer()
+                NavigationLink {
+                    recentProjectsPage
+                } label: {
+                    Label("查看全部", systemImage: "chevron.right")
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            ForEach(recentProjects.projects) { project in
+                NavigationLink {
+                    destination(for: project)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: iconName(for: project.kind))
+                            .font(.title3)
+                            .foregroundStyle(modeColor(for: project.kind))
+                            .frame(width: 38, height: 38)
+                            .background(
+                                modeColor(for: project.kind).opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(displayName(for: project))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(12)
+                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 2)
     }
 
     private func modeButton(for kind: PracticeKind) -> some View {
@@ -477,5 +510,52 @@ private extension View {
                     .stroke(Color(.separator), lineWidth: 0.5)
             }
             .shadow(color: .black.opacity(0.05), radius: 12, y: 5)
+    }
+}
+
+private struct ProjectPreviewThumbnail: View {
+    let url: URL
+    let kind: PracticeKind
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: fallbackIcon)
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.68))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.white.opacity(0.12))
+            }
+        }
+        .frame(width: 156, height: 104)
+        .background(.white.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .task(id: url) {
+            image = nil
+            let request = QLThumbnailGenerator.Request(
+                fileAt: url,
+                size: CGSize(width: 312, height: 208),
+                scale: UIScreen.main.scale,
+                representationTypes: .thumbnail
+            )
+            image = try? await QLThumbnailGenerator.shared
+                .generateBestRepresentation(for: request)
+                .uiImage
+        }
+        .accessibilityLabel("\(kind.title)预览")
+    }
+
+    private var fallbackIcon: String {
+        switch kind {
+        case .video: "play.rectangle.fill"
+        case .guitarPro: "music.note.list"
+        case .pdf: "doc.richtext.fill"
+        }
     }
 }

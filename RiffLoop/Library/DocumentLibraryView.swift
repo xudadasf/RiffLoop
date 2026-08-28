@@ -154,7 +154,9 @@ struct DocumentLibraryView: View {
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("刷新", action: model.refresh)
-                    Button("导入") { isImporterPresented = true }
+                    Button { isImporterPresented = true } label: {
+                        Label("导入", systemImage: "folder")
+                    }
                 }
             }
         }

@@ -91,7 +91,9 @@ struct GpPracticeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button("选择文件") { isLibraryPresented = true }
+                    Button { isLibraryPresented = true } label: {
+                        Label("选择文件", systemImage: "folder")
+                    }
                     Menu {
                         if viewModel.loopRange != nil {
                             Button("退出区间循环", role: .destructive, action: viewModel.clearLoop)

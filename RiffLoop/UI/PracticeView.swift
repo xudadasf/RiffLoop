@@ -88,7 +88,9 @@ struct PracticeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button("选择文件") { isLibraryPresented = true }
+                    Button { isLibraryPresented = true } label: {
+                        Label("选择文件", systemImage: "folder")
+                    }
                     Menu {
                         if viewModel.loopEnabled {
                             Button("退出 A/B 循环", role: .destructive, action: viewModel.clearLoop)

@@ -181,9 +181,12 @@ for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
 }
 assert.match(homeView, /继续今天的练习[\s\S]*?continuePracticeCard/);
 assert.match(homeView, /开始新的练习[\s\S]*?modeButton\(for: \.video\)[\s\S]*?modeButton\(for: \.guitarPro\)[\s\S]*?modeButton\(for: \.pdf\)/);
-assert.match(homeView, /calendarDays\(weeks: 2\)[\s\S]*?练习概览/);
+assert.match(homeView, /calendarDays\(weeks: 4\)[\s\S]*?最近一个月/);
 assert.match(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signingCompactTitle/);
 assert.match(homeView, /最近项目[\s\S]*?recentProjectsPage/);
+assert.match(homeView, /ForEach\(recentProjects\.projects\) \{ project in[\s\S]*?destination\(for: project\)/);
+assert.doesNotMatch(homeView, /\.navigationTitle\("RiffLoop"\)/);
+assert.match(homeView, /ProjectPreviewThumbnail[\s\S]*?QLThumbnailGenerator/);
 assert.doesNotMatch(homeView, /private var signingStatusCard/);
 assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
