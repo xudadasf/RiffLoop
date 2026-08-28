@@ -47,6 +47,7 @@ final class PracticeViewModel: ObservableObject {
     private var isLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
     private var pendingSeekTime: TimeInterval?
+    private var readinessObserver: NSKeyValueObservation?
     private var currentFileName: String?
     private var speedLadderBaseRate: Float?
     private var tapTempoTracker = TapTempoTracker()
@@ -133,6 +134,7 @@ final class PracticeViewModel: ObservableObject {
             if position.isFinite { currentTime = max(0, position) }
         }
         transportGeneration &+= 1
+        readinessObserver = nil
         player.cancelPendingPrerolls()
         player.currentItem?.cancelPendingSeeks()
         player.pause()
@@ -150,6 +152,7 @@ final class PracticeViewModel: ObservableObject {
         let wasPlaying = isPlaying
         transportGeneration &+= 1
         let generation = transportGeneration
+        readinessObserver = nil
         pendingSeekTime = target
         currentTime = target
         isLoopTransitioning = false
@@ -173,18 +176,7 @@ final class PracticeViewModel: ObservableObject {
                 }
                 self.currentTime = target
                 if wasPlaying {
-                    self.player.preroll(atRate: self.playbackRate) { [weak self] ready in
-                        Task { @MainActor [weak self] in
-                            guard let self, self.transportGeneration == generation else { return }
-                            guard ready else {
-                                self.pendingSeekTime = nil
-                                self.isPlaying = false
-                                self.errorMessage = "视频尚未准备好，请重试。"
-                                return
-                            }
-                            self.coordinatedStart(at: target)
-                        }
-                    }
+                    self.prerollWhenReady(at: target, generation: generation)
                 } else {
                     self.pendingSeekTime = nil
                     self.saveProfile()
@@ -404,6 +396,7 @@ final class PracticeViewModel: ObservableObject {
     private func preparePlaybackAndStart(at mediaTime: TimeInterval) {
         transportGeneration &+= 1
         let generation = transportGeneration
+        readinessObserver = nil
         let startTime = (loopEnabled ? validLoopRange : nil).map { range in
             mediaTime >= range.b ? range.a : mediaTime
         } ?? mediaTime
@@ -430,19 +423,35 @@ final class PracticeViewModel: ObservableObject {
                     return
                 }
                 self.currentTime = startTime
+                self.prerollWhenReady(at: startTime, generation: generation)
+            }
+        }
+    }
+
+    private func prerollWhenReady(at time: TimeInterval, generation: UInt64) {
+        // A completed seek can precede AVPlayer's readyToPlay status.
+        readinessObserver = player.observe(\.status, options: [.initial, .new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.transportGeneration == generation,
+                    self.readinessObserver != nil else { return }
+                guard self.player.status != .unknown else { return }
+                self.readinessObserver = nil
+                guard self.player.status == .readyToPlay else {
+                    self.pendingSeekTime = nil
+                    self.isPlaying = false
+                    self.errorMessage = "视频尚未准备好，请重新选择文件。"
+                    return
+                }
                 self.player.preroll(atRate: self.playbackRate) { [weak self] ready in
                     Task { @MainActor [weak self] in
-                        guard
-                            let self,
-                            self.transportGeneration == generation
-                        else { return }
+                        guard let self, self.transportGeneration == generation else { return }
                         guard ready else {
                             self.pendingSeekTime = nil
                             self.isPlaying = false
                             self.errorMessage = "视频尚未准备好，请重试。"
                             return
                         }
-                        self.coordinatedStart(at: startTime)
+                        self.coordinatedStart(at: time)
                     }
                 }
             }

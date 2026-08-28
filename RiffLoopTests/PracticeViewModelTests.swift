@@ -4,6 +4,26 @@ import XCTest
 
 @MainActor
 final class PracticeViewModelTests: XCTestCase {
+    func testColdOpenSeekPlayAndPauseCancelsReadinessWait() async throws {
+        let url = try makeTransportAudioFixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        for _ in 0..<3 {
+            let model = PracticeViewModel()
+            model.openMedia(at: url)
+            model.seek(to: 2)
+            model.togglePlayback()
+            model.pause()
+            try await Task.sleep(for: .milliseconds(150))
+            XCTAssertFalse(model.isPlaying)
+            XCTAssertEqual(model.player.rate, 0)
+            model.seek(to: 5)
+            model.togglePlayback()
+            try await waitForTransport { model.player.timeControlStatus == .playing }
+            XCTAssertGreaterThanOrEqual(model.player.currentTime().seconds, 4.95)
+            model.pause()
+        }
+    }
+
     func testPausedSeekThenPlayUsesNewPosition() async throws {
         let url = try await makeTransportVideoFixture()
         defer { try? FileManager.default.removeItem(at: url) }

@@ -49,23 +49,25 @@ check("the first manual play waits for seek and preroll before synchronized star
         "private func preparePlaybackAndStart(at mediaTime: TimeInterval)"
     );
     const seekIndex = body.indexOf("player.seek(");
-    const prerollIndex = body.indexOf("self.player.preroll(atRate:");
-    const startIndex = body.indexOf("self.coordinatedStart(at:");
+    const prerollIndex = body.indexOf("self.prerollWhenReady(at:");
     assert.ok(seekIndex >= 0, "manual start must finish an exact seek first");
     assert.ok(prerollIndex > seekIndex, "manual start must preroll after seeking");
-    assert.ok(startIndex > prerollIndex, "synchronized start must happen after preroll");
+    const readyBody = functionBody(viewModelSource, "private func prerollWhenReady(at time: TimeInterval, generation: UInt64)");
+    const readyIndex = readyBody.indexOf("self.player.status == .readyToPlay");
+    const preloadIndex = readyBody.indexOf("self.player.preroll(atRate:");
+    const startIndex = readyBody.indexOf("self.coordinatedStart(at:");
+    assert.ok(readyIndex >= 0 && preloadIndex > readyIndex, "preroll must wait for player readiness");
+    assert.ok(startIndex > preloadIndex, "synchronized start must happen after preroll");
 });
 
 check("resuming after a seek prerolls before restarting playback", () => {
     const body = functionBody(viewModelSource, "func seek(to seconds: TimeInterval)");
     const cancelIndex = body.indexOf("player.currentItem?.cancelPendingSeeks()");
     const seekIndex = body.indexOf("player.seek(");
-    const prerollIndex = body.indexOf("self.player.preroll(atRate:");
-    const startIndex = body.indexOf("self.coordinatedStart(at: target)");
+    const prerollIndex = body.indexOf("self.prerollWhenReady(at: target, generation: generation)");
     assert.ok(cancelIndex >= 0, "a new seek must cancel an older pending item seek");
     assert.ok(cancelIndex < seekIndex, "old item seeks must be cancelled before the new target is issued");
-    assert.ok(prerollIndex >= 0, "a playing seek must preroll the target frame");
-    assert.ok(startIndex > prerollIndex, "seek must restart only after preroll succeeds");
+    assert.ok(prerollIndex > seekIndex, "a playing seek must wait for readiness and preroll the target frame");
 });
 
 check("metronome fine adjustment keeps the video transport running", () => {
