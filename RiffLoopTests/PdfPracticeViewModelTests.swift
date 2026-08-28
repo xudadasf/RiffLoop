@@ -4,6 +4,28 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testMetronomeOnlyFollowLoopsWithoutAnAudioItem() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let store = FilePracticeSettingsStore()
+        defer {
+            try? FileManager.default.removeItem(at: pdf)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        try store.save(PdfPracticeProfile(readingPoints: [
+            PdfReadingPoint(time: 1, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 1.5, pageIndex: 0, verticalProgress: 0.8)
+        ], followLoopEnabled: true), kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startAutoFollowFromBeginning()
+        defer { model.pause() }
+        try await waitForTransport { model.isPlaying }
+        try await Task.sleep(for: .seconds(2))
+        XCTAssertGreaterThanOrEqual(model.currentTime, 0.9)
+        XCTAssertLessThan(model.currentTime, 1.6, "The metronome clock must return to the first reading point every round")
+        XCTAssertTrue(model.isFollowingTransportActive)
+    }
+
     func testManualSpeedKeepsLadderTargetReachable() {
         let viewModel = PdfPracticeViewModel()
 
