@@ -42,13 +42,13 @@ struct GpCoverPreview: UIViewRepresentable {
         }
 
         func render(in webView: WKWebView) {
-            guard ready, let data = try? Data(contentsOf: url) else { return }
-            webView.callAsyncJavaScript(
-                "window.renderPreview(bytes, title)",
-                arguments: ["bytes": data.base64EncodedString(), "title": url.deletingPathExtension().lastPathComponent],
-                in: nil,
-                in: .page
-            ) { _ in }
+            guard ready, let data = try? Data(contentsOf: url),
+                  let arguments = try? JSONSerialization.data(withJSONObject: [
+                    data.base64EncodedString(), url.deletingPathExtension().lastPathComponent
+                  ]),
+                  let json = String(data: arguments, encoding: .utf8)
+            else { return }
+            webView.evaluateJavaScript("window.renderPreview.apply(null, \(json))", completionHandler: nil)
         }
     }
 }
