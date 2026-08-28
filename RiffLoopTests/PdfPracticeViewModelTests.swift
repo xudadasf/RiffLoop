@@ -1,9 +1,46 @@
+import AVFoundation
 import XCTest
 import UIKit
 @testable import RiffLoop
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testFiftyAudioFollowLoopsThenInterruptionStopsTransport() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let audio = try makeTransportAudioFixture(duration: 1.5)
+        let store = FilePracticeSettingsStore()
+        defer {
+            try? FileManager.default.removeItem(at: pdf)
+            try? FileManager.default.removeItem(at: audio)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        try store.save(PdfPracticeProfile(metronomeEnabled: false, readingPoints: [
+            PdfReadingPoint(time: 0.4, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 1.5, pageIndex: 0, verticalProgress: 0.8)
+        ], followLoopEnabled: true), kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.bindAudio(at: audio)
+        model.startAutoFollowFromBeginning()
+        defer { model.pause() }
+        try await waitForTransport { model.isAudioPlaying && model.currentTime >= 0.4 }
+        var previous = model.currentTime
+        var rounds = 0
+        try await waitForTransport(timeout: 100) {
+            if model.currentTime < previous - 0.2 { rounds += 1 }
+            previous = model.currentTime
+            return rounds >= 50
+        }
+        XCTAssertTrue(model.isFollowingTransportActive)
+        NotificationCenter.default.post(name: AVAudioSession.interruptionNotification, object: nil,
+            userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue])
+        try await waitForTransport { !model.isPlaying }
+        let stoppedTime = model.currentTime
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(model.player.rate, 0)
+        XCTAssertEqual(model.currentTime, stoppedTime)
+    }
+
     func testMetronomeOnlyFollowLoopsWithoutAnAudioItem() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let store = FilePracticeSettingsStore()

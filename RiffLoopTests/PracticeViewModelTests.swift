@@ -4,6 +4,33 @@ import XCTest
 
 @MainActor
 final class PracticeViewModelTests: XCTestCase {
+    func testFiftyVideoLoopsAtTwoSpeedsRemainControllable() async throws {
+        let url = try await makeTransportVideoFixture()
+        defer { try? FileManager.default.removeItem(at: url) }
+        for rate in [Float(1), Float(1.25)] {
+            let model = PracticeViewModel()
+            model.openMedia(at: url)
+            defer { model.pause() }
+            try await waitForTransport { model.isMediaReady }
+            model.metronomeEnabled = false
+            model.snapLoopPointsToBeat = false
+            model.setPlaybackRate(rate)
+            model.pointA = 0.5
+            model.pointB = 1.2
+            model.setLoopEnabled(true)
+            let initialLoops = model.completedLoops
+            model.togglePlayback()
+            try await waitForTransport(timeout: 90) { model.completedLoops >= initialLoops + 50 }
+            XCTAssertTrue(model.isPlaying)
+            XCTAssertNil(model.errorMessage)
+            model.pause()
+            let pausedTime = model.currentTime
+            try await Task.sleep(for: .milliseconds(200))
+            XCTAssertEqual(model.player.rate, 0)
+            XCTAssertEqual(model.currentTime, pausedTime)
+        }
+    }
+
     func testColdOpenSeekPlayAndPauseCancelsReadinessWait() async throws {
         let url = try makeTransportAudioFixture()
         defer { try? FileManager.default.removeItem(at: url) }

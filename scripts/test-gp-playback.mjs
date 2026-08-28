@@ -609,6 +609,33 @@ assert.doesNotMatch(
     assert.deepEqual(countInCalls.at(-1), "play");
     assert.equal(countInRestarter.resume(), false, "a duplicate acknowledgement must not replay the same round");
 
+    for (let round = 0; round < 50; round += 1) {
+        countInCalls.length = 0;
+        scheduledRestarts.length = 0;
+        countInRestarter.prepare(30_720);
+        if (round % 2 === 0) countInRestarter.resume();
+        assert.deepEqual(countInCalls, ["pause"]);
+        countInRestarter.handlePlayerState("paused");
+        assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: false }]]);
+        assert.equal(scheduledRestarts.length, 0);
+        countInRestarter.handlePlayerPosition({ currentTick: 30_720, isSeek: true });
+        if (round % 2 !== 0) countInRestarter.resume();
+        assert.equal(scheduledRestarts.length, 1);
+        scheduledRestarts[0]();
+        scheduledRestarts[0](); // Duplicate delivery must not play twice.
+        assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: false }], "play"]);
+    }
+    countInRestarter.prepare(30_720);
+    countInRestarter.resume();
+    countInRestarter.handlePlayerState("paused");
+    countInRestarter.handlePlayerPosition({ currentTick: 30_720, isSeek: true });
+    const cancelledRestart = scheduledRestarts.at(-1);
+    countInRestarter.cancel();
+    const callsAtCancel = countInCalls.length;
+    cancelledRestart();
+    assert.equal(countInCalls.length, callsAtCancel, "leaving playback must cancel a scheduled count-in restart");
+    console.log("GP 50-round count-in handshakes and cancellation passed");
+
     const pausedFirstCalls = [];
     const pausedFirstSchedules = [];
     const pausedFirstRestarter = createRangeCountInRestarter({
