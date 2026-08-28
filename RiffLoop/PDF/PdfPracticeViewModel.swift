@@ -67,6 +67,7 @@ final class PdfPracticeViewModel: ObservableObject {
     private var isLoopTransitioning = false
     private var isReadingFollowLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
+    private var readinessObserver: NSKeyValueObservation?
     private var speedLadderBaseRate: Float?
 
     var isPlaying: Bool { isAudioPlaying || isMetronomePlaying }
@@ -74,6 +75,7 @@ final class PdfPracticeViewModel: ObservableObject {
     var isFollowingTransportActive: Bool { isAutoFollowing && isPlaying }
 
     init() {
+        player.automaticallyWaitsToMinimizeStalling = false
         periodicObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.05, preferredTimescale: 600),
             queue: .main
@@ -259,6 +261,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        readinessObserver = nil
         transportGeneration &+= 1
         recordPracticeTime()
         player.pause()
@@ -596,7 +599,33 @@ final class PdfPracticeViewModel: ObservableObject {
         let startMetronome = shouldPlayMetronome && metronomeEnabled && beatOffset != nil
         guard startAudio || startMetronome else { return }
 
+        if startAudio, player.status != .readyToPlay {
+            transportGeneration &+= 1
+            let generation = transportGeneration
+            readinessObserver = player.observe(\.status, options: [.initial, .new]) { [weak self] _, _ in
+                Task { @MainActor [weak self] in
+                    guard let self, self.transportGeneration == generation,
+                        self.readinessObserver != nil else { return }
+                    guard self.player.status != .unknown else { return }
+                    self.readinessObserver = nil
+                    guard self.player.status == .readyToPlay else {
+                        self.pause()
+                        self.message = "伴奏无法播放，请重新选择文件。"
+                        return
+                    }
+                    self.startPlayback(
+                        audio: shouldPlayAudio,
+                        metronome: shouldPlayMetronome,
+                        includeCountIn: includeCountIn,
+                        stopMetronomeAfterCountIn: stopMetronomeAfterCountIn
+                    )
+                }
+            }
+            return
+        }
+
         transportGeneration &+= 1
+        readinessObserver = nil
         let generation = transportGeneration
         isLoopTransitioning = false
         recordPracticeTime()
