@@ -77,9 +77,10 @@ final class PdfPracticeViewModel: ObservableObject {
         periodicObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.05, preferredTimescale: 600),
             queue: .main
-        ) { [weak self] time in
+        ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.timeChanged(time.seconds)
+                guard let self else { return }
+                self.timeChanged(self.player.currentTime().seconds)
             }
         }
         interruptionObserver = NotificationCenter.default.addObserver(

@@ -145,7 +145,7 @@ struct HomeView: View {
                 Text("开始新的练习")
                     .font(.headline)
                 Spacer()
-                Text("从文件库选择")
+                Text("自动打开上次有效文件")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -514,11 +514,15 @@ final class PracticeViewModel: ObservableObject {
 
     private func restartAfterTimingChange() {
         guard isPlaying else { return }
-        coordinatedStart(at: currentTime)
+        if let pendingSeekTime {
+            preparePlaybackAndStart(at: pendingSeekTime)
+        } else {
+            coordinatedStart(at: currentTime)
+        }
     }
 
     private func resynchronizeMetronome() {
-        guard isPlaying, metronomeEnabled, let beatOffset else { return }
+        guard isPlaying, pendingSeekTime == nil, metronomeEnabled, let beatOffset else { return }
 
         let playerTime = player.currentTime().seconds
         let mediaTime = playerTime.isFinite ? max(0, playerTime) : currentTime
@@ -613,7 +617,7 @@ final class PracticeViewModel: ObservableObject {
         periodicTimeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.05, preferredTimescale: 600),
             queue: .main
-        ) { [weak self] time in
+        ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
                 // AVPlayer callbacks can be queued before a seek, then arrive after it.
@@ -667,7 +671,15 @@ final class PracticeViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.pause()
+                guard let self, self.player.currentItem === item,
+                    self.pendingSeekTime == nil, !self.isLoopTransitioning,
+                    self.player.currentTime().seconds >= item.duration.seconds - 0.05
+                else { return }
+                if self.loopEnabled {
+                    self.handleLoopBoundary()
+                } else {
+                    self.pause()
+                }
             }
         }
     }

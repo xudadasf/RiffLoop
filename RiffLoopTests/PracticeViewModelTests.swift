@@ -86,6 +86,22 @@ final class PracticeViewModelTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(model.player.currentTime().seconds, 1.95)
         XCTAssertLessThan(model.player.currentTime().seconds, 3)
     }
+
+    func testLoopAtFileEndIgnoresPreviousRoundsEndNotification() async throws {
+        let url = try makeTransportAudioFixture(duration: 1.5)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let model = PracticeViewModel()
+        model.metronomeEnabled = false
+        model.openMedia(at: url)
+        defer { model.pause() }
+        try await waitForTransport { model.isMediaReady }
+        model.pointA = 0.25
+        model.pointB = 1.5
+        model.setLoopEnabled(true)
+        model.togglePlayback()
+        try await waitForTransport(timeout: 6) { model.completedLoops >= 2 }
+        XCTAssertTrue(model.isPlaying)
+    }
 }
 
 @MainActor
