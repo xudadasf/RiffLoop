@@ -94,15 +94,6 @@ struct GpPracticeView: View {
                     Button { isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
                     }
-                    Menu {
-                        if viewModel.loopRange != nil {
-                            Button("退出区间循环", role: .destructive, action: viewModel.clearLoop)
-                        }
-                        Button("循环设置") { activePanel = .loop }
-                        Button("练习记录") { activePanel = .loop }
-                    } label: {
-                        Label("更多", systemImage: "ellipsis")
-                    }
                 }
             }
             .sheet(isPresented: $isLibraryPresented) {
@@ -461,7 +452,7 @@ struct GpPracticeView: View {
             } header: {
                 Text("节拍细分")
             } footer: {
-                Text("细分跟随当前谱面的拍号。")
+                Text("细分跟随当前谱面的拍号；细分拍以更低音高播放，便于与主拍区分。")
             }
 
             Section {

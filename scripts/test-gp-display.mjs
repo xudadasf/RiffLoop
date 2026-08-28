@@ -112,6 +112,11 @@ assert.match(
     /GpWebView\(viewModel: viewModel\)[\s\S]*?simultaneousGesture\([\s\S]*?activePanel = nil/,
     "tapping the GP score must dismiss the non-modal settings panel"
 );
+assert.doesNotMatch(
+    gpView,
+    /Label\("更多", systemImage: "ellipsis"\)/,
+    "the GP toolbar must not duplicate the bottom control panels"
+);
 assert.match(
     gpView,
     /if let panel = activePanel \{[\s\S]*?panelContent\(panel\)/,

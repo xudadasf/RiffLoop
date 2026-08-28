@@ -67,8 +67,9 @@ for (const expected of [
 }
 for (const expected of [
     /accent === "strong"\) return 0\.95/,
-    /accent === "subAccent"\) return 0\.66/,
-    /accent === "normal"\) return 0\.44/,
+    /accent === "subAccent"\) return 0\.70/,
+    /accent === "normal"\) return 0\.52/,
+    /accent === "subdivision"\) return 0\.40/,
 ]) {
     assert.match(gpWeb, expected, "GP strong, secondary and normal beats must remain audibly distinct");
 }

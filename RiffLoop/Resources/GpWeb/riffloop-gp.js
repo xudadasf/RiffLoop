@@ -286,9 +286,9 @@
     const metronomeGain = (pulse) => {
         const accent = metronomeAccent(pulse);
         if (accent === "strong") return 0.95;
-        if (accent === "subAccent") return 0.66;
-        if (accent === "normal") return 0.44;
-        if (accent === "subdivision") return 0.30;
+        if (accent === "subAccent") return 0.70;
+        if (accent === "normal") return 0.52;
+        if (accent === "subdivision") return 0.40;
         return 0;
     };
     const applyMetronomeVolume = () => {
@@ -301,10 +301,10 @@
     const metronomePitchRange = 12;
     const metronomePitchSemitones = (pulse) => {
         const accent = metronomeAccent(pulse);
-        if (accent === "strong") return 7;
-        if (accent === "subAccent") return 2;
+        if (accent === "strong") return 8;
+        if (accent === "subAccent") return 3;
         if (accent === "normal") return -3;
-        if (accent === "subdivision") return -7;
+        if (accent === "subdivision") return -10;
         return 0;
     };
     const metronomePitchWheel = (pulse) => Math.round(

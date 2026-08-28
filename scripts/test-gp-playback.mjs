@@ -175,6 +175,11 @@ assert.doesNotMatch(
     assert.equal(controls[0].value > controls[2].value, true);
     assert.equal(controls[2].value > controls[1].value, true);
     assert.equal(controls[3].value, 0);
+    assert.equal(
+        controls[0].value - controls[1].value >= 15,
+        true,
+        "the primary beat must remain clearly louder than an ordinary beat"
+    );
     assert.deepEqual(
         midiFile.events
             .filter((event) => event instanceof ControlChangeEvent && event.controller !== 7)
