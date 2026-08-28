@@ -15,20 +15,16 @@
 # Usage:
 #   pwsh -File scripts/sideload-install.ps1                    # newest IPA under output/release-*
 #   pwsh -File scripts/sideload-install.ps1 -IpaPath <file.ipa>
-#   pwsh -File scripts/sideload-install.ps1 -DryRun            # stage everything, stop before Start
+#   pwsh -File scripts/sideload-install.ps1 -DryRun            # validate only; no GUI/device changes
+#   pwsh -File scripts/sideload-install.ps1 -IpaPath <file.ipa> -ExpectedRef v0.25.51
 param(
     [string]$IpaPath = "",
+    [string]$ExpectedRef = 'HEAD',
     [int]$TimeoutMinutes = 20,
     [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-
-$sideloadlyExe = "$env:LOCALAPPDATA\Sideloadly\Sideloadly.exe"
-if (-not (Test-Path $sideloadlyExe)) { throw "未找到 Sideloadly：$sideloadlyExe" }
-
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 if (-not $IpaPath) {
@@ -39,6 +35,16 @@ if (-not $IpaPath) {
 }
 $IpaPath = (Resolve-Path $IpaPath).Path
 Write-Host "IPA: $IpaPath"
+python (Join-Path $PSScriptRoot 'verify-ipa.py') $IpaPath --ref $ExpectedRef
+if ($LASTEXITCODE -ne 0) { throw '安装包提交、哈希或版本校验失败；未启动侧载。' }
+if ($DryRun) {
+    Write-Host 'DryRun：安装包校验通过，未启动 Sideloadly，未操作设备。'
+    return
+}
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$sideloadlyExe = "$env:LOCALAPPDATA\Sideloadly\Sideloadly.exe"
+if (-not (Test-Path $sideloadlyExe)) { throw "未找到 Sideloadly：$sideloadlyExe" }
 
 $stdoutLog = Join-Path $env:TEMP ("sideloadly-install-{0:yyyyMMdd-HHmmss}.log" -f (Get-Date))
 $stderrLog = "$stdoutLog.err"
@@ -154,12 +160,6 @@ Write-Host "Apple 账号已记住"
 # Sideloadly 0.60 automatically mangles the bundle ID on current iOS versions.
 # The daemon log is verified after Start because this setting is no longer exposed
 # as a named UI Automation control.
-
-if ($DryRun) {
-    Write-Host "DryRun：已就绪，未点击 Start。"
-    Write-Host "GUI 日志：$stdoutLog"
-    return
-}
 
 # 6. Click Start and wait for the install to complete.
 $startCond = New-Object System.Windows.Automation.PropertyCondition(

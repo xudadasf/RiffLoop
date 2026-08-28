@@ -2,6 +2,11 @@ name: iPad Unsigned IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Expected commit (release scripts supply this to reject branch races)
+        required: false
+        type: string
 
 concurrency:
   group: ios-unsigned-ipa-${{ github.ref }}
@@ -15,6 +20,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Verify requested commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [ -n "$EXPECTED_SHA" ]; then
+            test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          fi
 
       - name: Select Xcode 16.4
         run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer

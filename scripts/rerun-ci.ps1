@@ -1,89 +1,83 @@
-# Re-run the iPad CI and produce a fresh unsigned IPA, then download it.
-#
-# Usage:
-#   pwsh -File scripts/rerun-ci.ps1                 # rerun iOS CI for HEAD + dispatch IPA
-#   pwsh -File scripts/rerun-ci.ps1 -Wait           # also poll until finished and download
-#   pwsh -File scripts/rerun-ci.ps1 -Wait -TimeoutMinutes 60
+# Validate the published HEAD, pass its CI, then build exactly that commit.
+# Without -Wait, return after IPA dispatch (CI is always awaited).
 param(
+    [string]$Branch = '',
     [switch]$Wait,
-    [int]$TimeoutMinutes = 45
+    [ValidateRange(1, 120)][int]$TimeoutMinutes = 45
 )
-
-$ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$ownerRepo = "xudadasf/RiffLoop"
-$branch = "codex/ipad-migration"
-
+$ErrorActionPreference = 'Stop'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$base = 'https://api.github.com/repos/xudadasf/RiffLoop'
+$headSha = (git -C $repoRoot rev-parse --verify HEAD).Trim()
+if ($LASTEXITCODE -ne 0) { throw '无法读取 HEAD' }
+if (git -C $repoRoot status --porcelain --untracked-files=normal) {
+    throw '工作区有未提交内容；请只提交本次发布需要的文件，再运行发布脚本。'
+}
+if (-not $Branch) { $Branch = (git -C $repoRoot branch --show-current | Out-String).Trim() }
+if (-not $Branch) { throw '分离 HEAD 状态，请显式指定 -Branch。' }
+git check-ref-format --branch $Branch | Out-Null
+if ($LASTEXITCODE -ne 0) { throw '分支名称无效' }
+function Assert-PublishedHead {
+    $remote = git -C $repoRoot ls-remote --exit-code --heads origin "refs/heads/$Branch"
+    if ($LASTEXITCODE -ne 0 -or -not $remote -or ($remote -split '\s+')[0] -ne $headSha) {
+        throw "远端 $Branch 与本地 HEAD 不一致；未触发 IPA。请核对并推送当前提交。"
+    }
+}
+Assert-PublishedHead
 $cred = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
-$tok = ($cred | Select-String '^password=').ToString().Substring(9)
-if (-not $tok) { throw "git credential 中没有可用的 GitHub token" }
-$headers = @{ "User-Agent" = "riff-loop-downloader"; "Authorization" = "Bearer $tok" }
-
-$headSha = (git -C $repoRoot rev-parse HEAD).Trim()
-Write-Host "HEAD: $headSha"
-
-# 1. Rerun the latest iOS CI run for this commit or its nearest ancestor with one
-#    (a commit that only touched scripts/docs never triggered iOS CI itself).
-$ciRun = $null
-$candidates = @(git -C $repoRoot rev-list HEAD -n 30)
-foreach ($sha in $candidates) {
-    $runs = Invoke-RestMethod -Uri "https://api.github.com/repos/$ownerRepo/actions/runs?per_page=20&head_sha=$sha" -Headers $headers
-    $ciRun = $runs.workflow_runs | Where-Object { $_.name -eq "iOS CI" } | Select-Object -First 1
-    if ($ciRun) { break }
+$password = @($cred | Select-String '^password=')
+if ($password.Count -ne 1) { throw 'git credential 中没有可用的 GitHub token' }
+$headers = @{ 'User-Agent' = 'RiffLoop-release'; Authorization = "Bearer $($password[0].ToString().Substring(9))" }
+$deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+$encodedBranch = [uri]::EscapeDataString($Branch)
+function Find-Run([string]$workflow, [datetime]$since = [datetime]::MinValue) {
+    $runs = Invoke-RestMethod "$base/actions/workflows/$workflow/runs?head_sha=$headSha&branch=$encodedBranch&per_page=100" -Headers $headers
+    $runs.workflow_runs | Where-Object {
+        $_.head_sha -eq $headSha -and $_.head_branch -eq $Branch -and
+        ([datetime]$_.created_at).ToUniversalTime() -ge $since
+    } | Select-Object -First 1
 }
-if (-not $ciRun) { throw "HEAD 及其最近 30 个祖先提交都没有 iOS CI 运行记录" }
-if ($ciRun.status -eq "in_progress" -or $ciRun.status -eq "queued") {
-    Write-Host "iOS CI #$($ciRun.run_number) 已在运行，跳过 rerun"
-} else {
-    Write-Host "rerun iOS CI #$($ciRun.run_number) @ $($ciRun.head_sha.Substring(0,7)) ($($ciRun.conclusion))"
-    Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$ownerRepo/actions/runs/$($ciRun.id)/rerun" -Headers $headers | Out-Null
+function Dispatch-Run([string]$workflow) {
+    Assert-PublishedHead
+    # GitHub timestamps have second precision.
+    $since = [datetime]::UtcNow.AddSeconds(-1)
+    $body = @{ ref = $Branch }
+    if ($workflow -eq 'ios-unsigned-ipa.yml') { $body.inputs = @{ expected_sha = $headSha } }
+    Invoke-RestMethod -Method Post "$base/actions/workflows/$workflow/dispatches" -Headers $headers `
+        -ContentType 'application/json' -Body ($body | ConvertTo-Json) | Out-Null
+    for ($attempt = 0; $attempt -lt 24 -and (Get-Date) -lt $deadline; $attempt++) {
+        $run = Find-Run $workflow $since
+        if ($run) { return $run }
+        Start-Sleep -Seconds 5
+    }
+    throw "未找到本次 $workflow 运行；请检查 Actions，不要重复盲目打包。"
 }
-
-# 2. Dispatch the unsigned IPA workflow for the branch.
-$dispatchStarted = (Get-Date).ToUniversalTime()
-Write-Host "dispatch iPad Unsigned IPA @ $branch"
-Invoke-RestMethod -Method Post `
-    -Uri "https://api.github.com/repos/$ownerRepo/actions/workflows/ios-unsigned-ipa.yml/dispatches" `
-    -Headers $headers `
-    -ContentType "application/json" `
-    -Body (@{ ref = $branch } | ConvertTo-Json) | Out-Null
-
-if (-not $Wait) {
-    Write-Host "已触发。使用 -Wait 可等待完成并自动下载 IPA。"
-    return
-}
-
-function Wait-Run([long]$runId, [datetime]$deadline, [string]$label) {
+function Wait-Run($run, [string]$label) {
     while ((Get-Date) -lt $deadline) {
-        $run = Invoke-RestMethod -Uri "https://api.github.com/repos/$ownerRepo/actions/runs/$runId" -Headers $headers
-        if ($run.status -eq "completed") {
-            Write-Host "$label #$($run.run_number) => $($run.conclusion)"
-            return $run.conclusion
+        $state = Invoke-RestMethod "$base/actions/runs/$($run.id)" -Headers $headers
+        if ($state.head_sha -ne $headSha -or $state.head_branch -ne $Branch) { throw "$label 提交或分支不匹配" }
+        if ($state.status -eq 'completed') {
+            if ($state.conclusion -ne 'success') { throw "$label 未通过：$($state.conclusion)" }
+            Write-Host "$label #$($state.run_number) 通过 @ $headSha"
+            return $state
         }
         Start-Sleep -Seconds 20
     }
-    Write-Host "$label 等待超时"
-    return "timeout"
+    throw "$label 等待超时；未继续发布。"
 }
-
-$deadline = (Get-Date).AddMinutes($TimeoutMinutes)
-
-# Find the dispatched IPA run: latest "iPad Unsigned IPA" run created at/after dispatch.
-$ipaRun = $null
-for ($i = 0; $i -lt 15 -and -not $ipaRun; $i++) {
-    $runs = Invoke-RestMethod -Uri "https://api.github.com/repos/$ownerRepo/actions/runs?per_page=10" -Headers $headers
-    $ipaRun = $runs.workflow_runs | Where-Object {
-        $_.name -eq "iPad Unsigned IPA" -and $_.created_at.ToUniversalTime() -ge $dispatchStarted
-    } | Select-Object -First 1
-    if (-not $ipaRun) { Start-Sleep -Seconds 5 }
+Write-Host "发布分支：$Branch；提交：$headSha"
+$ci = Find-Run 'ios-ci.yml'
+if (-not $ci -or ($ci.status -eq 'completed' -and $ci.conclusion -ne 'success')) {
+    $ci = Dispatch-Run 'ios-ci.yml'
 }
-if (-not $ipaRun) { throw "未找到刚触发的 iPad Unsigned IPA 运行" }
-
-$ciConclusion = Wait-Run $ciRun.id $deadline "iOS CI"
-$ipaConclusion = Wait-Run $ipaRun.id $deadline "iPad Unsigned IPA"
-
-if ($ciConclusion -ne "success") { throw "iOS CI 未通过：$ciConclusion" }
-if ($ipaConclusion -ne "success") { throw "iPad Unsigned IPA 未通过：$ipaConclusion" }
-
-Write-Host "两个工作流均通过，下载 IPA…"
-& (Join-Path $PSScriptRoot "download-ipa.ps1")
+$null = Wait-Run $ci 'iOS CI'
+Assert-PublishedHead
+if (-not $Wait) {
+    Invoke-RestMethod -Method Post "$base/actions/workflows/ios-unsigned-ipa.yml/dispatches" -Headers $headers `
+        -ContentType 'application/json' -Body (@{ ref = $Branch; inputs = @{ expected_sha = $headSha } } | ConvertTo-Json) | Out-Null
+    Write-Host "CI 已通过，IPA 已触发。使用 download-ipa.ps1 -Ref $headSha 下载，或下次加 -Wait。"
+    return
+}
+$ipa = Dispatch-Run 'ios-unsigned-ipa.yml'
+$ipa = Wait-Run $ipa 'iPad Unsigned IPA'
+& (Join-Path $PSScriptRoot 'download-ipa.ps1') -Ref $headSha -RunId $ipa.id

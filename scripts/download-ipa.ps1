@@ -9,6 +9,7 @@
 # together with a build-info.json describing the run it came from.
 param(
     [string]$Ref = "",
+    [long]$RunId = 0,
     [switch]$AllowOlderCommit
 )
 
@@ -47,10 +48,16 @@ function Find-SuccessfulRun {
     return $null
 }
 
-$run = Find-SuccessfulRun
+$run = if ($RunId) {
+    Invoke-RestMethod "https://api.github.com/repos/$ownerRepo/actions/runs/$RunId" -Headers $headers
+} else { Find-SuccessfulRun }
 if (-not $run) {
     $hint = if ($AllowOlderCommit) { "" } else { " 使用 -AllowOlderCommit 可取最近一次成功构建。" }
     throw "未找到 iPad Unsigned IPA 的成功构建（commit $targetSha）。$hint"
+}
+if ($run.name -ne 'iPad Unsigned IPA' -or $run.status -ne 'completed' -or $run.conclusion -ne 'success' -or
+    (-not $AllowOlderCommit -and $run.head_sha -ne $targetSha)) {
+    throw '所选 IPA 运行未通过，或提交与请求不匹配；没有下载。'
 }
 
 Write-Host ("run: #{0} {1} ({2})" -f $run.run_number, $run.head_sha.Substring(0, 7), $run.created_at.ToString("yyyy-MM-dd HH:mm"))
@@ -68,7 +75,7 @@ Invoke-WebRequest -Uri $artifact.archive_download_url -Headers $headers -OutFile
 $projectYml = git -C $repoRoot show "$($run.head_sha):project.yml"
 $version = ([regex]::Match($projectYml, 'MARKETING_VERSION:\s*([0-9.]+)')).Groups[1].Value
 $build = ([regex]::Match($projectYml, 'CURRENT_PROJECT_VERSION:\s*(\d+)')).Groups[1].Value
-$outDir = Join-Path $repoRoot "output\release-$version-build$build"
+$outDir = Join-Path $repoRoot "output\release-$version-build$build-$($run.head_sha.Substring(0,7))"
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -94,6 +101,8 @@ $info = [ordered]@{
     sha256          = (Get-FileHash $ipaPath -Algorithm SHA256).Hash
 }
 $info | ConvertTo-Json | Set-Content -Path (Join-Path $outDir "build-info.json") -Encoding UTF8
+python (Join-Path $PSScriptRoot 'verify-ipa.py') $ipaPath --ref $run.head_sha
+if ($LASTEXITCODE -ne 0) { throw '安装包内容校验失败；不要安装此包。' }
 
 Write-Host ""
 Write-Host "IPA: $ipaPath"

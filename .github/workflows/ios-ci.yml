@@ -12,6 +12,11 @@ on:
       - "scripts/test-reported-ios-issues.mjs"
       - "scripts/test-video-mode.mjs"
       - "scripts/test-pdf-mode.mjs"
+      - "scripts/*ipa*"
+      - "scripts/*release*"
+      - "scripts/rerun-ci.ps1"
+      - "scripts/sideload-install.ps1"
+      - ".github/workflows/ios-unsigned-ipa.yml"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   pull_request:
@@ -24,6 +29,11 @@ on:
       - "scripts/test-reported-ios-issues.mjs"
       - "scripts/test-video-mode.mjs"
       - "scripts/test-pdf-mode.mjs"
+      - "scripts/*ipa*"
+      - "scripts/*release*"
+      - "scripts/rerun-ci.ps1"
+      - "scripts/sideload-install.ps1"
+      - ".github/workflows/ios-unsigned-ipa.yml"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
@@ -62,6 +72,11 @@ jobs:
         run: |
           xcodebuild -version
           xcodegen --version
+
+      - name: Test release safety gates
+        run: |
+          pwsh -File scripts/test-release-workflow.ps1
+          python3 scripts/test-verify-ipa.py
 
       - name: Prepare iPad mini simulator
         run: |
