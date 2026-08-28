@@ -431,11 +431,14 @@ struct GpPracticeView: View {
                             get: { viewModel.metronomeVolume },
                             set: { viewModel.setMetronomeVolume($0) }
                         ),
-                        in: 0...1
+                        in: 0...2
                     ) {
                         Text("节拍音量")
                     }
                     LabeledContent("节拍音量", value: percent(viewModel.metronomeVolume))
+                    Text("可增强至 200%；伴奏较响时可适当降低伴奏音量。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 

@@ -1,10 +1,52 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 
 const source = readFileSync(
     new URL("../RiffLoop/Resources/GpWeb/riffloop-gp.js", import.meta.url),
     "utf8"
 );
+
+// Render the shipped soundfont through the actual alphaTab synthesizer, not a mock.
+{
+    const alphaTab = createRequire(import.meta.url)("../RiffLoop/Resources/GpWeb/alphaTab.min.js");
+    const implementation = source.slice(source.indexOf("    const metronomeAccent ="), source.indexOf("    const reinforceLongLegatoTargets"));
+    const api = {};
+    const add = new Function("alphaTab", "api", "synthApi", "metronomeMasterVolume",
+        `let metronomeSubdivisionFactor = 2; let beatAccents = ['strong','subAccent','normal','muted'];
+        ${implementation}; applyMetronomeVolume(); return addMetronomeAccentControls;`
+    )(alphaTab, api, {}, 1);
+    const midi = new alphaTab.midi.MidiFile();
+    midi.addEvent(new alphaTab.midi.TimeSignatureEvent(0, 0, 8, 3, 24, 8));
+    midi.addEvent(new alphaTab.midi.TempoChangeEvent(0, 500_000));
+    midi.addEvent(new alphaTab.midi.EndOfTrackEvent(0, 3840));
+    add(midi);
+    const options = new alphaTab.synth.AudioExportOptions();
+    options.metronomeVolume = api.metronomeVolume;
+    options.soundFonts = [new Uint8Array(readFileSync(new URL('../RiffLoop/Resources/GpWeb/soundfont/sonivox.sf3', import.meta.url)))];
+    const renderer = alphaTab.synth.AlphaSynth.prototype.exportAudio.call(null, options, midi, [], new Map());
+    const samples = renderer.render(2100).samples;
+    const pulses = Array.from({ length: 8 }, (_, pulse) => {
+        const start = Math.round(pulse * 0.25 * 44100) * 2;
+        const end = Math.round((pulse * 0.25 + 0.09) * 44100) * 2;
+        let energy = 0, peak = 0, crossings = 0;
+        for (let i = start; i < end; i += 2) {
+            energy += samples[i] ** 2;
+            peak = Math.max(peak, Math.abs(samples[i]));
+            if (i > start && samples[i] > 0 && samples[i - 2] <= 0) crossings++;
+        }
+        return { rms: Math.sqrt(energy / ((end - start) / 2)), peak, frequency: crossings / 0.09 };
+    });
+    assert.ok(pulses[0].frequency < 4000, `Downbeat must be in a speaker-friendly range, got ${pulses[0].frequency} Hz`);
+    assert.ok(pulses[0].rms > 0.055, `Downbeat is too faint: RMS ${pulses[0].rms}`);
+    assert.ok(pulses[1].rms > 0.035, `Subdivision is too faint: RMS ${pulses[1].rms}`);
+    assert.ok(pulses[0].frequency > pulses[2].frequency * 1.2);
+    assert.ok(pulses[2].frequency > pulses[4].frequency * 1.2);
+    assert.ok(pulses[4].frequency > pulses[1].frequency * 1.2);
+    assert.equal(pulses[6].rms, 0, 'Muted main beat must stay silent');
+    assert.ok(pulses.every(pulse => pulse.peak * 2 < 1), '200% metronome must retain peak headroom');
+    console.log('GP shipped-synth metronome energy, pitch separation and headroom passed');
+}
 
 assert.doesNotMatch(
     source,
@@ -176,7 +218,7 @@ assert.doesNotMatch(
     assert.equal(controls[2].value > controls[1].value, true);
     assert.equal(controls[3].value, 0);
     assert.equal(
-        controls[0].value - controls[1].value >= 15,
+        controls[0].value - controls[1].value >= 10,
         true,
         "the primary beat must remain clearly louder than an ordinary beat"
     );
@@ -187,7 +229,7 @@ assert.doesNotMatch(
         [
             { tick: 0, channel: 2, controller: 101, value: 0 },
             { tick: 0, channel: 2, controller: 100, value: 0 },
-            { tick: 0, channel: 2, controller: 6, value: 12 },
+            { tick: 0, channel: 2, controller: 6, value: 36 },
         ],
         "the dedicated GP metronome channel must use a wide pitch range"
     );

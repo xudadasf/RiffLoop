@@ -286,25 +286,27 @@
     const metronomeGain = (pulse) => {
         const accent = metronomeAccent(pulse);
         if (accent === "strong") return 0.95;
-        if (accent === "subAccent") return 0.70;
-        if (accent === "normal") return 0.52;
-        if (accent === "subdivision") return 0.40;
+        if (accent === "subAccent") return 0.74;
+        if (accent === "normal") return 0.60;
+        if (accent === "subdivision") return 0.50;
         return 0;
     };
     const applyMetronomeVolume = () => {
-        api.metronomeVolume = metronomeMasterVolume;
+        api.metronomeVolume = metronomeMasterVolume * 1.6;
         synthApi.metronomeVolume = 0;
     };
     const metronomeControlValue = (pulse) => Math.round(
         Math.cbrt(Math.max(0, metronomeGain(pulse))) * 127
     );
-    const metronomePitchRange = 12;
+    // Sonivox's click is a very short high-frequency sample. Lower it into the
+    // audible woodblock range; controls still run inside the synth buffer clock.
+    const metronomePitchRange = 36;
     const metronomePitchSemitones = (pulse) => {
         const accent = metronomeAccent(pulse);
-        if (accent === "strong") return 8;
-        if (accent === "subAccent") return 3;
-        if (accent === "normal") return -3;
-        if (accent === "subdivision") return -10;
+        if (accent === "strong") return -16;
+        if (accent === "subAccent") return -23;
+        if (accent === "normal") return -28;
+        if (accent === "subdivision") return -35;
         return 0;
     };
     const metronomePitchWheel = (pulse) => Math.round(

@@ -263,7 +263,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setMetronomeVolume(_ volume: Double) {
-        metronomeVolume = min(max(volume, 0), 1)
+        metronomeVolume = min(max(volume, 0), 2)
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
         saveProfile()
     }
@@ -723,7 +723,7 @@ final class GpWebViewModel: ObservableObject {
         synthEnabled = pendingProfile.synthEnabled
         backingEnabled = pendingProfile.backingEnabled
         metronomeEnabled = pendingProfile.metronomeEnabled
-        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 1)
+        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 2)
         countInEnabled = pendingProfile.countInEnabled
         countInVolume = min(max(pendingProfile.countInVolume, 0), 1)
         metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
