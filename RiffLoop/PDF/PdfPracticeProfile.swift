@@ -30,6 +30,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
     var totalCompletedLoops = 0
     var highestPlaybackRate: Float = 1
     var readingPoints: [PdfReadingPoint] = []
+    var followLoopEnabled = false
 
     init(
         pageIndex: Int = 0,
@@ -60,7 +61,8 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         accumulatedPracticeTime: TimeInterval = 0,
         totalCompletedLoops: Int = 0,
         highestPlaybackRate: Float = 1,
-        readingPoints: [PdfReadingPoint] = []
+        readingPoints: [PdfReadingPoint] = [],
+        followLoopEnabled: Bool = false
     ) {
         self.pageIndex = pageIndex
         self.scaleFactor = scaleFactor
@@ -91,6 +93,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         self.totalCompletedLoops = totalCompletedLoops
         self.highestPlaybackRate = highestPlaybackRate
         self.readingPoints = readingPoints
+        self.followLoopEnabled = followLoopEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -125,5 +128,6 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         totalCompletedLoops = try values.decodeIfPresent(Int.self, forKey: .totalCompletedLoops) ?? 0
         highestPlaybackRate = try values.decodeIfPresent(Float.self, forKey: .highestPlaybackRate) ?? 1
         readingPoints = try values.decodeIfPresent([PdfReadingPoint].self, forKey: .readingPoints) ?? []
+        followLoopEnabled = try values.decodeIfPresent(Bool.self, forKey: .followLoopEnabled) ?? false
     }
 }

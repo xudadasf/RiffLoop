@@ -98,6 +98,36 @@ assert.match(
     "saved PDF reading tracks must have an obvious replay entry point"
 );
 assert.match(
+    pdfViewModel,
+    /var isFollowingTransportActive: Bool \{ isAutoFollowing && isPlaying \}/,
+    "the PDF primary transport must expose following state rather than raw metronome state"
+);
+assert.match(
+    pdfViewModel,
+    /func toggleReadingFollowPlayback\(\)[\s\S]*?startReadingFollow\(at:/,
+    "the PDF primary play control must start a recorded reading track"
+);
+assert.match(
+    pdfViewModel,
+    /func setFollowLoopEnabled\(_ enabled: Bool\)[\s\S]*?followLoopEnabled = enabled/,
+    "recorded reading tracks need an independent loop setting"
+);
+assert.match(
+    pdfViewModel,
+    /private func restartReadingFollowLoopIfNeeded\(\)[\s\S]*?prepareReadingFollow\(at:/,
+    "reaching the final reading point must return through the follow transport"
+);
+assert.match(
+    pdfView,
+    /Button\(action: viewModel\.toggleReadingFollowPlayback\)/,
+    "the PDF bottom play button must operate the reading track"
+);
+assert.match(
+    pdfView,
+    /Toggle\("循环跟谱", isOn: Binding\([\s\S]*?setFollowLoopEnabled/,
+    "the PDF follow panel must expose optional follow looping"
+);
+assert.match(
     pdfView,
     /\.overlay\(alignment: \.bottomTrailing\) \{[\s\S]*?if let panel = activePanel/,
     "PDF tool cards must open an in-page iPad settings panel"
@@ -126,6 +156,11 @@ assert.match(
     pdfView,
     /if let panel = activePanel \{[\s\S]*?panelContent\(panel\)/,
     "the selected PDF settings must render as an in-page overlay"
+);
+assert.doesNotMatch(
+    pdfView,
+    /Label\("更多", systemImage: "ellipsis"\)/,
+    "the PDF toolbar must not duplicate bottom tool panels"
 );
 
 console.log("PDF mode policies passed");

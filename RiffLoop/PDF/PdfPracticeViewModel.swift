@@ -48,6 +48,7 @@ final class PdfPracticeViewModel: ObservableObject {
     @Published private(set) var isRecordingReadingTrack = false
     @Published private(set) var isAutoFollowing = false
     @Published private(set) var autoFollowSuspended = false
+    @Published private(set) var followLoopEnabled = false
     @Published private(set) var message: String?
 
     private let settingsStore = FilePracticeSettingsStore()
@@ -64,11 +65,13 @@ final class PdfPracticeViewModel: ObservableObject {
     private var lastPracticeSampleDate: Date?
     private var lastProfileSaveDate = Date.distantPast
     private var isLoopTransitioning = false
+    private var isReadingFollowLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
     private var speedLadderBaseRate: Float?
 
     var isPlaying: Bool { isAudioPlaying || isMetronomePlaying }
     var hasUsableReadingTrack: Bool { isUsablePdfReadingTrack(readingPoints) }
+    var isFollowingTransportActive: Bool { isAutoFollowing && isPlaying }
 
     init() {
         periodicObserver = player.addPeriodicTimeObserver(
@@ -191,6 +194,7 @@ final class PdfPracticeViewModel: ObservableObject {
         isRecordingReadingTrack = false
         isAutoFollowing = false
         autoFollowSuspended = false
+        followLoopEnabled = false
         pointA = nil
         pointB = nil
         loopEnabled = false
@@ -199,6 +203,32 @@ final class PdfPracticeViewModel: ObservableObject {
 
     func togglePlayback() {
         isPlaying ? pause() : play()
+    }
+
+    func toggleReadingFollowPlayback() {
+        guard
+            hasUsableReadingTrack,
+            let firstTime = readingPoints.map(\.time).min(),
+            let lastTime = readingPoints.map(\.time).max()
+        else {
+            message = "这份 PDF 还没有可用轨迹，请先随播放时间录制一次。"
+            return
+        }
+        if isFollowingTransportActive {
+            pause()
+            return
+        }
+        let target = currentTime >= firstTime && currentTime < lastTime ? currentTime : firstTime
+        startReadingFollow(at: target)
+    }
+
+    func stopReadingFollowPlayback() {
+        guard let firstTime = readingPoints.map(\.time).min() else {
+            pause()
+            return
+        }
+        pause()
+        prepareReadingFollow(at: firstTime, startPlayback: false)
     }
 
     func toggleAudioPlayback() {
@@ -481,6 +511,7 @@ final class PdfPracticeViewModel: ObservableObject {
     func startReadingTrackRecording() {
         isAutoFollowing = false
         autoFollowSuspended = false
+        followLoopEnabled = false
         readingPoints = []
         isRecordingReadingTrack = true
         captureReadingPoint(force: true)
@@ -522,12 +553,7 @@ final class PdfPracticeViewModel: ObservableObject {
             message = "这份 PDF 还没有可用轨迹，请先随播放时间录制一次。"
             return
         }
-        isRecordingReadingTrack = false
-        isAutoFollowing = true
-        autoFollowSuspended = false
-        message = nil
-        seek(to: startTime)
-        applyReadingTarget(at: startTime)
+        startReadingFollow(at: startTime)
     }
 
     func resumeAutoFollow() {
@@ -541,6 +567,16 @@ final class PdfPracticeViewModel: ObservableObject {
         isRecordingReadingTrack = false
         isAutoFollowing = false
         autoFollowSuspended = false
+        followLoopEnabled = false
+        save()
+    }
+
+    func setFollowLoopEnabled(_ enabled: Bool) {
+        guard !enabled || hasUsableReadingTrack else {
+            message = "请先完成一条有效的跟谱轨迹。"
+            return
+        }
+        followLoopEnabled = enabled
         save()
     }
 
@@ -645,6 +681,7 @@ final class PdfPracticeViewModel: ObservableObject {
             duration = max(0, item.duration.seconds)
         }
         updateAutoFollow()
+        restartReadingFollowLoopIfNeeded()
         if isPlaying, Date().timeIntervalSince(lastProfileSaveDate) >= 2 {
             save()
         }
@@ -673,6 +710,83 @@ final class PdfPracticeViewModel: ObservableObject {
             force: force
         )
         save()
+    }
+
+    private func startReadingFollow(at time: TimeInterval) {
+        guard hasUsableReadingTrack else {
+            message = "这份 PDF 还没有可用轨迹，请先随播放时间录制一次。"
+            return
+        }
+        guard player.currentItem != nil || metronomeEnabled else {
+            message = "请先绑定伴奏或开启节拍器，再启动跟谱。"
+            return
+        }
+        isRecordingReadingTrack = false
+        isAutoFollowing = true
+        autoFollowSuspended = false
+        message = nil
+        prepareReadingFollow(at: time, startPlayback: true)
+    }
+
+    private func prepareReadingFollow(at time: TimeInterval, startPlayback shouldStartPlayback: Bool) {
+        transportGeneration &+= 1
+        let generation = transportGeneration
+        let target = max(0, time)
+        player.currentItem?.cancelPendingSeeks()
+        player.pause()
+        metronome.stop()
+        stopMetronomeOnlyClock()
+        countInStopTask?.cancel()
+        countInStopTask = nil
+        activeTransportAnchor = nil
+        isAudioPlaying = false
+        isMetronomePlaying = false
+
+        let complete: () -> Void = { [weak self] in
+            guard let self, self.transportGeneration == generation else { return }
+            self.currentTime = target
+            self.applyReadingTarget(at: target)
+            self.isReadingFollowLoopTransitioning = false
+            if shouldStartPlayback {
+                self.startPlayback(
+                    audio: self.player.currentItem != nil,
+                    metronome: self.metronomeEnabled
+                )
+            } else {
+                self.lastPracticeSampleDate = nil
+                self.save()
+            }
+        }
+
+        guard player.currentItem != nil else {
+            complete()
+            return
+        }
+        player.seek(to: cmTime(target), toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+            Task { @MainActor in
+                guard finished else {
+                    self.isReadingFollowLoopTransitioning = false
+                    self.pause()
+                    return
+                }
+                complete()
+            }
+        }
+    }
+
+    private func restartReadingFollowLoopIfNeeded() {
+        guard
+            followLoopEnabled,
+            isAutoFollowing,
+            isPlaying,
+            !isReadingFollowLoopTransitioning,
+            let firstTime = readingPoints.map(\.time).min(),
+            let lastTime = readingPoints.map(\.time).max(),
+            currentTime >= lastTime,
+            lastTime > firstTime
+        else { return }
+        isReadingFollowLoopTransitioning = true
+        prepareReadingFollow(at: firstTime, startPlayback: true)
     }
 
     private func rebuildBoundaryObserver() {
@@ -792,6 +906,7 @@ final class PdfPracticeViewModel: ObservableObject {
         highestPlaybackRate = max(playbackRate, profile.highestPlaybackRate)
         completedLoops = 0
         readingPoints = profile.readingPoints
+        followLoopEnabled = profile.followLoopEnabled && hasUsableReadingTrack
     }
 
     private func save() {
@@ -826,7 +941,8 @@ final class PdfPracticeViewModel: ObservableObject {
             accumulatedPracticeTime: accumulatedPracticeTime,
             totalCompletedLoops: totalCompletedLoops,
             highestPlaybackRate: highestPlaybackRate,
-            readingPoints: readingPoints
+            readingPoints: readingPoints,
+            followLoopEnabled: followLoopEnabled
         )
         try? settingsStore.save(profile, kind: .pdf, fileName: pdfFileName)
     }

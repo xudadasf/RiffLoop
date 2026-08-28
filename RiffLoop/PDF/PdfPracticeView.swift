@@ -99,13 +99,6 @@ struct PdfPracticeView: View {
                 Button { pdfLibraryPresented = true } label: {
                     Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
                 }
-                Menu {
-                    Button("节拍器设置") { activePanel = .metronome }
-                    Button("伴奏设置") { activePanel = .sound }
-                    Button("自动跟谱") { activePanel = .follow }
-                } label: {
-                    Label("更多", systemImage: "ellipsis")
-                }
             }
         }
         .sheet(isPresented: $pdfLibraryPresented) {
@@ -181,22 +174,24 @@ struct PdfPracticeView: View {
 
     private var deckTransportControls: some View {
         HStack(spacing: 8) {
-            Button(action: viewModel.togglePlayback) {
+            Button(action: viewModel.toggleReadingFollowPlayback) {
                 Label(
-                    viewModel.isPlaying ? "暂停" : "播放",
-                    systemImage: viewModel.isPlaying ? "pause.fill" : "play.fill"
+                    viewModel.isFollowingTransportActive ? "暂停跟谱" : "开始跟谱",
+                    systemImage: viewModel.isFollowingTransportActive ? "pause.fill" : "play.fill"
                 )
                 .font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
+            .disabled(!viewModel.hasUsableReadingTrack)
 
-            Button(action: viewModel.stop) {
-                Label("停止", systemImage: "stop.fill")
+            Button(action: viewModel.stopReadingFollowPlayback) {
+                Label("停止跟谱", systemImage: "stop.fill")
                     .labelStyle(.iconOnly)
                     .frame(minWidth: 32, minHeight: 44)
             }
             .buttonStyle(.bordered)
+            .disabled(!viewModel.hasUsableReadingTrack)
         }
     }
 
@@ -492,6 +487,12 @@ struct PdfPracticeView: View {
                             .buttonStyle(.borderedProminent)
                             .disabled(!viewModel.hasUsableReadingTrack)
                     }
+
+                    Toggle("循环跟谱", isOn: Binding(
+                        get: { viewModel.followLoopEnabled },
+                        set: { viewModel.setFollowLoopEnabled($0) }
+                    ))
+                    .disabled(!viewModel.hasUsableReadingTrack)
 
                     Divider()
                     Button("重新记录", action: viewModel.startReadingTrackRecording)
