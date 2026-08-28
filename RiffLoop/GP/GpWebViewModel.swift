@@ -324,6 +324,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setLoopCountInEnabled(_ enabled: Bool) {
         loopCountInEnabled = enabled
+        if enabled, countInVolume == 0 { countInVolume = 0.85 }
         call("setLoopCountInEnabled", arguments: [enabled])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()

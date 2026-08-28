@@ -597,6 +597,11 @@ assert.doesNotMatch(
     );
     assert.match(
         swiftViewModel,
+        /func setLoopCountInEnabled\(_ enabled: Bool\) \{[\s\S]*?if enabled, countInVolume == 0 \{ countInVolume = 0\.85 \}/,
+        "enabling a loop-only count-in must make its audible default explicit"
+    );
+    assert.match(
+        swiftViewModel,
         /private func recordLoopCompletion\(\)[\s\S]*?applyEffectivePlaybackSpeed\(\)[\s\S]*?if loopCountInEnabled \{[\s\S]*?call\("restartRangeWithCountIn"\)/,
         "Swift must apply the completed-loop speed update before acknowledging one count-in restart"
     );
