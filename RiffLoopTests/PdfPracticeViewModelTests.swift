@@ -50,7 +50,9 @@ final class PdfPracticeViewModelTests: XCTestCase {
         model.bindAudio(at: audio)
         model.startAutoFollowFromBeginning()
         defer { model.pause() }
-        var previous = 0.4
+        // Do not count the initial 0 -> first-point seek as a completed round.
+        try await waitForTransport { model.isAudioPlaying && model.currentTime >= 0.4 }
+        var previous = model.currentTime
         var rounds = 0
         try await waitForTransport(timeout: 6) {
             if model.currentTime < previous - 0.2 { rounds += 1 }
