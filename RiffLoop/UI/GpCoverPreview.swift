@@ -47,7 +47,7 @@ struct GpCoverPreview: UIViewRepresentable {
                 "window.renderPreview(bytes, title)",
                 arguments: ["bytes": data.base64EncodedString(), "title": url.deletingPathExtension().lastPathComponent],
                 in: nil,
-                contentWorld: .page
+                in: .page
             ) { _ in }
         }
     }
