@@ -123,9 +123,11 @@ struct PdfPracticeView: View {
             groupingInput = grouping.map(String.init).joined(separator: "+")
         }
         .onAppear {
-            guard !didOpenInitialURL, let initialURL else { return }
+            guard !didOpenInitialURL else { return }
             didOpenInitialURL = true
-            openPdf(initialURL)
+            if let url = initialURL ?? recentProjects.mostRecentValidURL(kind: .pdf) {
+                openPdf(url)
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { viewModel.pause() }

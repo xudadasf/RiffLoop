@@ -115,6 +115,11 @@ struct PracticeView: View {
                     scrubTime = newValue
                 }
             }
+            .onChange(of: viewModel.isMediaReady) { _, ready in
+                if ready, let currentFileName {
+                    recentProjects.opened(kind: .video, fileName: currentFileName)
+                }
+            }
             .onChange(of: viewModel.beatGrouping) { _, grouping in
                 groupingInput = grouping.map(String.init).joined(separator: "+")
             }
@@ -122,9 +127,11 @@ struct PracticeView: View {
                 if phase != .active { viewModel.pause() }
             }
             .onAppear {
-                guard !didOpenInitialURL, let initialURL else { return }
+                guard !didOpenInitialURL else { return }
                 didOpenInitialURL = true
-                open(initialURL)
+                if let url = initialURL ?? recentProjects.mostRecentValidURL(kind: .video) {
+                    open(url)
+                }
             }
             .onDisappear(perform: viewModel.pause)
     }
@@ -798,7 +805,6 @@ struct PracticeView: View {
     private func open(_ url: URL) {
         currentFileName = url.lastPathComponent
         viewModel.openMedia(at: url)
-        recentProjects.opened(kind: .video, fileName: url.lastPathComponent)
     }
 
     private var videoTitle: String {

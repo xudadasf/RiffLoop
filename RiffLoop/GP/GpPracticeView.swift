@@ -114,9 +114,16 @@ struct GpPracticeView: View {
                 viewModel.setSceneActive(phase == .active)
             }
             .onAppear {
-                guard !didOpenInitialURL, let initialURL else { return }
+                guard !didOpenInitialURL else { return }
                 didOpenInitialURL = true
-                importScore(from: initialURL)
+                if let url = initialURL ?? recentProjects.mostRecentValidURL(kind: .guitarPro) {
+                    importScore(from: url)
+                }
+            }
+            .onChange(of: viewModel.score) { _, score in
+                if score != nil, let currentFileName {
+                    recentProjects.opened(kind: .guitarPro, fileName: currentFileName)
+                }
             }
             .onDisappear(perform: viewModel.pause)
     }
@@ -679,7 +686,6 @@ struct GpPracticeView: View {
         do {
             currentFileName = url.lastPathComponent
             viewModel.loadScore(data: try Data(contentsOf: url), fileName: url.lastPathComponent)
-            recentProjects.opened(kind: .guitarPro, fileName: url.lastPathComponent)
         } catch {
             viewModel.reportImportError(error)
         }
