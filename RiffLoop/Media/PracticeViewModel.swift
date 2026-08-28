@@ -126,6 +126,7 @@ final class PracticeViewModel: ObservableObject {
         let generation = transportGeneration
 
         player.cancelPendingPrerolls()
+        player.currentItem?.cancelPendingSeeks()
         player.pause()
         metronome.stop()
         isPlaying = false

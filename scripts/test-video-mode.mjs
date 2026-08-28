@@ -58,8 +58,12 @@ check("the first manual play waits for seek and preroll before synchronized star
 
 check("resuming after a seek prerolls before restarting playback", () => {
     const body = functionBody(viewModelSource, "func seek(to seconds: TimeInterval)");
+    const cancelIndex = body.indexOf("player.currentItem?.cancelPendingSeeks()");
+    const seekIndex = body.indexOf("player.seek(");
     const prerollIndex = body.indexOf("self.player.preroll(atRate:");
     const startIndex = body.indexOf("self.coordinatedStart(at: target)");
+    assert.ok(cancelIndex >= 0, "a new seek must cancel an older pending item seek");
+    assert.ok(cancelIndex < seekIndex, "old item seeks must be cancelled before the new target is issued");
     assert.ok(prerollIndex >= 0, "a playing seek must preroll the target frame");
     assert.ok(startIndex > prerollIndex, "seek must restart only after preroll succeeds");
 });
