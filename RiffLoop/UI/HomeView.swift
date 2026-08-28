@@ -1,4 +1,5 @@
-import QuickLookThumbnailing
+import AVFoundation
+import PDFKit
 import SwiftUI
 import UIKit
 
@@ -79,30 +80,21 @@ struct HomeView: View {
     private var continuePracticeCard: some View {
         if let project = mostRecentProject {
             ZStack(alignment: .trailing) {
-                LinearGradient(
-                    colors: [Color(.label), Color(.secondaryLabel)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Image(systemName: iconName(for: project.kind))
-                    .font(.system(size: 150, weight: .semibold))
-                    .foregroundStyle(Color(.systemBackground).opacity(0.08))
-                    .padding(.trailing, 54)
+                PracticeCardBackground()
 
                 HStack(alignment: .bottom, spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("最近练习 · \(project.kind.title)")
                             .font(.caption.bold())
                             .textCase(.uppercase)
-                            .foregroundStyle(Color(.systemBackground).opacity(0.68))
+                            .foregroundStyle(.white.opacity(0.7))
                         Text(displayName(for: project))
                             .font(.title.bold())
-                            .foregroundStyle(Color(.systemBackground))
+                            .foregroundStyle(.white)
                             .lineLimit(1)
                         Text("上次打开：\(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
                             .font(.subheadline)
-                            .foregroundStyle(Color(.systemBackground).opacity(0.68))
+                            .foregroundStyle(.white.opacity(0.7))
 
                         HStack(spacing: 10) {
                             NavigationLink {
@@ -111,8 +103,8 @@ struct HomeView: View {
                                 Label("继续练习", systemImage: "play.fill")
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(Color(.systemBackground))
-                            .foregroundStyle(Color(.label))
+                            .tint(.white)
+                            .foregroundStyle(Color(red: 0.10, green: 0.16, blue: 0.22))
 
                             NavigationLink {
                                 recentProjectsPage
@@ -120,7 +112,7 @@ struct HomeView: View {
                                 Text("打开其他文件")
                             }
                             .buttonStyle(.bordered)
-                            .tint(Color(.systemBackground))
+                            .tint(.white)
                         }
                     }
 
@@ -513,6 +505,33 @@ private extension View {
     }
 }
 
+private struct PracticeCardBackground: View {
+    var body: some View {
+        LinearGradient(
+            colors: [Color(red: 0.08, green: 0.14, blue: 0.20), Color(red: 0.17, green: 0.29, blue: 0.34)],
+            startPoint: .leading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            Canvas { context, size in
+                // Quiet string-like arcs stay on the right, away from the title and actions.
+                for index in 0..<6 {
+                    var path = Path()
+                    let offset = CGFloat(index) * 22
+                    path.move(to: CGPoint(x: size.width * 0.45 + offset, y: size.height + 20))
+                    path.addCurve(
+                        to: CGPoint(x: size.width + 20, y: 20 + offset),
+                        control1: CGPoint(x: size.width * 0.65, y: size.height * 0.25 + offset),
+                        control2: CGPoint(x: size.width * 0.8, y: size.height * 0.85 - offset)
+                    )
+                    context.stroke(path, with: .color(.white.opacity(0.09)), lineWidth: 1)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private struct ProjectPreviewThumbnail: View {
     let url: URL
     let kind: PracticeKind
@@ -521,10 +540,13 @@ private struct ProjectPreviewThumbnail: View {
 
     var body: some View {
         Group {
-            if let image {
+            if kind == .guitarPro {
+                GpCoverPreview(url: url)
+                    .allowsHitTesting(false)
+            } else if let image {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .aspectRatio(contentMode: kind == .video ? .fit : .fill)
             } else {
                 Image(systemName: fallbackIcon)
                     .font(.system(size: 34, weight: .semibold))
@@ -533,20 +555,13 @@ private struct ProjectPreviewThumbnail: View {
                     .background(.white.opacity(0.12))
             }
         }
-        .frame(width: 156, height: 104)
+        .frame(width: 192, height: 128, alignment: .top)
         .background(.white.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .task(id: url) {
             image = nil
-            let request = QLThumbnailGenerator.Request(
-                fileAt: url,
-                size: CGSize(width: 312, height: 208),
-                scale: UIScreen.main.scale,
-                representationTypes: .thumbnail
-            )
-            image = try? await QLThumbnailGenerator.shared
-                .generateBestRepresentation(for: request)
-                .uiImage
+            guard kind != .guitarPro else { return }
+            image = await projectOpeningPreview(at: url, kind: kind)
         }
         .accessibilityLabel("\(kind.title)预览")
     }
@@ -557,5 +572,33 @@ private struct ProjectPreviewThumbnail: View {
         case .guitarPro: "music.note.list"
         case .pdf: "doc.richtext.fill"
         }
+    }
+}
+
+func projectOpeningPreview(at url: URL, kind: PracticeKind) async -> UIImage? {
+    if kind == .video {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        generator.maximumSize = CGSize(width: 768, height: 512)
+        guard let result = try? await generator.image(at: .zero) else { return nil }
+        return UIImage(cgImage: result.image)
+    }
+    guard kind == .pdf, let page = PDFDocument(url: url)?.page(at: 0) else { return nil }
+    let bounds = page.bounds(for: .cropBox)
+    guard bounds.width > 0, bounds.height > 0 else { return nil }
+    // Keep the first page's title instead of centre-cropping a whole-page thumbnail.
+    let size = CGSize(width: 768, height: 512)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    return UIGraphicsImageRenderer(size: size, format: format).image { context in
+        UIColor.white.setFill()
+        context.fill(CGRect(origin: .zero, size: size))
+        let scale = size.width / bounds.width
+        context.cgContext.translateBy(x: 0, y: bounds.height * scale)
+        context.cgContext.scaleBy(x: scale, y: -scale)
+        context.cgContext.translateBy(x: -bounds.minX, y: -bounds.minY)
+        page.draw(with: .cropBox, to: context.cgContext)
     }
 }

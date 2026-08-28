@@ -2,6 +2,17 @@ import XCTest
 @testable import RiffLoop
 
 final class GpMetronomeSettingsTests: XCTestCase {
+    @MainActor
+    func testBoostedMetronomeVolumeKeepsZeroAndCapsAtTwoHundredPercent() {
+        let model = GpWebViewModel()
+        model.setMetronomeVolume(1.5)
+        XCTAssertEqual(model.metronomeVolume, 1.5)
+        model.setMetronomeVolume(3)
+        XCTAssertEqual(model.metronomeVolume, 2)
+        model.setMetronomeVolume(-1)
+        XCTAssertEqual(model.metronomeVolume, 0)
+    }
+
     func testDefaultAccentsUseStrongDownbeat() {
         XCTAssertEqual(defaultGpBeatAccents(beatsPerMeasure: 4), [.strong, .normal, .normal, .normal])
     }

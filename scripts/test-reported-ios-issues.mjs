@@ -65,14 +65,7 @@ for (const expected of [
 ]) {
     assert.match(metronome, expected, "native strong, secondary and normal clicks must be clearly separated");
 }
-for (const expected of [
-    /accent === "strong"\) return 0\.95/,
-    /accent === "subAccent"\) return 0\.70/,
-    /accent === "normal"\) return 0\.52/,
-    /accent === "subdivision"\) return 0\.40/,
-]) {
-    assert.match(gpWeb, expected, "GP strong, secondary and normal beats must remain audibly distinct");
-}
+// GP audibility is verified from rendered PCM in test-gp-playback.mjs.
 assert.doesNotMatch(
     gpWeb,
     /midiEventsPlayed[\s\S]*?pdfClickMetronome\.play/,
@@ -187,7 +180,9 @@ assert.match(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signin
 assert.match(homeView, /最近项目[\s\S]*?recentProjectsPage/);
 assert.match(homeView, /ForEach\(recentProjects\.projects\) \{ project in[\s\S]*?destination\(for: project\)/);
 assert.doesNotMatch(homeView, /\.navigationTitle\("RiffLoop"\)/);
-assert.match(homeView, /ProjectPreviewThumbnail[\s\S]*?QLThumbnailGenerator/);
+assert.match(homeView, /ProjectPreviewThumbnail[\s\S]*?projectOpeningPreview/);
+assert.match(homeView, /generator\.image\(at: \.zero\)/, "video preview must be the opening frame");
+assert.match(homeView, /PDFDocument\(url: url\)\?\.page\(at: 0\)/, "PDF preview must start on the first page");
 assert.doesNotMatch(homeView, /private var signingStatusCard/);
 assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);

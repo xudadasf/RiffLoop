@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=768, user-scalable=no">
+    <style>
+        html, body { margin: 0; background: #f5f2e9; color: #171717; overflow: hidden; }
+        #score { width: 768px; }
+        #fallback { margin: 40px; font: 32px -apple-system, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="fallback"></div>
+    <div id="score"></div>
+    <script src="./alphaTab.min.js"></script>
+    <script>
+        const preview = new alphaTab.AlphaTabApi(document.getElementById('score'), {
+            core: { fontDirectory: './font/', useWorkers: false, enableLazyLoading: false },
+            display: { layoutMode: alphaTab.LayoutMode.Page, staveProfile: alphaTab.StaveProfile.ScoreTab,
+                startBar: 1, barCount: 2, barsPerRow: 2, scale: 1 },
+            player: { playerMode: alphaTab.PlayerMode.Disabled, enableUserInteraction: false }
+        });
+        preview.renderFinished.on(() => { document.getElementById('fallback').hidden = true; });
+        window.renderPreview = (base64, title) => {
+            const fallback = document.getElementById('fallback');
+            fallback.textContent = title;
+            fallback.hidden = false;
+            try {
+                const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+                const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes);
+                if (!score.title) score.title = title;
+                preview.renderScore(score, [0]);
+            } catch (_) { /* Keep the file title visible for unsupported files. */ }
+        };
+    </script>
+</body>
+</html>
