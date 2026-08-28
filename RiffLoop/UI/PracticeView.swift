@@ -418,8 +418,15 @@ struct PracticeView: View {
                 volumeSlider("节拍音量", value: Double(viewModel.metronomeVolume)) {
                     viewModel.setMetronomeVolume(Float($0))
                 }
-                Text("节拍微调 \(Int((viewModel.synchronizationOffset * 1_000).rounded())) ms")
-                    .font(.caption)
+                HStack {
+                    Text("节拍微调 \(Int((viewModel.synchronizationOffset * 1_000).rounded())) ms")
+                        .font(.caption)
+                    Spacer()
+                    Button("重置", action: viewModel.resetSynchronization)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(viewModel.synchronizationOffset == 0)
+                }
                 HStack {
                     ForEach([-10, -5, -1, 1, 5, 10], id: \.self) { milliseconds in
                         Button(milliseconds > 0 ? "+\(milliseconds)" : "\(milliseconds)") {

@@ -302,6 +302,12 @@ final class PracticeViewModel: ObservableObject {
         resynchronizeMetronome()
     }
 
+    func resetSynchronization() {
+        synchronizationOffset = 0
+        saveProfile()
+        resynchronizeMetronome()
+    }
+
     func setMeter(beats: Int, unit: Int) {
         beatsPerMeasure = min(max(beats, 1), 16)
         beatUnit = [2, 4, 8, 16].contains(unit) ? unit : 4

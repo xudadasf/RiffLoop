@@ -84,6 +84,11 @@ check("metronome fine adjustment keeps the video transport running", () => {
     assert.match(resyncBody, /metronome\.synchronize\(/);
     assert.doesNotMatch(resyncBody, /player\.pause\(\)/);
     assert.doesNotMatch(resyncBody, /player\.setRate\(/);
+
+    const resetBody = functionBody(viewModelSource, "func resetSynchronization()");
+    assert.match(resetBody, /synchronizationOffset = 0/);
+    assert.match(resetBody, /resynchronizeMetronome\(\)/);
+    assert.match(viewSource, /Button\("重置", action: viewModel\.resetSynchronization\)/);
 });
 
 check("enabling A/B loop seeks to point A through the coordinated transport", () => {
