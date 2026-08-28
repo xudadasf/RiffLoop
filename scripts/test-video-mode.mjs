@@ -125,6 +125,10 @@ check("a single compact speed trigger keeps the current multiplier visible", () 
     assert.match(viewSource, /String\(format: "%\.2f×", rate\)/);
 });
 
+check("the single-volume panel has a compact size", () => {
+    assert.match(viewSource, /height: panel == \.sound \? 180 : 540/);
+});
+
 check("disabling the speed ladder restores its latest manual base speed", () => {
     assert.match(viewModelSource, /private var speedLadderBaseRate: Float\?/);
 

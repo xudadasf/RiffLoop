@@ -73,7 +73,7 @@ struct PracticeView: View {
             .overlay(alignment: .bottomTrailing) {
                 if let panel = activePanel {
                     panelContent(panel)
-                        .frame(width: 420, height: 540)
+                        .frame(width: panel == .sound ? 340 : 420, height: panel == .sound ? 180 : 540)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
                         .padding(16)
