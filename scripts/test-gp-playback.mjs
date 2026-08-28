@@ -40,6 +40,9 @@ const source = readFileSync(
     assert.ok(pulses[0].frequency < 4000, `Downbeat must be in a speaker-friendly range, got ${pulses[0].frequency} Hz`);
     assert.ok(pulses[0].rms > 0.055, `Downbeat is too faint: RMS ${pulses[0].rms}`);
     assert.ok(pulses[1].rms > 0.035, `Subdivision is too faint: RMS ${pulses[1].rms}`);
+    assert.ok(pulses[0].rms > pulses[2].rms * 1.1, 'Strong and secondary beats must differ in energy');
+    assert.ok(pulses[2].rms > pulses[4].rms * 1.1, 'Secondary and normal beats must differ in energy');
+    assert.ok(pulses[4].rms > pulses[1].rms * 1.1, 'Normal and subdivision beats must differ in energy');
     assert.ok(pulses[0].frequency > pulses[2].frequency * 1.2);
     assert.ok(pulses[2].frequency > pulses[4].frequency * 1.2);
     assert.ok(pulses[4].frequency > pulses[1].frequency * 1.2);

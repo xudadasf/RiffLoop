@@ -24,6 +24,45 @@ final class PdfPracticeViewModelTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(model.currentTime, 0.9)
         XCTAssertLessThan(model.currentTime, 1.6, "The metronome clock must return to the first reading point every round")
         XCTAssertTrue(model.isFollowingTransportActive)
+        model.setFollowLoopEnabled(false)
+        try await waitForTransport { model.currentTime > 1.7 }
+        model.pause()
+        let pausedTime = model.currentTime
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(model.currentTime, pausedTime)
+    }
+
+    func testFollowLoopsAtAudioEndAndPauseStopsFurtherRounds() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let audio = try makeTransportAudioFixture(duration: 1.5)
+        let store = FilePracticeSettingsStore()
+        defer {
+            try? FileManager.default.removeItem(at: pdf)
+            try? FileManager.default.removeItem(at: audio)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        try store.save(PdfPracticeProfile(metronomeEnabled: false, readingPoints: [
+            PdfReadingPoint(time: 0.4, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 1.5, pageIndex: 0, verticalProgress: 0.8)
+        ], followLoopEnabled: true), kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.bindAudio(at: audio)
+        model.startAutoFollowFromBeginning()
+        defer { model.pause() }
+        var previous = 0.4
+        var rounds = 0
+        try await waitForTransport(timeout: 6) {
+            if model.currentTime < previous - 0.2 { rounds += 1 }
+            previous = model.currentTime
+            return rounds >= 2
+        }
+        XCTAssertTrue(model.isFollowingTransportActive)
+        model.stopReadingFollowPlayback()
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertEqual(model.currentTime, 0.4, accuracy: 0.05)
+        XCTAssertEqual(model.requestedProgress, 0)
     }
 
     func testManualSpeedKeepsLadderTargetReachable() {
