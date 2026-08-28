@@ -46,12 +46,13 @@ struct PracticeView: View {
     }
 
     private let rates: [Float] = [0.25, 0.5, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
-    private let quickRates: [Float] = [0.5, 0.75, 0.9, 1.0, 1.25]
-
     var body: some View {
         videoArea
             .simultaneousGesture(
-                TapGesture().onEnded { activePanel = nil }
+                TapGesture().onEnded {
+                    activePanel = nil
+                    viewModel.togglePlayback()
+                }
             )
             .overlay(alignment: .topTrailing) {
                 if viewModel.hasMedia {
@@ -90,16 +91,6 @@ struct PracticeView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button { isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
-                    }
-                    Menu {
-                        if viewModel.loopEnabled {
-                            Button("退出 A/B 循环", role: .destructive, action: viewModel.clearLoop)
-                        }
-                        Button("循环设置") { activePanel = .loop }
-                        Button("节拍器设置") { activePanel = .metronome }
-                        Button("声音与记录") { activePanel = .sound }
-                    } label: {
-                        Label("更多", systemImage: "ellipsis")
                     }
                 }
             }
@@ -159,16 +150,20 @@ struct PracticeView: View {
 
             VStack(spacing: 8) {
                 timeline
-                HStack(spacing: 6) {
-                    ForEach(quickRates, id: \.self) { rate in
-                        Button("手动 \(rateLabel(rate))") { viewModel.setPlaybackRate(rate) }
-                            .buttonStyle(.bordered)
-                            .tint(viewModel.playbackRate == rate ? .accentColor : .secondary)
-                    }
-                }
-                .controlSize(.small)
             }
             .frame(minWidth: 340, maxWidth: .infinity)
+
+            Menu {
+                ForEach(rates, id: \.self) { rate in
+                    Button(rateLabel(rate)) { viewModel.setPlaybackRate(rate) }
+                }
+            } label: {
+                Text(rateLabel(viewModel.playbackRate))
+                    .monospacedDigit()
+                    .frame(minWidth: 58, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.hasMedia)
 
             Rectangle()
                 .fill(Color(.separator))
@@ -438,15 +433,7 @@ struct PracticeView: View {
 
     private var compactSoundSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("视频声音与练习记录").font(.headline)
-            Picker("手动速度", selection: Binding(
-                get: { viewModel.playbackRate },
-                set: { viewModel.setPlaybackRate($0) }
-            )) {
-                ForEach(rates, id: \.self) { rate in
-                    Text("手动 \(rateLabel(rate))").tag(rate)
-                }
-            }
+            Text("声音与练习记录").font(.headline)
             volumeSlider("视频音量", value: Double(viewModel.mediaVolume)) {
                 viewModel.setMediaVolume(Float($0))
             }

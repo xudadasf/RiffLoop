@@ -108,8 +108,10 @@ check("the shared library exposes deletion for every practice mode", () => {
     assert.match(librarySource, /recentProjects\.remove\(/);
 });
 
-check("manual speed and speed-ladder controls explain their distinct roles", () => {
-    assert.ok(viewSource.includes('Text("手动 \\(rateLabel'));
+check("a single compact speed trigger keeps the current multiplier visible", () => {
+    assert.match(viewSource, /Menu \{[\s\S]*?Button\(rateLabel\(rate\)\).*?\}[\s\S]*?Text\(rateLabel\(viewModel\.playbackRate\)\)/);
+    const soundBody = functionBody(viewSource, "private var compactSoundSection: some View");
+    assert.doesNotMatch(soundBody, /Picker\("手动速度"/);
     assert.match(viewSource, /"阶梯说明：/);
     assert.match(viewSource, /String\(format: "%\.2f×", rate\)/);
 });
@@ -146,10 +148,11 @@ check("the speed ladder target never falls below its manual base speed", () => {
     assert.match(viewSource, /目标速度不会低于手动起始速度，阶梯只递增/);
 });
 
-check("the video surface cannot bypass RiffLoop transport controls", () => {
+check("the video surface keeps custom transport and supports direct tap", () => {
     assert.doesNotMatch(viewSource, /VideoPlayer\(player:/);
     assert.match(viewSource, /VideoSurface\(player:/);
     assert.match(viewSource, /showsPlaybackControls = false/);
+    assert.match(viewSource, /TapGesture\(\)\.onEnded \{[\s\S]*?viewModel\.togglePlayback\(\)/);
 });
 
 check("the video page keeps the content full-width with GP-style bottom tools", () => {
@@ -167,6 +170,11 @@ check("video settings stay open while transport remains interactive", () => {
         "tapping the video display must dismiss settings"
     );
     assert.match(viewSource, /if let panel = activePanel \{[\s\S]*?panelContent\(panel\)/);
+});
+
+check("the video toolbar does not duplicate bottom tool actions", () => {
+    assert.doesNotMatch(viewSource, /Label\("更多", systemImage: "ellipsis"\)/);
+    assert.match(viewSource, /Label\("选择文件", systemImage: "folder"\)/);
 });
 
 for (const result of checks) {
