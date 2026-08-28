@@ -56,6 +56,32 @@ check("the first manual play waits for seek and preroll before synchronized star
     assert.ok(startIndex > prerollIndex, "synchronized start must happen after preroll");
 });
 
+check("resuming after a seek prerolls before restarting playback", () => {
+    const body = functionBody(viewModelSource, "func seek(to seconds: TimeInterval)");
+    const prerollIndex = body.indexOf("self.player.preroll(atRate:");
+    const startIndex = body.indexOf("self.coordinatedStart(at: target)");
+    assert.ok(prerollIndex >= 0, "a playing seek must preroll the target frame");
+    assert.ok(startIndex > prerollIndex, "seek must restart only after preroll succeeds");
+});
+
+check("metronome fine adjustment keeps the video transport running", () => {
+    const adjustmentBody = functionBody(
+        viewModelSource,
+        "func adjustSynchronization(by seconds: TimeInterval)"
+    );
+    assert.doesNotMatch(adjustmentBody, /applyTimingSettings\(\)/);
+    assert.match(adjustmentBody, /resynchronizeMetronome\(\)/);
+
+    const resyncBody = functionBody(
+        viewModelSource,
+        "private func resynchronizeMetronome()"
+    );
+    assert.match(resyncBody, /player\.currentTime\(\)/);
+    assert.match(resyncBody, /metronome\.synchronize\(/);
+    assert.doesNotMatch(resyncBody, /player\.pause\(\)/);
+    assert.doesNotMatch(resyncBody, /player\.setRate\(/);
+});
+
 check("enabling A/B loop seeks to point A through the coordinated transport", () => {
     const body = functionBody(viewModelSource, "func setLoopEnabled(_ enabled: Bool)");
     assert.match(body, /let loopEntryTarget = enabled \? pointA : nil/);

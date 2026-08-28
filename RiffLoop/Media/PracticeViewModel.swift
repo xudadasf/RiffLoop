@@ -142,7 +142,17 @@ final class PracticeViewModel: ObservableObject {
                 }
                 self.currentTime = target
                 if wasPlaying {
-                    self.coordinatedStart(at: target)
+                    self.player.preroll(atRate: self.playbackRate) { [weak self] ready in
+                        Task { @MainActor [weak self] in
+                            guard let self, self.transportGeneration == generation else { return }
+                            guard ready else {
+                                self.isPlaying = false
+                                self.errorMessage = "视频尚未准备好，请重试。"
+                                return
+                            }
+                            self.coordinatedStart(at: target)
+                        }
+                    }
                 }
             }
         }
@@ -287,7 +297,8 @@ final class PracticeViewModel: ObservableObject {
 
     func adjustSynchronization(by seconds: TimeInterval) {
         synchronizationOffset = min(max(synchronizationOffset + seconds, -0.5), 0.5)
-        applyTimingSettings()
+        saveProfile()
+        resynchronizeMetronome()
     }
 
     func setMeter(beats: Int, unit: Int) {
@@ -455,6 +466,31 @@ final class PracticeViewModel: ObservableObject {
     private func restartAfterTimingChange() {
         guard isPlaying else { return }
         coordinatedStart(at: currentTime)
+    }
+
+    private func resynchronizeMetronome() {
+        guard isPlaying, metronomeEnabled, let beatOffset else { return }
+
+        let playerTime = player.currentTime().seconds
+        let mediaTime = playerTime.isFinite ? max(0, playerTime) : currentTime
+        let lead: TimeInterval = 0.100
+        let hostTime = CMClockGetTime(CMClockGetHostTimeClock()).seconds + lead
+        let anchor = TransportAnchor(
+            mediaTime: mediaTime + lead * Double(playbackRate),
+            hostTime: hostTime,
+            mediaRate: Double(playbackRate)
+        )
+
+        do {
+            try metronome.synchronize(
+                timeline: makeTimeline(beatOffset: beatOffset + synchronizationOffset),
+                anchor: anchor,
+                rhythmMode: rhythmMode,
+                volume: metronomeVolume
+            )
+        } catch {
+            errorMessage = "节拍器同步失败：\(error.localizedDescription)"
+        }
     }
 
     private func handleLoopBoundary() {
