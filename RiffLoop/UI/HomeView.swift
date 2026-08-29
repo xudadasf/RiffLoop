@@ -15,6 +15,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     welcomeHeader
+                    signingStatusCard
                     continuePracticeCard
 
                     ViewThatFits(in: .horizontal) {
@@ -41,16 +42,6 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isSigningHelpPresented = true
-                    } label: {
-                        Label(signingCompactTitle, systemImage: signingStatusIcon)
-                    }
-                    .tint(signingStatusColor)
-                }
-            }
             .onAppear(perform: refreshSigningStatus)
             .sheet(isPresented: $isSigningHelpPresented) {
                 signingHelp
@@ -413,15 +404,51 @@ struct HomeView: View {
         }
     }
 
-    private var signingCompactTitle: String {
-        guard let expirationDate = signingStatus.expirationDate else { return signingStatusTitle }
-        let days = max(0, Int(ceil(expirationDate.timeIntervalSinceNow / (24 * 60 * 60))))
-        switch signingStatus.kind {
-        case .valid: return "签名有效 · \(days) 天"
-        case .expiringSoon: return "签名剩 \(days) 天"
-        case .expired: return "签名已过期"
-        case .unavailable: return signingStatusTitle
+    private var signingStatusCard: some View {
+        Button {
+            isSigningHelpPresented = true
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: signingStatusIcon)
+                    .font(.title2)
+                    .foregroundStyle(signingStatusColor)
+                    .frame(width: 42, height: 42)
+                    .background(signingStatusColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("签名与续签")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(signingExpirationTitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Text("查看续签方法")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.blue)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
         }
+        .buttonStyle(.plain)
+    }
+
+    private var signingExpirationTitle: String {
+        guard let expirationDate = signingStatus.expirationDate else {
+            return "无法读取到期时间 · 点此查看续签方法"
+        }
+        let dateText = expirationDate.formatted(date: .long, time: .shortened)
+        if signingStatus.kind == .expired {
+            return "已于 \(dateText) 到期"
+        }
+        let days = max(0, Int(ceil(expirationDate.timeIntervalSinceNow / (24 * 60 * 60))))
+        return "到期：\(dateText) · 剩余 \(days) 天"
     }
 
     private var signingHelp: some View {
@@ -429,6 +456,13 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Label("续签需要在 Windows 的 Sideloadly 中完成", systemImage: "desktopcomputer")
                     .font(.title2.bold())
+
+                Text(signingExpirationTitle)
+                    .font(.headline)
+                    .foregroundStyle(signingStatusColor)
+
+                Text("免费 Apple 账号的签名通常只有 7 天。Sideloadly Automatic Refresh 会尝试自动刷新；如果没有自动完成，请按下面步骤手动覆盖续签。")
+                    .foregroundStyle(.secondary)
 
                 Text("1. 首次设置需用 USB：在 iTunes 的设备摘要中开启“通过 Wi-Fi 与此 iPad 同步”，点击“同步/完成”，并让 Sideloadly 成功安装过一次。")
                 Text("2. 日常无线续签时，电脑与 iPad 连接同一个局域网，保持 iPad 屏幕点亮，并关闭电脑和 iPad 上的 VPN/代理。")
@@ -459,15 +493,6 @@ struct HomeView: View {
                     Button("关闭") { isSigningHelpPresented = false }
                 }
             }
-        }
-    }
-
-    private var signingStatusTitle: String {
-        switch signingStatus.kind {
-        case .valid: "签名有效"
-        case .expiringSoon: "签名即将到期"
-        case .expired: "签名已过期"
-        case .unavailable: "无法读取签名状态"
         }
     }
 

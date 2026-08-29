@@ -176,14 +176,21 @@ for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
 assert.match(homeView, /继续今天的练习[\s\S]*?continuePracticeCard/);
 assert.match(homeView, /开始新的练习[\s\S]*?modeButton\(for: \.video\)[\s\S]*?modeButton\(for: \.guitarPro\)[\s\S]*?modeButton\(for: \.pdf\)/);
 assert.match(homeView, /calendarDays\(weeks: 4\)[\s\S]*?最近一个月/);
-assert.match(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signingCompactTitle/);
+assert.match(
+    homeView,
+    /welcomeHeader[\s\S]*?signingStatusCard[\s\S]*?continuePracticeCard/,
+    "the signing status must be visible in the scroll content instead of collapsing to a toolbar icon"
+);
+assert.match(homeView, /Text\("签名与续签"\)[\s\S]*?signingExpirationTitle[\s\S]*?查看续签方法/);
+assert.match(homeView, /expirationDate\.formatted\(date: \.long, time: \.shortened\)[\s\S]*?到期：/);
+assert.match(homeView, /Automatic Refresh[\s\S]*?手动覆盖续签/);
+assert.doesNotMatch(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signingCompactTitle/);
 assert.match(homeView, /最近项目[\s\S]*?recentProjectsPage/);
 assert.match(homeView, /ForEach\(recentProjects\.projects\) \{ project in[\s\S]*?destination\(for: project\)/);
 assert.doesNotMatch(homeView, /\.navigationTitle\("RiffLoop"\)/);
 assert.match(homeView, /ProjectPreviewThumbnail[\s\S]*?projectOpeningPreview/);
 assert.match(homeView, /generator\.image\(at: \.zero\)/, "video preview must be the opening frame");
 assert.match(homeView, /PDFDocument\(url: url\)\?\.page\(at: 0\)/, "PDF preview must start on the first page");
-assert.doesNotMatch(homeView, /private var signingStatusCard/);
 assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
 assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");
