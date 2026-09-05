@@ -90,6 +90,26 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             XCTAssertGreaterThan(metrics["beams"] ?? 0, 100, "Rhythm beams must remain visible")
             XCTAssertEqual(metrics["overlaps"], 0, "H/P labels overlap rhythm beams at width \(width), scale \(scale)")
         }
+        // A paused player cursor stays at the beginning while the reader scrolls
+        // further down. Reflow must not let the renderer drag them back to bar 1.
+        _ = try await webView.evaluateJavaScript("""
+            (() => {
+                const api = window.riffloopLayoutTestApi;
+                const viewport = document.getElementById('viewport');
+                viewport.scrollTop = api.renderer.boundsLookup.findMasterBarByIndex(10).realBounds.y;
+                window.zoomAnchorChecked = false;
+                const finished = () => {
+                    api.postRenderFinished.off(finished);
+                    requestAnimationFrame(() => requestAnimationFrame(() => { window.zoomAnchorChecked = true; }));
+                };
+                api.postRenderFinished.on(finished);
+                window.riffloop.setScoreZoom(1);
+            })()
+            """)
+        try await waitForJavaScript(webView, "window.zoomAnchorChecked")
+        try await Task.sleep(for: .milliseconds(150))
+        let retainedScroll = try await webView.evaluateJavaScript("document.getElementById('viewport').scrollTop > 50")
+        XCTAssertEqual(retainedScroll as? Bool, true, "Zoom must retain the reader's position after queued cursor updates")
         let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: webView.bounds).image { _ in
             webView.drawHierarchy(in: webView.bounds, afterScreenUpdates: true)
         })

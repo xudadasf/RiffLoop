@@ -940,9 +940,16 @@
     api.postRenderFinished.on(() => {
         if (!zoomAnchor) return;
         const anchor = zoomAnchor;
-        zoomAnchor = null;
-        const bounds = api.renderer?.boundsLookup?.findMasterBarByIndex(anchor.index)?.realBounds;
-        if (bounds) viewportElement.scrollTop = Math.max(0, bounds.y - anchor.offset);
+        // Cursor placement is queued for the next animation frame by alphaTab.
+        // Restore after it, otherwise that queued scroll overwrites the anchor.
+        api.uiFacade.beginInvoke(() => {
+            if (zoomAnchor !== anchor) return;
+            zoomAnchor = null;
+            const bounds = api.renderer?.boundsLookup?.findMasterBarByIndex(anchor.index)?.realBounds;
+            if (!bounds) return;
+            api.uiFacade.stopScrolling(api.uiFacade.getScrollContainer());
+            viewportElement.scrollTop = Math.max(0, bounds.y - anchor.offset);
+        });
     });
     api.renderFinished.on((result) => {
         drawTiedTabDestinations();
