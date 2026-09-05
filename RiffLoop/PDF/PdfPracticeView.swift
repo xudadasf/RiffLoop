@@ -133,6 +133,7 @@ struct PdfPracticeView: View {
             if phase != .active { viewModel.pause() }
         }
         .onDisappear(perform: viewModel.pause)
+            .keepPracticeScreenAwake(hasFile: viewModel.document != nil)
     }
 
     private var playbackStateBadge: some View {
@@ -152,7 +153,7 @@ struct PdfPracticeView: View {
     private var controlDeck: some View {
         HStack(spacing: 12) {
             deckTransportControls
-                .frame(width: 172)
+                .frame(width: 260)
 
             pageAndProgressControls
                 .frame(minWidth: 300, maxWidth: .infinity)
@@ -176,6 +177,12 @@ struct PdfPracticeView: View {
 
     private var deckTransportControls: some View {
         HStack(spacing: 8) {
+            Button(action: viewModel.toggleMetronomePlayback) {
+                Label(viewModel.isMetronomePlaying ? "停止节拍" : "启动节拍", systemImage: "metronome")
+                    .frame(minHeight: 48)
+            }
+            .buttonStyle(.bordered)
+            .tint(viewModel.isMetronomePlaying ? .orange : .accentColor)
             Button(action: viewModel.toggleReadingFollowPlayback) {
                 Label(
                     viewModel.isFollowingTransportActive ? "暂停跟谱" : "开始跟谱",
@@ -248,7 +255,7 @@ struct PdfPracticeView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Text("未绑定伴奏 · 可单独使用节拍器")
+                Text(viewModel.isPlaying ? viewModel.currentBeatCue : "未绑定伴奏 · 可单独使用节拍器")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -360,7 +367,7 @@ struct PdfPracticeView: View {
                         get: { Double(viewModel.audioVolume) },
                         set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
                     ),
-                    in: 0...1
+                    in: 0...2
                 )
             } else {
                 Text("未选择伴奏，节拍器仍可独立使用。")
@@ -381,8 +388,6 @@ struct PdfPracticeView: View {
             .buttonStyle(.borderedProminent)
             Stepper("BPM \(Int(viewModel.bpm))", value: $viewModel.bpm, in: 30...300)
                 .onChange(of: viewModel.bpm) { _, _ in viewModel.updateAudioSettings() }
-            Toggle("节拍器", isOn: $viewModel.metronomeEnabled)
-                .onChange(of: viewModel.metronomeEnabled) { _, _ in viewModel.updateAudioSettings() }
             Picker("细分", selection: $viewModel.subdivision) {
                 ForEach(Subdivision.allCases) { Text($0.label(forBeatUnit: 4)).tag($0) }
             }
@@ -422,7 +427,7 @@ struct PdfPracticeView: View {
                     get: { Double(viewModel.metronomeVolume) },
                     set: { viewModel.metronomeVolume = Float($0); viewModel.updateAudioSettings() }
                 ),
-                in: 0...1
+                in: 0...2
             )
         }
     }
@@ -455,10 +460,16 @@ struct PdfPracticeView: View {
     private var autoFollowSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("自动跟谱").font(.headline)
-            Text("先开始记录，再点击下方播放；按演奏进度滚动和翻页，结束后即可按同一时间轴自动跟谱。")
+            Text("开始记录会启动节拍器，随后按拍子滚动或翻页。保存后，在你选定的拍子点击“开始跟谱”复现；节拍器可以独立开关。")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
+            if let cue = viewModel.readingStartCue {
+                Text("记录起点：\(cue)").font(.caption.monospacedDigit())
+            }
+            if viewModel.isPlaying {
+                Text("当前：\(viewModel.currentBeatCue)").font(.headline.monospacedDigit())
+            }
             if viewModel.isRecordingReadingTrack {
                 Label("正在记录 · \(viewModel.readingPoints.count) 个位置点", systemImage: "record.circle")
                     .foregroundStyle(.red)

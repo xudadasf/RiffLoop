@@ -134,6 +134,7 @@ struct PracticeView: View {
                 }
             }
             .onDisappear(perform: viewModel.pause)
+            .keepPracticeScreenAwake(hasFile: viewModel.hasMedia)
     }
 
     private var playbackStateBadge: some View {
@@ -469,7 +470,7 @@ struct PracticeView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(title) \(Int((value * 100).rounded()))%")
                 .font(.caption)
-            Slider(value: Binding(get: { value }, set: onChange), in: 0...1)
+            Slider(value: Binding(get: { value }, set: onChange), in: 0...2)
         }
     }
 
@@ -706,7 +707,7 @@ struct PracticeView: View {
                     get: { Double(viewModel.mediaVolume) },
                     set: { viewModel.setMediaVolume(Float($0)) }
                 ),
-                in: 0...1
+                in: 0...2
             )
             .frame(width: 100)
 
@@ -716,7 +717,7 @@ struct PracticeView: View {
                     get: { Double(viewModel.metronomeVolume) },
                     set: { viewModel.setMetronomeVolume(Float($0)) }
                 ),
-                in: 0...1
+                in: 0...2
             )
             .frame(width: 100)
 

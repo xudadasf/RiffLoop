@@ -191,7 +191,7 @@ assert.doesNotMatch(homeView, /\.navigationTitle\("RiffLoop"\)/);
 assert.match(homeView, /ProjectPreviewThumbnail[\s\S]*?projectOpeningPreview/);
 assert.match(homeView, /generator\.image\(at: \.zero\)/, "video preview must be the opening frame");
 assert.match(homeView, /PDFDocument\(url: url\)\?\.page\(at: 0\)/, "PDF preview must start on the first page");
-assert.match(homeView, /NavigationStack\s*\{\s*ScrollView\s*\{/);
+assert.match(homeView, /NavigationStack(?:\(path: \$externalDocuments\))?\s*\{\s*ScrollView\s*\{/);
 assert.match(practiceHistory, /calendarDays\(weeks: Int = 5/);
 assert.match(practiceHistory, /while segmentStart < endingAt/, "sessions crossing midnight must be split by day");
 

@@ -210,7 +210,7 @@
         const requestedMutes = new Map();
         let enabled = true;
         let masterVolume = 0.75;
-        const clampVolume = (value) => Math.min(1, Math.max(0, Number(value) || 0));
+        const clampVolume = (value) => Math.min(2, Math.max(0, Number(value) || 0));
         const applyVolume = (track) => {
             const requested = requestedVolumes.get(track.index) ?? 1;
             playerApi.changeTrackVolume([track], requested * masterVolume);
@@ -531,8 +531,13 @@
                     resumeBacking();
                 }
             }
-            api.play();
+            const accepted = api.play();
+            if (accepted === false) {
+                pause();
+                return false;
+            }
             reportState(true, false);
+            return true;
         };
         const startDeferredBacking = (scoreTime) => {
             const target = Number(scoreTime);
@@ -623,7 +628,7 @@
     const notifyPlayerReady = () => {
         if (didNotifyPlayerReady || !isPlaybackReady({
             hasLoaded: scoreHasLoaded,
-            hasBacking: canUseBacking(),
+            hasBacking: !usesNativeBacking && canUseBacking(),
             mainReady: Boolean(api.isReadyForPlayback),
             synthReady: Boolean(synthApi.isReadyForPlayback)
         })) return;
@@ -763,7 +768,7 @@
         const handlePlayerState = (state) => {
             if (phase !== "waitingForPause" || !isPaused(state)) return false;
             phase = "waitingForSeek";
-            seekBoth(targetTick, { reveal: false });
+            seekBoth(targetTick, { reveal: true });
             return true;
         };
         const handlePlayerPosition = (position) => {
@@ -1247,6 +1252,7 @@
                 committedRange = null;
                 rangeLoopingEnabled = false;
                 wholeSongLoopingEnabled = false;
+                rangeCompletionAwaitingReset = false;
                 restoreScoreScrollPolicy();
                 loadedScoreBytes = decodeBase64(base64);
                 api.load(loadedScoreBytes.slice());
@@ -1374,6 +1380,7 @@
             refreshPendingRangeHighlight();
         },
         commitRange(firstBar, lastBar, startTick, endTick) {
+            rangeCountInRestarter.cancel();
             const rangeStartTick = Number(startTick);
             rangeCompletionAwaitingReset = false;
             committedRange = {

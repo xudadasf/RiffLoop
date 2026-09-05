@@ -5,6 +5,61 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testRecordingStartsMetronomeAndSavesUsableTrack() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            FilePracticeSettingsStore().remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startReadingTrackRecording()
+        XCTAssertTrue(model.isMetronomePlaying)
+        try await Task.sleep(for: .milliseconds(500))
+        model.setVerticalProgress(0.8)
+        model.finishReadingTrackRecording()
+        XCTAssertTrue(model.hasUsableReadingTrack)
+        XCTAssertNotNil(model.readingStartCue)
+        XCTAssertTrue(model.isMetronomePlaying)
+        model.toggleReadingFollowPlayback()
+        XCTAssertTrue(model.isFollowingTransportActive)
+        model.toggleMetronomePlayback()
+        let time = model.currentTime
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertFalse(model.isMetronomePlaying)
+        XCTAssertTrue(model.isFollowingTransportActive)
+        XCTAssertGreaterThan(model.currentTime, time)
+        model.toggleMetronomePlayback()
+        model.toggleReadingFollowPlayback()
+        XCTAssertFalse(model.isAutoFollowing)
+        XCTAssertTrue(model.isMetronomePlaying, "Stopping follow must keep the independent metronome running")
+    }
+
+    func testSilentFollowingWorksWithoutAudioAndStopsOnPause() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let store = FilePracticeSettingsStore()
+        defer {
+            try? FileManager.default.removeItem(at: pdf)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        try store.save(PdfPracticeProfile(metronomeEnabled: false, readingPoints: [
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 2, pageIndex: 0, verticalProgress: 1)
+        ]), kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startAutoFollowFromBeginning()
+        defer { model.pause() }
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertTrue(model.isFollowingTransportActive)
+        XCTAssertFalse(model.isMetronomePlaying)
+        XCTAssertGreaterThan(model.verticalProgress, 0)
+        model.pause()
+        let time = model.currentTime
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(time, model.currentTime)
+    }
     func testFiftyAudioFollowLoopsThenInterruptionStopsTransport() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let audio = try makeTransportAudioFixture(duration: 1.5)
@@ -97,6 +152,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
             return rounds >= 2
         }
         XCTAssertTrue(model.isFollowingTransportActive)
+        model.pause()
         model.stopReadingFollowPlayback()
         try await Task.sleep(for: .milliseconds(250))
         XCTAssertFalse(model.isPlaying)
@@ -178,7 +234,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
         try settingsStore.save(
             PdfPracticeProfile(
                 playbackRate: 0,
-                audioVolume: 2,
+                audioVolume: 99,
                 bpm: 999,
                 synchronizationOffset: 2,
                 metronomeVolume: -1
@@ -192,7 +248,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.openPdf(at: pdf))
 
         XCTAssertEqual(viewModel.playbackRate, 0.25)
-        XCTAssertEqual(viewModel.audioVolume, 1)
+        XCTAssertEqual(viewModel.audioVolume, 2)
         XCTAssertEqual(viewModel.bpm, 300)
         XCTAssertEqual(viewModel.synchronizationOffset, 0.5)
         XCTAssertEqual(viewModel.metronomeVolume, 0)

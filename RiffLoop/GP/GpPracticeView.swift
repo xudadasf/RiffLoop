@@ -126,6 +126,7 @@ struct GpPracticeView: View {
                 }
             }
             .onDisappear(perform: viewModel.pause)
+            .keepPracticeScreenAwake(hasFile: viewModel.score != nil)
     }
 
     private var emptyScoreView: some View {
@@ -161,7 +162,7 @@ struct GpPracticeView: View {
         }
         if viewModel.isPlaying {
             let loopSuffix = viewModel.rangeLoopingEnabled && viewModel.loopRange != nil
-                ? " · 循环第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮"
+                ? (viewModel.speedLadderEnabled ? " · 提速第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮" : " · 区间循环")
                 : ""
             return ("播放中 · \(speedLabel(viewModel.playbackSpeed))\(loopSuffix)", .green)
         }
@@ -438,12 +439,12 @@ struct GpPracticeView: View {
                             get: { viewModel.metronomeVolume },
                             set: { viewModel.setMetronomeVolume($0) }
                         ),
-                        in: 0...2
+                        in: 0...3
                     ) {
                         Text("节拍音量")
                     }
                     LabeledContent("节拍音量", value: percent(viewModel.metronomeVolume))
-                    Text("可增强至 200%；伴奏较响时可适当降低伴奏音量。")
+                    Text("可增强至 300%；伴奏较响时可适当降低伴奏音量。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -490,7 +491,7 @@ struct GpPracticeView: View {
                             get: { viewModel.countInVolume },
                             set: { viewModel.setCountInVolume($0) }
                         ),
-                        in: 0...1
+                        in: 0...2
                     ) {
                         Text("预备拍音量")
                     }
@@ -512,7 +513,7 @@ struct GpPracticeView: View {
                         get: { viewModel.masterVolume },
                         set: { viewModel.setMasterVolume($0) }
                     ),
-                    in: 0...1
+                    in: 0...2
                 ) {
                     Text("合成总音量")
                 }
@@ -530,7 +531,7 @@ struct GpPracticeView: View {
                             get: { viewModel.backingVolume },
                             set: { viewModel.setBackingVolume($0) }
                         ),
-                        in: 0...1
+                        in: 0...2
                     ) {
                         Text("伴奏音量")
                     }
@@ -597,7 +598,7 @@ struct GpPracticeView: View {
                                     get: { viewModel.trackVolumes[track.index] ?? Double(track.volume) / 16 },
                                     set: { viewModel.setTrackVolume(index: track.index, volume: $0) }
                                 ),
-                                in: 0...1
+                                in: 0...2
                             ) {
                                 Text("\(track.name)音量")
                             }
@@ -619,7 +620,7 @@ struct GpPracticeView: View {
     private var loopDetail: String {
         if viewModel.loopPreview != nil { return "选择中 · 松手确认" }
         guard viewModel.rangeLoopingEnabled, viewModel.loopRange != nil else { return "循环已关闭" }
-        return "第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮 · \(viewModel.loopCountInEnabled ? "预备开启" : "无预备")"
+        return (viewModel.speedLadderEnabled ? "提速第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮 · " : "") + (viewModel.loopCountInEnabled ? "预备开启" : "无预备")
     }
 
     private var metronomeSummary: String {

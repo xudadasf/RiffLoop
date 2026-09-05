@@ -30,6 +30,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
     var totalCompletedLoops = 0
     var highestPlaybackRate: Float = 1
     var readingPoints: [PdfReadingPoint] = []
+    var readingStartCue: String?
     var followLoopEnabled = false
 
     init(
@@ -62,6 +63,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         totalCompletedLoops: Int = 0,
         highestPlaybackRate: Float = 1,
         readingPoints: [PdfReadingPoint] = [],
+        readingStartCue: String? = nil,
         followLoopEnabled: Bool = false
     ) {
         self.pageIndex = pageIndex
@@ -93,6 +95,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         self.totalCompletedLoops = totalCompletedLoops
         self.highestPlaybackRate = highestPlaybackRate
         self.readingPoints = readingPoints
+        self.readingStartCue = readingStartCue
         self.followLoopEnabled = followLoopEnabled
     }
 
@@ -128,6 +131,7 @@ struct PdfPracticeProfile: Codable, Equatable, Sendable {
         totalCompletedLoops = try values.decodeIfPresent(Int.self, forKey: .totalCompletedLoops) ?? 0
         highestPlaybackRate = try values.decodeIfPresent(Float.self, forKey: .highestPlaybackRate) ?? 1
         readingPoints = try values.decodeIfPresent([PdfReadingPoint].self, forKey: .readingPoints) ?? []
+        readingStartCue = try values.decodeIfPresent(String.self, forKey: .readingStartCue)
         followLoopEnabled = try values.decodeIfPresent(Bool.self, forKey: .followLoopEnabled) ?? false
     }
 }

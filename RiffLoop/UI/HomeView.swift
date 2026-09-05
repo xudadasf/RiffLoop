@@ -9,9 +9,11 @@ struct HomeView: View {
     @StateObject private var practiceHistory = PracticeHistoryStore.shared
     @State private var signingStatus = SigningStatusSnapshot.current()
     @State private var isSigningHelpPresented = false
+    @State private var externalDocuments: [ExternalDocument] = []
+    @State private var importError: String?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $externalDocuments) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     welcomeHeader
@@ -43,10 +45,29 @@ struct HomeView: View {
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .onAppear(perform: refreshSigningStatus)
+            .navigationDestination(for: ExternalDocument.self) { document in
+                switch document.kind {
+                case .video: PracticeView(initialURL: document.url)
+                case .guitarPro: GpPracticeView(initialURL: document.url)
+                case .pdf: PdfPracticeView(initialURL: document.url)
+                }
+            }
             .sheet(isPresented: $isSigningHelpPresented) {
                 signingHelp
             }
         }
+        .onOpenURL { url in
+            do {
+                let document = try ExternalDocument.receive(url)
+                isSigningHelpPresented = false
+                externalDocuments = [document]
+            } catch { importError = error.localizedDescription }
+        }
+        .alert("文件打开失败", isPresented: Binding(
+            get: { importError != nil }, set: { if !$0 { importError = nil } }
+        )) {
+            Button("好", role: .cancel) { importError = nil }
+        } message: { Text(importError ?? "") }
     }
 
     private var welcomeHeader: some View {

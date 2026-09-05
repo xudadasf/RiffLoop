@@ -55,6 +55,7 @@ final class GpNativeBackingPlayer {
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private let timePitch = AVAudioUnitTimePitch()
+    private let gainUnit = AVAudioUnitEQ(numberOfBands: 0)
     private var audioFile: AVAudioFile?
     private var temporaryURL: URL?
     private var anchorFrame: AVAudioFramePosition = 0
@@ -62,8 +63,10 @@ final class GpNativeBackingPlayer {
     init() {
         engine.attach(playerNode)
         engine.attach(timePitch)
+        engine.attach(gainUnit)
         engine.connect(playerNode, to: timePitch, format: nil)
-        engine.connect(timePitch, to: engine.mainMixerNode, format: nil)
+        engine.connect(timePitch, to: gainUnit, format: nil)
+        engine.connect(gainUnit, to: engine.mainMixerNode, format: nil)
     }
 
     deinit {
@@ -110,7 +113,9 @@ final class GpNativeBackingPlayer {
     }
 
     func setVolume(_ volume: Double) {
-        playerNode.volume = Float(min(max(volume, 0), 1))
+        let gain = min(max(volume, 0), 2)
+        playerNode.volume = Float(min(gain, 1))
+        gainUnit.globalGain = gain > 1 ? Float(20 * log10(gain)) : 0
     }
 
     func setRate(_ rate: Double) {

@@ -46,6 +46,7 @@ final class MetronomeEngine {
     private let schedulingLead: TimeInterval = 0.025
     private let format: AVAudioFormat
 
+    private var clickBoost: Float = 1
     private var regularClick: AVAudioPCMBuffer!
     private var accentClick: AVAudioPCMBuffer!
     private var subAccentClick: AVAudioPCMBuffer!
@@ -95,6 +96,7 @@ final class MetronomeEngine {
             self.anchor = anchor
             self.rhythmMode = rhythmMode
             playerNode.volume = min(max(volume, 0), 1)
+            clickBoost = min(2, max(1, volume))
             rebuildClickBuffers(
                 duration: min(0.035, max(0.004, timeline.eventInterval / anchor.mediaRate / 2))
             )
@@ -186,42 +188,48 @@ final class MetronomeEngine {
             amplitude: strongVoice.amplitude,
             decay: strongVoice.decay,
             duration: duration,
-            format: format
+            format: format,
+            boost: clickBoost
         )
         subAccentClick = Self.makeClick(
             frequency: subAccentVoice.frequency,
             amplitude: subAccentVoice.amplitude,
             decay: subAccentVoice.decay,
             duration: duration,
-            format: format
+            format: format,
+            boost: clickBoost
         )
         regularClick = Self.makeClick(
             frequency: normalVoice.frequency,
             amplitude: normalVoice.amplitude,
             decay: normalVoice.decay,
             duration: duration,
-            format: format
+            format: format,
+            boost: clickBoost
         )
         subdivisionClick = Self.makeClick(
             frequency: 1_150,
             amplitude: 0.30,
             decay: 110,
             duration: duration,
-            format: format
+            format: format,
+            boost: clickBoost
         )
         kickClick = Self.makeClick(
             frequency: 120,
             amplitude: 0.95,
             decay: 70,
             duration: duration,
-            format: format
+            format: format,
+            boost: clickBoost
         )
         snareClick = Self.makeClick(
             frequency: 1_700,
             amplitude: 0.78,
             decay: 90,
             duration: duration,
-            format: format
+            format: format,
+            boost: clickBoost
         )
     }
 
@@ -230,7 +238,8 @@ final class MetronomeEngine {
         amplitude: Float,
         decay: Double,
         duration: TimeInterval,
-        format: AVAudioFormat
+        format: AVAudioFormat,
+        boost: Float
     ) -> AVAudioPCMBuffer {
         let frameCount = AVAudioFrameCount(format.sampleRate * duration)
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
@@ -244,7 +253,7 @@ final class MetronomeEngine {
             let sample = amplitude * envelope * Float(sin(2 * .pi * frequency * seconds))
 
             for channel in 0..<Int(format.channelCount) {
-                channels[channel][frame] = sample
+                channels[channel][frame] = boostedAudioSample(sample, gain: boost)
             }
         }
 

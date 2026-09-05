@@ -109,6 +109,11 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        pause()
+        updatePracticeClock(isPlaying: false)
+        saveProfile()
+        isPlaying = false
+        loopSelection = GpLoopSelectionStateMachine()
         nativeBackingPlayer.reset()
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
@@ -227,19 +232,19 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setTrackVolume(index: Int, volume: Double) {
-        trackVolumes[index] = min(max(volume, 0), 1)
+        trackVolumes[index] = min(max(volume, 0), 2)
         call("setTrackVolume", arguments: [index, trackVolumes[index] ?? 1])
         saveProfile()
     }
 
     func setMasterVolume(_ volume: Double) {
-        masterVolume = min(max(volume, 0), 1)
+        masterVolume = min(max(volume, 0), 2)
         call("setMasterVolume", arguments: [masterVolume])
         saveProfile()
     }
 
     func setBackingVolume(_ volume: Double) {
-        backingVolume = min(max(volume, 0), 1)
+        backingVolume = min(max(volume, 0), 2)
         nativeBackingPlayer.setVolume(backingVolume)
         call("setBackingVolume", arguments: [backingVolume])
         saveProfile()
@@ -263,7 +268,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setMetronomeVolume(_ volume: Double) {
-        metronomeVolume = min(max(volume, 0), 2)
+        metronomeVolume = min(max(volume, 0), 3)
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
         saveProfile()
     }
@@ -276,7 +281,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setCountInVolume(_ volume: Double) {
-        countInVolume = min(max(volume, 0), 1)
+        countInVolume = min(max(volume, 0), 2)
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -310,6 +315,7 @@ final class GpWebViewModel: ObservableObject {
         if enabled { wholeSongLoopingEnabled = false }
         completedLoops = 0
         call("setRangeLoopingEnabled", arguments: [enabled])
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
 
@@ -319,6 +325,7 @@ final class GpWebViewModel: ObservableObject {
         if enabled { rangeLoopingEnabled = false }
         completedLoops = 0
         call("setWholeSongLoopingEnabled", arguments: [enabled])
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
 
@@ -369,6 +376,7 @@ final class GpWebViewModel: ObservableObject {
         rangeLoopingEnabled = false
         completedLoops = 0
         call("clearPlaybackRange")
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
 
@@ -413,6 +421,8 @@ final class GpWebViewModel: ObservableObject {
             renderMetrics = metrics
         case .playerReady:
             playerReady = true
+            // MIDI/player replacement can reset settings after scoreLoaded.
+            applyPlayerSettings()
             if let pendingResumeTick {
                 self.pendingResumeTick = nil
                 seek(
@@ -694,6 +704,7 @@ final class GpWebViewModel: ObservableObject {
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
             )
+            call("setCountInVolume", arguments: [effectiveCountInVolume])
             loopSelectionMessage = "已按音符循环第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节内选定范围"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             saveProfile()
@@ -718,14 +729,14 @@ final class GpWebViewModel: ObservableObject {
             max(pendingProfile.baseBpm ?? metadata.initialBpm ?? 120, bpmRange.lowerBound),
             bpmRange.upperBound
         )
-        masterVolume = min(max(pendingProfile.masterVolume, 0), 1)
-        backingVolume = min(max(pendingProfile.backingVolume, 0), 1)
+        masterVolume = min(max(pendingProfile.masterVolume, 0), 2)
+        backingVolume = min(max(pendingProfile.backingVolume, 0), 2)
         synthEnabled = pendingProfile.synthEnabled
         backingEnabled = pendingProfile.backingEnabled
         metronomeEnabled = pendingProfile.metronomeEnabled
-        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 2)
+        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 3)
         countInEnabled = pendingProfile.countInEnabled
-        countInVolume = min(max(pendingProfile.countInVolume, 0), 1)
+        countInVolume = min(max(pendingProfile.countInVolume, 0), 2)
         metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
             ? pendingProfile.metronomeSubdivisionFactor
             : 1
@@ -765,6 +776,10 @@ final class GpWebViewModel: ObservableObject {
         }
         call("showTracks", arguments: [[displayedTrack]])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
+        applyPlayerSettings()
+    }
+
+    private func applyPlayerSettings() {
         call("setPlaybackSpeed", arguments: [effectivePlaybackSpeed])
         call("setMasterVolume", arguments: [masterVolume])
         call("setBackingVolume", arguments: [backingVolume])

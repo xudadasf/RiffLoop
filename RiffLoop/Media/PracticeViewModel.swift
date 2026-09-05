@@ -40,6 +40,7 @@ final class PracticeViewModel: ObservableObject {
     @Published private(set) var currentBeatIndex = 0
 
     private let metronome = MetronomeEngine()
+    private let audioGain = PlayerAudioGain()
     private let settingsStore = FilePracticeSettingsStore()
     private var periodicTimeObserver: Any?
     private var loopBoundaryObserver: Any?
@@ -58,7 +59,7 @@ final class PracticeViewModel: ObservableObject {
 
     init() {
         player.automaticallyWaitsToMinimizeStalling = false
-        player.volume = mediaVolume
+        audioGain.setVolume(mediaVolume, player: player)
         installPeriodicTimeObserver()
     }
 
@@ -88,6 +89,7 @@ final class PracticeViewModel: ObservableObject {
 
         let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
+        audioGain.attach(to: item, player: player)
         observeEnd(of: item)
         isMediaReady = false
 
@@ -260,13 +262,13 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setMediaVolume(_ volume: Float) {
-        mediaVolume = min(max(volume, 0), 1)
-        player.volume = mediaVolume
+        mediaVolume = min(max(volume, 0), 2)
+        audioGain.setVolume(mediaVolume, player: player)
         saveProfile()
     }
 
     func setMetronomeVolume(_ volume: Float) {
-        metronomeVolume = min(max(volume, 0), 1)
+        metronomeVolume = min(max(volume, 0), 2)
         saveProfile()
         restartAfterTimingChange()
     }
@@ -751,8 +753,8 @@ final class PracticeViewModel: ObservableObject {
         subdivision = profile.subdivision
         rhythmMode = profile.rhythmMode
         metronomeEnabled = profile.metronomeEnabled
-        mediaVolume = min(max(profile.mediaVolume, 0), 1)
-        metronomeVolume = min(max(profile.metronomeVolume, 0), 1)
+        mediaVolume = min(max(profile.mediaVolume, 0), 2)
+        metronomeVolume = min(max(profile.metronomeVolume, 0), 2)
         synchronizationOffset = min(max(profile.synchronizationOffset, -0.5), 0.5)
         beatOffset = profile.beatOffset
         pointA = profile.pointA
@@ -774,7 +776,7 @@ final class PracticeViewModel: ObservableObject {
         accumulatedPracticeTime = max(0, profile.accumulatedPracticeTime)
         completedLoops = max(0, profile.completedLoops)
         highestPlaybackRate = max(profile.highestPlaybackRate, playbackRate)
-        player.volume = mediaVolume
+        audioGain.setVolume(mediaVolume, player: player)
     }
 
     private func saveProfile() {

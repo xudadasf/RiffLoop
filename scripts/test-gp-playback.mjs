@@ -1,3 +1,4 @@
+import './test-gp-transport-recovery.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -587,7 +588,7 @@ assert.doesNotMatch(
     assert.equal(scheduledRestarts.length, 0, "a late Playing state must not restart count-in");
     assert.equal(countInRestarter.handlePlayerState("paused"), true);
     assert.equal(countInRestarter.handlePlayerState("paused"), false);
-    assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: false }]]);
+    assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: true }]]);
     assert.equal(scheduledRestarts.length, 0, "Paused must seek A but wait for alphaTab's seek receipt");
     assert.equal(
         countInRestarter.handlePlayerPosition({ currentTick: 30_721, isSeek: false }),
@@ -616,14 +617,14 @@ assert.doesNotMatch(
         if (round % 2 === 0) countInRestarter.resume();
         assert.deepEqual(countInCalls, ["pause"]);
         countInRestarter.handlePlayerState("paused");
-        assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: false }]]);
+        assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: true }]]);
         assert.equal(scheduledRestarts.length, 0);
         countInRestarter.handlePlayerPosition({ currentTick: 30_720, isSeek: true });
         if (round % 2 !== 0) countInRestarter.resume();
         assert.equal(scheduledRestarts.length, 1);
         scheduledRestarts[0]();
         scheduledRestarts[0](); // Duplicate delivery must not play twice.
-        assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: false }], "play"]);
+        assert.deepEqual(countInCalls, ["pause", ["seek", 30_720, { reveal: true }], "play"]);
     }
     countInRestarter.prepare(30_720);
     countInRestarter.resume();
@@ -659,7 +660,7 @@ assert.doesNotMatch(
     pausedFirstSchedules[0]();
     assert.deepEqual(pausedFirstCalls, [
         "pause",
-        ["seek", 30_720, { reveal: false }],
+        ["seek", 30_720, { reveal: true }],
         "play",
     ]);
 
