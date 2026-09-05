@@ -18,6 +18,7 @@
             core: { fontDirectory: './font/', useWorkers: false, enableLazyLoading: false },
             display: { layoutMode: alphaTab.LayoutMode.Page, staveProfile: alphaTab.StaveProfile.ScoreTab,
                 startBar: 1, barCount: 2, barsPerRow: 2, scale: 1 },
+            notation: { rhythmHeight: 45 },
             player: { playerMode: alphaTab.PlayerMode.Disabled, enableUserInteraction: false }
         });
         preview.renderFinished.on(() => { document.getElementById('fallback').hidden = true; });

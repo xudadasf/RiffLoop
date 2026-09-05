@@ -29,6 +29,10 @@
             barsPerRow: 2,
             scale: 0.82
         },
+        notation: {
+            // Leave room for downward H/P labels between the low strings and beams.
+            rhythmHeight: 45
+        },
         player: {
             // Keep the rendered score on the synthesizer clock. Some GP files contain a
             // very short embedded backing clip; using that clip as the visible player's

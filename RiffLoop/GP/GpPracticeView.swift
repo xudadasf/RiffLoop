@@ -149,11 +149,12 @@ struct GpPracticeView: View {
                 .lineLimit(1)
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.primary)
+        .foregroundStyle(.white)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
+        .background(.black.opacity(0.55), in: Capsule())
         .accessibilityLabel(state.text)
+        .allowsHitTesting(false)
     }
 
     private var playbackState: (text: String, color: Color) {
