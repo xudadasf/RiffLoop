@@ -50,7 +50,7 @@ final class ReproductionRecorder: NSObject, MXMetricManagerSubscriber, @unchecke
             "locale": Locale.current.identifier,
             "timezone": TimeZone.current.identifier,
             "recordingSchema": "1",
-            "limitations": "semantic operations and sampled state; no guaranteed deterministic OS scheduling; 4 journal parts, 256 MB materials, last 3 sessions"
+            "limitations": "anomaly only: up to 60 seconds/512 KB prelude, 15 seconds aftermath; 3-second crash checkpoint; 2 MB journal and 128 MB material budget per session; no deterministic OS scheduling"
         ])
         MXMetricManager.shared.add(self)
         for payload in MXMetricManager.shared.pastDiagnosticPayloads { didReceive([payload]) }

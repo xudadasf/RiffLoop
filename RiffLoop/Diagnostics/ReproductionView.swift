@@ -11,8 +11,8 @@ struct ReproductionView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("自动保存操作顺序、时间间隔、设置、素材快照和异常线索，用于按相同步骤重放。")
-                    Text("保留最近 3 次启动；每次最多 8 MB 操作记录和 256 MB 素材。超过限制、未捕获素材或异常退出时来不及落盘的步骤，会降低复现完整度。")
+                    Text("只在出现异常或手动标记时保存现场：异常前最多 60 秒的操作、当时设置及异常后 15 秒的结果。")
+                    Text("正常操作只放在最多 512 KB 的滚动缓冲中，每 3 秒覆盖一个闪退恢复检查点，不累计保存。最多保留 3 个会话，各最多 2 MB 异常记录、128 MB 相关素材，旧记录自动清理。")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("刚才出现异常，标记现场") {
                         ReproductionStore.shared.record("incident", "user.marked_problem")
@@ -27,11 +27,11 @@ struct ReproductionView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
-                Section("启动会话") {
-                    ForEach(sessions) { session in
+                Section("异常现场") {
+                    ForEach(sessions.filter { $0.incidents > 0 }) { session in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(session.started.formatted(date: .abbreviated, time: .standard)).font(.headline)
-                            Text("\(session.environment["version"] ?? "") · \(session.lastSequence) 条记录 · \(session.incidents) 条异常线索")
+                            Text("\(session.environment["version"] ?? "") · \(session.incidents) 条异常线索")
                                 .font(.subheadline)
                             let pending = session.materials.filter { $0.status != "captured" }.count
                             Text("素材 \(session.materials.count - pending)/\(session.materials.count) · 丢弃步骤 \(session.droppedEvents) · 写入错误 \(session.recordingErrors)")

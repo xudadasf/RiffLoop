@@ -24,7 +24,7 @@ final class ReproductionStoreTests: XCTestCase {
         store.update(["file": "a.gp", "playing": "true"])
         store.record("action", "panel", ["target": "sound"])
         store.update(["panel": "sound"])
-        store.record("begin", "load", ["file": "b.gp", "operationID": "load-2"])
+        store.record("incident", "load", ["file": "b.gp", "operationID": "load-2"])
         let sessions = await store.sessions()
         let id = try XCTUnwrap(sessions.first?.id)
         let journal = try events(root, id)
@@ -63,14 +63,17 @@ final class ReproductionStoreTests: XCTestCase {
         let store = ReproductionStore(root: root, materialLimit: 8)
         store.start(environment: [:])
         let source = root.appendingPathComponent("score.gp")
-        try Data("new disk version".utf8).write(to: source)
+        try Data("loaded".utf8).write(to: source)
         store.capture(source, role: "gp", loadedData: Data("loaded".utf8))
-        store.capture(source, role: "video") // over budget; must not claim reproducibility
+        let video = root.appendingPathComponent("video.mp4")
+        try Data("oversized video".utf8).write(to: video)
+        store.capture(video, role: "video") // over budget; must not claim reproducibility
         let list = await store.sessions()
         let id = try XCTUnwrap(list.first?.id)
         let export = try await store.export(id)
         addTeardownBlock { try? FileManager.default.removeItem(at: export) }
         XCTAssertTrue(FileManager.default.fileExists(atPath: export.path))
+        XCTAssertEqual(try Data(contentsOf: export).prefix(4), Data([0x50, 0x4b, 0x03, 0x04]))
         let refreshed = await store.sessions()
         let session = try XCTUnwrap(refreshed.first)
         let material = try XCTUnwrap(session.materials.first)
@@ -86,7 +89,7 @@ final class ReproductionStoreTests: XCTestCase {
         let root = try root()
         let store = ReproductionStore(root: root, partLimit: 512)
         store.start(environment: [:])
-        for number in 0..<50 { store.record("action", "seek", ["tick": String(number)]) }
+        for number in 0..<50 { store.record(number == 49 ? "incident" : "action", "seek", ["tick": String(number)]) }
         let sessions = await store.sessions()
         let session = try XCTUnwrap(sessions.first)
         XCTAssertGreaterThan(session.droppedEvents, 0)
@@ -104,6 +107,7 @@ final class ReproductionStoreTests: XCTestCase {
         let selected = root.appendingPathComponent("never-readable.gp")
         store.expectLoadedInput(selected, role: "gp")
         let score = root.appendingPathComponent("loaded.gp")
+        try Data("loaded".utf8).write(to: score)
         for _ in 0..<3 {
             store.expectLoadedInput(score, role: "gp")
             store.capture(score, role: "gp", loadedData: Data("loaded".utf8))
@@ -118,5 +122,24 @@ final class ReproductionStoreTests: XCTestCase {
         XCTAssertEqual(materials.first?.status, "waiting_for_loaded_bytes")
         XCTAssertTrue(materials.dropFirst().allSatisfy { $0.status == "captured" })
         XCTAssertEqual(Set(materials.dropFirst().compactMap(\.snapshot)).count, 1)
+    }
+
+    func testNormalActivityDoesNotCreateArchivedLogsOrMaterialCopies() async throws {
+        let root = try root()
+        let store = ReproductionStore(root: root)
+        store.start(environment: [:])
+        let source = root.appendingPathComponent("normal.gp")
+        try Data("score".utf8).write(to: source)
+        store.capture(source, role: "gp", loadedData: Data("score".utf8))
+        for number in 0..<100 { store.record("action", "seek", ["tick": String(number)]) }
+        store.record("lifecycle", "checkpoint")
+        let list = await store.sessions()
+        let session = try XCTUnwrap(list.first)
+        XCTAssertEqual(session.incidents, 0)
+        let directory = root.appendingPathComponent(session.id)
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        XCTAssertFalse(files.contains { $0.lastPathComponent.hasPrefix("events-") })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("materials").path))
+        XCTAssertLessThanOrEqual(try Data(contentsOf: directory.appendingPathComponent("checkpoint.jsonl")).count, 512_000)
     }
 }

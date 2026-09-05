@@ -46,6 +46,12 @@ final class ReproductionStore: @unchecked Sendable {
     private var session: ReproductionSession?
     private var context: [String: String] = [:]
     private var origin = ProcessInfo.processInfo.systemUptime
+    private var buffer: [(event: ReproductionEvent, bytes: Int)] = []
+    private var bufferBytes = 0
+    private var lastCheckpoint = 0.0
+    private var recordingUntil = 0.0
+    private var incidentMaterialNames = Set<String>()
+    private var lastArchivedSequence = 0
     private var part = 0
     private var partBytes = 0
     private let partLimit: Int
@@ -54,7 +60,7 @@ final class ReproductionStore: @unchecked Sendable {
     private var captures: [String: String] = [:]
     private var loadedSnapshots: [String: (relative: String, bytes: Int64)] = [:] // material queue only
 
-    init(root: URL? = nil, partLimit: Int = 2_000_000, materialLimit: Int64 = 256_000_000) {
+    init(root: URL? = nil, partLimit: Int = 500_000, materialLimit: Int64 = 128_000_000) {
         self.root = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Reproduction", isDirectory: true)
         self.partLimit = partLimit
@@ -71,6 +77,20 @@ final class ReproductionStore: @unchecked Sendable {
                 var root = self.root
                 try root.setResourceValues(excluded)
                 let previous = self.readSessions().first
+                if let previous, previous.phase == "active" || previous.phase == "starting" {
+                    let checkpoint = self.directory(previous.id).appendingPathComponent("checkpoint.jsonl")
+                    if let data = try? Data(contentsOf: checkpoint), !data.isEmpty {
+                        try data.write(to: self.directory(previous.id).appendingPathComponent("events-recovered.jsonl"), options: .atomic)
+                    }
+                    var recovered = previous
+                    recovered.incidents += 1
+                    recovered.phase = "unfinished_unknown"
+                    try JSONEncoder().encode(recovered).write(to: self.directory(previous.id).appendingPathComponent("manifest.json"), options: .atomic)
+                }
+                // Completed normal sessions contain only a tiny rolling checkpoint and need no history.
+                for old in self.readSessions() where old.incidents == 0 {
+                    try? FileManager.default.removeItem(at: self.directory(old.id))
+                }
                 self.origin = ProcessInfo.processInfo.systemUptime
                 let session = ReproductionSession(id: UUID().uuidString, started: Date(), environment: environment)
                 self.session = session
@@ -148,33 +168,10 @@ final class ReproductionStore: @unchecked Sendable {
             self.materials.async {
                 var material = ReproductionMaterial(id: id, name: url.lastPathComponent, role: role, originalPath: url.path)
                 do {
-                    let before = try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-                    material.bytes = Int64(loadedData?.count ?? before?.fileSize ?? 0)
-                    let loadedHash = loadedData.map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() }
-                    if let loadedHash, let existing = self.loadedSnapshots[loadedHash] {
-                        material.sha256 = loadedHash; material.snapshot = existing.relative; material.bytes = existing.bytes
-                        material.status = "captured"
-                        self.finishCapture(material, sessionID: sessionID)
-                        return
-                    }
-                    guard material.bytes <= self.materialLimit - self.reservedBytes else {
-                        material.status = "omitted: material budget exceeded; original file required"
-                        self.finishCapture(material, sessionID: sessionID)
-                        return
-                    }
-                    self.reservedBytes += material.bytes
-                    let relative = "materials/\(id)/\(url.lastPathComponent)"
-                    let target = self.directory(sessionID).appendingPathComponent(relative)
-                    try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                    if let loadedData { try loadedData.write(to: target, options: .atomic) }
-                    else { try FileManager.default.copyItem(at: url, to: target) }
-                    material.sha256 = try loadedHash ?? Self.hash(target)
-                    material.snapshot = relative
-                    if let loadedHash { self.loadedSnapshots[loadedHash] = (relative, material.bytes) }
-                    let after = try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-                    material.status = loadedData != nil || (before != nil && before?.fileSize == after?.fileSize && before?.contentModificationDate == after?.contentModificationDate)
-                        ? "captured" : "changed_during_capture: cannot verify loaded bytes"
-                } catch { material.status = "capture_failed: \(error.localizedDescription)" }
+                    material.bytes = Int64(loadedData?.count ?? attributes?.fileSize ?? 0)
+                    material.sha256 = try loadedData.map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() } ?? Self.hash(url)
+                    material.status = "referenced: snapshot only on anomaly"
+                } catch { material.status = "reference_failed: \(error.localizedDescription)" }
                 self.finishCapture(material, sessionID: sessionID)
             }
         }
@@ -186,6 +183,36 @@ final class ReproductionStore: @unchecked Sendable {
                   let index = self.session?.materials.firstIndex(where: { $0.id == material.id }) else { return }
             self.session?.materials[index] = material
             self.writeEvent("material", "material.finished", ["materialID": material.id, "status": material.status])
+            if material.snapshot == nil && material.status.hasPrefix("referenced:") && self.incidentMaterialNames.contains(material.name) {
+                self.snapshotMaterial(material, sessionID: sessionID)
+            }
+        }
+    }
+
+    private func snapshotMaterial(_ reference: ReproductionMaterial, sessionID: String) {
+        guard let index = session?.materials.firstIndex(where: { $0.id == reference.id }),
+              session?.materials[index].status.hasPrefix("referenced:") == true else { return }
+        session?.materials[index].status = "snapshot_pending"
+        materials.async {
+            var material = reference
+            do {
+                if let hash = reference.sha256, let existing = self.loadedSnapshots[hash] {
+                    material.snapshot = existing.relative; material.status = "captured"
+                } else if material.bytes > self.materialLimit - self.reservedBytes {
+                    material.status = "omitted: anomaly material budget exceeded; original file required"
+                } else {
+                    let relative = "materials/\(material.id)/\(material.name)"
+                    let target = self.directory(sessionID).appendingPathComponent(relative)
+                    try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try FileManager.default.copyItem(at: URL(fileURLWithPath: material.originalPath), to: target)
+                    let copiedHash = try Self.hash(target)
+                    self.reservedBytes += material.bytes
+                    material.snapshot = relative
+                    material.status = copiedHash == reference.sha256 ? "captured" : "source_changed: loaded hash differs from snapshot"
+                    if material.status == "captured" { self.loadedSnapshots[copiedHash] = (relative, material.bytes) }
+                }
+            } catch { material.status = "snapshot_failed: \(error.localizedDescription)" }
+            self.finishCapture(material, sessionID: sessionID)
         }
     }
 
@@ -200,43 +227,84 @@ final class ReproductionStore: @unchecked Sendable {
     private func directory(_ id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
 
     private func writeEvent(_ kind: String, _ name: String, _ details: [String: String], date: Date = Date(), uptime: Double = ProcessInfo.processInfo.systemUptime) {
-        guard var session else { return }
-        session.lastSequence += 1
-        if kind == "incident" { session.incidents += 1 }
-        session.lastState = context
-        let event = ReproductionEvent(sequence: session.lastSequence, date: date,
-            elapsed: max(0, uptime - origin), kind: kind, name: name, details: details, state: context)
+        guard var current = session else { return }
+        current.lastSequence += 1
+        current.lastState = context
+        if kind == "incident" { current.incidents += 1 }
+        var event = ReproductionEvent(sequence: current.lastSequence, date: date, elapsed: max(0, uptime - origin),
+            kind: kind, name: name, details: details, state: context)
+        var bytes = (try? JSONEncoder().encode(event).count) ?? 0
+        if bytes > 256_000 {
+            current.recordingErrors += 1
+            event = ReproductionEvent(sequence: event.sequence, date: event.date, elapsed: event.elapsed,
+                kind: event.kind, name: "recording.oversized_event", details: ["originalName": name, "bytes": String(bytes)], state: [:])
+            bytes = (try? JSONEncoder().encode(event).count) ?? 0
+        }
+        buffer.append((event, bytes)); bufferBytes += bytes
+        while buffer.count > 1 && (bufferBytes > 512_000 || event.elapsed - buffer[0].event.elapsed > 60) {
+            bufferBytes -= buffer.removeFirst().bytes
+        }
+        session = current
+        if kind == "incident" {
+            recordingUntil = uptime + 15
+            // Flush the prelude once, then append only the 15-second aftermath.
+            for item in buffer where item.event.sequence > lastArchivedSequence { persistEvent(item.event) }
+            let relevantNames = Set(buffer.flatMap { item in
+                Array(item.event.details.filter { $0.key == "file" || $0.key == "fileName" }.values)
+                + item.event.state.filter { $0.key.hasSuffix("FileName") }.values.map {
+                    (try? JSONDecoder().decode(String.self, from: Data($0.utf8))) ?? $0
+                }
+            })
+            incidentMaterialNames.formUnion(relevantNames)
+            for material in session?.materials ?? [] where relevantNames.contains(material.name) {
+                snapshotMaterial(material, sessionID: current.id)
+            }
+        } else if uptime < recordingUntil {
+            persistEvent(event)
+        }
+        // Tiny crash-recovery checkpoint, overwritten every three seconds; normal history is not accumulated.
+        if kind == "incident" || kind == "lifecycle" || uptime - lastCheckpoint >= 3 {
+            do {
+                var data = Data()
+                for item in buffer where item.event.sequence > lastArchivedSequence {
+                    data.append(try JSONEncoder().encode(item.event)); data.append(10)
+                }
+                try data.write(to: directory(current.id).appendingPathComponent("checkpoint.jsonl"), options: .atomic)
+                try JSONEncoder().encode(session).write(to: directory(current.id).appendingPathComponent("manifest.json"), options: .atomic)
+                lastCheckpoint = uptime
+            } catch { session?.recordingErrors += 1 }
+        }
+    }
+
+    private func persistEvent(_ event: ReproductionEvent) {
+        guard var current = session else { return }
         do {
             var data = try JSONEncoder().encode(event)
             if data.count > partLimit {
-                session.droppedEvents += 1
-                let omission = ReproductionEvent(sequence: event.sequence, date: event.date, elapsed: event.elapsed,
-                    kind: "incident", name: "recording.oversized_event", details: ["originalKind": kind, "originalName": name,
-                        "bytes": String(data.count), "reason": "event exceeds journal part budget; parameters/state omitted"], state: [:])
-                data = try JSONEncoder().encode(omission)
+                current.droppedEvents += 1
+                data = try JSONEncoder().encode(ReproductionEvent(sequence: event.sequence, date: event.date, elapsed: event.elapsed,
+                    kind: "incident", name: "recording.oversized_event", details: ["originalName": event.name, "bytes": String(data.count)], state: [:]))
             }
-            data.append(0x0a)
+            data.append(10)
             if partBytes + data.count > partLimit {
-                part += 1
-                partBytes = 0
+                part += 1; partBytes = 0
                 if part >= 4 {
-                    let old = directory(session.id).appendingPathComponent("events-\(part - 4).jsonl")
-                    if let bytes = try? Data(contentsOf: old) { session.droppedEvents += bytes.filter { $0 == 0x0a }.count }
+                    let old = directory(current.id).appendingPathComponent("events-\(part - 4).jsonl")
+                    if let bytes = try? Data(contentsOf: old) { current.droppedEvents += bytes.filter { $0 == 10 }.count }
                     try? FileManager.default.removeItem(at: old)
                 }
             }
-            let file = directory(session.id).appendingPathComponent("events-\(part).jsonl")
+            let file = directory(current.id).appendingPathComponent("events-\(part).jsonl")
             if !FileManager.default.fileExists(atPath: file.path) { try Data().write(to: file) }
             let handle = try FileHandle(forWritingTo: file)
             defer { try? handle.close() }
-            try handle.seekToEnd()
-            try handle.write(contentsOf: data)
-            // Persist action/incident breadcrumbs before their corresponding async result.
-            if kind != "sample" { try handle.synchronize() }
+            try handle.seekToEnd(); try handle.write(contentsOf: data)
+            if event.kind != "sample" { try handle.synchronize() }
             partBytes += data.count
-            try JSONEncoder().encode(session).write(to: directory(session.id).appendingPathComponent("manifest.json"), options: .atomic)
-        } catch { session.recordingErrors += 1 }
-        self.session = session
+            lastArchivedSequence = event.sequence
+            try JSONEncoder().encode(current).write(to: directory(current.id).appendingPathComponent("manifest.json"), options: .atomic)
+        } catch { current.recordingErrors += 1 }
+        session = current
     }
 
     func saveSystemReport(_ data: Data) {
@@ -253,7 +321,11 @@ final class ReproductionStore: @unchecked Sendable {
 
     func sessions() async -> [ReproductionSession] {
         await withCheckedContinuation { continuation in
-            io.async { continuation.resume(returning: self.readSessions()) }
+            io.async {
+                var list = self.readSessions().filter { $0.id != self.session?.id }
+                if let current = self.session { list.insert(current, at: 0) }
+                continuation.resume(returning: list)
+            }
         }
     }
 
@@ -266,9 +338,17 @@ final class ReproductionStore: @unchecked Sendable {
     }
 
     func export(_ id: String) async throws -> URL {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            io.async {
+                if self.session?.id == id { self.writeEvent("incident", "user.export_requested", [:]) }
+                c.resume()
+            }
+        }
         // Drain capture requests first, then copies, then manifest updates, without blocking UI.
-        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in io.async { c.resume() } }
-        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in materials.async { c.resume() } }
+        for _ in 0..<2 {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in io.async { c.resume() } }
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in materials.async { c.resume() } }
+        }
         return try await withCheckedThrowingContinuation { continuation in
             io.async {
                 let staging = FileManager.default.temporaryDirectory.appendingPathComponent("repro-\(UUID().uuidString)", isDirectory: true)
@@ -295,16 +375,6 @@ final class ReproductionStore: @unchecked Sendable {
         let fm = FileManager.default
         defer { try? fm.removeItem(at: staging) }
         var manifest = try JSONDecoder().decode(ReproductionSession.self, from: Data(contentsOf: staging.appendingPathComponent("manifest.json")))
-        for index in manifest.materials.indices {
-            guard let relative = manifest.materials[index].snapshot else { continue }
-            let file = staging.appendingPathComponent(relative)
-            try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? fm.copyItem(at: directory(id).appendingPathComponent(relative), to: file)
-            if (try? Self.hash(file)) != manifest.materials[index].sha256 {
-                manifest.materials[index].status = "snapshot_checksum_failed"
-            }
-            // Original local sandbox paths are not useful on another installation.
-        }
         var events: [ReproductionEvent] = []
         for file in try fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil)
             where file.lastPathComponent.hasPrefix("events-") && file.pathExtension == "jsonl" {
@@ -316,15 +386,45 @@ final class ReproductionStore: @unchecked Sendable {
         events.sort { $0.sequence < $1.sequence }
         // A killed process may leave a partial line or a journal/manifest mismatch.
         // Preserve the original files, but never silently label this export complete.
-        if events.last?.sequence != manifest.lastSequence || zip(events, events.dropFirst()).contains(where: { $1.sequence != $0.sequence + 1 }) {
+        if events.isEmpty {
             manifest.recordingErrors += 1
+        }
+        let relevantNames = Set(events.flatMap { event in
+            Array(event.details.filter { $0.key == "file" || $0.key == "fileName" }.values)
+            + event.state.filter { $0.key.hasSuffix("FileName") }.values.map {
+                (try? JSONDecoder().decode(String.self, from: Data($0.utf8))) ?? $0
+            }
+        })
+        manifest.materials = manifest.materials.filter { relevantNames.contains($0.name) || $0.snapshot != nil }
+        var exportBytes: Int64 = 0
+        var exportedHashes: [String: String] = [:]
+        for index in manifest.materials.indices {
+            var material = manifest.materials[index]
+            if let hash = material.sha256, let shared = exportedHashes[hash] {
+                material.snapshot = shared; material.status = "captured"
+            } else if material.bytes > materialLimit - exportBytes {
+                material.snapshot = nil; material.status = "omitted: anomaly material budget exceeded"
+            } else if let hash = material.sha256 {
+                let relative = material.snapshot ?? "materials/\(material.id)/\(material.name)"
+                let target = staging.appendingPathComponent(relative)
+                let source = material.snapshot.map { directory(id).appendingPathComponent($0) } ?? URL(fileURLWithPath: material.originalPath)
+                do {
+                    try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if !fm.fileExists(atPath: target.path) { try fm.copyItem(at: source, to: target) }
+                    material.snapshot = relative
+                    exportBytes += material.bytes
+                    material.status = try Self.hash(target) == hash ? "captured" : "source_changed: loaded hash differs from snapshot"
+                    if material.status == "captured" { exportedHashes[hash] = relative }
+                } catch { material.status = "snapshot_failed: \(error.localizedDescription)" }
+            }
+            manifest.materials[index] = material
         }
         try JSONEncoder().encode(manifest).write(to: staging.appendingPathComponent("manifest.json"), options: .atomic)
         let incomplete = manifest.materials.filter { $0.status != "captured" }
         var text = "# RiffLoop 异常复现包\n\n会话：\(id)\n版本：\(manifest.environment["version"] ?? "unknown")\n"
         text += "\n素材检查：\(incomplete.isEmpty ? "已收集素材校验通过" : "不完整，见 manifest.json 的 materials.status")"
         text += "\n轮转丢弃事件：\(manifest.droppedEvents)；记录错误：\(manifest.recordingErrors)\n"
-        text += "\n## 重放方法\n\n1. 使用 environment 中同版本的 App 和尽量相同的系统、屏幕及音频路由。\n2. 把 materials 中素材导入对应文件库，按 SHA256 核对，恢复首次动作的 state/profile 设置。\n3. 按下表顺序操作，elapsed 秒保留相对间隔；对照 result/event 确认结果。\n4. 在 incident 或有 begin 没有 result 的位置重点重复，系统报告按内部时间戳关联。\n\n这是可核对的人工重放步骤，不是自动执行脚本。系统调度、后台中断和线程竞争可能无法每次重现。音频硬件、未完成的操作、素材缺失、日志轮转或输入采样会降低复现完整度。\n\n## 操作与结果\n\n"
+        text += "\n## 重放方法\n\n只保留异常前最多 60 秒（最多 512 KB）及异常后 15 秒；sequence 的间隔可能是正常片段被省略。\n\n1. 使用 environment 中同版本的 App 和尽量相同的系统、屏幕及音频路由。\n2. 把 materials 中素材导入对应文件库，按 SHA256 核对，恢复首次动作的 state/profile 设置。\n3. 按下表顺序操作，elapsed 秒保留相对间隔；对照 result/event 确认结果。\n4. 在 incident 或有 begin 没有 result 的位置重点重复，系统报告按内部时间戳关联。\n\n这是可核对的人工重放步骤，不是自动执行脚本。系统调度、后台中断和线程竞争可能无法每次重现。音频硬件、未完成的操作、素材缺失、日志轮转或输入采样会降低复现完整度。\n\n## 操作与结果\n\n"
         for event in events {
             text += String(format: "[%06d +%.3fs] %@ %@\n", event.sequence, event.elapsed, event.kind, event.name)
             text += "参数：\(encoded(event.details))\n状态：\(encoded(event.state))\n\n"
