@@ -392,8 +392,7 @@ struct PdfPracticeView: View {
                 action: viewModel.toggleMetronomePlayback
             )
             .buttonStyle(.borderedProminent)
-            Stepper("BPM \(Int(viewModel.bpm))", value: $viewModel.bpm, in: 30...300)
-                .onChange(of: viewModel.bpm) { _, _ in viewModel.updateAudioSettings() }
+            TempoInputControl(bpm: $viewModel.bpm, onChange: viewModel.updateAudioSettings)
             Picker("细分", selection: $viewModel.subdivision) {
                 ForEach(Subdivision.allCases) { Text($0.label(forBeatUnit: 4)).tag($0) }
             }

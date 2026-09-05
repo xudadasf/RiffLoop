@@ -21,6 +21,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var loopRange: GpLoopBarRange?
     @Published private(set) var loopPreview: GpLoopBarRange?
     @Published private(set) var loopSelectionMessage: String?
+    @Published private(set) var scoreZoom = 1.0
     @Published private(set) var playbackSpeed = 1.0
     @Published private(set) var baseBpm = 120.0
     @Published private(set) var displayedTrack = 0
@@ -189,6 +190,12 @@ final class GpWebViewModel: ObservableObject {
         completedLoops = 0
         highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
         applyEffectivePlaybackSpeed()
+        saveProfile()
+    }
+
+    func setScoreZoom(_ value: Double) {
+        scoreZoom = value.isFinite ? min(max((value * 10).rounded() / 10, 0.8), 1.5) : 1
+        call("setScoreZoom", arguments: [scoreZoom])
         saveProfile()
     }
 
@@ -723,6 +730,7 @@ final class GpWebViewModel: ObservableObject {
         mutedTracks = pendingProfile.mutedTracks.intersection(validTrackIndices)
         soloTrack = pendingProfile.soloTrack.flatMap { validTrackIndices.contains($0) ? $0 : nil }
         trackVolumes = pendingProfile.trackVolumes.filter { validTrackIndices.contains($0.key) }
+        scoreZoom = pendingProfile.scoreZoom.isFinite ? min(max(pendingProfile.scoreZoom, 0.8), 1.5) : 1
         playbackSpeed = min(max(pendingProfile.playbackSpeed, 0.5), 1.5)
         let bpmRange = gpCustomBaseBpmRange(originalBpm: metadata.initialBpm ?? 120)
         baseBpm = min(
@@ -774,6 +782,7 @@ final class GpWebViewModel: ObservableObject {
         if beatAccents.isEmpty {
             beatAccents = defaultGpBeatAccents(beatsPerMeasure: metadata.beatsPerMeasure ?? 4)
         }
+        call("setScoreZoom", arguments: [scoreZoom])
         call("showTracks", arguments: [[displayedTrack]])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
         applyPlayerSettings()
@@ -865,6 +874,7 @@ final class GpWebViewModel: ObservableObject {
         guard let currentFileName else { return }
         try? settingsStore.save(
             GpPracticeProfile(
+                scoreZoom: scoreZoom,
                 playbackSpeed: playbackSpeed,
                 baseBpm: baseBpm,
                 lastPositionTick: position.currentTick.isFinite ? max(0, position.currentTick) : 0,

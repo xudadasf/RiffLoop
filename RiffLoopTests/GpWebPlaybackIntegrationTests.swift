@@ -31,7 +31,7 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         webView.frame = CGRect(x: 0, y: 0, width: 1133, height: 535)
         webView.loadFileURL(root.appendingPathComponent("index.html"), allowingReadAccessTo: root)
         try await waitForJavaScript(webView, "Boolean(window.riffloopLayoutTestApi)")
-        for (width, scale) in [(768, 0.82), (1133, 0.82), (768, 1.0), (1133, 1.0)] {
+        for (width, scale) in [(768, 0.656), (1133, 0.656), (768, 0.82), (1133, 0.82), (768, 1.23), (1133, 1.23)] {
             webView.frame.size.width = CGFloat(width)
             _ = try await webView.evaluateJavaScript("""
                 (() => {
@@ -130,6 +130,10 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             print("GP integration loading \(name)")
             model.loadScore(data: data, fileName: name)
             try await waitUntil("GP readiness: \(model.errorMessage ?? "no error")") { model.playerReady }
+            model.setScoreZoom(1.5)
+            XCTAssertEqual(model.scoreZoom, 1.5)
+            model.setScoreZoom(0.8)
+            model.setScoreZoom(1)
             model.setPlaybackSpeed(0.9)
             model.setLoopCountInEnabled(true)
             for bar in [0, 2] {

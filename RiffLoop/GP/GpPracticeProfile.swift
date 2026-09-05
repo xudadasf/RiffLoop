@@ -1,6 +1,7 @@
 import Foundation
 
 struct GpPracticeProfile: Codable, Equatable, Sendable {
+    var scoreZoom = 1.0
     var playbackSpeed = 1.0
     var baseBpm: Double?
     var lastPositionTick = 0.0
@@ -31,6 +32,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     var highestPracticeSpeed = 1.0
 
     init(
+        scoreZoom: Double = 1.0,
         playbackSpeed: Double = 1.0,
         baseBpm: Double? = nil,
         lastPositionTick: Double = 0,
@@ -60,6 +62,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         totalCompletedLoops: Int = 0,
         highestPracticeSpeed: Double = 1.0
     ) {
+        self.scoreZoom = scoreZoom
         self.playbackSpeed = playbackSpeed
         self.baseBpm = baseBpm
         self.lastPositionTick = lastPositionTick
@@ -92,6 +95,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        scoreZoom = try values.decodeIfPresent(Double.self, forKey: .scoreZoom) ?? 1
         playbackSpeed = try values.decodeIfPresent(Double.self, forKey: .playbackSpeed) ?? 1
         baseBpm = try values.decodeIfPresent(Double.self, forKey: .baseBpm)
         lastPositionTick = try values.decodeIfPresent(Double.self, forKey: .lastPositionTick) ?? 0

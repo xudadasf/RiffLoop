@@ -26,7 +26,7 @@
         display: {
             layoutMode: alphaTab.LayoutMode.Page,
             staveProfile: alphaTab.StaveProfile.ScoreTab,
-            barsPerRow: 2,
+            barsPerRow: -1,
             scale: 0.82
         },
         notation: {
@@ -866,6 +866,8 @@
     }));
     api.scoreLoaded.on((score) => {
         scoreHasLoaded = true;
+        api.settings.notation.rhythmHeight = window.RiffLoopLayout.rhythmHeight(score.tracks);
+        api.updateSettings();
         synthOutput.reset(score.tracks);
         const scoreTempos = score.masterBars
             .flatMap((bar) => Array.from(bar.tempoAutomations || []))
@@ -925,6 +927,7 @@
                                 label.textContent = `(${Math.round(origin.fret - (bar.staff?.transpositionPitch || 0))})`;
                                 label.style.left = `${noteBounds.noteHeadBounds.x}px`;
                                 label.style.top = `${noteBounds.noteHeadBounds.y}px`;
+                                label.style.fontSize = `${11 * api.settings.display.scale / 0.82}px`;
                                 layer.appendChild(label);
                             }
                         }
@@ -933,6 +936,14 @@
             }
         }
     };
+    let zoomAnchor = null;
+    api.postRenderFinished.on(() => {
+        if (!zoomAnchor) return;
+        const anchor = zoomAnchor;
+        zoomAnchor = null;
+        const bounds = api.renderer?.boundsLookup?.findMasterBarByIndex(anchor.index)?.realBounds;
+        if (bounds) viewportElement.scrollTop = Math.max(0, bounds.y - anchor.offset);
+    });
     api.renderFinished.on((result) => {
         drawTiedTabDestinations();
         refreshPendingRangeHighlight();
@@ -1165,6 +1176,7 @@
                     id: event.pointerId,
                     startX: event.clientX,
                     startY: event.clientY,
+                    previousX: event.clientX,
                     previousY: event.clientY,
                     hit,
                     mode: "pending"
@@ -1189,7 +1201,8 @@
                     }
                 }
                 if (pointer.mode === "scroll") {
-                    viewport.scrollBy(0, pointer.previousY - event.clientY);
+                    viewport.scrollBy(pointer.previousX - event.clientX, pointer.previousY - event.clientY);
+                    pointer.previousX = event.clientX;
                     pointer.previousY = event.clientY;
                     return;
                 }
@@ -1269,6 +1282,7 @@
         },
         loadScore(base64) {
             try {
+                zoomAnchor = null;
                 rangeCountInRestarter.cancel();
                 transport.pause();
                 resetPlaybackReadiness();
@@ -1360,7 +1374,27 @@
             const tracks = indices
                 .map((index) => api.score.tracks[index])
                 .filter(Boolean);
-            if (tracks.length > 0) api.renderTracks(tracks);
+            if (tracks.length > 0) {
+                api.settings.notation.rhythmHeight = window.RiffLoopLayout.rhythmHeight(tracks);
+                api.updateSettings();
+                api.renderTracks(tracks);
+            }
+        },
+        setScoreZoom(value) {
+            const scale = 0.82 * window.RiffLoopLayout.zoom(value);
+            if (Math.abs(api.settings.display.scale - scale) < 0.0001) return;
+            if (!zoomAnchor) {
+                for (let index = 0; index < (api.score?.masterBars.length || 0); index++) {
+                    const bounds = api.renderer?.boundsLookup?.findMasterBarByIndex(index)?.realBounds;
+                    if (bounds && bounds.y + bounds.h > viewportElement.scrollTop + 12) {
+                        zoomAnchor = { index, offset: bounds.y - viewportElement.scrollTop };
+                        break;
+                    }
+                }
+            }
+            api.settings.display.scale = scale;
+            api.updateSettings();
+            if (api.score) api.render();
         },
         setTrackMute(index, mute) {
             synthOutput.setTrackMute(index, mute);

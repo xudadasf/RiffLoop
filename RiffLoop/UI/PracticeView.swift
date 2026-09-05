@@ -360,14 +360,7 @@ struct PracticeView: View {
 
             Group {
                 HStack {
-                    Text("BPM")
-                    TextField("120", value: $viewModel.bpm, format: .number.precision(.fractionLength(0)))
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.center)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 72)
-                        .onSubmit { viewModel.applyTimingSettings() }
-                    Stepper("", value: $viewModel.bpm, in: 30...300, step: 1).labelsHidden()
+                    TempoInputControl(bpm: $viewModel.bpm, onChange: viewModel.applyTimingSettings)
                     Button("Tap", action: viewModel.recordTap)
                     Button("设第 1 拍", action: viewModel.setBeatOne)
                 }
@@ -599,21 +592,7 @@ struct PracticeView: View {
 
     private var metronomeControls: some View {
         HStack(spacing: 14) {
-            HStack(spacing: 8) {
-                Text("BPM")
-                TextField("120", value: $viewModel.bpm, format: .number.precision(.fractionLength(0)))
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 80)
-                    .onSubmit { viewModel.applyTimingSettings() }
-
-                Stepper("", value: $viewModel.bpm, in: 30...300, step: 1)
-                    .labelsHidden()
-                    .onChange(of: viewModel.bpm) { _, _ in
-                        viewModel.applyTimingSettings()
-                    }
-            }
+            TempoInputControl(bpm: $viewModel.bpm, onChange: viewModel.applyTimingSettings)
 
             Picker("细分", selection: $viewModel.subdivision) {
                 ForEach(Subdivision.allCases) { subdivision in

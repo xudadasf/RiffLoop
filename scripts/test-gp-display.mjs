@@ -135,3 +135,14 @@ assert.match(
 }
 
 console.log("GP playback display policy passed");
+const layoutSource = readFileSync(new URL('../RiffLoop/Resources/GpWeb/riffloop-layout.js', import.meta.url), 'utf8');
+const layoutWindow = {};
+new Function('window', layoutSource)(layoutWindow);
+const layout = layoutWindow.RiffLoopLayout;
+assert.equal(layout.rhythmHeight([]), 25);
+assert.equal(layout.zoom(NaN), 1);
+assert.equal(layout.zoom(0), .8);
+assert.equal(layout.zoom(3), 1.5);
+const legatoTrack = {staves:[{showTablature:true,bars:[{voices:[{beats:[{notes:[{isHammerPullOrigin:true}]}]}]}]}]};
+assert.equal(layout.rhythmHeight([legatoTrack]), 50);
+assert.equal(layout.rhythmHeight([{staves: [{showTablature:false}]}]), 25);

@@ -2,10 +2,57 @@ import PDFKit
 import AVFoundation
 import UIKit
 import XCTest
+import WebKit
 @testable import RiffLoop
 
 @MainActor
 final class HomePreviewTests: XCTestCase {
+    func testGpPreviewFitsCardAndRecoversAfterInvalidOrRapidReplacement() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        let controller = UIViewController()
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 192, height: 128))
+        controller.view.addSubview(web)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let root = try XCTUnwrap(Bundle.main.resourceURL?.appendingPathComponent("GpWeb"))
+        web.loadFileURL(root.appendingPathComponent("preview.html"), allowingReadAccessTo: root)
+        try await wait(web, "Boolean(window.renderPreview)")
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
+        let base64 = try Data(contentsOf: url).base64EncodedString()
+        _ = try await web.evaluateJavaScript("window.renderPreview('broken', 'Unsupported file')")
+        try await wait(web, "!document.getElementById('fallback').hidden")
+        _ = try await web.evaluateJavaScript("window.renderPreview('\(base64)', 'First'); window.renderPreview('\(base64)', 'Latest')")
+        try await wait(web, "document.getElementById('score').style.visibility === 'visible' && document.getElementById('fallback').textContent === 'Latest'")
+        let fits = try await web.evaluateJavaScript("""
+            (() => {
+                const rect = document.getElementById('score').getBoundingClientRect();
+                return rect.width > 0 && rect.left >= -1 && rect.right <= innerWidth + 1 &&
+                    rect.top >= -1 && rect.bottom <= innerHeight + 1 &&
+                    !document.getElementById('score').textContent.includes('RiffLoop-Test') &&
+                    preview.settings.player.playerMode === alphaTab.PlayerMode.Disabled;
+            })()
+            """)
+        XCTAssertEqual(fits as? Bool, true, "Preview must fit the card without duplicate title or audio")
+        let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: web.bounds).image { _ in
+            web.drawHierarchy(in: web.bounds, afterScreenUpdates: true)
+        })
+        attachment.name = "GP opening thumbnail at actual card size"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    private func wait(_ web: WKWebView, _ expression: String) async throws {
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline {
+            if let value = try? await web.evaluateJavaScript(expression), value as? Bool == true { return }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTFail("Preview timed out: \(expression)")
+        throw NSError(domain: "PreviewTest", code: 1)
+    }
+
     func testVideoPreviewUsesOpeningFrameInsteadOfLaterContent() async throws {
         let url = try await makeTransportVideoFixture()
         defer { try? FileManager.default.removeItem(at: url) }

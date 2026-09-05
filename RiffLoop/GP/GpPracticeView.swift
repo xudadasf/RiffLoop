@@ -91,6 +91,22 @@ struct GpPracticeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    HStack(spacing: 2) {
+                        Button { viewModel.setScoreZoom(viewModel.scoreZoom - 0.1) } label: {
+                            Image(systemName: "minus.magnifyingglass")
+                        }
+                        .disabled(viewModel.scoreZoom <= 0.8)
+                        .accessibilityLabel("缩小谱面")
+                        Button("\(Int((viewModel.scoreZoom * 100).rounded()))%") { viewModel.setScoreZoom(1) }
+                            .font(.subheadline.monospacedDigit())
+                            .accessibilityLabel("谱面缩放，点按恢复 100%")
+                        Button { viewModel.setScoreZoom(viewModel.scoreZoom + 0.1) } label: {
+                            Image(systemName: "plus.magnifyingglass")
+                        }
+                        .disabled(viewModel.scoreZoom >= 1.5)
+                        .accessibilityLabel("放大谱面")
+                    }
+                    .disabled(viewModel.score == nil)
                     Button { isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
                     }

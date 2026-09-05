@@ -2,36 +2,79 @@
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=768, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <style>
-        html, body { margin: 0; background: #f5f2e9; color: #171717; overflow: hidden; }
-        #score { width: 768px; }
-        #fallback { margin: 40px; font: 32px -apple-system, sans-serif; }
+        html, body { margin: 0; width: 100%; height: 100%; background: #f5f2e9; color: #171717; overflow: hidden; }
+        #score { width: 480px; transform-origin: top left; position: absolute; visibility: hidden; }
+        #fallback { padding: 20px; font: 13px/1.5 -apple-system, sans-serif; overflow-wrap: anywhere; }
     </style>
 </head>
 <body>
-    <div id="fallback"></div>
+    <div id="fallback">谱面预览</div>
     <div id="score"></div>
     <script src="./alphaTab.min.js"></script>
+    <script src="./riffloop-layout.js"></script>
     <script>
-        const preview = new alphaTab.AlphaTabApi(document.getElementById('score'), {
+        const element = document.getElementById('score');
+        const fallback = document.getElementById('fallback');
+        const preview = new alphaTab.AlphaTabApi(element, {
             core: { fontDirectory: './font/', useWorkers: false, enableLazyLoading: false },
-            display: { layoutMode: alphaTab.LayoutMode.Page, staveProfile: alphaTab.StaveProfile.ScoreTab,
-                startBar: 1, barCount: 2, barsPerRow: 2, scale: 1 },
-            notation: { rhythmHeight: 50 },
+            display: { layoutMode: alphaTab.LayoutMode.Page,
+                startBar: 1, barCount: 1, barsPerRow: -1, scale: 1, padding: [12, 12] },
+            notation: { rhythmHeight: 50, elements: {
+                scoreTitle: false, scoreSubTitle: false, scoreArtist: false, scoreAlbum: false,
+                scoreWords: false, scoreMusic: false, scoreWordsAndMusic: false,
+                scoreCopyright: false, guitarTuning: false, trackNames: false, chordDiagrams: false
+            } },
             player: { playerMode: alphaTab.PlayerMode.Disabled, enableUserInteraction: false }
         });
-        preview.renderFinished.on(() => { document.getElementById('fallback').hidden = true; });
-        window.renderPreview = (base64, title) => {
-            const fallback = document.getElementById('fallback');
+        let pending = null;
+        let rendering = false;
+        let renderSize = null;
+        const fit = () => {
+            if (!renderSize) return;
+            const scale = Math.min(innerWidth / renderSize.width, innerHeight / renderSize.height);
+            element.style.transform = `scale(${scale})`;
+            element.style.left = `${Math.max(0, (innerWidth - renderSize.width * scale) / 2)}px`;
+            element.style.top = `${Math.max(0, (innerHeight - renderSize.height * scale) / 2)}px`;
+        };
+        const renderNext = () => {
+            if (rendering || !pending) return;
+            const {base64, title} = pending;
+            pending = null;
             fallback.textContent = title;
             fallback.hidden = false;
+            element.style.visibility = 'hidden';
             try {
                 const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
                 const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes);
-                if (!score.title) score.title = title;
-                preview.renderScore(score, [0]);
-            } catch (_) { /* Keep the file title visible for unsupported files. */ }
+                const track = score.tracks.find(t => !t.isPercussion && t.staves.some(s => s.showTablature)) || score.tracks[0];
+                if (!track) throw new Error('No tracks');
+                // The card already shows the file title. A single staff keeps its opening readable.
+                preview.settings.display.staveProfile = track.staves.some(s => s.showTablature)
+                    ? alphaTab.StaveProfile.Tab : alphaTab.StaveProfile.Score;
+                preview.settings.notation.rhythmHeight = window.RiffLoopLayout.rhythmHeight([track]);
+                preview.updateSettings();
+                rendering = true;
+                preview.renderScore(score, [track.index]);
+            } catch (_) { rendering = false; renderNext(); }
+        };
+        preview.renderFinished.on(result => {
+            renderSize = {width: Math.max(1, result.totalWidth), height: Math.max(1, result.totalHeight)};
+        });
+        preview.postRenderFinished.on(() => {
+            rendering = false;
+            if (pending) { renderNext(); return; }
+            fit();
+            fallback.hidden = true;
+            element.style.visibility = 'visible';
+        });
+        preview.error.on(() => { rendering = false; element.style.visibility = 'hidden'; fallback.hidden = false; renderNext(); });
+        new ResizeObserver(fit).observe(document.body);
+        window.renderPreview = (base64, title) => {
+            pending = {base64, title};
+            element.style.visibility = 'hidden';
+            renderNext();
         };
     </script>
 </body>

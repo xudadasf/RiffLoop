@@ -4,6 +4,27 @@ import XCTest
 
 @MainActor
 final class PracticeExperienceTests: XCTestCase {
+    func testTempoKeypadRendersWithoutSystemKeyboard() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        let controller = UIHostingController(rootView: TempoKeypad(value: 120, apply: { _ in }, cancel: {})
+            .preferredColorScheme(.dark))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        try await Task.sleep(for: .milliseconds(300))
+        func hasTextInput(_ view: UIView) -> Bool {
+            view is UITextField || view is UITextView || view.subviews.contains(where: hasTextInput)
+        }
+        XCTAssertFalse(hasTextInput(controller.view), "The digit pad must never summon iPad's alphabetic keyboard")
+        let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
+            controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
+        })
+        attachment.name = "BPM numeric keypad"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testPracticePagesRenderAndKeepPausedFilesAwake() async throws {
         let pdf = FileManager.default.temporaryDirectory.appendingPathComponent("practice-preview-\(UUID().uuidString).pdf")
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))

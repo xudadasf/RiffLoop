@@ -8,6 +8,7 @@ final class GpPracticeProfileTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         let store = FilePracticeSettingsStore(defaults: defaults)
         let profile = GpPracticeProfile(
+            scoreZoom: 1.4,
             playbackSpeed: 0.8,
             baseBpm: 96,
             lastPositionTick: 12_345,
@@ -36,6 +37,7 @@ final class GpPracticeProfileTests: XCTestCase {
 
         let profile = try JSONDecoder().decode(GpPracticeProfile.self, from: data)
 
+        XCTAssertEqual(profile.scoreZoom, 1)
         XCTAssertTrue(profile.metronomeEnabled)
         XCTAssertTrue(profile.countInEnabled)
         XCTAssertFalse(profile.wholeSongLoopingEnabled)
