@@ -178,17 +178,23 @@ struct PdfPracticeView: View {
     private var deckTransportControls: some View {
         HStack(spacing: 8) {
             Button(action: viewModel.toggleMetronomePlayback) {
-                Label(viewModel.isMetronomePlaying ? "停止节拍" : "启动节拍", systemImage: "metronome")
-                    .frame(minHeight: 48)
+                VStack(spacing: 4) {
+                    Image(systemName: "metronome")
+                    Text(viewModel.isMetronomePlaying ? "停止节拍" : "启动节拍")
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.bordered)
             .tint(viewModel.isMetronomePlaying ? .orange : .accentColor)
             Button(action: viewModel.toggleReadingFollowPlayback) {
-                Label(
-                    viewModel.isFollowingTransportActive ? "暂停跟谱" : "开始跟谱",
-                    systemImage: viewModel.isFollowingTransportActive ? "pause.fill" : "play.fill"
-                )
-                .font(.headline)
+                VStack(spacing: 4) {
+                    Image(systemName: viewModel.isFollowingTransportActive ? "pause.fill" : "play.fill")
+                    Text(viewModel.isFollowingTransportActive ? "暂停跟谱" : "开始跟谱")
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                }
                 .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)

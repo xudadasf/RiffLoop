@@ -21,7 +21,7 @@ final class PracticeExperienceTests: XCTestCase {
             }
         }
         try data.write(to: pdf)
-        let video = try makeTransportAudioFixture()
+        let video = try await makeTransportVideoFixture()
         let gp = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
         defer {
             try? FileManager.default.removeItem(at: pdf)

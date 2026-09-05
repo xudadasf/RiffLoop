@@ -36,7 +36,9 @@ Swift/Xcode 在 GitHub Actions 的 macOS 上编译测试，不在 Windows 安装
 
 - 本地五套 Node 回归、7 个发布流程安全用例、6 项 IPA 校验器测试通过。
 - GP 新回归先失败、修正后通过，使用生产控制器及内置 alphaTab 的拒绝启动分支；这不等于已覆盖用户所有间歇性问题。
-- 新增真实 WebKit GP 换谱/0.9×循环预备拍测试；新增 Swift 外部导入、PDF 独立时钟、音频增益、页面常亮及三种模式截图检查。云端结果待本轮完成后补充。
+- CI [33943999314](https://github.com/xudadasf/RiffLoop/actions/runs/33943999314) 的 126 项 Swift 用例中，真实 GP 换谱/0.9×选区循环、PDF 独立时钟、视频快速跳转及两档各 50 轮循环通过；3 项新页面常亮断言失败，独立 UIHostingController 缺少 SwiftUI Scene 环境桥接，测试改为传入实际 UIWindowScene 前台状态后再验。不能把该失败运行当作发布通过。
+- 后续真实 AlphaSynth 回归复现“预备拍缓冲后暂停，已丢弃的样本计数阻塞恢复”。手动恢复前清除计数并回到暂停的谱面位置，20 次中断恢复通过；自动 B→A 握手保持原路径。云端 WebKit 测试增加了预备拍中途暂停再恢复。
+- 已查看三模式截图，修正 GP 快捷倍速挤出最右侧工具及 PDF 按钮文字断行；视频截图改用 H.264 画面。当前提交的完整云端结果仍待补充。
 - 本轮开始时实机读取仍为 0.25.52（96）、原 Bundle ID、ProfileValidated=true；取得 11 个 Documents 文件的清单及 14 个偏好设置键的临时快照。私有快照不提交 Git。
 - Sideloadly 已识别 USB 设备，初次检查 Apple ID 栏为空。新账号签名、覆盖安装和 Automatic Refresh 尚未完成验证。
 - 微信分享、真实触控、主观听感、连续长时间练习不能用静态脚本通过替代；未测项目如实保留。

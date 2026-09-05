@@ -236,14 +236,16 @@ struct GpPracticeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 6) {
-                ForEach(quickSpeeds, id: \.self) { value in
-                    Button(speedLabel(value)) {
-                        viewModel.setPlaybackSpeed(value)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(quickSpeeds, id: \.self) { value in
+                        Button(speedLabel(value)) {
+                            viewModel.setPlaybackSpeed(value)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(viewModel.playbackSpeed == value ? .accentColor : .secondary)
+                        .disabled(!viewModel.playerReady)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(viewModel.playbackSpeed == value ? .accentColor : .secondary)
-                    .disabled(!viewModel.playerReady)
                 }
             }
             .controlSize(.small)

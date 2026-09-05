@@ -1,8 +1,10 @@
-# iPad 发布与归档（2026-08-29）
+# iPad 发布与归档（2026-09-05）
 
 只发布明确提交的 iOS 版本。保留用户脏文件；需要发版时使用干净的独立工作树，不要为了通过检查而提交或删除 `需修改记录.md`、Android 文件等无关内容。
 
 ## 1. 完整回归
+
+新账号先执行 `. ./scripts/enter-dev.ps1`。USB 依赖缺失或共享 Python 无读取权限时执行 `scripts/setup-device-tools.ps1`，随后重新进入环境。GitHub 登录由 `gh auth login --web` 发起，浏览器设备码来自该终端；登录成功后执行 `gh auth setup-git`。密码/验证码由本人在官方窗口填写，禁止写入仓库。
 
 在项目根目录执行：
 
@@ -61,4 +63,6 @@ pwsh -File scripts/device-check.ps1 -SyslogSeconds 10
 
 用户确认后，标签指向实际验收的应用提交，而非较新的文档提交。不要强制移动已发布标签。
 
-归档 IPA、`build-info.json`、测试及真机记录到主项目的 `output/stable-releases/版本-build构建号/`，核对 SHA256，再更新 `docs/releases/` 和交接文档。仅工具/文档/测试变更不需要重新安装当前稳定 App。
+用户于 2026-09-05 要求本地只保留源码、测试、脚本和开发文档。IPA 与 `build-info.json` 先作为同一 GitHub Release 的附件保存，校对远端可下载和 SHA256，再删除本地可再生包、构建缓存及日志。Actions 的验证附件保留 30 天，长期结论和必要截图应另外保存到发布记录/Release，不能只留下会过期的临时链接。候选版本标记 prerelease，实机验收前不替换稳定标签。
+
+清理前逐个检查完整绝对路径必须属于当前 checkout 的生成目录；不要删除用户未提交文件、设备备份、外部迁移备份、签名工具或登录配置。仅工具/文档/测试变更不需要重新安装当前稳定 App。
