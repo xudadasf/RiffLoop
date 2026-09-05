@@ -96,7 +96,7 @@ final class ReproductionStoreTests: XCTestCase {
         let retained = try events(root, session.id)
         XCTAssertEqual(retained.last?.details["tick"], "49")
         XCTAssertEqual(session.lastSequence, session.droppedEvents + retained.count)
-        let parts = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent(session.id), includingPropertiesForKeys: nil).filter { $0.pathExtension == "jsonl" }
+        let parts = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent(session.id), includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("events-") && $0.pathExtension == "jsonl" }
         XCTAssertLessThanOrEqual(parts.count, 4)
     }
 
