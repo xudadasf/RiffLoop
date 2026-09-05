@@ -1121,8 +1121,9 @@ assert.doesNotMatch(
         const timerFns = [];
         const viewport = {
             scrolls: [],
+            horizontalScrolls: [],
             getBoundingClientRect: () => ({ top: 0, bottom: 600, left: 0, right: 800 }),
-            scrollBy(dx, dy) { this.scrolls.push(dy); },
+            scrollBy(dx, dy) { this.scrolls.push(dy); this.horizontalScrolls.push(dx); },
         };
         const interactionClasses = new Set();
         const element = {
@@ -1186,6 +1187,15 @@ assert.doesNotMatch(
             pointerUp(x, y) { selection.pointerUp(event("pointerup", x, y)); },
             pointerCancel(x, y) { selection.pointerCancel(event("pointercancel", x, y)); },
         };
+    }
+
+    {
+        const h = makeHarness(() => scoreHit(0));
+        h.pointerDown(200, 100);
+        h.pointerMove(100, 100);
+        h.pointerUp(100, 100);
+        assert.deepEqual(h.viewport.horizontalScrolls, [100], "Dense zoomed bars can pan horizontally");
+        assert.equal(h.posted.length, 0, "Horizontal pan must not seek or create a loop");
     }
 
     {

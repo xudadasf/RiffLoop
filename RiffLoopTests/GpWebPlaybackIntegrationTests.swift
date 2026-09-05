@@ -156,7 +156,12 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
                 try await waitUntil("GP must advance after count-in at 0.9x") {
                     model.position.currentTick > hit.startTick + 300
                 }
-                try await waitUntil("GP must complete and restart its selected range") { model.completedLoops >= 2 }
+                let retainedRange = model.loopRange
+                model.setScoreZoom(1.3)
+                try await waitUntil("GP must complete and restart its selected range after live zoom") { model.completedLoops >= 2 }
+                XCTAssertEqual(model.loopRange, retainedRange, "Zoom must preserve the loop")
+                XCTAssertEqual(model.playbackSpeed, 0.9, "Zoom must not change tempo")
+                model.setScoreZoom(1)
                 XCTAssertNil(model.errorMessage)
                 model.pause()
                 try await Task.sleep(for: .milliseconds(400))
