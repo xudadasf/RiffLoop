@@ -15,7 +15,10 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         let names = ["transport-test-\(UUID().uuidString).gp", "transport-test-\(UUID().uuidString).gp"]
         defer {
             model.pause()
+            controller.beginAppearanceTransition(false, animated: false)
+            controller.endAppearanceTransition()
             window.isHidden = true
+            window.rootViewController = nil
             for name in names { FilePracticeSettingsStore().remove(kind: .guitarPro, fileName: name) }
         }
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
@@ -36,6 +39,11 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
                 model.receive(.pointerDown(hit))
                 model.receive(.pointerUp)
                 XCTAssertNotNil(model.loopRange)
+                try await Task.sleep(for: .milliseconds(300))
+                model.togglePlayback()
+                // Interrupt the initial prebuffered count-in as well as completed loops.
+                try await Task.sleep(for: .milliseconds(250))
+                model.pause()
                 try await Task.sleep(for: .milliseconds(300))
                 model.togglePlayback()
                 try await waitUntil("GP must advance after count-in at 0.9x") {

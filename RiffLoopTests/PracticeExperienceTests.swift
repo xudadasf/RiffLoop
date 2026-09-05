@@ -39,6 +39,9 @@ final class PracticeExperienceTests: XCTestCase {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: NavigationStack { page }
+            // A standalone UIHostingController has no SwiftUI App/Scene bridge.
+            // Supply the actual foreground UIWindowScene state for this host.
+            .environment(\.scenePhase, scene.activationState == .foregroundActive ? .active : .inactive)
             .environmentObject(RecentProjectsStore())
             .environmentObject(DocumentDisplayNameStore())
             .preferredColorScheme(.dark))

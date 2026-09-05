@@ -51,3 +51,53 @@ assert.deepEqual(readyEvents, ['playerReady'], 'Native backing must not wait for
 readyHarness.load();
 assert.equal(readyEvents.length, 1, 'Changing files must invalidate the fresh-ready receipt');
 console.log('GP per-score readiness and native-backing independence passed');
+
+// Real AlphaSynth prebuffers count-in samples. WebAudio discards that queue on
+// pause, so a manual resume must discard the synth's outstanding sample count.
+{
+    const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(readFileSync(new URL('../RiffLoopTests/Fixtures/transport.gp', import.meta.url)));
+    const midi = new alphaTab.midi.MidiFile();
+    new alphaTab.midi.MidiFileGenerator(score, new alphaTab.Settings(), new alphaTab.midi.AlphaSynthMidiFileHandler(midi)).generate();
+    const event = () => ({ on(fn) { this.fn = fn; }, fire(value) { this.fn?.(value); } });
+    const output = {
+        sampleRate: 44100, ready: event(), sampleRequest: event(), samplesPlayed: event(),
+        open() { this.ready.fire(); }, activate() {}, play() {},
+        pause() { this.buffer = null; }, resetSamples() { this.buffer = null; },
+        addSamples(samples) { this.buffer = samples; }
+    };
+    const player = new alphaTab.synth.AlphaSynth(output, 0);
+    player.loadMidiFile(midi);
+    player.playbackSpeed = 0.9;
+    player.countInVolume = 1;
+    player.playbackRange = { startTick: 7680, endTick: 11520 };
+    // AlphaTabApi exposes main-score positions, not the count-in's local tick.
+    let lastPosition = 7680, furthestPosition = 7680;
+    player.positionChanged.on(position => {
+        lastPosition = position.currentTick;
+        furthestPosition = Math.max(furthestPosition, lastPosition);
+    });
+    const api = {
+        get playerState() { return player.state; },
+        get timePosition() { return player.timePosition; },
+        get tickPosition() { return lastPosition; },
+        set tickPosition(tick) { player.tickPosition = tick; },
+        play: () => player.play(), pause: () => player.pause(), stop: () => player.stop()
+    };
+    const transport = createTransport({ api, synthApi: { pause() {}, stop() {} },
+        canUseBacking: () => false, schedule: () => {} });
+    for (let cycle = 0; cycle < 20; cycle++) {
+        player.tickPosition = 7680;
+        furthestPosition = 7680;
+        transport.toggle();
+        for (let index = 0; index < 4; index++) output.sampleRequest.fire();
+        transport.toggle(); // Pause while count-in audio is buffered.
+        transport.toggle();
+        for (let index = 0; index < 400 && furthestPosition < 8100; index++) {
+            output.sampleRequest.fire();
+            if (output.buffer?.length) output.samplesPlayed.fire(output.buffer.length / 2);
+        }
+        assert.ok(furthestPosition >= 8100, `Count-in pause/resume cycle ${cycle} must reach the score`);
+        transport.stop();
+    }
+    console.log('GP real-synth interrupted count-in recovery passed for 20 cycles');
+}

@@ -482,6 +482,7 @@
         let playbackAnchorTime = 0;
         let latestScoreTime = 0;
         let pauseGeneration = 0;
+        let resetMainBeforePlay = false;
         const resetBackingPriming = () => {
             backingPriming = false;
             backingStarted = false;
@@ -500,7 +501,8 @@
             synthApi.pause();
             pauseBacking();
         };
-        const pause = () => {
+        const pause = (manual = false) => {
+            resetMainBeforePlay = resetMainBeforePlay || manual;
             wantsPlayback = false;
             resetBackingPriming();
             const generation = ++pauseGeneration;
@@ -513,6 +515,14 @@
             schedule(pauseAgain, 240);
         };
         const play = () => {
+            if (resetMainBeforePlay) {
+                // WebAudio drops buffered samples on pause. A count-in interrupted
+                // by the user must not keep waiting for those discarded samples.
+                const tick = Number(api.tickPosition);
+                api.stop();
+                if (Number.isFinite(tick)) api.tickPosition = tick;
+                resetMainBeforePlay = false;
+            }
             wantsPlayback = true;
             pauseGeneration += 1;
             playbackAnchorTime = Number(api.timePosition) || 0;
@@ -563,10 +573,11 @@
             return finishBackingPriming();
         };
         const toggle = () => {
-            if (wantsPlayback || playerIsPlaying(api) || playerIsPlaying(synthApi)) pause();
+            if (wantsPlayback || playerIsPlaying(api) || playerIsPlaying(synthApi)) pause(true);
             else play();
         };
         const stop = () => {
+            resetMainBeforePlay = false;
             wantsPlayback = false;
             resetBackingPriming();
             pauseGeneration += 1;
@@ -1272,7 +1283,7 @@
             }
         },
         playPause() { playPauseBoth(); },
-        pause() { rangeCountInRestarter.cancel(); transport.pause(); },
+        pause() { rangeCountInRestarter.cancel(); transport.pause(true); },
         stop() { rangeCountInRestarter.cancel(); transport.stop(); seekBoth(stopTick()); },
         seekTick(tick) { seekBoth(tick); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
