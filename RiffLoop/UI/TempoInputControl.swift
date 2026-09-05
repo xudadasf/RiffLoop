@@ -107,9 +107,9 @@ struct TempoKeypad: View {
                 .font(.system(size: 36, weight: .semibold, design: .rounded).monospacedDigit())
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .accessibilityLabel("待输入速度")
-            Text(draft.pasteRejected ? "请输入 30–300 的整数" : "30–300 BPM · 输入后点应用")
+            Text(draft.pasteRejected || draft.value == nil ? "请输入 30–300 的整数" : "30–300 BPM · 输入后点应用")
                 .font(.caption)
-                .foregroundStyle(draft.pasteRejected ? Color.orange : .secondary)
+                .foregroundStyle(draft.pasteRejected || draft.value == nil ? Color.orange : .secondary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 ForEach(1...9, id: \.self) { number in digitButton(number) }
                 Button { draft.clear() } label: {

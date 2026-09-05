@@ -11,6 +11,8 @@ struct HomeView: View {
     @State private var isSigningHelpPresented = false
     @State private var externalDocuments: [ExternalDocument] = []
     @State private var importError: String?
+    @State private var recentSearch = ""
+    @State private var recentKind: PracticeKind?
 
     var body: some View {
         NavigationStack(path: $externalDocuments) {
@@ -23,16 +25,16 @@ struct HomeView: View {
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: 16) {
                             startPracticeCard
-                                .frame(minWidth: 520, maxWidth: .infinity, minHeight: 216, maxHeight: 216)
+                                .frame(minWidth: 520, maxWidth: .infinity, minHeight: 236)
                             practiceSummaryCard
-                                .frame(width: 340, height: 216)
+                                .frame(width: 340).frame(minHeight: 236)
                         }
 
                         VStack(spacing: 16) {
                             startPracticeCard
-                                .frame(minHeight: 216, maxHeight: 216)
+                                .frame(minHeight: 236)
                             practiceSummaryCard
-                                .frame(minHeight: 216, maxHeight: 216)
+                                .frame(minHeight: 236)
                         }
                     }
 
@@ -205,8 +207,15 @@ struct HomeView: View {
                         }
                         .accessibilityLabel(day.date.formatted(date: .abbreviated, time: .omitted))
                         .accessibilityValue(formatPracticeDuration(day.seconds))
+                        .help("\(day.date.formatted(date: .abbreviated, time: .omitted)) · \(formatPracticeDuration(day.seconds))")
                 }
             }
+            HStack {
+                Text("最近 4 周 · 每格一天")
+                Spacer()
+                Text("浅 → 深：练习增加")
+            }
+            .font(.caption2).foregroundStyle(.secondary)
         }
         .padding(18)
         .cardSurface()
@@ -227,7 +236,7 @@ struct HomeView: View {
                 .buttonStyle(.bordered)
             }
 
-            ForEach(recentProjects.projects) { project in
+            ForEach(recentProjects.projects.prefix(4)) { project in
                 NavigationLink {
                     destination(for: project)
                 } label: {
@@ -296,7 +305,7 @@ struct HomeView: View {
 
     private var recentProjectsPage: some View {
         List {
-            ForEach(recentProjects.projects) { project in
+            ForEach(filteredRecentProjects) { project in
                 NavigationLink {
                     destination(for: project)
                 } label: {
@@ -320,6 +329,30 @@ struct HomeView: View {
             }
         }
         .navigationTitle("最近项目")
+        .searchable(text: $recentSearch, prompt: "搜索文件名称")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("全部类型") { recentKind = nil }
+                    ForEach([PracticeKind.video, .guitarPro, .pdf], id: \.self) { kind in
+                        Button(kind.title) { recentKind = kind }
+                    }
+                } label: { Label(recentKind?.title ?? "全部类型", systemImage: "line.3.horizontal.decrease.circle") }
+            }
+        }
+        .overlay {
+            if filteredRecentProjects.isEmpty {
+                ContentUnavailableView("没有匹配的项目", systemImage: "magnifyingglass", description: Text("尝试其他名称或选择全部类型。"))
+            }
+        }
+    }
+
+    private var filteredRecentProjects: [RecentProject] {
+        recentProjects.projects.filter { project in
+            (recentKind == nil || project.kind == recentKind) &&
+            (recentSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+             displayName(for: project).localizedStandardContains(recentSearch.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
     }
 
     private func practiceMetric(_ title: String, seconds: TimeInterval) -> some View {
@@ -430,6 +463,12 @@ struct HomeView: View {
             isSigningHelpPresented = true
         } label: {
             HStack(spacing: 14) {
+                if signingStatus.kind == .valid {
+                    Image(systemName: signingStatusIcon).foregroundStyle(signingStatusColor)
+                    Text(signingExpirationTitle).font(.subheadline).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("查看续签方法").font(.subheadline.weight(.semibold))
+                } else {
                 Image(systemName: signingStatusIcon)
                     .font(.title2)
                     .foregroundStyle(signingStatusColor)
@@ -454,6 +493,7 @@ struct HomeView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
+            }
             .padding(14)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
         }
@@ -474,7 +514,8 @@ struct HomeView: View {
 
     private var signingHelp: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
                 Label("续签需要在 Windows 的 Sideloadly 中完成", systemImage: "desktopcomputer")
                     .font(.title2.bold())
 
@@ -497,16 +538,23 @@ struct HomeView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                Spacer()
-
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(28)
+            }
+            .safeAreaInset(edge: .bottom) {
                 Button("重新检测") {
                     refreshSigningStatus()
                     isSigningHelpPresented = false
                 }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 12)
+                .background(.regularMaterial)
             }
-            .padding(28)
+            .padding(.bottom, 12)
             .navigationTitle("无线/手动续签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

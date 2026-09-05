@@ -5,6 +5,92 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testRecordingDraftDoesNotOverwriteSavedTrackAndCancelRestoresIt() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let store = FilePracticeSettingsStore()
+        let original = PdfPracticeProfile(readingPoints: [
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 20, pageIndex: 0, verticalProgress: 1)
+        ], readingStartCue: "原起点", followLoopEnabled: true)
+        try store.save(original, kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startReadingTrackRecording()
+        try await Task.sleep(for: .milliseconds(300))
+        model.setVerticalProgress(0.4)
+        model.updateAudioSettings() // Unrelated autosaves must retain the original.
+        let during = try store.load(PdfPracticeProfile.self, kind: .pdf, fileName: pdf.lastPathComponent)
+        XCTAssertEqual(during?.readingPoints, original.readingPoints)
+        XCTAssertEqual(during?.readingStartCue, original.readingStartCue)
+        XCTAssertEqual(during?.followLoopEnabled, true)
+        XCTAssertFalse(model.hasUsableReadingTrack, "Draft must not be playable as a saved track")
+        model.cancelReadingTrackRecording()
+        XCTAssertEqual(model.readingPoints, original.readingPoints)
+        XCTAssertEqual(model.readingStartCue, original.readingStartCue)
+        XCTAssertTrue(model.followLoopEnabled)
+        XCTAssertTrue(model.hasUsableReadingTrack)
+    }
+
+    func testLeavingAndSwitchingPdfDiscardDraftAndPreserveOriginal() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let other = try makePdf(named: "\(UUID().uuidString).pdf")
+        let store = FilePracticeSettingsStore()
+        let original = PdfPracticeProfile(readingPoints: [
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 10, pageIndex: 0, verticalProgress: 0.9)
+        ])
+        try store.save(original, kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            for url in [pdf, other] {
+                try? FileManager.default.removeItem(at: url)
+                store.remove(kind: .pdf, fileName: url.lastPathComponent)
+            }
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startReadingTrackRecording()
+        model.pause() // The view calls pause on disappearance/background/interruption.
+        XCTAssertEqual(model.readingPoints, original.readingPoints)
+        model.startReadingTrackRecording()
+        try await Task.sleep(for: .milliseconds(250))
+        model.setVerticalProgress(0.3)
+        XCTAssertTrue(model.openPdf(at: other))
+        XCTAssertTrue(model.readingPoints.isEmpty)
+        XCTAssertTrue(model.openPdf(at: pdf))
+        XCTAssertEqual(model.readingPoints, original.readingPoints)
+        XCTAssertNil(model.readingStartCue, "A draft cue must not leak into a previously uncued track")
+    }
+
+    func testExplicitSaveReplacesTrackAndConfirmedDeletePersists() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let store = FilePracticeSettingsStore()
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startReadingTrackRecording()
+        try await Task.sleep(for: .milliseconds(350))
+        model.setVerticalProgress(0.8)
+        model.finishReadingTrackRecording()
+        let saved = model.readingPoints
+        XCTAssertTrue(model.hasUsableReadingTrack)
+        XCTAssertTrue(model.openPdf(at: pdf))
+        XCTAssertEqual(model.readingPoints, saved)
+        model.deleteReadingTrack() // UI must request confirmation before this action.
+        XCTAssertTrue(model.openPdf(at: pdf))
+        XCTAssertTrue(model.readingPoints.isEmpty)
+        XCTAssertNil(model.readingStartCue)
+    }
+
     func testSeekingDuringSilentFollowWithBoundAudioKeepsReadingClockRunning() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let audio = try makeTransportAudioFixture()

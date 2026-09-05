@@ -286,13 +286,10 @@ struct GpPracticeView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(activePanel == panel ? Color.accentColor : .primary)
                 Text(summary)
-                    .font(.caption2)
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 58, alignment: .leading)
             .padding(.horizontal, 10)
@@ -308,6 +305,7 @@ struct GpPracticeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityValue(detail)
         .accessibilityHint("打开\(panel.title)设置")
     }
 
@@ -558,19 +556,20 @@ struct GpPracticeView: View {
                 } header: {
                     Text("内嵌伴奏")
                 } footer: {
-                    Text("伴奏由 iOS 原生播放器输出，谱面合成器继续负责音符声音。")
+                    Text("调节内嵌伴奏与乐器声音的平衡。")
                 }
             }
 
             if !viewModel.backingDiagnosticLines.isEmpty {
-                Section("伴奏诊断") {
-                    if let probe = viewModel.backingProbeDiagnostic {
-                        Text("MIME：\(probe)")
+                Section {
+                    DisclosureGroup("故障诊断") {
+                        if let probe = viewModel.backingProbeDiagnostic {
+                            Text("MIME：\(probe)")
+                        }
+                        Text(viewModel.backingDiagnosticLines.joined(separator: "\n"))
+                            .font(.caption.monospaced()).textSelection(.enabled)
                     }
-                    Text(viewModel.backingDiagnosticLines.joined(separator: "\n"))
                 }
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
             }
         }
     }
@@ -632,8 +631,8 @@ struct GpPracticeView: View {
     }
 
     private var loopSummary: String {
-        guard let range = viewModel.loopPreview ?? viewModel.loopRange else { return "尚未选择 A/B" }
-        return "A 第 \(range.firstBar + 1) 小节 → B 第 \(range.lastBar + 1) 小节"
+        guard let range = viewModel.loopPreview ?? viewModel.loopRange else { return viewModel.wholeSongLoopingEnabled ? "整曲循环" : "循环关闭" }
+        return "第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节"
     }
 
     private var loopDetail: String {
@@ -643,7 +642,7 @@ struct GpPracticeView: View {
     }
 
     private var metronomeSummary: String {
-        "\(Int(viewModel.currentBpm.rounded())) BPM · \(subdivisionLabel(factor: viewModel.metronomeSubdivisionFactor))"
+        viewModel.metronomeEnabled ? "\(Int(viewModel.currentBpm.rounded())) BPM" : "节拍器关闭"
     }
 
     private var metronomeDetail: String {
@@ -651,7 +650,7 @@ struct GpPracticeView: View {
     }
 
     private var soundSummary: String {
-        "合成 \(percent(viewModel.masterVolume)) · 伴奏 \(percent(viewModel.backingVolume))"
+        viewModel.synthEnabled ? "合成 \(percent(viewModel.masterVolume))" : "合成关闭"
     }
 
     private var soundDetail: String {
@@ -664,7 +663,7 @@ struct GpPracticeView: View {
         guard let score = viewModel.score,
               let track = score.tracks.first(where: { $0.index == viewModel.displayedTrack })
         else { return "尚未载入轨道" }
-        return "显示：\(track.name)"
+        return "轨道 \(track.index + 1)"
     }
 
     private var trackDetail: String {

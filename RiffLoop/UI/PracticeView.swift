@@ -73,7 +73,7 @@ struct PracticeView: View {
             .overlay(alignment: .bottomTrailing) {
                 if let panel = activePanel {
                     panelContent(panel)
-                        .frame(width: panel == .sound ? 340 : 420, height: panel == .sound ? 180 : 540)
+                        .frame(width: 420, height: panel == .sound ? 320 : 540)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
                         .padding(16)
@@ -232,13 +232,10 @@ struct PracticeView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(activePanel == panel ? Color.accentColor : .primary)
                 Text(summary)
-                    .font(.caption2)
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
             .padding(.horizontal, 10)
@@ -254,6 +251,7 @@ struct PracticeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityValue(detail)
     }
 
     @ViewBuilder
@@ -271,9 +269,9 @@ struct PracticeView: View {
             ScrollView {
                 Group {
                     switch panel {
-                    case .loop: compactLoopSection
-                    case .metronome: compactMetronomeSection
-                    case .sound: compactSoundSection
+                    case .loop: compactLoopSection.practiceSettingsGroup()
+                    case .metronome: compactMetronomeSection.practiceSettingsGroup()
+                    case .sound: compactSoundSection.practiceSettingsGroup()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -359,15 +357,15 @@ struct PracticeView: View {
                 }
 
             Group {
-                HStack {
-                    TempoInputControl(bpm: $viewModel.bpm, onChange: viewModel.applyTimingSettings)
-                    Button("Tap", action: viewModel.recordTap)
+                TempoInputControl(bpm: $viewModel.bpm, onChange: viewModel.applyTimingSettings)
+                HStack(spacing: 16) {
+                    Button("点按测速", action: viewModel.recordTap)
                     Button("设第 1 拍", action: viewModel.setBeatOne)
                 }
                 Text("节拍细分")
                     .font(.subheadline.weight(.semibold))
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                Group {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 95))], spacing: 8) {
                         ForEach(Subdivision.allCases) { subdivision in
                             Button(subdivision.label(forBeatUnit: viewModel.beatUnit)) {
                                 viewModel.subdivision = subdivision
@@ -394,13 +392,15 @@ struct PracticeView: View {
                         ForEach([2, 4, 8, 16], id: \.self) { Text("/\($0)").tag($0) }
                     }
                 }
-                TextField("拍子分组，例如 2+2+3", text: $groupingInput)
+                Text("拍子分组").font(.subheadline.weight(.semibold))
+                TextField("例如 2+2+3", text: $groupingInput)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit {
                         if !viewModel.setBeatGrouping(groupingInput) {
                             groupingInput = viewModel.beatGrouping.map(String.init).joined(separator: "+")
                         }
                     }
+                Text("训练模式").font(.subheadline.weight(.semibold))
                 Picker("训练模式", selection: $viewModel.rhythmMode) {
                     ForEach(RhythmMode.allCases) { Text($0.label).tag($0) }
                 }
@@ -419,6 +419,8 @@ struct PracticeView: View {
                 volumeSlider("节拍音量", value: Double(viewModel.metronomeVolume)) {
                     viewModel.setMetronomeVolume(Float($0))
                 }
+                DisclosureGroup("高级同步") {
+                    VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("节拍微调 \(Int((viewModel.synchronizationOffset * 1_000).rounded())) ms")
                         .font(.caption)
@@ -434,6 +436,8 @@ struct PracticeView: View {
                             viewModel.adjustSynchronization(by: Double(milliseconds) / 1_000)
                         }
                     }
+                }
+                    }.padding(.top, 10)
                 }
             }
         }
@@ -460,11 +464,7 @@ struct PracticeView: View {
         value: Double,
         onChange: @escaping (Double) -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(title) \(Int((value * 100).rounded()))%")
-                .font(.caption)
-            Slider(value: Binding(get: { value }, set: onChange), in: 0...2)
-        }
+        PracticeVolumeControl(title: title, value: Binding(get: { value }, set: onChange))
     }
 
     private var videoArea: some View {
@@ -479,7 +479,7 @@ struct PracticeView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "film.stack")
                         .font(.system(size: 48))
-                    Text("导入一个 MP4 开始技术验证")
+                    Text("选择视频开始练习")
                         .font(.title2.weight(.semibold))
                     Button("选择视频") {
                         isLibraryPresented = true
