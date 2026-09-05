@@ -175,9 +175,12 @@ final class FullPageAudit: XCTestCase {
         shot("pdf-follow-cancel-restored")
         scrollPanel(); shot("pdf-follow-bottom")
         requireTap("删除轨迹")
+        let confirmation = app.alerts["删除这份 PDF 的跟谱轨迹？"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        XCTAssertTrue(confirmation.buttons["删除轨迹"].isHittable)
+        XCTAssertTrue(confirmation.buttons["取消"].isHittable)
         shot("pdf-delete-track-confirmation")
-        // Cancel the iPad confirmation by tapping the visible page outside it.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.35)).tap()
+        confirmation.buttons["取消"].tap()
         XCTAssertTrue(app.staticTexts["轨迹已保存 · 2 个位置点"].exists)
         requireTap("完成")
         library("pdf")
