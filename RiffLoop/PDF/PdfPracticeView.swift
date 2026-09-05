@@ -123,7 +123,7 @@ struct PdfPracticeView: View {
         .onChange(of: viewModel.beatGrouping) { _, grouping in
             groupingInput = grouping.map(String.init).joined(separator: "+")
         }
-        .confirmationDialog("删除这份 PDF 的跟谱轨迹？", isPresented: $confirmTrackDeletion, titleVisibility: .visible) {
+        .alert("删除这份 PDF 的跟谱轨迹？", isPresented: $confirmTrackDeletion) {
             Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
             Button("取消", role: .cancel) { }
         } message: {
