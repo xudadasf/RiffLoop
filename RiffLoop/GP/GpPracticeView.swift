@@ -87,25 +87,8 @@ struct GpPracticeView: View {
                 controlDeck
             }
             .animation(.snappy, value: activePanel)
-            .onAppear {
-                ReproductionStore.shared.update(["screen": "gp", "panel": "none"])
-                ReproductionStore.shared.record("action", "gp.open")
-            }
-            .onChange(of: activePanel) { _, panel in
-                ReproductionStore.shared.update(["panel": String(describing: panel)])
-                ReproductionStore.shared.record("action", "gp.panel", ["panel": String(describing: panel)])
-            }
-            .task {
-                while !Task.isCancelled {
-                    viewModel.reproductionSnapshot()
-                    ReproductionStore.shared.record("sample", "gp.state")
-                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
-                }
-            }
-            .onChange(of: isLibraryPresented) { _, visible in
-                ReproductionStore.shared.update(["library": String(visible)])
-                ReproductionStore.shared.record("action", "gp.isLibraryPresented", ["visible": String(visible)])
-            }
+            .modifier(ReproductionScreenModifier(mode: "gp", panel: activePanel?.rawValue ?? "none",
+                libraries: ["isLibraryPresented": isLibraryPresented], snapshot: viewModel.reproductionSnapshot))
             .navigationTitle(gpTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -726,6 +709,9 @@ struct GpPracticeView: View {
     }
 
     private func importScore(from url: URL) {
+        ReproductionStore.shared.expectLoadedInput(url, role: "gp")
+        let operation = ReproductionRecorder.shared.begin("gp.read_file", details: ["file": url.lastPathComponent])
+        defer { ReproductionRecorder.shared.end(operation, result: "read_method_returned; see load/error") }
         ReproductionStore.shared.record("action", "gp.select_file", ["file": url.lastPathComponent])
         do {
             currentFileName = url.lastPathComponent

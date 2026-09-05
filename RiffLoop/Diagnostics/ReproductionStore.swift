@@ -52,6 +52,7 @@ final class ReproductionStore: @unchecked Sendable {
     private let materialLimit: Int64
     private var reservedBytes: Int64 = 0
     private var captures: [String: String] = [:]
+    private var loadedSnapshots: [String: (relative: String, bytes: Int64)] = [:] // material queue only
 
     init(root: URL? = nil, partLimit: Int = 2_000_000, materialLimit: Int64 = 256_000_000) {
         self.root = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -111,6 +112,18 @@ final class ReproductionStore: @unchecked Sendable {
         return String(decoding: data, as: UTF8.self)
     }
 
+    /// Register a selected GP before synchronous file reading, so a read that hangs or fails
+    /// leaves an explicit missing prerequisite, even if no bytes reach the player.
+    func expectLoadedInput(_ url: URL, role: String) {
+        io.async {
+            guard self.session != nil else { return }
+            var material = ReproductionMaterial(id: UUID().uuidString, name: url.lastPathComponent, role: role, originalPath: url.path)
+            material.status = "waiting_for_loaded_bytes"
+            self.session?.materials.append(material)
+            self.writeEvent("material", "material.expected", ["materialID": material.id, "role": role, "file": material.name])
+        }
+    }
+
     /// Capture a separate copy, so later deletion/renaming does not silently change a replay.
     /// Over-budget, changed, or unreadable inputs are explicitly incomplete in the manifest.
     func capture(_ url: URL, role: String, loadedData: Data? = nil) {
@@ -124,15 +137,26 @@ final class ReproductionStore: @unchecked Sendable {
                 self.writeEvent("material", "material.reused", ["materialID": id, "role": role])
                 return
             }
-            let id = UUID().uuidString
+            let expected = loadedData == nil ? nil : self.session?.materials.last(where: {
+                $0.role == role && $0.name == url.lastPathComponent && $0.status == "waiting_for_loaded_bytes"
+            })
+            let id = expected?.id ?? UUID().uuidString
             self.captures[key] = id
-            self.session?.materials.append(ReproductionMaterial(id: id, name: url.lastPathComponent, role: role, originalPath: url.path))
+            if expected == nil { self.session?.materials.append(ReproductionMaterial(id: id, name: url.lastPathComponent, role: role, originalPath: url.path)) }
+            if let index = self.session?.materials.firstIndex(where: { $0.id == id }) { self.session?.materials[index].status = "pending" }
             self.writeEvent("material", "material.requested", ["materialID": id, "role": role, "file": url.lastPathComponent])
             self.materials.async {
                 var material = ReproductionMaterial(id: id, name: url.lastPathComponent, role: role, originalPath: url.path)
                 do {
                     let before = try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
                     material.bytes = Int64(loadedData?.count ?? before?.fileSize ?? 0)
+                    let loadedHash = loadedData.map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() }
+                    if let loadedHash, let existing = self.loadedSnapshots[loadedHash] {
+                        material.sha256 = loadedHash; material.snapshot = existing.relative; material.bytes = existing.bytes
+                        material.status = "captured"
+                        self.finishCapture(material, sessionID: sessionID)
+                        return
+                    }
                     guard material.bytes <= self.materialLimit - self.reservedBytes else {
                         material.status = "omitted: material budget exceeded; original file required"
                         self.finishCapture(material, sessionID: sessionID)
@@ -144,8 +168,9 @@ final class ReproductionStore: @unchecked Sendable {
                     try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
                     if let loadedData { try loadedData.write(to: target, options: .atomic) }
                     else { try FileManager.default.copyItem(at: url, to: target) }
-                    material.sha256 = try Self.hash(target)
+                    material.sha256 = try loadedHash ?? Self.hash(target)
                     material.snapshot = relative
+                    if let loadedHash { self.loadedSnapshots[loadedHash] = (relative, material.bytes) }
                     let after = try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
                     material.status = loadedData != nil || (before != nil && before?.fileSize == after?.fileSize && before?.contentModificationDate == after?.contentModificationDate)
                         ? "captured" : "changed_during_capture: cannot verify loaded bytes"
@@ -183,6 +208,13 @@ final class ReproductionStore: @unchecked Sendable {
             elapsed: max(0, uptime - origin), kind: kind, name: name, details: details, state: context)
         do {
             var data = try JSONEncoder().encode(event)
+            if data.count > partLimit {
+                session.droppedEvents += 1
+                let omission = ReproductionEvent(sequence: event.sequence, date: event.date, elapsed: event.elapsed,
+                    kind: "incident", name: "recording.oversized_event", details: ["originalKind": kind, "originalName": name,
+                        "bytes": String(data.count), "reason": "event exceeds journal part budget; parameters/state omitted"], state: [:])
+                data = try JSONEncoder().encode(omission)
+            }
             data.append(0x0a)
             if partBytes + data.count > partLimit {
                 part += 1
@@ -273,12 +305,21 @@ final class ReproductionStore: @unchecked Sendable {
             }
             // Original local sandbox paths are not useful on another installation.
         }
+        var events: [ReproductionEvent] = []
+        for file in try fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil)
+            where file.lastPathComponent.hasPrefix("events-") && file.pathExtension == "jsonl" {
+            for line in try Data(contentsOf: file).split(separator: 0x0a) {
+                do { events.append(try JSONDecoder().decode(ReproductionEvent.self, from: Data(line))) }
+                catch { manifest.recordingErrors += 1 }
+            }
+        }
+        events.sort { $0.sequence < $1.sequence }
+        // A killed process may leave a partial line or a journal/manifest mismatch.
+        // Preserve the original files, but never silently label this export complete.
+        if events.last?.sequence != manifest.lastSequence || zip(events, events.dropFirst()).contains(where: { $1.sequence != $0.sequence + 1 }) {
+            manifest.recordingErrors += 1
+        }
         try JSONEncoder().encode(manifest).write(to: staging.appendingPathComponent("manifest.json"), options: .atomic)
-        let events = try fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil)
-            .filter { $0.lastPathComponent.hasPrefix("events-") && $0.pathExtension == "jsonl" }
-            .flatMap { url in
-                try Data(contentsOf: url).split(separator: 0x0a).compactMap { try? JSONDecoder().decode(ReproductionEvent.self, from: Data($0)) }
-            }.sorted { $0.sequence < $1.sequence }
         let incomplete = manifest.materials.filter { $0.status != "captured" }
         var text = "# RiffLoop 异常复现包\n\n会话：\(id)\n版本：\(manifest.environment["version"] ?? "unknown")\n"
         text += "\n素材检查：\(incomplete.isEmpty ? "已收集素材校验通过" : "不完整，见 manifest.json 的 materials.status")"

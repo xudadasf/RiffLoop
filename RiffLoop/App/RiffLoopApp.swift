@@ -1,10 +1,13 @@
 import SwiftUI
 
 @main
+@MainActor
 struct RiffLoopApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var recentProjects = RecentProjectsStore()
     @StateObject private var displayNames = DocumentDisplayNameStore()
+
+    init() { ReproductionRecorder.shared.start() }
 
     var body: some Scene {
         WindowGroup {
@@ -17,7 +20,6 @@ struct RiffLoopApp: App {
                     ReproductionStore.shared.record("lifecycle", "scene.phase", ["phase": String(describing: phase)])
                 }
                 .task {
-                    ReproductionRecorder.shared.start()
                     try? RiffLoopDocumentStore().prepareDirectories()
                 }
         }

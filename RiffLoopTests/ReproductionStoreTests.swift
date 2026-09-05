@@ -96,4 +96,27 @@ final class ReproductionStoreTests: XCTestCase {
         let parts = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent(session.id), includingPropertiesForKeys: nil).filter { $0.pathExtension == "jsonl" }
         XCTAssertLessThanOrEqual(parts.count, 4)
     }
+
+    func testUnreadInputRemainsMissingAndIdenticalLoadedScoresShareBudget() async throws {
+        let root = try root()
+        let store = ReproductionStore(root: root, materialLimit: 6)
+        store.start(environment: [:])
+        let selected = root.appendingPathComponent("never-readable.gp")
+        store.expectLoadedInput(selected, role: "gp")
+        let score = root.appendingPathComponent("loaded.gp")
+        for _ in 0..<3 {
+            store.expectLoadedInput(score, role: "gp")
+            store.capture(score, role: "gp", loadedData: Data("loaded".utf8))
+        }
+        let list = await store.sessions()
+        let id = try XCTUnwrap(list.first?.id)
+        let export = try await store.export(id)
+        addTeardownBlock { try? FileManager.default.removeItem(at: export) }
+        let updated = await store.sessions()
+        let materials = try XCTUnwrap(updated.first?.materials)
+        XCTAssertEqual(materials.count, 4)
+        XCTAssertEqual(materials.first?.status, "waiting_for_loaded_bytes")
+        XCTAssertTrue(materials.dropFirst().allSatisfy { $0.status == "captured" })
+        XCTAssertEqual(Set(materials.dropFirst().compactMap(\.snapshot)).count, 1)
+    }
 }

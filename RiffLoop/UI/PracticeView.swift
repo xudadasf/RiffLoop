@@ -84,25 +84,8 @@ struct PracticeView: View {
                 controlDeck
             }
             .animation(.snappy, value: activePanel)
-            .onAppear {
-                ReproductionStore.shared.update(["screen": "video", "panel": "none"])
-                ReproductionStore.shared.record("action", "video.open")
-            }
-            .onChange(of: activePanel) { _, panel in
-                ReproductionStore.shared.update(["panel": String(describing: panel)])
-                ReproductionStore.shared.record("action", "video.panel", ["panel": String(describing: panel)])
-            }
-            .task {
-                while !Task.isCancelled {
-                    viewModel.reproductionSnapshot()
-                    ReproductionStore.shared.record("sample", "video.state")
-                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
-                }
-            }
-            .onChange(of: isLibraryPresented) { _, visible in
-                ReproductionStore.shared.update(["library": String(visible)])
-                ReproductionStore.shared.record("action", "video.isLibraryPresented", ["visible": String(visible)])
-            }
+            .modifier(ReproductionScreenModifier(mode: "video", panel: activePanel?.rawValue ?? "none",
+                libraries: ["isLibraryPresented": isLibraryPresented], snapshot: viewModel.reproductionSnapshot))
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(videoTitle)
             .navigationBarTitleDisplayMode(.inline)

@@ -126,11 +126,10 @@ final class ReproductionRecorder: NSObject, MXMetricManagerSubscriber, @unchecke
     }
 
     func end(_ id: String, result: String) {
-        queue.async {
-            guard let operation = self.operations.removeValue(forKey: id) else { return }
-            ReproductionStore.shared.record("result", operation.name, ["operationID": id, "result": result,
-                "secondsSinceLastResume": String(ProcessInfo.processInfo.systemUptime - operation.started)])
-        }
+        // Enqueue the result at the call site, beside its state snapshot. Routing it through
+        // the watchdog first could incorrectly attach a later action's state and timestamp.
+        ReproductionStore.shared.record("result", "operation.completed", ["operationID": id, "result": result])
+        queue.async { self.operations.removeValue(forKey: id) }
     }
 
     private func tick() {

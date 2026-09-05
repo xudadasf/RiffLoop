@@ -93,29 +93,8 @@ struct PdfPracticeView: View {
             }
         }
         .animation(.snappy, value: activePanel)
-            .onAppear {
-                ReproductionStore.shared.update(["screen": "pdf", "panel": "none"])
-                ReproductionStore.shared.record("action", "pdf.open")
-            }
-            .onChange(of: activePanel) { _, panel in
-                ReproductionStore.shared.update(["panel": String(describing: panel)])
-                ReproductionStore.shared.record("action", "pdf.panel", ["panel": String(describing: panel)])
-            }
-            .task {
-                while !Task.isCancelled {
-                    viewModel.reproductionSnapshot()
-                    ReproductionStore.shared.record("sample", "pdf.state")
-                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
-                }
-            }
-            .onChange(of: pdfLibraryPresented) { _, visible in
-                ReproductionStore.shared.update(["library": String(visible)])
-                ReproductionStore.shared.record("action", "pdf.pdfLibraryPresented", ["visible": String(visible)])
-            }
-            .onChange(of: audioLibraryPresented) { _, visible in
-                ReproductionStore.shared.update(["library": String(visible)])
-                ReproductionStore.shared.record("action", "pdf.audioLibraryPresented", ["visible": String(visible)])
-            }
+            .modifier(ReproductionScreenModifier(mode: "pdf", panel: activePanel?.rawValue ?? "none",
+                libraries: ["pdfLibraryPresented": pdfLibraryPresented, "audioLibraryPresented": audioLibraryPresented], snapshot: viewModel.reproductionSnapshot))
         .navigationTitle(pdfTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
