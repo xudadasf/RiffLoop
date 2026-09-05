@@ -31,7 +31,7 @@
         },
         notation: {
             // Leave room for downward H/P labels between the low strings and beams.
-            rhythmHeight: 45
+            rhythmHeight: 50
         },
         player: {
             // Keep the rendered score on the synthesizer clock. Some GP files contain a

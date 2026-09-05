@@ -31,11 +31,13 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         webView.frame = CGRect(x: 0, y: 0, width: 1133, height: 535)
         webView.loadFileURL(root.appendingPathComponent("index.html"), allowingReadAccessTo: root)
         try await waitForJavaScript(webView, "Boolean(window.riffloopLayoutTestApi)")
-        for width in [768, 1133] {
+        for (width, scale) in [(768, 0.82), (1133, 0.82), (768, 1.0), (1133, 1.0)] {
             webView.frame.size.width = CGFloat(width)
             _ = try await webView.evaluateJavaScript("""
                 (() => {
                     const api = window.riffloopLayoutTestApi;
+                    api.settings.display.scale = \(scale);
+                    api.updateSettings();
                     const bars = [];
                     for (const duration of [16, 32, 64]) {
                         for (let string = 1; string <= 6; string++) {
@@ -65,9 +67,10 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             let result = try await webView.evaluateJavaScript("""
                 (() => {
                     const labels = [...document.querySelectorAll('#score svg text')].filter(e => /^[HP]$/.test(e.textContent));
+                    const scale = window.riffloopLayoutTestApi.settings.display.scale / 0.82;
                     const beams = [...document.querySelectorAll('#score svg rect, #score svg path, #score svg polygon')].filter(e => {
                         const b = e.getBoundingClientRect();
-                        return b.width > 10 && b.height > 1.2 && b.height < 4.5 && getComputedStyle(e).fill !== 'rgb(165, 165, 165)';
+                        return b.width > 10 && b.height > 1.2 * scale && b.height < 4.5 * scale && getComputedStyle(e).fill !== 'rgb(165, 165, 165)';
                     });
                     return {
                         labels: labels.length,
@@ -85,7 +88,7 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             let metrics = try XCTUnwrap(result as? [String: Int])
             XCTAssertEqual(metrics["labels"], 174, "All H/P labels must remain visible")
             XCTAssertGreaterThan(metrics["beams"] ?? 0, 100, "Rhythm beams must remain visible")
-            XCTAssertEqual(metrics["overlaps"], 0, "H/P labels overlap rhythm beams at width \(width)")
+            XCTAssertEqual(metrics["overlaps"], 0, "H/P labels overlap rhythm beams at width \(width), scale \(scale)")
         }
         let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: webView.bounds).image { _ in
             webView.drawHierarchy(in: webView.bounds, afterScreenUpdates: true)
