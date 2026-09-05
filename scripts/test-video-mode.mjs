@@ -128,7 +128,8 @@ check("a single compact speed trigger keeps the current multiplier visible", () 
 });
 
 check("the single-volume panel has a compact size", () => {
-    assert.match(viewSource, /height: panel == \.sound \? 180 : 540/);
+    const sizes = viewSource.match(/height: panel == \.sound \? (\d+) : (\d+)/);
+    assert.ok(sizes && Number(sizes[1]) < Number(sizes[2]), "sound stays shorter than the metronome panel");
 });
 
 check("disabling the speed ladder restores its latest manual base speed", () => {

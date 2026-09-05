@@ -35,6 +35,7 @@ struct PdfPracticeView: View {
     @State private var didOpenInitialURL = false
     @State private var groupingInput = "4"
     @State private var activePanel: PdfControlPanel?
+    @State private var confirmTrackDeletion = false
 
     let initialURL: URL?
 
@@ -79,7 +80,7 @@ struct PdfPracticeView: View {
         .overlay(alignment: .bottomTrailing) {
             if let panel = activePanel {
                 panelContent(panel)
-                    .frame(width: 420, height: 540)
+                    .frame(width: 420, height: activePanel == .sound ? 400 : 540)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
                     .padding(16)
@@ -121,6 +122,12 @@ struct PdfPracticeView: View {
         }
         .onChange(of: viewModel.beatGrouping) { _, grouping in
             groupingInput = grouping.map(String.init).joined(separator: "+")
+        }
+        .confirmationDialog("删除这份 PDF 的跟谱轨迹？", isPresented: $confirmTrackDeletion, titleVisibility: .visible) {
+            Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("将删除已保存的位置点。PDF 文件和伴奏会保留。")
         }
         .onAppear {
             guard !didOpenInitialURL else { return }
@@ -281,13 +288,10 @@ struct PdfPracticeView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(activePanel == panel ? Color.accentColor : .primary)
                 Text(summary)
-                    .font(.caption2)
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
             .padding(.horizontal, 10)
@@ -303,6 +307,7 @@ struct PdfPracticeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityValue(detail)
     }
 
     @ViewBuilder
@@ -321,13 +326,12 @@ struct PdfPracticeView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     switch panel {
                     case .metronome:
-                        pdfMetronomeSection
-                        Divider()
+                        pdfMetronomeSection.practiceSettingsGroup()
                         pdfAlignmentSection
                     case .sound:
-                        pdfTransportSection
+                        pdfTransportSection.practiceSettingsGroup()
                     case .follow:
-                        autoFollowSection
+                        autoFollowSection.practiceSettingsGroup()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -350,7 +354,8 @@ struct PdfPracticeView: View {
                     Button("停止伴奏", action: viewModel.stopAudio)
                     Button("更换", action: { audioLibraryPresented = true })
                 }
-                Picker("速度", selection: Binding(
+                Text("伴奏速度").font(.subheadline.weight(.semibold))
+            Picker("速度", selection: Binding(
                     get: { viewModel.playbackRate },
                     set: { viewModel.setPlaybackRate($0) }
                 )) {
@@ -367,14 +372,10 @@ struct PdfPracticeView: View {
                 )
                 Text("\(format(viewModel.currentTime)) / \(format(viewModel.duration))")
                     .monospacedDigit()
-                Text("伴奏音量")
-                Slider(
-                    value: Binding(
-                        get: { Double(viewModel.audioVolume) },
-                        set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
-                    ),
-                    in: 0...2
-                )
+                PracticeVolumeControl(title: "伴奏音量", value: Binding(
+                    get: { Double(viewModel.audioVolume) },
+                    set: { viewModel.audioVolume = Float($0); viewModel.updateAudioSettings() }
+                ))
             } else {
                 Text("未选择伴奏，节拍器仍可独立使用。")
                     .font(.caption)
@@ -393,10 +394,12 @@ struct PdfPracticeView: View {
             )
             .buttonStyle(.borderedProminent)
             TempoInputControl(bpm: $viewModel.bpm, onChange: viewModel.updateAudioSettings)
+            Text("细分").font(.subheadline.weight(.semibold))
             Picker("细分", selection: $viewModel.subdivision) {
                 ForEach(Subdivision.allCases) { Text($0.label(forBeatUnit: 4)).tag($0) }
             }
             .onChange(of: viewModel.subdivision) { _, _ in viewModel.updateAudioSettings() }
+            Text("训练模式").font(.subheadline.weight(.semibold))
             Picker("训练模式", selection: $viewModel.rhythmMode) {
                 ForEach(RhythmMode.allCases) { Text($0.label).tag($0) }
             }
@@ -409,7 +412,8 @@ struct PdfPracticeView: View {
                 ),
                 in: 1...16
             )
-            TextField("拍子分组，例如 2+2+3", text: $groupingInput)
+            Text("拍子分组").font(.subheadline.weight(.semibold))
+            TextField("例如 2+2+3", text: $groupingInput)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
                     if !viewModel.setBeatGrouping(groupingInput) {
@@ -426,22 +430,18 @@ struct PdfPracticeView: View {
                     }
                 }
             }
-            Text("节拍器音量")
-            Slider(
-                value: Binding(
-                    get: { Double(viewModel.metronomeVolume) },
-                    set: { viewModel.metronomeVolume = Float($0); viewModel.updateAudioSettings() }
-                ),
-                in: 0...2
-            )
+            PracticeVolumeControl(title: "节拍音量", value: Binding(
+                get: { Double(viewModel.metronomeVolume) },
+                set: { viewModel.metronomeVolume = Float($0); viewModel.updateAudioSettings() }
+            ))
         }
     }
 
     @ViewBuilder
     private var pdfAlignmentSection: some View {
         if viewModel.audioFileName != nil {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("伴奏与节拍器对齐").font(.headline)
+            DisclosureGroup("高级同步 · 伴奏对齐") {
+                VStack(alignment: .leading, spacing: 12) {
                 Text("默认第 1 拍从伴奏开头开始，也可以把当前播放位置设为第 1 拍。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -458,14 +458,17 @@ struct PdfPracticeView: View {
                         }
                     }
                 }
+                }
+                .padding(.top, 12)
             }
+            .practiceSettingsGroup()
         }
     }
 
     private var autoFollowSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("自动跟谱").font(.headline)
-            Text("开始记录会启动节拍器，随后按拍子滚动或翻页。保存后，在你选定的拍子点击“开始跟谱”复现；节拍器可以独立开关。")
+            Text("1. 随节拍滚动或翻页，记录位置。\n2. 保存轨迹。\n3. 在相同拍子点击“开始跟谱”。")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -480,6 +483,9 @@ struct PdfPracticeView: View {
                     .foregroundStyle(.red)
                 Button("结束并保存记录", action: viewModel.finishReadingTrackRecording)
                     .buttonStyle(.borderedProminent)
+                Button("取消记录", action: viewModel.cancelReadingTrackRecording)
+                Text("当前为草稿。取消、离开或切换文件会保留原轨迹；节拍器可独立开关。")
+                    .font(.caption).foregroundStyle(.secondary)
             } else {
                 if viewModel.readingPoints.isEmpty {
                     Button("开始记录", action: viewModel.startReadingTrackRecording)
@@ -514,7 +520,7 @@ struct PdfPracticeView: View {
 
                     Divider()
                     Button("重新记录", action: viewModel.startReadingTrackRecording)
-                    Button("删除轨迹", role: .destructive, action: viewModel.deleteReadingTrack)
+                    Button("删除轨迹", role: .destructive) { confirmTrackDeletion = true }
                 }
             }
         }
@@ -564,7 +570,7 @@ struct PdfPracticeView: View {
     }
 
     private var soundSummary: String {
-        viewModel.audioFileName ?? "未绑定伴奏"
+        viewModel.audioFileName == nil ? "未选伴奏" : "音量 \(Int((viewModel.audioVolume * 100).rounded()))%"
     }
 
     private var soundDetail: String {
@@ -573,7 +579,7 @@ struct PdfPracticeView: View {
             : "\(speedLabel(viewModel.playbackRate)) · 音量 \(Int((viewModel.audioVolume * 100).rounded()))%"
     }
 
-    private var followSummary: String { readingButtonTitle }
+    private var followSummary: String { viewModel.isRecordingReadingTrack ? "记录中" : (viewModel.readingPoints.isEmpty ? "尚未记录" : "\(viewModel.readingPoints.count) 个位置点") }
 
     private var followDetail: String {
         "已保存 \(viewModel.readingPoints.count) 个位置点"

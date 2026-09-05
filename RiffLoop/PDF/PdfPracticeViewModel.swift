@@ -46,6 +46,13 @@ final class PdfPracticeViewModel: ObservableObject {
 
     @Published private(set) var readingPoints: [PdfReadingPoint] = []
     @Published private(set) var readingStartCue: String?
+    // While recording, autosaves must retain the last explicitly saved track.
+    private struct SavedReadingTrack {
+        var points: [PdfReadingPoint]
+        var cue: String?
+        var loopEnabled: Bool
+    }
+    private var recordingOriginal: SavedReadingTrack?
     @Published private(set) var isReadingClockRunning = false
     private var readingTimeOffset = 0.0
     private var readingUsesLiveClock = false
@@ -82,7 +89,7 @@ final class PdfPracticeViewModel: ObservableObject {
         let beat = max(0, Int(floor((currentTime - (beatOffset ?? 0) - synchronizationOffset) * bpm / 60)))
         return "第 \(beat / max(1, beatsPerMeasure) + 1) 小节 · 第 \(beat % max(1, beatsPerMeasure) + 1) 拍"
     }
-    var hasUsableReadingTrack: Bool { isUsablePdfReadingTrack(readingPoints) }
+    var hasUsableReadingTrack: Bool { !isRecordingReadingTrack && isUsablePdfReadingTrack(readingPoints) }
     var isFollowingTransportActive: Bool { isAutoFollowing && isPlaying }
 
     init() {
@@ -218,6 +225,8 @@ final class PdfPracticeViewModel: ObservableObject {
         verticalProgress = 0
         requestedProgress = nil
         readingPoints = []
+        recordingOriginal = nil
+        readingStartCue = nil
         isRecordingReadingTrack = false
         isAutoFollowing = false
         autoFollowSuspended = false
@@ -329,7 +338,7 @@ final class PdfPracticeViewModel: ObservableObject {
         isMetronomePlaying = false
         isReadingClockRunning = false
         isAutoFollowing = false
-        if isRecordingReadingTrack { finishReadingTrackRecording() }
+        if isRecordingReadingTrack { cancelReadingTrackRecording() }
         lastPracticeSampleDate = nil
         save()
     }
@@ -577,6 +586,8 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func startReadingTrackRecording() {
+        guard !isRecordingReadingTrack else { return }
+        recordingOriginal = SavedReadingTrack(points: readingPoints, cue: readingStartCue, loopEnabled: followLoopEnabled)
         isAutoFollowing = false
         autoFollowSuspended = false
         followLoopEnabled = false
@@ -587,7 +598,7 @@ final class PdfPracticeViewModel: ObservableObject {
         if beatOffset == nil { beatOffset = 0 }
         if !isMetronomePlaying { toggleMetronomePlayback() }
         guard isMetronomePlaying else {
-            isRecordingReadingTrack = false
+            cancelReadingTrackRecording()
             isReadingClockRunning = false
             stopMetronomeOnlyClock()
             return
@@ -598,12 +609,31 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func finishReadingTrackRecording() {
+        guard isRecordingReadingTrack else { return }
         captureReadingPoint(force: true)
+        guard isUsablePdfReadingTrack(readingPoints) else {
+            message = "记录时间太短。请随节拍滚动或翻页后再保存；原轨迹仍保留。"
+            return
+        }
         isRecordingReadingTrack = false
+        recordingOriginal = nil
         isReadingClockRunning = isAutoFollowing
         message = hasUsableReadingTrack
             ? nil
             : "没有记录到时间变化。请先点击播放，让伴奏或节拍器时间轴开始推进，再滚动或翻页。"
+        save()
+    }
+
+    func cancelReadingTrackRecording() {
+        guard let original = recordingOriginal else { return }
+        readingPoints = original.points
+        readingStartCue = original.cue
+        followLoopEnabled = original.loopEnabled
+        recordingOriginal = nil
+        isRecordingReadingTrack = false
+        isReadingClockRunning = false
+        readingTimeOffset = 0
+        message = nil
         save()
     }
 
@@ -637,6 +667,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func deleteReadingTrack() {
+        guard !isRecordingReadingTrack else { return }
         stopFollowingOnly()
         readingPoints = []
         readingStartCue = nil
@@ -992,6 +1023,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     private func apply(_ profile: PdfPracticeProfile) {
+        recordingOriginal = nil
         pageIndex = min(max(profile.pageIndex, 0), max(0, pageCount - 1))
         scaleFactor = min(max(profile.scaleFactor, 0.75), 2.5)
         verticalProgress = min(max(profile.verticalProgress, 0), 1)
@@ -1066,9 +1098,9 @@ final class PdfPracticeViewModel: ObservableObject {
             accumulatedPracticeTime: accumulatedPracticeTime,
             totalCompletedLoops: totalCompletedLoops,
             highestPlaybackRate: highestPlaybackRate,
-            readingPoints: readingPoints,
-            readingStartCue: readingStartCue,
-            followLoopEnabled: followLoopEnabled
+            readingPoints: recordingOriginal?.points ?? readingPoints,
+            readingStartCue: recordingOriginal.map(\.cue) ?? readingStartCue,
+            followLoopEnabled: recordingOriginal?.loopEnabled ?? followLoopEnabled
         )
         try? settingsStore.save(profile, kind: .pdf, fileName: pdfFileName)
     }

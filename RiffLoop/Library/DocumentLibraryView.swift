@@ -124,24 +124,14 @@ struct DocumentLibraryView: View {
                             }
                             .buttonStyle(.plain)
 
-                            Button {
-                                filePendingRename = fileURL
+                            Menu {
+                                Button("修改显示名称", systemImage: "pencil") { filePendingRename = fileURL }
+                                Button("删除文件", systemImage: "trash", role: .destructive) { filePendingDeletion = fileURL }
                             } label: {
-                                Label("修改显示名称", systemImage: "pencil")
-                                    .labelStyle(.iconOnly)
+                                Image(systemName: "ellipsis.circle")
+                                    .font(.title3).frame(minWidth: 44, minHeight: 44)
                             }
-                            .buttonStyle(.bordered)
-                            .accessibilityLabel("修改 \(displayName(for: fileURL)) 的显示名称")
-
-                            Button(role: .destructive) {
-                                filePendingDeletion = fileURL
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                                    .labelStyle(.iconOnly)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
-                            .accessibilityLabel("删除 \(fileURL.lastPathComponent)")
+                            .accessibilityLabel("更多：\(displayName(for: fileURL))")
                         }
                     }
                 }
@@ -155,7 +145,8 @@ struct DocumentLibraryView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("刷新", action: model.refresh)
                     Button { isImporterPresented = true } label: {
-                        Label("导入", systemImage: "folder")
+                        Label("导入文件", systemImage: "plus")
+                            .labelStyle(.titleAndIcon)
                     }
                 }
             }
@@ -292,7 +283,7 @@ private struct DocumentDisplayNameEditor: View {
                         displayNames.setDisplayName(name, for: kind, fileName: fileName)
                         dismiss()
                     } label: {
-                        Image(systemName: "checkmark")
+                        Text("保存")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -301,6 +292,7 @@ private struct DocumentDisplayNameEditor: View {
                 name = displayNames.customName(for: kind, fileName: fileName) ?? ""
             }
         }
-        .frame(minWidth: 440, minHeight: 340)
+        .presentationDetents([.height(420), .large])
+        .presentationDragIndicator(.visible)
     }
 }

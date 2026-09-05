@@ -186,7 +186,7 @@ assert.match(homeView, /expirationDate\.formatted\(date: \.long, time: \.shorten
 assert.match(homeView, /Automatic Refresh[\s\S]*?手动覆盖续签/);
 assert.doesNotMatch(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signingCompactTitle/);
 assert.match(homeView, /最近项目[\s\S]*?recentProjectsPage/);
-assert.match(homeView, /ForEach\(recentProjects\.projects\) \{ project in[\s\S]*?destination\(for: project\)/);
+assert.match(homeView, /ForEach\(filteredRecentProjects\) \{ project in[\s\S]*?destination\(for: project\)/);
 assert.doesNotMatch(homeView, /\.navigationTitle\("RiffLoop"\)/);
 assert.match(homeView, /ProjectPreviewThumbnail[\s\S]*?projectOpeningPreview/);
 assert.match(homeView, /generator\.image\(at: \.zero\)/, "video preview must be the opening frame");
