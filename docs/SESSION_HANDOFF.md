@@ -16,7 +16,7 @@
 
 统一跟踪：[Issue #1](https://github.com/xudadasf/RiffLoop/issues/1)。`0.25.53（97）` 已构建、校验并归档，应用提交 `59f23259768f0bccd332afc02c53916f853665d7`；稳定标签仍为 `v0.25.51`。
 
-**接下来：** 安装仍未完成。认证先返回 Apple 登录 HTTP 404，随后用户打开安装器出现 `IPC fail: CoreFP err Could not CoreFP key: Access is denied`。实机重新查询仍为 0.25.52（96），原 Bundle ID，签名有效。当前 Windows 进程不是管理员，CoreFP 的 HKLM 注册表项普通用户仅可读；权限问题是待验证的原因，不能把 404 直接当成密码错误。已对同一已校验 IPA 发起安装器管理员启动，但桌面控制连续返回 `foreground window did not report a process id`，尚未确认新的界面或认证结果。先恢复可操作桌面并处理 Windows 提权确认，再核验认证、安装结果、文件/偏好保留和 Automatic Refresh。禁止卸载/清数据；不要为后续文档提交重新打包。密码、验证码不得记录到 Git。
+**接下来：** 安装仍未完成。认证先返回 Apple 登录 HTTP 404，随后安装器出现 `IPC fail: CoreFP err Could not create CoreFP key: Access is denied`。实机重新查询仍为 0.25.52（96），原 Bundle ID，签名有效。桌面控制重置后已恢复；已关闭当前账号的前台/后台进程并使用同一已校验 IPA 重新启动，未操作其他 Windows 会话。安装器自带的一次性本地认证初始化明确要求管理员权限，确认后仍报 CoreFP 拒绝访问。调用 RunAs 后实际前台与后台进程的 TokenElevation 都是 0，不能以启动命令成功代表提权成功。CoreFP 的 HKLM 项普通用户仅可读；现需本人完成 Windows 管理员启动/验证，再核验初始化与 Apple 登录。不可把先前的 HTTP 404 直接当成密码错误。随后继续核验安装结果、文件/偏好保留和 Automatic Refresh。禁止卸载/清数据；不要为文档提交重新打包。密码、验证码不得记录到 Git。
 
 1. 外部打开：声明 GP/GPX/GP3–5、PDF、MP4/MOV/M4V，接收文件 URL，复制到对应文件库后进入模式。同名文件另存，禁止覆盖原练习文件。微信实际列表显示需真机测试。
 2. 文件打开时屏幕常亮：包括暂停看谱；离开页面/进入后台释放，多页面切换不互相取消。
