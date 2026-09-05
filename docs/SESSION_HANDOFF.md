@@ -14,7 +14,7 @@
 
 ## 本轮需求与实现状态
 
-新增 [Issue #2](https://github.com/xudadasf/RiffLoop/issues/2)：用户确认当前 GP 谱第 5～7 小节 H/P 与节奏横线重叠，状态提示希望半透明。已复现并最小调整节奏区高度，准备 0.25.54（98），构建及覆盖安装尚待完成。详见 [0.25.54 记录](releases/0.25.54.md)；私人谱子仅在本机临时目录，不上传 Git。
+新增 [Issue #2](https://github.com/xudadasf/RiffLoop/issues/2)：用户确认当前 GP 谱第 5～7 小节 H/P 与节奏横线重叠，状态提示希望半透明。已复现并最小调整节奏区高度为 50、提示为 55% 黑色背景并允许触控穿透。0.25.54（98）应用提交 `1d47a4b1c927c520b833392b19f5f4d4fb4676e8` 的 CI #115（128 项 Swift 测试）及 IPA #91 均通过，包校验/DryRun 通过，截图已复核；[候选 Release](https://github.com/xudadasf/RiffLoop/releases/tag/v0.25.54-rc.1) 归档。**尚未覆盖安装 98**：Windows 截图/点击报 0x80070057 / 0x80070005，重建工具连接仍失败，需要恢复当前 Windows 账号交互桌面后继续。安装前重做数据快照；安装后检查原 Bundle ID、文件与偏好完整性、自动续签及真实 GP 第 5～7 小节。详见 [0.25.54 记录](releases/0.25.54.md)；私人谱子仅在本机临时目录，不上传 Git。
 
 统一跟踪：[Issue #1](https://github.com/xudadasf/RiffLoop/issues/1)。`0.25.53（97）` 已构建、校验并归档，应用提交 `59f23259768f0bccd332afc02c53916f853665d7`；稳定标签仍为 `v0.25.51`。
 
