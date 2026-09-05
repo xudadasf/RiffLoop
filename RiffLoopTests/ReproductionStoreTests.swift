@@ -142,4 +142,21 @@ final class ReproductionStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("materials").path))
         XCTAssertLessThanOrEqual(try Data(contentsOf: directory.appendingPathComponent("checkpoint.jsonl")).count, 512_000)
     }
+    func testRedeliveredSystemReportDoesNotCreateFreshIncidentsOnNormalLaunch() async throws {
+        let root = try root()
+        let store = ReproductionStore(root: root)
+        store.start(environment: [:])
+        let report = Data("synthetic system report".utf8)
+        store.saveSystemReport(report)
+        store.saveSystemReport(report)
+        store.phase("inactive")
+        let first = await store.sessions()
+        XCTAssertEqual(first.first?.incidents, 1)
+        let next = ReproductionStore(root: root)
+        next.start(environment: [:])
+        next.saveSystemReport(report)
+        let second = await next.sessions()
+        XCTAssertEqual(second.first?.incidents, 0)
+    }
+
 }

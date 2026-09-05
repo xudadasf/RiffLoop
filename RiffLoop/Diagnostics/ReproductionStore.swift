@@ -311,8 +311,16 @@ final class ReproductionStore: @unchecked Sendable {
         io.async {
             guard let id = self.session?.id else { return }
             do {
-                let name = "metrickit-\(UUID().uuidString).json"
+                // MetricKit may redeliver old payloads on every launch. Do not turn normal
+                // launches into fresh incidents or evict the original reproduction session.
+                let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                let seenURL = self.root.appendingPathComponent("seen-system-reports.json")
+                var seen = (try? JSONDecoder().decode([String].self, from: Data(contentsOf: seenURL))) ?? []
+                guard !seen.contains(digest) else { return }
+                let name = "metrickit-\(digest).json"
                 try data.write(to: self.directory(id).appendingPathComponent(name), options: .atomic)
+                seen.append(digest)
+                try JSONEncoder().encode(Array(seen.suffix(128))).write(to: seenURL, options: .atomic)
                 self.writeEvent("incident", "system.diagnostic_received", ["file": name,
                     "note": "System delivery may describe an earlier session; correlate payload timestamps."])
             } catch { self.writeEvent("incident", "system.diagnostic_write_failed", ["error": error.localizedDescription]) }
