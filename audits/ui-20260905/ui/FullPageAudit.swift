@@ -15,7 +15,7 @@ final class FullPageAudit: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         sequence += 1
         let stem = String(format: "%02d", sequence) + "-" + name
-        let image = XCTAttachment(screenshot: app.screenshot())
+        let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         image.name = stem
         image.lifetime = .keepAlways
         add(image)
@@ -71,11 +71,20 @@ final class FullPageAudit: XCTestCase {
     }
 
     func library(_ prefix: String, common: Bool = false) {
-        requireTap("选择文件")
+        requireTap(prefix == "pdf" ? "更换 PDF" : "选择文件")
         shot(prefix + "-library")
         if common {
             if tap("修改 ", prefix: true) { shot("shared-rename"); requireTap("取消") }
-            if tap("删除 ", prefix: true) { shot("shared-delete-confirmation"); requireTap("取消") }
+            if tap("删除 ", prefix: true) {
+                shot("shared-delete-confirmation")
+                if !tap("取消") {
+                    // iPad confirmation popovers dismiss by tapping outside;
+                    // do not activate the destructive confirmation button.
+                    let title = app.navigationBars["GP"].staticTexts["GP"]
+                    XCTAssertTrue(title.isHittable)
+                    title.tap()
+                }
+            }
             if tap("导入") {
                 shot("shared-system-file-picker")
                 if !tap("取消") { _ = tap("Cancel") }

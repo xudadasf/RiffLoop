@@ -69,9 +69,27 @@ jobs:
           fi
           cp seed.log audit.log Evidence/ 2>/dev/null || true
           git rev-parse HEAD > Evidence/source-commit.txt
+      - name: Keep named audit images and trees only
+        if: always()
+        shell: python
+        run: |
+          import json, pathlib, re, shutil
+          src = pathlib.Path('Evidence')
+          dst = pathlib.Path('AuditEvidence')
+          dst.mkdir(exist_ok=True)
+          m = src / 'manifest.json'
+          if m.exists():
+              tests = json.loads(m.read_text())
+              for test in tests:
+                  test['attachments'] = [a for a in test.get('attachments', []) if re.match(r'\d+-[a-z0-9-]+_', a.get('suggestedHumanReadableName', ''))]
+                  for a in test['attachments']:
+                      shutil.copy2(src / a['exportedFileName'], dst / a['exportedFileName'])
+              (dst/'manifest.json').write_text(json.dumps(tests))
+          for name in ['tests.json', 'seed.log', 'audit.log', 'source-commit.txt']:
+              if (src/name).exists(): shutil.copy2(src/name, dst/name)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: RiffLoop-UI-audit-synthetic
-          path: Evidence
+          path: AuditEvidence
           retention-days: 7
