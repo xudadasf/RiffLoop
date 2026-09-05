@@ -190,7 +190,7 @@ struct GpPracticeView: View {
                 toolButton(.sound, summary: soundSummary, detail: soundDetail)
                 toolButton(.tracks, summary: trackSummary, detail: trackDetail)
             }
-            .frame(maxWidth: 488)
+            .frame(width: 448)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -277,7 +277,7 @@ struct GpPracticeView: View {
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 58, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(

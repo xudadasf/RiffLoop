@@ -1,5 +1,7 @@
 # RiffLoop Technical Prototype 0.23.0
 
+**iOS 接续入口（2026-09-05）：** 本次迁移后的独立项目只开发 iPad/iOS。请先读 [当前接续状态](docs/SESSION_HANDOFF.md)、[新会话交接](新会话交接文档.md) 和 [发布流程](docs/RELEASE_WORKFLOW.md)。新账号在当前 checkout 执行 `. ./scripts/enter-dev.ps1`；不要沿用旧账号桌面的共享链接。历史安装包保存在 [GitHub Releases](https://github.com/xudadasf/RiffLoop/releases)，本地仅保留源码、测试、脚本和开发文档。
+
 RiffLoop 是一个横屏乐器练习助手。Android 版本持续开发并在真机验证；iOS/iPad mini 6 版本已恢复开发，通过 GitHub Actions 云编译 + Sideloadly 侧载真机验证。
 
 ## Android 版本

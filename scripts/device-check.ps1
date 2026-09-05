@@ -56,7 +56,7 @@ Write-Host "app: $appInfo"
 # 3. Process state
 Write-Step "3. process state"
 $procJson = "$env:TEMP\riff-procs.json"
-pymobiledevice3 developer dvt proclist 2>$null | Out-File $procJson -Encoding utf8
+pymobiledevice3 developer dvt proclist --userspace 2>$null | Out-File $procJson -Encoding utf8
 $procInfo = python -c @"
 import json, sys
 data = json.load(open(sys.argv[1], encoding='utf-8'))
@@ -72,7 +72,7 @@ Write-Host "process: $procInfo"
 # 4. Screenshot + layout analysis
 Write-Step "4. screenshot"
 $shot = Join-Path $outDir "screen.png"
-pymobiledevice3 developer dvt screenshot $shot 2>$null | Out-Null
+pymobiledevice3 developer dvt screenshot --userspace $shot 2>$null | Out-Null
 if (-not (Test-Path $shot)) { throw "截图失败" }
 Add-Type -AssemblyName System.Drawing
 $bmp = New-Object System.Drawing.Bitmap($shot)
@@ -114,7 +114,7 @@ app = data.get('com.riffloop.prototype.N3N672QNHY') or {}
 print(app.get('Container', ''))
 "@ $appsJson
 if ($container) {
-    $docs = pymobiledevice3 developer dvt ls "$container/Documents" 2>$null | Out-String
+    $docs = pymobiledevice3 developer dvt ls --userspace "$container/Documents" 2>$null | Out-String
     Write-Host $docs.Trim()
 } else {
     Write-Host "无法取得容器路径"
