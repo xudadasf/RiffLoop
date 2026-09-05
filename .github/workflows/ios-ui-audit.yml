@@ -1,0 +1,77 @@
+name: iOS UI audit
+on:
+  push:
+    branches: [codex/ui-audit-20260905]
+    paths: [audits/ui-20260905/**, .github/workflows/ios-ui-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+      - run: brew install xcodegen
+      - name: Generate audit-only test configuration
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('project.yml')
+          s = p.read_text()
+          s = s.replace('      testTargets:\n        - RiffLoopTests', '      testTargets:\n        - RiffLoopTests\n        - RiffLoopAuditUI')
+          s = s.replace('      - path: RiffLoopTests\n', '      - path: audits/ui-20260905/seed\n      - path: RiffLoopTests\n')
+          s += '''
+            RiffLoopAuditUI:
+              type: bundle.ui-testing
+              platform: iOS
+              sources:
+                - path: audits/ui-20260905/ui
+              dependencies:
+                - target: RiffLoop
+              settings:
+                base:
+                  PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.audit.ui
+                  GENERATE_INFOPLIST_FILE: YES
+                  TEST_TARGET_NAME: RiffLoop
+          '''
+          p.write_text(s)
+      - run: xcodegen generate
+      - name: Boot iPad mini in dark appearance
+        run: |
+          DEVICE_ID=$(xcrun simctl create RiffLoop-Audit com.apple.CoreSimulator.SimDeviceType.iPad-mini-A17-Pro com.apple.CoreSimulator.SimRuntime.iOS-18-5)
+          echo "DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl ui "$DEVICE_ID" appearance dark
+      - name: Seed disposable simulator
+        run: >-
+          xcodebuild test -project RiffLoop.xcodeproj -scheme RiffLoop
+          -destination "platform=iOS Simulator,id=$DEVICE_ID"
+          -derivedDataPath DerivedData -resultBundlePath Seed.xcresult
+          -only-testing:RiffLoopTests/AuditFixtureTests
+          CODE_SIGNING_ALLOWED=NO > seed.log 2>&1
+      - name: Capture actual app flows
+        run: >-
+          xcodebuild test-without-building -project RiffLoop.xcodeproj -scheme RiffLoop
+          -destination "platform=iOS Simulator,id=$DEVICE_ID"
+          -derivedDataPath DerivedData -resultBundlePath Audit.xcresult
+          -only-testing:RiffLoopAuditUI -parallel-testing-enabled NO
+          CODE_SIGNING_ALLOWED=NO > audit.log 2>&1
+      - name: Export evidence
+        if: always()
+        run: |
+          mkdir -p Evidence
+          if [ -d Audit.xcresult ]; then
+            xcrun xcresulttool export attachments --path Audit.xcresult --output-path Evidence
+            xcrun xcresulttool get test-results tests --path Audit.xcresult > Evidence/tests.json
+          fi
+          cp seed.log audit.log Evidence/ 2>/dev/null || true
+          git rev-parse HEAD > Evidence/source-commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RiffLoop-UI-audit-synthetic
+          path: Evidence
+          retention-days: 7
