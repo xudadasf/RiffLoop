@@ -173,14 +173,30 @@ final class FullPageAudit: XCTestCase {
     func test04SupplementaryPages() {
         openMode("Guitar Pro 乐谱")
         requireTap("节拍器", prefix: true)
-        let enabled = app.switches.matching(NSPredicate(format: "label CONTAINS %@", "开启节拍器")).firstMatch
-        if enabled.exists && enabled.value as? String == "0" { enabled.tap() }
+        let enabled = app.switches["开启节拍器"]
+        XCTAssertTrue(enabled.waitForExistence(timeout: 5))
+        // SwiftUI exposes a wide row and a nested UISwitch. Tap the actual
+        // switch, since the row's center does not toggle this Form control.
+        let control = enabled.switches.firstMatch
+        XCTAssertTrue(control.isHittable)
+        control.tap()
+        XCTAssertTrue(app.staticTexts["节拍音量"].firstMatch.waitForExistence(timeout: 5))
         shot("gp-metronome-enabled-top")
         scrollPanel(); shot("gp-metronome-enabled-middle")
         scrollPanel(); shot("gp-metronome-enabled-bottom")
+        let countIn = app.switches["开始播放前预备拍"].switches.firstMatch
+        XCTAssertTrue(countIn.isHittable)
+        countIn.tap()
+        scrollPanel(); shot("gp-count-in-volume")
         requireTap("完成")
+    }
+
+    func test05SystemPicker() {
+        openMode("Guitar Pro 乐谱")
         requireTap("选择文件")
+        Thread.sleep(forTimeInterval: 2)
         requireTap("导入")
+        Thread.sleep(forTimeInterval: 6)
         shot("shared-system-file-picker")
         // Closing the disposable simulator app avoids any dependency on the
         // provider's localized Cancel label, and never imports a file.
