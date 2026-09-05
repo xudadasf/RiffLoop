@@ -38,13 +38,13 @@ final class PracticeExperienceTests: XCTestCase {
     private func capture(_ page: AnyView, name: String, delay: Double = 1) async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
-        let controller = UIHostingController(rootView: NavigationStack { page }
+        let controller = UIHostingController(rootView: AnyView(NavigationStack { page }
             // A standalone UIHostingController has no SwiftUI App/Scene bridge.
             // Supply the actual foreground UIWindowScene state for this host.
             .environment(\.scenePhase, scene.activationState == .foregroundActive ? .active : .inactive)
             .environmentObject(RecentProjectsStore())
             .environmentObject(DocumentDisplayNameStore())
-            .preferredColorScheme(.dark))
+            .preferredColorScheme(.dark)))
         window.rootViewController = controller
         window.makeKeyAndVisible()
         defer {
@@ -62,5 +62,10 @@ final class PracticeExperienceTests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+        // Exercise SwiftUI removal while the hosting window is still alive, as
+        // navigating back does. Destroying UIKit first skips that transition.
+        controller.rootView = AnyView(Color.clear)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled, "Leaving \(name) must release screen awake")
     }
 }
