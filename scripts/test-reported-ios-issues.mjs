@@ -182,7 +182,7 @@ assert.match(
     "the signing status must be visible in the scroll content instead of collapsing to a toolbar icon"
 );
 assert.match(homeView, /Text\("签名与续签"\)[\s\S]*?signingExpirationTitle[\s\S]*?查看续签方法/);
-assert.match(homeView, /expirationDate\.formatted\(date: \.long, time: \.shortened\)[\s\S]*?到期：/);
+assert.match(homeView, /expirationDate\.formatted\(Date\.FormatStyle\(date: \.abbreviated, time: \.shortened\)\.locale\(Locale\(identifier: "zh_CN"\)\)\)[\s\S]*?到期：/);
 assert.match(homeView, /Automatic Refresh[\s\S]*?手动覆盖续签/);
 assert.doesNotMatch(homeView, /ToolbarItem\(placement: \.topBarTrailing\)[\s\S]*?signingCompactTitle/);
 assert.match(homeView, /最近项目[\s\S]*?recentProjectsPage/);

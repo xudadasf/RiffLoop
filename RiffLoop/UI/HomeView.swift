@@ -106,7 +106,7 @@ struct HomeView: View {
                             .font(.title.bold())
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Text("上次打开：\(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text("上次打开：\(project.lastOpenedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "zh_CN"))))")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.7))
 
@@ -205,9 +205,9 @@ struct HomeView: View {
                                     .stroke(.orange, lineWidth: 1.5)
                             }
                         }
-                        .accessibilityLabel(day.date.formatted(date: .abbreviated, time: .omitted))
+                        .accessibilityLabel(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN"))))
                         .accessibilityValue(formatPracticeDuration(day.seconds))
-                        .help("\(day.date.formatted(date: .abbreviated, time: .omitted)) · \(formatPracticeDuration(day.seconds))")
+                        .help("\(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN")))) · \(formatPracticeDuration(day.seconds))")
                 }
             }
             HStack {
@@ -254,7 +254,7 @@ struct HomeView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
-                            Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
+                            Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "zh_CN"))))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -312,7 +312,7 @@ struct HomeView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(displayName(for: project))
-                            Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(date: .abbreviated, time: .shortened))")
+                            Text("\(project.kind.folderName) · \(project.lastOpenedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "zh_CN"))))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -504,7 +504,7 @@ struct HomeView: View {
         guard let expirationDate = signingStatus.expirationDate else {
             return "无法读取到期时间 · 点此查看续签方法"
         }
-        let dateText = expirationDate.formatted(date: .long, time: .shortened)
+        let dateText = expirationDate.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "zh_CN")))
         if signingStatus.kind == .expired {
             return "已于 \(dateText) 到期"
         }
