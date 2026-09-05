@@ -350,7 +350,7 @@ struct PracticeView: View {
 
     private var compactMetronomeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("节拍器").font(.headline)
+            Text("播放与速度").font(.headline)
             Toggle("开启节拍器", isOn: $viewModel.metronomeEnabled)
                 .onChange(of: viewModel.metronomeEnabled) { _, _ in
                     viewModel.applyTimingSettings()

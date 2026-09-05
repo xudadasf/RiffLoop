@@ -80,7 +80,7 @@ struct PdfPracticeView: View {
         .overlay(alignment: .bottomTrailing) {
             if let panel = activePanel {
                 panelContent(panel)
-                    .frame(width: 420, height: activePanel == .sound ? 400 : 540)
+                    .frame(width: 420, height: activePanel == .sound ? (viewModel.audioFileName == nil ? 250 : 460) : 540)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
                     .padding(16)
@@ -387,7 +387,7 @@ struct PdfPracticeView: View {
 
     private var pdfMetronomeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("节拍器").font(.headline)
+            Text("播放与速度").font(.headline)
             Button(
                 viewModel.isMetronomePlaying ? "暂停节拍器" : "启动节拍器",
                 action: viewModel.toggleMetronomePlayback

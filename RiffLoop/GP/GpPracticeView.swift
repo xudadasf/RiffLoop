@@ -650,7 +650,11 @@ struct GpPracticeView: View {
     }
 
     private var soundSummary: String {
-        viewModel.synthEnabled ? "合成 \(percent(viewModel.masterVolume))" : "合成关闭"
+        if viewModel.synthEnabled { return "合成 \(percent(viewModel.masterVolume))" }
+        if viewModel.score?.hasBackingTrack == true && viewModel.backingEnabled {
+            return "伴奏 \(percent(viewModel.backingVolume))"
+        }
+        return "声音关闭"
     }
 
     private var soundDetail: String {

@@ -5,6 +5,32 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testTooShortDraftKeepsOriginalAndCancelStopsSilentClock() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let store = FilePracticeSettingsStore()
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.startReadingTrackRecording()
+        model.finishReadingTrackRecording() // No clock tick has occurred yet.
+        XCTAssertTrue(model.isRecordingReadingTrack)
+        XCTAssertNotNil(model.message)
+        XCTAssertEqual(try store.load(PdfPracticeProfile.self, kind: .pdf, fileName: pdf.lastPathComponent)?.readingPoints, [])
+        model.pauseMetronome()
+        try await Task.sleep(for: .milliseconds(200))
+        model.cancelReadingTrackRecording()
+        let time = model.currentTime
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertEqual(model.currentTime, time)
+        XCTAssertTrue(model.readingPoints.isEmpty)
+        XCTAssertNil(model.readingStartCue)
+    }
+
     func testRecordingDraftDoesNotOverwriteSavedTrackAndCancelRestoresIt() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let store = FilePracticeSettingsStore()

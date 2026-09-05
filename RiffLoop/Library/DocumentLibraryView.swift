@@ -131,6 +131,7 @@ struct DocumentLibraryView: View {
                                 Image(systemName: "ellipsis.circle")
                                     .font(.title3).frame(minWidth: 44, minHeight: 44)
                             }
+                            .buttonStyle(.borderless)
                             .accessibilityLabel("更多：\(displayName(for: fileURL))")
                         }
                     }
@@ -145,8 +146,10 @@ struct DocumentLibraryView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("刷新", action: model.refresh)
                     Button { isImporterPresented = true } label: {
-                        Label("导入文件", systemImage: "plus")
-                            .labelStyle(.titleAndIcon)
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                            Text("导入文件")
+                        }
                     }
                 }
             }
