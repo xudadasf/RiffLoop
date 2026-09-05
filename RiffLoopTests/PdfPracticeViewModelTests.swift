@@ -117,6 +117,28 @@ final class PdfPracticeViewModelTests: XCTestCase {
         XCTAssertNil(model.readingStartCue)
     }
 
+    func testAccompanimentDisplayStopsAtEndWhilePracticeClockContinues() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let audio = try makeTransportAudioFixture(duration: 0.5)
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            try? FileManager.default.removeItem(at: audio)
+            FilePracticeSettingsStore().remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.bindAudio(at: audio)
+        model.toggleMetronomePlayback()
+        try await waitForTransport { model.duration > 0 && model.currentTime > model.duration + 0.2 }
+        XCTAssertEqual(model.audioTimelinePosition, model.duration)
+        XCTAssertTrue(model.isMetronomePlaying)
+        XCTAssertFalse(model.isAudioPlaying)
+        let clock = model.currentTime
+        try await waitForTransport { model.currentTime > clock + 0.2 }
+        XCTAssertEqual(model.audioTimelinePosition, model.duration)
+    }
+
     func testSeekingDuringSilentFollowWithBoundAudioKeepsReadingClockRunning() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let audio = try makeTransportAudioFixture()

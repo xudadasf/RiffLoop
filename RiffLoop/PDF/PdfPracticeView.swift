@@ -254,11 +254,11 @@ struct PdfPracticeView: View {
 
             if viewModel.audioFileName != nil {
                 HStack(spacing: 8) {
-                    Text(format(viewModel.currentTime))
+                    Text(format(viewModel.audioTimelinePosition))
                         .font(.caption.monospacedDigit().weight(.semibold))
                     Slider(
                         value: Binding(
-                            get: { viewModel.currentTime },
+                            get: { viewModel.audioTimelinePosition },
                             set: { viewModel.seek(to: $0) }
                         ),
                         in: 0...max(viewModel.duration, 0.01)
@@ -365,12 +365,12 @@ struct PdfPracticeView: View {
                 }
                 Slider(
                     value: Binding(
-                        get: { viewModel.currentTime },
+                        get: { viewModel.audioTimelinePosition },
                         set: { viewModel.seek(to: $0) }
                     ),
                     in: 0...max(viewModel.duration, 0.01)
                 )
-                Text("\(format(viewModel.currentTime)) / \(format(viewModel.duration))")
+                Text("\(format(viewModel.audioTimelinePosition)) / \(format(viewModel.duration))")
                     .monospacedDigit()
                 PracticeVolumeControl(title: "伴奏音量", value: Binding(
                     get: { Double(viewModel.audioVolume) },

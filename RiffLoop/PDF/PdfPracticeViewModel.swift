@@ -85,6 +85,8 @@ final class PdfPracticeViewModel: ObservableObject {
     private var speedLadderBaseRate: Float?
 
     var isPlaying: Bool { isAudioPlaying || isMetronomePlaying || isReadingClockRunning }
+    // The independent practice clock can continue after the accompaniment ends.
+    var audioTimelinePosition: Double { min(max(currentTime, 0), max(duration, 0)) }
     var currentBeatCue: String {
         let beat = max(0, Int(floor((currentTime - (beatOffset ?? 0) - synchronizationOffset) * bpm / 60)))
         return "第 \(beat / max(1, beatsPerMeasure) + 1) 小节 · 第 \(beat % max(1, beatsPerMeasure) + 1) 拍"
