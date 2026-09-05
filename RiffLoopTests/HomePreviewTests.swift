@@ -35,9 +35,10 @@ final class HomePreviewTests: XCTestCase {
             })()
             """)
         XCTAssertEqual(fits as? Bool, true, "Preview must fit the card without duplicate title or audio")
-        let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: web.bounds).image { _ in
-            web.drawHierarchy(in: web.bounds, afterScreenUpdates: true)
-        })
+        // WK content is composited in another process. UIKit drawHierarchy can
+        // return the initial placeholder even after the DOM has finished.
+        let snapshot = try await web.takeSnapshot(configuration: nil)
+        let attachment = XCTAttachment(image: snapshot)
         attachment.name = "GP opening thumbnail at actual card size"
         attachment.lifetime = .keepAlways
         add(attachment)

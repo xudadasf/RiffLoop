@@ -112,13 +112,18 @@ struct TempoKeypad: View {
                 .foregroundStyle(draft.pasteRejected ? Color.orange : .secondary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 ForEach(1...9, id: \.self) { number in digitButton(number) }
-                Button("清空") { draft.clear() }.frame(maxWidth: .infinity, minHeight: 44)
+                Button { draft.clear() } label: {
+                    Text("清空").frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+                }
                 digitButton(0)
                 Button { draft.delete() } label: {
-                    Image(systemName: "delete.left").frame(maxWidth: .infinity, minHeight: 44)
+                    Image(systemName: "delete.left").frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
                 }.accessibilityLabel("删除一位")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
             HStack {
                 PasteButton(payloadType: String.self) { values in
                     if let text = values.first { draft.paste(text) }
@@ -146,8 +151,11 @@ struct TempoKeypad: View {
     }
 
     private func digitButton(_ number: Int) -> some View {
-        Button("\(number)") { draft.digit(number) }
-            .font(.title2.monospacedDigit())
-            .frame(maxWidth: .infinity, minHeight: 44)
+        Button { draft.digit(number) } label: {
+            Text("\(number)")
+                .font(.title2.monospacedDigit())
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        }
     }
 }
