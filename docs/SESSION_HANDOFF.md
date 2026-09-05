@@ -14,7 +14,9 @@
 
 ## 本轮需求与实现状态
 
-统一跟踪：[Issue #1](https://github.com/xudadasf/RiffLoop/issues/1)。版本计划 `0.25.53（97）`；稳定标签仍为 `v0.25.51`。
+统一跟踪：[Issue #1](https://github.com/xudadasf/RiffLoop/issues/1)。`0.25.53（97）` 已构建、校验并归档，应用提交 `59f23259768f0bccd332afc02c53916f853665d7`；稳定标签仍为 `v0.25.51`。
+
+**接下来：** Sideloadly 的 Apple ID Authentication 窗口等待本人填写原账号密码。已选中正确 IPA，自动 Bundle ID 开启，尚未完成安装。认证完成后先等待安装结果，再读取实机版本/Bundle ID、比较安装前文件与偏好记录、核验 Automatic Refresh。不要重新卸载/安装；不要为后续文档提交重新打包。
 
 1. 外部打开：声明 GP/GPX/GP3–5、PDF、MP4/MOV/M4V，接收文件 URL，复制到对应文件库后进入模式。同名文件另存，禁止覆盖原练习文件。微信实际列表显示需真机测试。
 2. 文件打开时屏幕常亮：包括暂停看谱；离开页面/进入后台释放，多页面切换不互相取消。
@@ -40,9 +42,10 @@ Swift/Xcode 在 GitHub Actions 的 macOS 上编译测试，不在 Windows 安装
 - 后续真实 AlphaSynth 回归复现“预备拍缓冲后暂停，已丢弃的样本计数阻塞恢复”。手动恢复前清除计数并回到暂停的谱面位置，20 次中断恢复通过；自动 B→A 握手保持原路径。云端 WebKit 测试增加了预备拍中途暂停再恢复。
 - [CI 33945156173](https://github.com/xudadasf/RiffLoop/actions/runs/33945156173)（`5850ee5`）完整通过，126 项 Swift 测试、Node 与发布安全检查成功，含预备拍中断恢复、三页常亮及 SwiftUI 移除页面后释放请求。已查看三模式截图，PDF 按钮文字断行已解决；GP 工具区另加宽度限制后，最终提交仍需匹配 CI 与重新截图。
 - 本轮开始时实机读取仍为 0.25.52（96）、原 Bundle ID、ProfileValidated=true；取得 11 个 Documents 文件的清单及 14 个偏好设置键的临时快照。私有快照不提交 Git。
-- Sideloadly 已识别 USB 设备，已依据设备原签名填写相同 Apple ID。新账号签名、覆盖安装和 Automatic Refresh 尚未完成验证。USB `device-check.ps1` 已增加 `--userspace`，新账号运行检查通过。
+- 最终 [CI #113](https://github.com/xudadasf/RiffLoop/actions/runs/33945792459) / [IPA #90](https://github.com/xudadasf/RiffLoop/actions/runs/33946252956) 对应同一应用提交：127 项 Swift 测试全部通过（含最后的 PDF 静音跟谱拖动进度用例）。三模式截图复核通过；IPA 实际元数据/文档类型及安装 DryRun 通过。
+- Sideloadly 已识别 USB 设备，已依据设备原签名填写相同 Apple ID。覆盖安装停在密码认证，新账号实际安装和 Automatic Refresh 尚未完成验证。USB `device-check.ps1` 已增加 `--userspace`，新账号运行检查通过。
 - 微信分享、真实触控、主观听感、连续长时间练习不能用静态脚本通过替代；未测项目如实保留。
 
-最后完成状态、CI/IPA 链接、实际提交和 SHA256 将在本文件及发布记录中更新。接续时先查看 Issue 和当前分支最新提交，不重复修已验证问题。
+候选包：[Release v0.25.53-rc.1](https://github.com/xudadasf/RiffLoop/releases/tag/v0.25.53-rc.1)。IPA SHA256：`D8F11DA16878D0AC5F862C5B681BCD7AC97D8EE05C9F1CF9A11ACE1710292C0D`。本机会话选择的包位于 `%LOCALAPPDATA%\Temp\riffloop-release-02553\output\release-0.25.53-build97-59f2325\`，与构建清单同目录；临时包缺失时从 Release 下载并重新校验。
 
-历史 0.25.51/0.25.52 已保存到 GitHub Releases，重新下载哈希一致。本机 `output` 递归清理被自动审批以 `blocked by policy` 拦截，仍保留约 257 MB 输出；不要声称本地清理已完成。外部迁移备份不清理。详细过程见 [0.25.53 记录](releases/0.25.53.md)。
+历史 0.25.51/0.25.52 已保存到 GitHub Releases，重新下载哈希一致。本机 `output` 递归清理及缩小范围后的单个测试缓存清理均被自动审批以 `blocked by policy` 拦截，仍保留约 264 MiB 输出；不要声称本地清理已完成。外部迁移备份不清理。详细过程见 [0.25.53 记录](releases/0.25.53.md)。
