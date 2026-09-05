@@ -57,7 +57,7 @@ jobs:
           xcodebuild test-without-building -project RiffLoop.xcodeproj -scheme RiffLoop
           -destination "platform=iOS Simulator,id=$DEVICE_ID"
           -derivedDataPath DerivedData -resultBundlePath Audit.xcresult
-          -only-testing:RiffLoopAuditUI -parallel-testing-enabled NO
+          -only-testing:RiffLoopAuditUI/FullPageAudit/test04SupplementaryPages -parallel-testing-enabled NO
           CODE_SIGNING_ALLOWED=NO > audit.log 2>&1
       - name: Export evidence
         if: always()

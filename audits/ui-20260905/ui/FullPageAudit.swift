@@ -169,4 +169,21 @@ final class FullPageAudit: XCTestCase {
         home()
         shot("home-after-practice")
     }
+
+    func test04SupplementaryPages() {
+        openMode("Guitar Pro 乐谱")
+        requireTap("节拍器", prefix: true)
+        let enabled = app.switches.matching(NSPredicate(format: "label CONTAINS %@", "开启节拍器")).firstMatch
+        if enabled.exists && enabled.value as? String == "0" { enabled.tap() }
+        shot("gp-metronome-enabled-top")
+        scrollPanel(); shot("gp-metronome-enabled-middle")
+        scrollPanel(); shot("gp-metronome-enabled-bottom")
+        requireTap("完成")
+        requireTap("选择文件")
+        requireTap("导入")
+        shot("shared-system-file-picker")
+        // Closing the disposable simulator app avoids any dependency on the
+        // provider's localized Cancel label, and never imports a file.
+        app.terminate()
+    }
 }
