@@ -48,6 +48,7 @@ final class PracticeViewModel: ObservableObject {
     private var isLoopTransitioning = false
     private var transportGeneration: UInt64 = 0
     private var pendingSeekTime: TimeInterval?
+    private var startWhenMediaReady = false
     private var readinessObserver: NSKeyValueObservation?
     private var currentFileName: String?
     private var speedLadderBaseRate: Float?
@@ -89,7 +90,6 @@ final class PracticeViewModel: ObservableObject {
 
         let item = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: item)
-        audioGain.attach(to: item, player: player)
         observeEnd(of: item)
         isMediaReady = false
 
@@ -101,6 +101,7 @@ final class PracticeViewModel: ObservableObject {
         seek(to: currentTime)
         Task { @MainActor [weak self] in
             do {
+                if let self { await self.audioGain.attach(to: item, player: self.player) }
                 let playable = try await item.asset.load(.isPlayable)
                 let length = try await item.asset.load(.duration).seconds
                 guard let self, self.player.currentItem === item else { return }
@@ -111,6 +112,10 @@ final class PracticeViewModel: ObservableObject {
                 }
                 self.duration = length
                 self.isMediaReady = true
+                if self.startWhenMediaReady {
+                    self.startWhenMediaReady = false
+                    self.preparePlaybackAndStart(at: self.currentTime)
+                }
             } catch {
                 guard let self, self.player.currentItem === item else { return }
                 self.hasMedia = false
@@ -130,6 +135,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        startWhenMediaReady = false
         recordPracticeTime()
         if pendingSeekTime == nil, isPlaying {
             let position = player.currentTime().seconds
@@ -396,6 +402,11 @@ final class PracticeViewModel: ObservableObject {
     }
 
     private func preparePlaybackAndStart(at mediaTime: TimeInterval) {
+        guard isMediaReady else {
+            startWhenMediaReady = true
+            isPlaying = true
+            return
+        }
         transportGeneration &+= 1
         let generation = transportGeneration
         readinessObserver = nil
@@ -431,6 +442,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     private func prerollWhenReady(at time: TimeInterval, generation: UInt64) {
+        guard isMediaReady else { startWhenMediaReady = true; return }
         // A completed seek can precede AVPlayer's readyToPlay status.
         readinessObserver = player.observe(\.status, options: [.initial, .new]) { [weak self] _, _ in
             Task { @MainActor [weak self] in

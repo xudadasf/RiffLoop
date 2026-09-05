@@ -109,7 +109,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
-        pause()
+        if rendererReady { pause() }
         updatePracticeClock(isPlaying: false)
         saveProfile()
         isPlaying = false

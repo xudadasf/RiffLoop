@@ -21,11 +21,14 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
         let data = try Data(contentsOf: url)
         for name in names {
+            print("GP integration loading \(name)")
             model.loadScore(data: data, fileName: name)
             try await waitUntil("GP readiness: \(model.errorMessage ?? "no error")") { model.playerReady }
             model.setPlaybackSpeed(0.9)
             model.setLoopCountInEnabled(true)
             for bar in [0, 2] {
+                print("GP integration selecting bar \(bar), ready=\(model.playerReady), error=\(model.errorMessage ?? "none")")
+                defer { print("GP integration final state: tick=\(model.position.currentTick), loops=\(model.completedLoops), playing=\(model.isPlaying), error=\(model.errorMessage ?? "none")") }
                 model.pause()
                 try await Task.sleep(for: .milliseconds(300))
                 model.clearLoop()

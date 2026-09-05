@@ -150,6 +150,15 @@ jobs:
             xcrun xcresulttool export diagnostics --path "$result" --output-path TestArtifacts/Diagnostics || true
           done
 
+      - name: Export practice screenshots for review
+        if: always()
+        run: |
+          mkdir -p TestArtifacts/PracticeScreenshots
+          for result in DerivedData/Logs/Test/*.xcresult; do
+            test -d "$result" || continue
+            xcrun xcresulttool export attachments --path "$result" --output-path TestArtifacts/PracticeScreenshots || true
+          done
+
       - name: Upload iPad mini screenshot and test result
         if: always()
         uses: actions/upload-artifact@v4

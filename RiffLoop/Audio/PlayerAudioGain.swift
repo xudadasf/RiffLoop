@@ -26,15 +26,13 @@ final class PlayerAudioGain {
         for state in states { state.gain.withLock { $0 = boost } }
     }
 
-    func attach(to item: AVPlayerItem, player: AVPlayer) {
+    func attach(to item: AVPlayerItem, player: AVPlayer) async {
         generation += 1
         let request = generation
         states = []
-        Task { [weak self, weak item, weak player] in
-            guard let item, let player else { return }
             do {
                 let tracks = try await item.asset.loadTracks(withMediaType: .audio)
-                guard let self, request == self.generation, player.currentItem === item else { return }
+                guard request == self.generation, player.currentItem === item else { return }
                 var parameters: [AVAudioMixInputParameters] = []
                 for track in tracks {
                     let state = AudioGainState()
@@ -88,6 +86,5 @@ final class PlayerAudioGain {
                 // AVPlayer reports actual file/decoder failures through its normal UI.
                 // Keep standard playback available if a track cannot provide a tap.
             }
-        }
     }
 }

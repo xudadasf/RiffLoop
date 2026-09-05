@@ -30,3 +30,24 @@ synth.qp = true;
 transport.toggle();
 assert.equal(acceptedStarts, 1, 'The first tap after replacement player readiness must play');
 console.log('GP replacement-player rejection and retry passed');
+
+const readyEvents = [];
+const readiness = source.slice(source.indexOf('    const isPlaybackReady ='), source.indexOf('    const applyLoopMode ='));
+const readyHarness = new Function('post', `
+    let scoreHasLoaded = false, didNotifyPlayerReady = false;
+    let mainPlayerReadyForScore = false, backingPlayerReadyForScore = false;
+    const usesNativeBacking = true, canUseBacking = () => true;
+    const api = { isReadyForPlayback: true }, synthApi = { isReadyForPlayback: false };
+    ${readiness}
+    return {
+        load() { resetPlaybackReadiness(); scoreHasLoaded = true; notifyPlayerReady(); },
+        ready() { mainPlayerReadyForScore = true; notifyPlayerReady(); }
+    };
+`)(event => readyEvents.push(event));
+readyHarness.load();
+assert.equal(readyEvents.length, 0, 'A previous score\'s cached readiness must not enable the new file');
+readyHarness.ready();
+assert.deepEqual(readyEvents, ['playerReady'], 'Native backing must not wait for the unused WebKit backing player');
+readyHarness.load();
+assert.equal(readyEvents.length, 1, 'Changing files must invalidate the fresh-ready receipt');
+console.log('GP per-score readiness and native-backing independence passed');

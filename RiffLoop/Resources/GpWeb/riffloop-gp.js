@@ -275,6 +275,8 @@
     let beatAccents = ["strong", "normal", "normal", "normal"];
     let scoreHasLoaded = false;
     let didNotifyPlayerReady = false;
+    let mainPlayerReadyForScore = false;
+    let backingPlayerReadyForScore = false;
     let pendingRangeHighlight = null;
     let lastPositionPostTime = Number.NEGATIVE_INFINITY;
     const metronomeAccent = (pulse) => {
@@ -624,13 +626,15 @@
     const resetPlaybackReadiness = () => {
         scoreHasLoaded = false;
         didNotifyPlayerReady = false;
+        mainPlayerReadyForScore = false;
+        backingPlayerReadyForScore = false;
     };
     const notifyPlayerReady = () => {
         if (didNotifyPlayerReady || !isPlaybackReady({
             hasLoaded: scoreHasLoaded,
             hasBacking: !usesNativeBacking && canUseBacking(),
-            mainReady: Boolean(api.isReadyForPlayback),
-            synthReady: Boolean(synthApi.isReadyForPlayback)
+            mainReady: mainPlayerReadyForScore && Boolean(api.isReadyForPlayback),
+            synthReady: backingPlayerReadyForScore && Boolean(synthApi.isReadyForPlayback)
         })) return;
         didNotifyPlayerReady = true;
         post("playerReady");
@@ -922,8 +926,14 @@
             height: Number(result.totalHeight || scoreElement.scrollHeight || 0)
         });
     });
-    api.playerReady.on(notifyPlayerReady);
-    synthApi.playerReady.on(notifyPlayerReady);
+    api.playerReady.on(() => {
+        mainPlayerReadyForScore = true;
+        notifyPlayerReady();
+    });
+    synthApi.playerReady.on(() => {
+        backingPlayerReadyForScore = true;
+        notifyPlayerReady();
+    });
     synthApi.playerReady.on(() => postBackingDiagnostic("synth-player-ready"));
     synthApi.scoreLoaded.on((score) => {
         postBackingDiagnostic("synth-score-loaded", undefined, {
