@@ -119,7 +119,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
 
     func testAccompanimentDisplayStopsAtEndWhilePracticeClockContinues() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
-        let audio = try makeTransportAudioFixture(duration: 0.5)
+        let audio = try makeTransportAudioFixture(duration: 2)
         let model = PdfPracticeViewModel()
         defer {
             model.pause()
@@ -129,6 +129,9 @@ final class PdfPracticeViewModelTests: XCTestCase {
         }
         XCTAssertTrue(model.openPdf(at: pdf))
         model.bindAudio(at: audio)
+        model.toggleAudioPlayback()
+        try await waitForTransport { model.duration > 0 && model.isAudioPlaying }
+        model.pauseAudio()
         model.toggleMetronomePlayback()
         try await waitForTransport { model.duration > 0 && model.currentTime > model.duration + 0.2 }
         XCTAssertEqual(model.audioTimelinePosition, model.duration)
