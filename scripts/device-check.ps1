@@ -96,7 +96,7 @@ $proc = Start-Process -FilePath "python" -ArgumentList '-m', 'pymobiledevice3', 
 Start-Sleep -Seconds $SyslogSeconds
 $proc.Kill()
 $errLines = Select-String -Path $logOut, "$logOut.err" -Pattern 'RiffLoop' -ErrorAction SilentlyContinue |
-    Where-Object { $_.Line -match 'ERROR|FAULT|CRASH|abort|assert' } |
+    Where-Object { $_.Line -match '<(?:ERROR|FAULT|CRITICAL|EMERGENCY|ALERT)>|\b(?:SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|assertion failed|fatal error|terminating app due to uncaught exception)\b' } |
     Where-Object { $_.Line -notmatch 'process-info-codesignature' }
 if ($errLines) {
     Write-Host "发现异常日志："

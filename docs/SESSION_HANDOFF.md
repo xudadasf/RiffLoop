@@ -7,7 +7,7 @@
 - 仓库：xudadasf/RiffLoop，开发分支 `codex/ipad-home-ui`。
 - 这台 Windows 电脑的独立项目入口：`C:\Users\sadadashare\Desktop\RiffLoop-iOS`。禁止使用旧“Codex共享项目”指向 sadada 桌面的链接。
 - 仅修改、测试 iPad/iOS，保持 Android 不变。`需修改记录.md` 是用户保留的未提交文件，禁止修改、暂存、提交或清理。
-- 用户要求代理负责修改、完整回归、编译、下载、安装及可执行的体验测试。Apple 密码/验证码仍由本人在官方窗口填写。
+- 用户要求代理负责修改、完整回归、编译、下载、安装及可执行的体验测试。认证只在相应官方登录窗口完成；密码、验证码不写入脚本、日志或 Git。
 - 保持原 Apple 账号及最终 Bundle ID `com.riffloop.prototype.N3N672QNHY`；只能覆盖安装，禁止卸载/清数据。
 - GP 保持 B → Paused → seek A → A 回执 → 一小节预备拍 → A 到 B；原生内嵌伴奏不退回 WKWebView Blob/data URL。
 - 相关需求、诊断和验证写入 Git/GitHub，便于新账号接续。用户要求本地保留源码、测试、脚本和开发文档，验证后清理可再生安装包/构建缓存/日志。不要清理外部迁移备份或 iPad 文件。
@@ -16,7 +16,9 @@
 
 统一跟踪：[Issue #1](https://github.com/xudadasf/RiffLoop/issues/1)。`0.25.53（97）` 已构建、校验并归档，应用提交 `59f23259768f0bccd332afc02c53916f853665d7`；稳定标签仍为 `v0.25.51`。
 
-**接下来：** 安装仍未完成。认证先返回 Apple 登录 HTTP 404，随后安装器出现 `IPC fail: CoreFP err Could not create CoreFP key: Access is denied`。实机重新查询仍为 0.25.52（96），原 Bundle ID，签名有效。桌面控制重置后已恢复；已关闭当前账号的前台/后台进程并使用同一已校验 IPA 重新启动，未操作其他 Windows 会话。安装器自带的一次性本地认证初始化明确要求管理员权限，确认后仍报 CoreFP 拒绝访问。调用 RunAs 后实际前台与后台进程的 TokenElevation 都是 0，不能以启动命令成功代表提权成功。CoreFP 的 HKLM 项普通用户仅可读；现需本人完成 Windows 管理员启动/验证，再核验初始化与 Apple 登录。不可把先前的 HTTP 404 直接当成密码错误。随后继续核验安装结果、文件/偏好保留和 Automatic Refresh。禁止卸载/清数据；不要为文档提交重新打包。密码、验证码不得记录到 Git。
+**当前状态：** 2026-09-05 15:22 已成功覆盖安装 0.25.53（97），设备读取原 Bundle ID、签名有效。安装前后 11 个 Documents 文件（108,822,138 字节）逐一 SHA-256 一致，14 个偏好键值全部一致。新账号的 Automatic Refresh 已登记（one_off=0、有效期 7 天、96 小时刷新阈值）。已观察到新版本 GP 页面正常显示；微信分享、主观听感和长时实机练习仍待体验验收，不能标为已完成。不要卸载/清数据，也不要为文档及电脑检查脚本提交重新打包。
+
+**权限问题已解决：** 新账号原本不在管理员组，电脑 EnableLUA=0；此前 RunAs 返回进程并不代表已提权。用户从原管理员账号将当前账号加入管理员组并重新登录后，当前令牌 IsInRole(Administrator)=true，CoreFP 初始化、Apple 登录/验证码、签名及覆盖安装均通过。另将 `HKLM\SOFTWARE\Apple Inc.\CoreFP` 的 `LibSidePath` 从旧账号组件改为当前账号 `%LOCALAPPDATA%\Sideloadly\an\CoreFP.dll`；修改前两份 DLL 的 SHA-256 一致且 Apple 数字签名有效，旧值备份在本机临时目录，重启当前账号安装器后确认从新路径初始化。未修改其他注册表值/权限，未操作旧账号后台进程。
 
 1. 外部打开：声明 GP/GPX/GP3–5、PDF、MP4/MOV/M4V，接收文件 URL，复制到对应文件库后进入模式。同名文件另存，禁止覆盖原练习文件。微信实际列表显示需真机测试。
 2. 文件打开时屏幕常亮：包括暂停看谱；离开页面/进入后台释放，多页面切换不互相取消。
@@ -43,7 +45,7 @@ Swift/Xcode 在 GitHub Actions 的 macOS 上编译测试，不在 Windows 安装
 - [CI 33945156173](https://github.com/xudadasf/RiffLoop/actions/runs/33945156173)（`5850ee5`）完整通过，126 项 Swift 测试、Node 与发布安全检查成功，含预备拍中断恢复、三页常亮及 SwiftUI 移除页面后释放请求。已查看三模式截图，PDF 按钮文字断行已解决；GP 工具区另加宽度限制后，最终提交仍需匹配 CI 与重新截图。
 - 本轮开始时实机读取仍为 0.25.52（96）、原 Bundle ID、ProfileValidated=true；取得 11 个 Documents 文件的清单及 14 个偏好设置键的临时快照。私有快照不提交 Git。
 - 最终 [CI #113](https://github.com/xudadasf/RiffLoop/actions/runs/33945792459) / [IPA #90](https://github.com/xudadasf/RiffLoop/actions/runs/33946252956) 对应同一应用提交：127 项 Swift 测试全部通过（含最后的 PDF 静音跟谱拖动进度用例）。三模式截图复核通过；IPA 实际元数据/文档类型及安装 DryRun 通过。
-- Sideloadly 已识别 USB 设备，已依据设备原签名填写相同 Apple ID。覆盖安装停在密码认证，新账号实际安装和 Automatic Refresh 尚未完成验证。USB `device-check.ps1` 已增加 `--userspace`，新账号运行检查通过。
+- Sideloadly 已完成同账号覆盖安装、安装结果与 Automatic Refresh 数据库登记核验。USB 检查支持 `--userspace`；安装后进程启动、文件读取和截图成功。8 秒启动日志未见实际错误；脚本原先将 `-default` 中的 `fault` 误判为 FAULT，现按日志级别和明确崩溃标记匹配，原日志及正反例复核通过。独立 CoreDevice 前台启动服务不可用，不将其计为通过。
 - 微信分享、真实触控、主观听感、连续长时间练习不能用静态脚本通过替代；未测项目如实保留。
 
 候选包：[Release v0.25.53-rc.1](https://github.com/xudadasf/RiffLoop/releases/tag/v0.25.53-rc.1)。IPA SHA256：`D8F11DA16878D0AC5F862C5B681BCD7AC97D8EE05C9F1CF9A11ACE1710292C0D`。本机会话选择的包位于 `%LOCALAPPDATA%\Temp\riffloop-release-02553\output\release-0.25.53-build97-59f2325\`，与构建清单同目录；临时包缺失时从 Release 下载并重新校验。
