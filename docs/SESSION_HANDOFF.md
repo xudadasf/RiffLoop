@@ -55,3 +55,7 @@ Swift/Xcode 在 GitHub Actions 的 macOS 上编译测试，不在 Windows 安装
 候选包：[Release v0.25.53-rc.1](https://github.com/xudadasf/RiffLoop/releases/tag/v0.25.53-rc.1)。IPA SHA256：`D8F11DA16878D0AC5F862C5B681BCD7AC97D8EE05C9F1CF9A11ACE1710292C0D`。本机会话选择的包位于 `%LOCALAPPDATA%\Temp\riffloop-release-02553\output\release-0.25.53-build97-59f2325\`，与构建清单同目录；临时包缺失时从 Release 下载并重新校验。
 
 历史 0.25.51/0.25.52 已保存到 GitHub Releases，重新下载哈希一致。本机 `output` 递归清理及缩小范围后的单个测试缓存清理均被自动审批以 `blocked by policy` 拦截，仍保留约 264 MiB 输出；不要声称本地清理已完成。外部迁移备份不清理。详细过程见 [0.25.53 记录](releases/0.25.53.md)。
+
+## 最近一次本地缓存清理
+
+用户于 2026-09-05 再次要求执行清理。已核对约 1,215.3 MiB、47 个生成目标并补齐旧安装包远端归档；项目 output 和独立临时缓存的正常删除再次被自动审批拒绝，47 个目标仍存在，实际没有释放空间。源码、用户记录、设备快照与自动续签缓存保持原状。详见 [清理记录](LOCAL_CLEANUP.md)。
