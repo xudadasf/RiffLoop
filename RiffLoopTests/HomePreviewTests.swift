@@ -19,6 +19,7 @@ final class HomePreviewTests: XCTestCase {
         let root = try XCTUnwrap(Bundle.main.resourceURL?.appendingPathComponent("GpWeb"))
         web.loadFileURL(root.appendingPathComponent("preview.html"), allowingReadAccessTo: root)
         try await wait(web, "Boolean(window.renderPreview)")
+        let placeholder = try await web.takeSnapshot(configuration: nil)
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
         let base64 = try Data(contentsOf: url).base64EncodedString()
         _ = try await web.evaluateJavaScript("window.renderPreview('broken', 'Unsupported file')")
@@ -37,7 +38,14 @@ final class HomePreviewTests: XCTestCase {
         XCTAssertEqual(fits as? Bool, true, "Preview must fit the card without duplicate title or audio")
         // WK content is composited in another process. UIKit drawHierarchy can
         // return the initial placeholder even after the DOM has finished.
+        _ = try await web.evaluateJavaScript("""
+            window.previewPainted = false;
+            requestAnimationFrame(() => requestAnimationFrame(() => { window.previewPainted = true; }));
+            """)
+        try await wait(web, "window.previewPainted")
+        try await Task.sleep(for: .milliseconds(500))
         let snapshot = try await web.takeSnapshot(configuration: nil)
+        XCTAssertNotEqual(snapshot.pngData(), placeholder.pngData(), "A placeholder is not a rendered score preview")
         let attachment = XCTAttachment(image: snapshot)
         attachment.name = "GP opening thumbnail at actual card size"
         attachment.lifetime = .keepAlways
