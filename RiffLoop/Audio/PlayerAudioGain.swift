@@ -22,7 +22,8 @@ final class PlayerAudioGain {
     func setVolume(_ volume: Float, player: AVPlayer) {
         requestedGain = min(2, max(0, volume))
         player.volume = min(1, requestedGain)
-        for state in states { state.gain.withLock { $0 = max(1, requestedGain) } }
+        let boost = max(1, requestedGain)
+        for state in states { state.gain.withLock { $0 = boost } }
     }
 
     func attach(to item: AVPlayerItem, player: AVPlayer) {
@@ -37,7 +38,8 @@ final class PlayerAudioGain {
                 var parameters: [AVAudioMixInputParameters] = []
                 for track in tracks {
                     let state = AudioGainState()
-                    state.gain.withLock { $0 = max(1, self.requestedGain) }
+                    let boost = max(1, self.requestedGain)
+                    state.gain.withLock { $0 = boost }
                     let retained = Unmanaged.passRetained(state)
                     var callbacks = MTAudioProcessingTapCallbacks(
                         version: kMTAudioProcessingTapCallbacksVersion_0,

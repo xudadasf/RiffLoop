@@ -50,6 +50,11 @@ targets:
     platform: iOS
     sources:
       - path: RiffLoopTests
+        excludes:
+          - Fixtures
+      - path: RiffLoopTests/Fixtures
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: RiffLoop
     settings:

@@ -1,9 +1,20 @@
 import SwiftUI
 import UIKit
 
+@MainActor
+enum PracticeScreenAwakeCoordinator {
+    private static var owners = Set<UUID>()
+
+    static func setActive(_ active: Bool, owner: UUID) {
+        if active { owners.insert(owner) } else { owners.remove(owner) }
+        UIApplication.shared.isIdleTimerDisabled = !owners.isEmpty
+    }
+}
+
 private struct PracticeScreenAwake: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     @State private var visible = false
+    @State private var owner = UUID()
     let hasFile: Bool
 
     func body(content: Content) -> some View {
@@ -15,7 +26,7 @@ private struct PracticeScreenAwake: ViewModifier {
     }
 
     private func update() {
-        UIApplication.shared.isIdleTimerDisabled = visible && hasFile && scenePhase == .active
+        PracticeScreenAwakeCoordinator.setActive(visible && hasFile && scenePhase == .active, owner: owner)
     }
 }
 
