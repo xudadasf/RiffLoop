@@ -74,21 +74,12 @@ final class FullPageAudit: XCTestCase {
         requireTap(prefix == "pdf" ? "更换 PDF" : "选择文件")
         shot(prefix + "-library")
         if common {
-            if tap("修改 ", prefix: true) { shot("shared-rename"); requireTap("取消") }
-            if tap("删除 ", prefix: true) {
-                shot("shared-delete-confirmation")
-                if !tap("取消") {
-                    // iPad confirmation popovers dismiss by tapping outside;
-                    // do not activate the destructive confirmation button.
-                    let title = app.navigationBars["GP"].staticTexts["GP"]
-                    XCTAssertTrue(title.isHittable)
-                    title.tap()
-                }
-            }
-            if tap("导入") {
-                shot("shared-system-file-picker")
-                if !tap("取消") { _ = tap("Cancel") }
-            }
+            requireTap("更多：", prefix: true)
+            shot("shared-file-actions")
+            requireTap("修改显示名称")
+            shot("shared-rename")
+            XCTAssertTrue(app.buttons["保存"].isHittable)
+            requireTap("取消")
         }
         requireTap("关闭")
     }
@@ -105,11 +96,17 @@ final class FullPageAudit: XCTestCase {
     }
 
     func test01HomeAndGP() {
+        Thread.sleep(forTimeInterval: 4)
         shot("home-top")
+        let signing = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "查看续签方法")).firstMatch
+        XCTAssertTrue(signing.isHittable)
+        signing.tap()
+        shot("signing-help-top")
+        app.swipeUp(); shot("signing-help-bottom")
+        requireTap("关闭")
         app.swipeUp(); shot("home-bottom")
         if tap("查看全部") { shot("recent-projects"); home() }
         app.swipeDown()
-        if tap("查看续签方法") { shot("signing-help"); requireTap("关闭") }
 
         openMode("Guitar Pro 乐谱")
         shot("gp-main")
@@ -163,7 +160,19 @@ final class FullPageAudit: XCTestCase {
             shot("pdf-follow-recording")
             if tap("结束并保存记录") { shot("pdf-follow-recorded") }
         }
+        scrollPanel()
+        requireTap("重新记录")
+        Thread.sleep(forTimeInterval: 1)
+        shot("pdf-follow-replacement-draft")
+        requireTap("取消记录")
+        XCTAssertTrue(app.staticTexts["轨迹已保存 · 2 个位置点"].exists)
+        shot("pdf-follow-cancel-restored")
         scrollPanel(); shot("pdf-follow-bottom")
+        requireTap("删除轨迹")
+        shot("pdf-delete-track-confirmation")
+        // Cancel the iPad confirmation by tapping the visible page outside it.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.35)).tap()
+        XCTAssertTrue(app.staticTexts["轨迹已保存 · 2 个位置点"].exists)
         requireTap("完成")
         library("pdf")
         home()
@@ -195,7 +204,7 @@ final class FullPageAudit: XCTestCase {
         openMode("Guitar Pro 乐谱")
         requireTap("选择文件")
         Thread.sleep(forTimeInterval: 2)
-        requireTap("导入")
+        requireTap("导入文件")
         Thread.sleep(forTimeInterval: 6)
         shot("shared-system-file-picker")
         // Closing the disposable simulator app avoids any dependency on the
