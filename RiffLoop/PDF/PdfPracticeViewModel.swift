@@ -134,6 +134,13 @@ final class PdfPracticeViewModel: ObservableObject {
 
     @discardableResult
     func openPdf(at url: URL) -> Bool {
+        ReproductionStore.shared.capture(url, role: "pdf")
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.openPdf", details: ["url": String(describing: url.lastPathComponent)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard let document = PDFDocument(url: url), document.pageCount > 0 else {
             message = "PDF 无法打开，请重新选择文件。"
             return false
@@ -165,6 +172,13 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func bindAudio(at url: URL, restoringPosition: TimeInterval = 0) {
+        ReproductionStore.shared.capture(url, role: "pdf_audio")
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.bindAudio", details: ["url": String(describing: url.lastPathComponent), "restoringPosition": String(describing: restoringPosition)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pause()
         removeItemObservers()
         audioFileName = url.lastPathComponent
@@ -191,6 +205,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func removeAudio() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.removeAudio", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pause()
         resetAudioItem()
         pointA = nil
@@ -201,6 +221,12 @@ final class PdfPracticeViewModel: ObservableObject {
 
     @discardableResult
     func pdfWasDeleted(at url: URL) -> Bool {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pdfWasDeleted", details: ["url": String(describing: url.lastPathComponent)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard pdfFileName == url.lastPathComponent else { return false }
         transportGeneration &+= 1
         recordPracticeTime()
@@ -240,10 +266,22 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func togglePlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.togglePlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         isPlaying ? pause() : play()
     }
 
     func toggleReadingFollowPlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleReadingFollowPlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard
             hasUsableReadingTrack,
             let firstTime = readingPoints.map(\.time).min()
@@ -259,6 +297,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func stopReadingFollowPlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.stopReadingFollowPlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         stopFollowingOnly()
         if let firstTime = readingPoints.map(\.time).min() {
             applyReadingTarget(at: firstTime)
@@ -281,6 +325,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func toggleAudioPlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleAudioPlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard player.currentItem != nil else { return }
         isAudioPlaying ? pauseAudio() : startPlayback(
             audio: true,
@@ -289,6 +339,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func toggleMetronomePlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleMetronomePlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if isMetronomePlaying {
             metronomeEnabled = false
             pauseMetronome()
@@ -316,6 +372,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func play(includeCountIn: Bool = false) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.play", details: ["includeCountIn": String(describing: includeCountIn)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         startPlayback(
             audio: player.currentItem != nil,
             metronome: metronomeEnabled,
@@ -324,6 +386,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pause", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pendingAudioPlayback = nil
         readinessObserver = nil
         transportGeneration &+= 1
@@ -346,6 +414,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pauseAudio() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pauseAudio", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pendingAudioPlayback = nil
         transportGeneration &+= 1
         recordPracticeTime()
@@ -362,6 +436,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pauseMetronome() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pauseMetronome", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         recordPracticeTime()
         countInStopTask?.cancel()
         countInStopTask = nil
@@ -376,6 +456,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func stopAudio() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.stopAudio", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pauseAudio()
         let generation = transportGeneration
         player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) {
@@ -393,11 +479,23 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func stop() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.stop", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pause()
         seek(to: 0)
     }
 
     func seek(to seconds: TimeInterval) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.seek", details: ["seconds": String(describing: seconds)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         transportGeneration &+= 1
         isLoopTransitioning = false
         let generation = transportGeneration
@@ -438,16 +536,34 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setBeatOneAtAudioStart() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setBeatOneAtAudioStart", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         beatOffset = 0
         updateAudioSettings()
     }
 
     func setBeatOneAtCurrentPosition() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setBeatOneAtCurrentPosition", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         beatOffset = currentTime
         updateAudioSettings()
     }
 
     func setPointA() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setPointA", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pointA = currentTime
         if let pointB, pointB <= currentTime {
             self.pointB = nil
@@ -458,6 +574,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setPointB() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setPointB", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard pointA == nil || currentTime > (pointA ?? 0) else {
             message = "B 点必须晚于 A 点。"
             return
@@ -468,6 +590,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func updateAudioSettings() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.updateAudioSettings", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         let resumeAudio = isAudioPlaying
         let resumeMetronome = isMetronomePlaying
         let resumeReading = isReadingClockRunning
@@ -485,6 +613,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setPlaybackRate(_ rate: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setPlaybackRate", details: ["rate": String(describing: rate)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         playbackRate = min(max(rate, 0.25), 1.5)
         if speedLadderEnabled {
             speedLadderBaseRate = playbackRate
@@ -496,6 +630,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setMeter(beats: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setMeter", details: ["beats": String(describing: beats)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         beatsPerMeasure = min(max(beats, 1), 16)
         beatGrouping = [beatsPerMeasure]
         beatAccents = defaultBeatAccents(
@@ -506,6 +646,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setBeatGrouping(_ input: String) -> Bool {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setBeatGrouping", details: ["input": String(describing: input)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard let grouping = parseBeatGrouping(input, beatsPerMeasure: beatsPerMeasure) else {
             message = "拍子分组必须为正整数，并且总和等于每小节拍数。"
             return false
@@ -520,17 +666,35 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func cycleAccent(at index: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.cycleAccent", details: ["index": String(describing: index)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard beatAccents.indices.contains(index) else { return }
         beatAccents[index] = beatAccents[index].next
         updateAudioSettings()
     }
 
     func setLoopCountInEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setLoopCountInEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         loopCountInEnabled = enabled
         save()
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setSpeedLadderEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard speedLadderEnabled != enabled else { return }
         if enabled {
             speedLadderBaseRate = playbackRate
@@ -545,18 +709,36 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setSpeedLadderTarget(_ target: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setSpeedLadderTarget", details: ["target": String(describing: target)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         speedLadderTarget = min(max(target, playbackRate), 1.5)
         completedLoops = 0
         save()
     }
 
     func setLoopsPerSpeedStep(_ loops: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setLoopsPerSpeedStep", details: ["loops": String(describing: loops)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         loopsPerSpeedStep = min(max(loops, 1), 10)
         completedLoops = 0
         save()
     }
 
     func setSpeedLadderStep(_ step: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setSpeedLadderStep", details: ["step": String(describing: step)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         speedLadderStep = min(max(step, 0.01), 0.25)
         completedLoops = 0
         save()
@@ -588,6 +770,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func startReadingTrackRecording() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.startReadingTrackRecording", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard !isRecordingReadingTrack else { return }
         recordingOriginal = SavedReadingTrack(points: readingPoints, cue: readingStartCue, loopEnabled: followLoopEnabled)
         isAutoFollowing = false
@@ -611,6 +799,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func finishReadingTrackRecording() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.finishReadingTrackRecording", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard isRecordingReadingTrack else { return }
         captureReadingPoint(force: true)
         guard isUsablePdfReadingTrack(readingPoints) else {
@@ -628,6 +822,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func cancelReadingTrackRecording() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.cancelReadingTrackRecording", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard let original = recordingOriginal else { return }
         recordPracticeTime()
         readingPoints = original.points
@@ -643,6 +843,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func toggleAutoFollow() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleAutoFollow", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if isAutoFollowing {
             stopFollowingOnly()
             return
@@ -655,6 +861,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func startAutoFollowFromBeginning() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.startAutoFollowFromBeginning", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard
             hasUsableReadingTrack,
             let startTime = readingPoints.map(\.time).min()
@@ -666,12 +878,24 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func resumeAutoFollow() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.resumeAutoFollow", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         autoFollowSuspended = false
         message = nil
         updateAutoFollow()
     }
 
     func deleteReadingTrack() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.deleteReadingTrack", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard !isRecordingReadingTrack else { return }
         stopFollowingOnly()
         readingPoints = []
@@ -685,6 +909,12 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func setFollowLoopEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("pdf.setFollowLoopEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard !enabled || hasUsableReadingTrack else {
             message = "请先完成一条有效的跟谱轨迹。"
             return
@@ -1207,4 +1437,45 @@ final class PdfPracticeViewModel: ObservableObject {
     private func cmTime(_ seconds: TimeInterval) -> CMTime {
         CMTime(seconds: seconds, preferredTimescale: 1_000_000_000)
     }
+    func reproductionSnapshot() {
+        let store = ReproductionStore.shared
+        var state: [String: String] = [:]
+        state["pdf.pdfFileName"] = store.encoded(pdfFileName)
+        state["pdf.audioFileName"] = store.encoded(audioFileName)
+        state["pdf.pageIndex"] = store.encoded(pageIndex)
+        state["pdf.pageCount"] = store.encoded(pageCount)
+        state["pdf.scaleFactor"] = store.encoded(scaleFactor)
+        state["pdf.verticalProgress"] = store.encoded(verticalProgress)
+        state["pdf.isAudioPlaying"] = store.encoded(isAudioPlaying)
+        state["pdf.isMetronomePlaying"] = store.encoded(isMetronomePlaying)
+        state["pdf.currentTime"] = store.encoded(currentTime)
+        state["pdf.duration"] = store.encoded(duration)
+        state["pdf.playbackRate"] = store.encoded(playbackRate)
+        state["pdf.audioVolume"] = store.encoded(audioVolume)
+        state["pdf.bpm"] = store.encoded(bpm)
+        state["pdf.beatOffset"] = store.encoded(beatOffset)
+        state["pdf.synchronizationOffset"] = store.encoded(synchronizationOffset)
+        state["pdf.metronomeEnabled"] = store.encoded(metronomeEnabled)
+        state["pdf.metronomeVolume"] = store.encoded(metronomeVolume)
+        state["pdf.subdivision"] = store.encoded(subdivision)
+        state["pdf.beatsPerMeasure"] = store.encoded(beatsPerMeasure)
+        state["pdf.beatGrouping"] = store.encoded(beatGrouping)
+        state["pdf.beatAccents"] = store.encoded(beatAccents)
+        state["pdf.rhythmMode"] = store.encoded(rhythmMode)
+        state["pdf.pointA"] = store.encoded(pointA)
+        state["pdf.pointB"] = store.encoded(pointB)
+        state["pdf.loopEnabled"] = store.encoded(loopEnabled)
+        state["pdf.loopCountInEnabled"] = store.encoded(loopCountInEnabled)
+        state["pdf.speedLadderEnabled"] = store.encoded(speedLadderEnabled)
+        state["pdf.speedLadderTarget"] = store.encoded(speedLadderTarget)
+        state["pdf.loopsPerSpeedStep"] = store.encoded(loopsPerSpeedStep)
+        state["pdf.speedLadderStep"] = store.encoded(speedLadderStep)
+        state["pdf.isRecordingReadingTrack"] = store.encoded(isRecordingReadingTrack)
+        state["pdf.isAutoFollowing"] = store.encoded(isAutoFollowing)
+        state["pdf.autoFollowSuspended"] = store.encoded(autoFollowSuspended)
+        state["pdf.followLoopEnabled"] = store.encoded(followLoopEnabled)
+        state["pdf.message"] = store.encoded(message)
+        store.update(state)
+    }
+
 }

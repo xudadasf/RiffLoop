@@ -9,7 +9,7 @@ const documentLibrary = read("RiffLoop/Library/DocumentLibraryView.swift");
 
 assert.match(
     pdfView,
-    /ContentUnavailableView\s*\{[\s\S]*?选择 PDF 开始练习[\s\S]*?\}\s*actions:\s*\{[\s\S]*?Button\("选择或导入 PDF"\)\s*\{\s*pdfLibraryPresented = true/,
+    /ContentUnavailableView\s*\{[\s\S]*?选择 PDF 开始练习[\s\S]*?\}\s*actions:\s*\{[\s\S]*?Button\("选择或导入 PDF"\)\s*\{[^}]*?pdfLibraryPresented = true/,
     "the empty PDF page must expose a visible choose/import action"
 );
 assert.match(

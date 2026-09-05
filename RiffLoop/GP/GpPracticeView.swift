@@ -87,6 +87,25 @@ struct GpPracticeView: View {
                 controlDeck
             }
             .animation(.snappy, value: activePanel)
+            .onAppear {
+                ReproductionStore.shared.update(["screen": "gp", "panel": "none"])
+                ReproductionStore.shared.record("action", "gp.open")
+            }
+            .onChange(of: activePanel) { _, panel in
+                ReproductionStore.shared.update(["panel": String(describing: panel)])
+                ReproductionStore.shared.record("action", "gp.panel", ["panel": String(describing: panel)])
+            }
+            .task {
+                while !Task.isCancelled {
+                    viewModel.reproductionSnapshot()
+                    ReproductionStore.shared.record("sample", "gp.state")
+                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
+                }
+            }
+            .onChange(of: isLibraryPresented) { _, visible in
+                ReproductionStore.shared.update(["library": String(visible)])
+                ReproductionStore.shared.record("action", "gp.isLibraryPresented", ["visible": String(visible)])
+            }
             .navigationTitle(gpTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -107,7 +126,7 @@ struct GpPracticeView: View {
                         .accessibilityLabel("放大谱面")
                     }
                     .disabled(viewModel.score == nil)
-                    Button { isLibraryPresented = true } label: {
+                    Button { ReproductionStore.shared.record("action", "gp.tap_files", ["target": "isLibraryPresented"]); isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
                     }
                 }
@@ -279,6 +298,7 @@ struct GpPracticeView: View {
         detail: String
     ) -> some View {
         Button {
+            ReproductionStore.shared.record("action", "gp.tap_panel", ["target": String(describing: panel)])
             activePanel = activePanel == panel ? nil : panel
         } label: {
             VStack(alignment: .leading, spacing: 5) {
@@ -706,6 +726,7 @@ struct GpPracticeView: View {
     }
 
     private func importScore(from url: URL) {
+        ReproductionStore.shared.record("action", "gp.select_file", ["file": url.lastPathComponent])
         do {
             currentFileName = url.lastPathComponent
             viewModel.loadScore(data: try Data(contentsOf: url), fileName: url.lastPathComponent)

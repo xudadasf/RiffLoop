@@ -24,6 +24,8 @@ final class DocumentLibraryModel: ObservableObject {
     }
 
     func refresh() {
+        let operation = ReproductionRecorder.shared.begin("library.refresh", details: ["kind": kind.rawValue])
+        defer { ReproductionRecorder.shared.end(operation, result: errorMessage ?? "completed") }
         do {
             files = try store.files(for: kind)
             errorMessage = nil
@@ -34,6 +36,8 @@ final class DocumentLibraryModel: ObservableObject {
 
     @discardableResult
     func importExternalFile(_ sourceURL: URL) -> URL? {
+        let operation = ReproductionRecorder.shared.begin("library.importExternalFile", details: ["kind": kind.rawValue, "file": sourceURL.lastPathComponent])
+        defer { ReproductionRecorder.shared.end(operation, result: errorMessage ?? "completed") }
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
 
@@ -49,6 +53,8 @@ final class DocumentLibraryModel: ObservableObject {
 
     @discardableResult
     func deleteFile(_ fileURL: URL) -> Bool {
+        let operation = ReproductionRecorder.shared.begin("library.deleteFile", details: ["kind": kind.rawValue, "file": fileURL.lastPathComponent])
+        defer { ReproductionRecorder.shared.end(operation, result: errorMessage ?? "completed") }
         do {
             try store.deleteFile(fileURL, for: kind)
             settingsStore.remove(kind: kind, fileName: fileURL.lastPathComponent)
@@ -102,6 +108,7 @@ struct DocumentLibraryView: View {
                     List(model.files, id: \.path) { fileURL in
                         HStack(spacing: 12) {
                             Button {
+                                ReproductionStore.shared.record("action", "library.select", ["kind": model.kind.rawValue, "file": fileURL.lastPathComponent])
                                 onSelect(fileURL)
                                 dismiss()
                             } label: {
@@ -153,6 +160,9 @@ struct DocumentLibraryView: View {
                     }
                 }
             }
+        }
+        .onChange(of: isImporterPresented) { _, shown in
+            ReproductionStore.shared.record("action", "library.importer", ["visible": String(shown), "kind": model.kind.rawValue])
         }
         .fileImporter(
             isPresented: $isImporterPresented,

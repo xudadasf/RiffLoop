@@ -8,6 +8,7 @@ struct HomeView: View {
     @EnvironmentObject private var displayNames: DocumentDisplayNameStore
     @StateObject private var practiceHistory = PracticeHistoryStore.shared
     @State private var signingStatus = SigningStatusSnapshot.current()
+    @State private var diagnosticsPresented = false
     @State private var isSigningHelpPresented = false
     @State private var externalDocuments: [ExternalDocument] = []
     @State private var importError: String?
@@ -20,6 +21,9 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     welcomeHeader
                     signingStatusCard
+                    Button { diagnosticsPresented = true } label: {
+                        Label("异常复现记录", systemImage: "waveform.path.ecg")
+                    }.accessibilityIdentifier("diagnostics.open")
                     continuePracticeCard
 
                     ViewThatFits(in: .horizontal) {
@@ -46,7 +50,12 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .onAppear(perform: refreshSigningStatus)
+            .onAppear {
+                refreshSigningStatus()
+                ReproductionStore.shared.update(["screen": "home", "panel": "none", "library": "false"])
+                ReproductionStore.shared.record("action", "home.open")
+            }
+            .sheet(isPresented: $diagnosticsPresented) { ReproductionView() }
             .navigationDestination(for: ExternalDocument.self) { document in
                 switch document.kind {
                 case .video: PracticeView(initialURL: document.url)

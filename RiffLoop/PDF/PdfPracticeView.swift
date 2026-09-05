@@ -66,7 +66,7 @@ struct PdfPracticeView: View {
                 } description: {
                     Text("从 RiffLoop 的 PDF 文件库选择，或从 Files 导入新文件。")
                 } actions: {
-                    Button("选择或导入 PDF") { pdfLibraryPresented = true }
+                    Button("选择或导入 PDF") { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "pdfLibraryPresented"]); pdfLibraryPresented = true }
                         .buttonStyle(.borderedProminent)
                 }
             }
@@ -93,11 +93,34 @@ struct PdfPracticeView: View {
             }
         }
         .animation(.snappy, value: activePanel)
+            .onAppear {
+                ReproductionStore.shared.update(["screen": "pdf", "panel": "none"])
+                ReproductionStore.shared.record("action", "pdf.open")
+            }
+            .onChange(of: activePanel) { _, panel in
+                ReproductionStore.shared.update(["panel": String(describing: panel)])
+                ReproductionStore.shared.record("action", "pdf.panel", ["panel": String(describing: panel)])
+            }
+            .task {
+                while !Task.isCancelled {
+                    viewModel.reproductionSnapshot()
+                    ReproductionStore.shared.record("sample", "pdf.state")
+                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
+                }
+            }
+            .onChange(of: pdfLibraryPresented) { _, visible in
+                ReproductionStore.shared.update(["library": String(visible)])
+                ReproductionStore.shared.record("action", "pdf.pdfLibraryPresented", ["visible": String(visible)])
+            }
+            .onChange(of: audioLibraryPresented) { _, visible in
+                ReproductionStore.shared.update(["library": String(visible)])
+                ReproductionStore.shared.record("action", "pdf.audioLibraryPresented", ["visible": String(visible)])
+            }
         .navigationTitle(pdfTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button { pdfLibraryPresented = true } label: {
+                Button { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "pdfLibraryPresented"]); pdfLibraryPresented = true } label: {
                     Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
                 }
             }
@@ -281,6 +304,7 @@ struct PdfPracticeView: View {
         detail: String
     ) -> some View {
         Button {
+            ReproductionStore.shared.record("action", "pdf.tap_panel", ["target": String(describing: panel)])
             activePanel = activePanel == panel ? nil : panel
         } label: {
             VStack(alignment: .leading, spacing: 5) {
@@ -352,7 +376,7 @@ struct PdfPracticeView: View {
                     Button(viewModel.isAudioPlaying ? "暂停伴奏" : "播放伴奏", action: viewModel.toggleAudioPlayback)
                         .buttonStyle(.borderedProminent)
                     Button("停止伴奏", action: viewModel.stopAudio)
-                    Button("更换", action: { audioLibraryPresented = true })
+                    Button("更换", action: { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "audioLibraryPresented"]); audioLibraryPresented = true })
                 }
                 Text("伴奏速度").font(.subheadline.weight(.semibold))
             Picker("速度", selection: Binding(
@@ -380,7 +404,7 @@ struct PdfPracticeView: View {
                 Text("未选择伴奏，节拍器仍可独立使用。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("选择伴奏") { audioLibraryPresented = true }
+                Button("选择伴奏") { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "audioLibraryPresented"]); audioLibraryPresented = true }
             }
         }
     }

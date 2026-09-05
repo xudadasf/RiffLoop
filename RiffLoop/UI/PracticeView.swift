@@ -84,12 +84,31 @@ struct PracticeView: View {
                 controlDeck
             }
             .animation(.snappy, value: activePanel)
+            .onAppear {
+                ReproductionStore.shared.update(["screen": "video", "panel": "none"])
+                ReproductionStore.shared.record("action", "video.open")
+            }
+            .onChange(of: activePanel) { _, panel in
+                ReproductionStore.shared.update(["panel": String(describing: panel)])
+                ReproductionStore.shared.record("action", "video.panel", ["panel": String(describing: panel)])
+            }
+            .task {
+                while !Task.isCancelled {
+                    viewModel.reproductionSnapshot()
+                    ReproductionStore.shared.record("sample", "video.state")
+                    do { try await Task.sleep(for: .seconds(1)) } catch { break }
+                }
+            }
+            .onChange(of: isLibraryPresented) { _, visible in
+                ReproductionStore.shared.update(["library": String(visible)])
+                ReproductionStore.shared.record("action", "video.isLibraryPresented", ["visible": String(visible)])
+            }
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(videoTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button { isLibraryPresented = true } label: {
+                    Button { ReproductionStore.shared.record("action", "video.tap_files", ["target": "isLibraryPresented"]); isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
                     }
                 }
@@ -225,6 +244,7 @@ struct PracticeView: View {
         detail: String
     ) -> some View {
         Button {
+            ReproductionStore.shared.record("action", "video.tap_panel", ["target": String(describing: panel)])
             activePanel = activePanel == panel ? nil : panel
         } label: {
             VStack(alignment: .leading, spacing: 5) {
@@ -482,7 +502,7 @@ struct PracticeView: View {
                     Text("选择视频开始练习")
                         .font(.title2.weight(.semibold))
                     Button("选择视频") {
-                        isLibraryPresented = true
+                        ReproductionStore.shared.record("action", "video.tap_files", ["target": "isLibraryPresented"]); isLibraryPresented = true
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
@@ -525,7 +545,7 @@ struct PracticeView: View {
 
     private var transportControls: some View {
         HStack(spacing: 16) {
-            Button("选择文件") { isLibraryPresented = true }
+            Button("选择文件") { ReproductionStore.shared.record("action", "video.tap_files", ["target": "isLibraryPresented"]); isLibraryPresented = true }
                 .buttonStyle(.bordered)
 
             Button { viewModel.skip(by: -10) } label: {

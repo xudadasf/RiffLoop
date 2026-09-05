@@ -87,6 +87,7 @@ final class GpWebViewModel: ObservableObject {
         )
     }
 
+    private var reproductionLoad: String?
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
     private var didSendSoundFont = false
@@ -110,6 +111,17 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        if let previous = reproductionLoad { ReproductionRecorder.shared.end(previous, result: "superseded_by_file_switch") }
+        reproductionLoad = ReproductionRecorder.shared.begin("gp.load_until_player_ready", details: ["file": fileName])
+        ReproductionStore.shared.update(["gp.loadID": reproductionLoad ?? ""])
+        let input = RiffLoopDocumentStore().folderURL(for: .guitarPro).appendingPathComponent(fileName)
+        ReproductionStore.shared.capture(input, role: "gp", loadedData: data)
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.loadScore", details: ["data": String(describing: data.count), "fileName": String(describing: fileName)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if rendererReady { pause() }
         updatePracticeClock(isPlaying: false)
         saveProfile()
@@ -160,10 +172,22 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func togglePlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.togglePlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         call("playPause")
     }
 
     func pause() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.pause", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         nativeBackingPlayer.pause()
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
@@ -171,6 +195,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func stop() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.stop", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         nativeBackingPlayer.pause()
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
@@ -178,10 +208,22 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func seek(to tick: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.seek", details: ["tick": String(describing: tick)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         call("seekTick", arguments: [tick])
     }
 
     func setPlaybackSpeed(_ speed: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setPlaybackSpeed", details: ["speed": String(describing: speed)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         playbackSpeed = min(max(speed, 0.5), 1.5)
         if speedLadderEnabled {
             speedLadderBaseSpeed = playbackSpeed
@@ -194,12 +236,24 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setScoreZoom(_ value: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setScoreZoom", details: ["value": String(describing: value)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         scoreZoom = value.isFinite ? min(max((value * 10).rounded() / 10, 0.8), 1.5) : 1
         call("setScoreZoom", arguments: [scoreZoom])
         saveProfile()
     }
 
     func setBaseBpm(_ bpm: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setBaseBpm", details: ["bpm": String(describing: bpm)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         baseBpm = min(max(bpm.rounded(), customBpmRange.lowerBound), customBpmRange.upperBound)
         completedLoops = 0
         applyEffectivePlaybackSpeed()
@@ -207,6 +261,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func resetBaseBpm() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.resetBaseBpm", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         baseBpm = originalBaseBpm
         completedLoops = 0
         applyEffectivePlaybackSpeed()
@@ -214,18 +274,36 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func showTracks(_ indices: [Int]) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.showTracks", details: ["indices": String(describing: indices)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if let first = indices.first { displayedTrack = first }
         call("showTracks", arguments: [indices])
         saveProfile()
     }
 
     func setTrackMute(index: Int, muted: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setTrackMute", details: ["index": String(describing: index), "muted": String(describing: muted)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if muted { mutedTracks.insert(index) } else { mutedTracks.remove(index) }
         call("setTrackMute", arguments: [index, muted])
         saveProfile()
     }
 
     func setTrackSolo(index: Int, solo: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setTrackSolo", details: ["index": String(describing: index), "solo": String(describing: solo)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if solo {
             if let previous = soloTrack, previous != index {
                 call("setTrackSolo", arguments: [previous, false])
@@ -239,18 +317,36 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setTrackVolume(index: Int, volume: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setTrackVolume", details: ["index": String(describing: index), "volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         trackVolumes[index] = min(max(volume, 0), 2)
         call("setTrackVolume", arguments: [index, trackVolumes[index] ?? 1])
         saveProfile()
     }
 
     func setMasterVolume(_ volume: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setMasterVolume", details: ["volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         masterVolume = min(max(volume, 0), 2)
         call("setMasterVolume", arguments: [masterVolume])
         saveProfile()
     }
 
     func setBackingVolume(_ volume: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setBackingVolume", details: ["volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         backingVolume = min(max(volume, 0), 2)
         nativeBackingPlayer.setVolume(backingVolume)
         call("setBackingVolume", arguments: [backingVolume])
@@ -258,12 +354,24 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSynthEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSynthEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         synthEnabled = enabled
         call("setSynthEnabled", arguments: [enabled])
         saveProfile()
     }
 
     func setBackingEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setBackingEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         backingEnabled = enabled
         if !enabled {
             nativeBackingPlayer.pause()
@@ -275,12 +383,24 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setMetronomeVolume(_ volume: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setMetronomeVolume", details: ["volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         metronomeVolume = min(max(volume, 0), 3)
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
         saveProfile()
     }
 
     func setMetronomeEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setMetronomeEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         metronomeEnabled = enabled
         if enabled, metronomeVolume == 0 { metronomeVolume = 0.85 }
         call("setMetronomeVolume", arguments: [enabled ? metronomeVolume : 0])
@@ -288,12 +408,24 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setCountInVolume(_ volume: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setCountInVolume", details: ["volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         countInVolume = min(max(volume, 0), 2)
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
 
     func setCountInEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setCountInEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         countInEnabled = enabled
         if enabled, countInVolume == 0 { countInVolume = 0.85 }
         call("setCountInVolume", arguments: [effectiveCountInVolume])
@@ -301,6 +433,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setMetronomeSubdivisionFactor(_ factor: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setMetronomeSubdivisionFactor", details: ["factor": String(describing: factor)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard [1, 2, 4, 8].contains(factor), factor != metronomeSubdivisionFactor else { return }
         metronomeSubdivisionFactor = factor
         playerReady = false
@@ -309,6 +447,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func cycleBeatAccent(at index: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.cycleBeatAccent", details: ["index": String(describing: index)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard beatAccents.indices.contains(index) else { return }
         beatAccents[index] = beatAccents[index].next
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue), true])
@@ -316,6 +460,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setRangeLoopingEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setRangeLoopingEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard loopRange != nil else { return }
         if !enabled { restoreSpeedBeforeLadder() }
         rangeLoopingEnabled = enabled
@@ -327,6 +477,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setWholeSongLoopingEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setWholeSongLoopingEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if enabled { restoreSpeedBeforeLadder() }
         wholeSongLoopingEnabled = enabled
         if enabled { rangeLoopingEnabled = false }
@@ -337,6 +493,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setLoopCountInEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setLoopCountInEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         loopCountInEnabled = enabled
         if enabled, countInVolume == 0 { countInVolume = 0.85 }
         call("setLoopCountInEnabled", arguments: [enabled])
@@ -345,6 +507,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSpeedLadderEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard speedLadderEnabled != enabled else { return }
         if enabled {
             speedLadderBaseSpeed = playbackSpeed
@@ -358,24 +526,48 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSpeedLadderTarget(_ target: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSpeedLadderTarget", details: ["target": String(describing: target)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         speedLadderTarget = min(max(target, playbackSpeed), 1.5)
         completedLoops = 0
         saveProfile()
     }
 
     func setLoopsPerSpeedStep(_ loops: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setLoopsPerSpeedStep", details: ["loops": String(describing: loops)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         loopsPerSpeedStep = min(max(loops, 1), 10)
         completedLoops = 0
         saveProfile()
     }
 
     func setSpeedLadderStep(_ step: Double) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSpeedLadderStep", details: ["step": String(describing: step)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         speedLadderStep = min(max(step, 0.01), 0.25)
         completedLoops = 0
         saveProfile()
     }
 
     func clearLoop() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.clearLoop", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         restoreSpeedBeforeLadder()
         loopRange = nil
         loopPreview = nil
@@ -388,6 +580,12 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSceneActive(_ isActive: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSceneActive", details: ["isActive": String(describing: isActive)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         if !isActive {
             nativeBackingPlayer.pause()
             nativeBackingPlaybackRequested = false
@@ -400,10 +598,22 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func dismissError() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.dismissError", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         errorMessage = nil
     }
 
     func reportImportError(_ error: Error) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("gp.reportImportError", details: ["error": String(describing: error)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         errorMessage = "GP 导入失败：\(error.localizedDescription)"
     }
 
@@ -427,6 +637,8 @@ final class GpWebViewModel: ObservableObject {
         case let .renderFinished(metrics):
             renderMetrics = metrics
         case .playerReady:
+            if let operation = reproductionLoad { ReproductionRecorder.shared.end(operation, result: "player_ready_observed; correlate bridge generation") }
+            reproductionLoad = nil
             playerReady = true
             // MIDI/player replacement can reset settings after scoreLoaded.
             applyPlayerSettings()
@@ -523,6 +735,9 @@ final class GpWebViewModel: ObservableObject {
                 "[DEBUG-gp-audio-56] \(diagnosticLine)"
             )
         case let .error(message):
+            ReproductionStore.shared.record("incident", "gp.error", ["message": message])
+            if let operation = reproductionLoad { ReproductionRecorder.shared.end(operation, result: "error: " + message) }
+            reproductionLoad = nil
             errorMessage = message
         }
     }
@@ -911,7 +1126,14 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func call(_ function: String, arguments: [Any] = []) {
-        guard let webView else { return }
+        // Binary load arguments are already preserved as material snapshots; never duplicate base64 in the journal.
+        let safeArguments = function == "loadScore" || function == "loadSoundFont"
+            ? "binary omitted; see materials" : String(describing: arguments)
+        let operation = ReproductionRecorder.shared.begin("gp.command." + function, details: ["arguments": safeArguments, "loadID": reproductionLoad ?? "none"])
+        guard let webView else {
+            ReproductionRecorder.shared.end(operation, result: "not_dispatched: webview_missing")
+            return
+        }
 
         do {
             let data = try JSONSerialization.data(withJSONObject: arguments)
@@ -941,6 +1163,7 @@ final class GpWebViewModel: ObservableObject {
                 })()
                 """
             webView.evaluateJavaScript(script) { [weak self] result, error in
+                ReproductionRecorder.shared.end(operation, result: error?.localizedDescription ?? String(describing: result))
                 Task { @MainActor [weak self] in
                     if let error {
                         self?.errorMessage = "GP 命令 \(function) 执行失败：\(error.localizedDescription)"
@@ -955,7 +1178,47 @@ final class GpWebViewModel: ObservableObject {
                 }
             }
         } catch {
+            ReproductionRecorder.shared.end(operation, result: "encoding_failed: " + error.localizedDescription)
             errorMessage = "GP 命令 \(function) 编码失败：\(error.localizedDescription)"
         }
     }
+    func reproductionSnapshot() {
+        let store = ReproductionStore.shared
+        var state: [String: String] = [:]
+        state["gp.rendererReady"] = store.encoded(rendererReady)
+        state["gp.playerReady"] = store.encoded(playerReady)
+        state["gp.currentFileName"] = store.encoded(currentFileName)
+        state["gp.position"] = store.encoded(position)
+        state["gp.isPlaying"] = store.encoded(isPlaying)
+        state["gp.scoreZoom"] = store.encoded(scoreZoom)
+        state["gp.playbackSpeed"] = store.encoded(playbackSpeed)
+        state["gp.baseBpm"] = store.encoded(baseBpm)
+        state["gp.displayedTrack"] = store.encoded(displayedTrack)
+        state["gp.mutedTracks"] = store.encoded(mutedTracks)
+        state["gp.soloTrack"] = store.encoded(soloTrack)
+        state["gp.trackVolumes"] = store.encoded(trackVolumes)
+        state["gp.masterVolume"] = store.encoded(masterVolume)
+        state["gp.backingVolume"] = store.encoded(backingVolume)
+        state["gp.synthEnabled"] = store.encoded(synthEnabled)
+        state["gp.backingEnabled"] = store.encoded(backingEnabled)
+        state["gp.metronomeEnabled"] = store.encoded(metronomeEnabled)
+        state["gp.metronomeVolume"] = store.encoded(metronomeVolume)
+        state["gp.countInEnabled"] = store.encoded(countInEnabled)
+        state["gp.countInVolume"] = store.encoded(countInVolume)
+        state["gp.metronomeSubdivisionFactor"] = store.encoded(metronomeSubdivisionFactor)
+        state["gp.beatAccents"] = store.encoded(beatAccents)
+        state["gp.loopRange"] = store.encoded(loopRange)
+        state["gp.loopPreview"] = store.encoded(loopPreview)
+        state["gp.rangeLoopingEnabled"] = store.encoded(rangeLoopingEnabled)
+        state["gp.wholeSongLoopingEnabled"] = store.encoded(wholeSongLoopingEnabled)
+        state["gp.loopCountInEnabled"] = store.encoded(loopCountInEnabled)
+        state["gp.speedLadderEnabled"] = store.encoded(speedLadderEnabled)
+        state["gp.speedLadderTarget"] = store.encoded(speedLadderTarget)
+        state["gp.loopsPerSpeedStep"] = store.encoded(loopsPerSpeedStep)
+        state["gp.speedLadderStep"] = store.encoded(speedLadderStep)
+        state["gp.completedLoops"] = store.encoded(completedLoops)
+        state["gp.errorMessage"] = store.encoded(errorMessage)
+        store.update(state)
+    }
+
 }

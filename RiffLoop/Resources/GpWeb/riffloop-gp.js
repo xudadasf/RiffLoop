@@ -6,12 +6,27 @@
     const scoreFollowOffset = (height) => -Math.round(Math.max(0, Number(height) || 0) * 0.42);
     const LONG_PRESS_MILLISECONDS = 600;
     const POSITION_POST_INTERVAL_MILLISECONDS = 50;
+    let reproductionGeneration = 0;
     const post = (event, payload) => {
         const handler = window.webkit?.messageHandlers?.riffloop;
         if (handler) {
-            handler.postMessage(payload === undefined ? { event } : { event, payload });
+            handler.postMessage({ event, ...(payload === undefined ? {} : { payload }), observedLoadGeneration: reproductionGeneration, javascriptMilliseconds: performance.now() });
         }
     };
+    window.addEventListener("error", (event) => {
+        post("reproductionError", { type: "error", message: String(event.message), file: event.filename, line: event.lineno, stack: String(event.error?.stack || "") });
+    });
+    window.addEventListener("unhandledrejection", (event) => {
+        post("reproductionError", { type: "unhandledrejection", message: String(event.reason?.stack || event.reason) });
+    });
+    let reproductionScrollTimer;
+    viewportElement.addEventListener("scroll", () => {
+        clearTimeout(reproductionScrollTimer);
+        reproductionScrollTimer = setTimeout(() => post("reproductionViewport", {
+            top: viewportElement.scrollTop, left: viewportElement.scrollLeft,
+            width: viewportElement.clientWidth, height: viewportElement.clientHeight
+        }), 250);
+    }, { passive: true });
     const errorMessage = (error) => error?.message || String(error);
     const usesNativeBacking = Boolean(window.webkit?.messageHandlers?.riffloop);
 
@@ -1288,6 +1303,8 @@
             }
         },
         loadScore(base64) {
+            reproductionGeneration += 1;
+            post("reproductionLoad", { base64Characters: base64.length });
             try {
                 zoomAnchor = null;
                 rangeCountInRestarter.cancel();

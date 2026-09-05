@@ -13,7 +13,9 @@ struct FilePracticeSettingsStore {
         kind: PracticeKind,
         fileName: String
     ) throws {
-        defaults.set(try JSONEncoder().encode(value), forKey: key(kind: kind, fileName: fileName))
+        let data = try JSONEncoder().encode(value)
+        ReproductionStore.shared.record("state", "profile.saved", ["kind": kind.rawValue, "file": fileName, "profile": String(decoding: data, as: UTF8.self)])
+        defaults.set(data, forKey: key(kind: kind, fileName: fileName))
     }
 
     func load<Value: Decodable>(
@@ -22,8 +24,10 @@ struct FilePracticeSettingsStore {
         fileName: String
     ) throws -> Value? {
         guard let data = defaults.data(forKey: key(kind: kind, fileName: fileName)) else {
+            ReproductionStore.shared.record("state", "profile.default", ["kind": kind.rawValue, "file": fileName])
             return nil
         }
+        ReproductionStore.shared.record("state", "profile.restored", ["kind": kind.rawValue, "file": fileName, "profile": String(decoding: data, as: UTF8.self)])
         return try JSONDecoder().decode(type, from: data)
     }
 

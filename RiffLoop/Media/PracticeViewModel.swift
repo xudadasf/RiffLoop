@@ -79,6 +79,13 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func openMedia(at url: URL) {
+        ReproductionStore.shared.capture(url, role: "video")
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.openMedia", details: ["url": String(describing: url.lastPathComponent)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pause()
         currentFileName = url.lastPathComponent
         let profile = (try? settingsStore.load(
@@ -126,15 +133,33 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func dismissError() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.dismissError", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         errorMessage = nil
     }
 
     func togglePlayback() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.togglePlayback", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard hasMedia else { return }
         isPlaying ? pause() : preparePlaybackAndStart(at: currentTime)
     }
 
     func pause() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.pause", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         startWhenMediaReady = false
         recordPracticeTime()
         if pendingSeekTime == nil, isPlaying {
@@ -155,6 +180,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func seek(to seconds: TimeInterval) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.seek", details: ["seconds": String(describing: seconds)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard hasMedia else { return }
         let target = duration > 0 ? min(max(seconds, 0), duration) : max(seconds, 0)
         let wasPlaying = isPlaying
@@ -194,12 +225,24 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setBeatOne() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setBeatOne", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         beatOffset = currentTime
         saveProfile()
         restartAfterTimingChange()
     }
 
     func setPointA() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setPointA", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pointA = loopPoint(from: currentTime)
         normalizeLoopPointsAfterSettingA()
         rebuildLoopBoundaryObserver()
@@ -207,6 +250,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setPointB() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setPointB", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         let point = loopPoint(from: currentTime)
         guard pointA == nil || point > (pointA ?? 0) else {
             errorMessage = "B 点必须晚于 A 点。"
@@ -218,6 +267,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setLoopEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setLoopEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard !enabled || validLoopRange != nil else {
             errorMessage = "请先设置 A 点和 B 点。"
             loopEnabled = false
@@ -234,6 +289,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func applyTimingSettings() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.applyTimingSettings", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         bpm = min(max(bpm, 30), 300)
         beatsPerMeasure = min(max(beatsPerMeasure, 1), 16)
         if ![2, 4, 8, 16].contains(beatUnit) { beatUnit = 4 }
@@ -256,6 +317,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setPlaybackRate(_ rate: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setPlaybackRate", details: ["rate": String(describing: rate)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         playbackRate = min(max(rate, 0.25), 1.5)
         if speedLadderEnabled {
             speedLadderBaseRate = playbackRate
@@ -268,23 +335,47 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setMediaVolume(_ volume: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setMediaVolume", details: ["volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         mediaVolume = min(max(volume, 0), 2)
         audioGain.setVolume(mediaVolume, player: player)
         saveProfile()
     }
 
     func setMetronomeVolume(_ volume: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setMetronomeVolume", details: ["volume": String(describing: volume)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         metronomeVolume = min(max(volume, 0), 2)
         saveProfile()
         restartAfterTimingChange()
     }
 
     func setLoopCountInEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setLoopCountInEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         loopCountInEnabled = enabled
         saveProfile()
     }
 
     func setSnapLoopPointsToBeat(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setSnapLoopPointsToBeat", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         snapLoopPointsToBeat = enabled
         if enabled {
             pointA = pointA.map { snapToNearestBeat($0, beatOffset: beatOffset, bpm: bpm) }
@@ -296,6 +387,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setSpeedLadderEnabled", details: ["enabled": String(describing: enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard speedLadderEnabled != enabled else { return }
         if enabled {
             speedLadderBaseRate = playbackRate
@@ -313,36 +410,72 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setSpeedLadderTarget(_ target: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setSpeedLadderTarget", details: ["target": String(describing: target)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         speedLadderTarget = min(max(target, minimumSpeedLadderTarget), 1.5)
         completedLoops = 0
         saveProfile()
     }
 
     func setLoopsPerSpeedStep(_ loops: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setLoopsPerSpeedStep", details: ["loops": String(describing: loops)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         loopsPerSpeedStep = min(max(loops, 1), 10)
         completedLoops = 0
         saveProfile()
     }
 
     func setSpeedLadderStep(_ step: Float) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setSpeedLadderStep", details: ["step": String(describing: step)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         speedLadderStep = min(max(step, 0.01), 0.25)
         completedLoops = 0
         saveProfile()
     }
 
     func adjustSynchronization(by seconds: TimeInterval) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.adjustSynchronization", details: ["seconds": String(describing: seconds)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         synchronizationOffset = min(max(synchronizationOffset + seconds, -0.5), 0.5)
         saveProfile()
         resynchronizeMetronome()
     }
 
     func resetSynchronization() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.resetSynchronization", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         synchronizationOffset = 0
         saveProfile()
         resynchronizeMetronome()
     }
 
     func setMeter(beats: Int, unit: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setMeter", details: ["beats": String(describing: beats), "unit": String(describing: unit)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         beatsPerMeasure = min(max(beats, 1), 16)
         beatUnit = [2, 4, 8, 16].contains(unit) ? unit : 4
         beatGrouping = defaultBeatGrouping(
@@ -357,6 +490,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func setBeatGrouping(_ input: String) -> Bool {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.setBeatGrouping", details: ["input": String(describing: input)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard let grouping = parseBeatGrouping(input, beatsPerMeasure: beatsPerMeasure) else {
             return false
         }
@@ -370,12 +509,24 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func cycleAccent(at index: Int) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.cycleAccent", details: ["index": String(describing: index)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         guard beatAccents.indices.contains(index) else { return }
         beatAccents[index] = beatAccents[index].next
         applyTimingSettings()
     }
 
     func recordTap() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.recordTap", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         let milliseconds = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
         if let estimate = tapTempoTracker.recordTap(timestampMilliseconds: milliseconds) {
             bpm = estimate
@@ -384,6 +535,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func clearLoop() {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.clearLoop", details: [:])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         pointA = nil
         pointB = nil
         loopEnabled = false
@@ -393,6 +550,12 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func skip(by seconds: TimeInterval) {
+        reproductionSnapshot()
+        let reproductionOperation = ReproductionRecorder.shared.begin("video.skip", details: ["seconds": String(describing: seconds)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
+        }
         seek(to: currentTime + seconds)
     }
 
@@ -832,4 +995,39 @@ final class PracticeViewModel: ObservableObject {
             errorMessage = "练习设置保存失败：\(error.localizedDescription)"
         }
     }
+    func reproductionSnapshot() {
+        let store = ReproductionStore.shared
+        var state: [String: String] = [:]
+        state["video.currentFileName"] = store.encoded(currentFileName)
+        state["video.isMediaReady"] = store.encoded(isMediaReady)
+        state["video.isPlaying"] = store.encoded(isPlaying)
+        state["video.currentTime"] = store.encoded(currentTime)
+        state["video.duration"] = store.encoded(duration)
+        state["video.bpm"] = store.encoded(bpm)
+        state["video.subdivision"] = store.encoded(subdivision)
+        state["video.beatsPerMeasure"] = store.encoded(beatsPerMeasure)
+        state["video.beatUnit"] = store.encoded(beatUnit)
+        state["video.beatGrouping"] = store.encoded(beatGrouping)
+        state["video.beatAccents"] = store.encoded(beatAccents)
+        state["video.rhythmMode"] = store.encoded(rhythmMode)
+        state["video.metronomeEnabled"] = store.encoded(metronomeEnabled)
+        state["video.beatOffset"] = store.encoded(beatOffset)
+        state["video.pointA"] = store.encoded(pointA)
+        state["video.pointB"] = store.encoded(pointB)
+        state["video.loopEnabled"] = store.encoded(loopEnabled)
+        state["video.playbackRate"] = store.encoded(playbackRate)
+        state["video.mediaVolume"] = store.encoded(mediaVolume)
+        state["video.metronomeVolume"] = store.encoded(metronomeVolume)
+        state["video.synchronizationOffset"] = store.encoded(synchronizationOffset)
+        state["video.snapLoopPointsToBeat"] = store.encoded(snapLoopPointsToBeat)
+        state["video.loopCountInEnabled"] = store.encoded(loopCountInEnabled)
+        state["video.speedLadderEnabled"] = store.encoded(speedLadderEnabled)
+        state["video.speedLadderTarget"] = store.encoded(speedLadderTarget)
+        state["video.loopsPerSpeedStep"] = store.encoded(loopsPerSpeedStep)
+        state["video.speedLadderStep"] = store.encoded(speedLadderStep)
+        state["video.completedLoops"] = store.encoded(completedLoops)
+        state["video.errorMessage"] = store.encoded(errorMessage)
+        store.update(state)
+    }
+
 }
