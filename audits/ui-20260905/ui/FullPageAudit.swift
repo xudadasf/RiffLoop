@@ -74,7 +74,13 @@ final class FullPageAudit: XCTestCase {
         requireTap(prefix == "pdf" ? "更换 PDF" : "选择文件")
         shot(prefix + "-library")
         if common {
-            requireTap("更多：", prefix: true)
+            let more = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "更多：")).firstMatch
+            XCTAssertTrue(more.waitForExistence(timeout: 5))
+            // SwiftUI Menu can report isHittable=false inside a List despite
+            // its visible 44-point button. Tap its observed bounds and verify
+            // the resulting menu, rather than accepting a tap as success.
+            more.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(app.buttons["修改显示名称"].waitForExistence(timeout: 5))
             shot("shared-file-actions")
             requireTap("修改显示名称")
             shot("shared-rename")
