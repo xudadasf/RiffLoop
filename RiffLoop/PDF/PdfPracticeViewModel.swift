@@ -393,6 +393,7 @@ final class PdfPracticeViewModel: ObservableObject {
         let target = duration > 0 ? min(max(seconds, 0), duration) : max(seconds, 0)
         let resumeAudio = isAudioPlaying
         let resumeMetronome = isMetronomePlaying
+        let resumeReading = isReadingClockRunning
         recordPracticeTime()
         player.pause()
         metronome.stop()
@@ -404,7 +405,9 @@ final class PdfPracticeViewModel: ObservableObject {
         isMetronomePlaying = false
         guard player.currentItem != nil else {
             currentTime = target
-            if resumeMetronome { startPlayback(audio: false, metronome: true) }
+            if resumeMetronome || resumeReading {
+                startPlayback(audio: false, metronome: resumeMetronome)
+            }
             return
         }
         player.seek(to: cmTime(target), toleranceBefore: .zero, toleranceAfter: .zero) {
@@ -413,7 +416,7 @@ final class PdfPracticeViewModel: ObservableObject {
                 guard let self, finished else { return }
                 guard self.transportGeneration == generation else { return }
                 self.currentTime = target
-                if resumeAudio || resumeMetronome {
+                if resumeAudio || resumeMetronome || resumeReading {
                     self.startPlayback(audio: resumeAudio, metronome: resumeMetronome)
                 } else {
                     self.lastPracticeSampleDate = nil

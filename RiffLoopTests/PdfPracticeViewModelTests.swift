@@ -5,6 +5,34 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testSeekingDuringSilentFollowWithBoundAudioKeepsReadingClockRunning() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let audio = try makeTransportAudioFixture()
+        let store = FilePracticeSettingsStore()
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            try? FileManager.default.removeItem(at: audio)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        try store.save(PdfPracticeProfile(metronomeEnabled: false, readingPoints: [
+            PdfReadingPoint(time: 0, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 4, pageIndex: 0, verticalProgress: 1)
+        ]), kind: .pdf, fileName: pdf.lastPathComponent)
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.bindAudio(at: audio)
+        model.startAutoFollowFromBeginning()
+        try await waitForTransport { model.isAudioPlaying && model.currentTime > 0.1 }
+        model.pauseAudio()
+        model.seek(to: 1)
+        try await waitForTransport { model.currentTime > 1.2 }
+        XCTAssertTrue(model.isFollowingTransportActive)
+        XCTAssertFalse(model.isAudioPlaying)
+        XCTAssertFalse(model.isMetronomePlaying)
+        XCTAssertGreaterThan(model.verticalProgress, 0.25)
+    }
+
     func testRecordingStartsMetronomeAndSavesUsableTrack() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let model = PdfPracticeViewModel()
