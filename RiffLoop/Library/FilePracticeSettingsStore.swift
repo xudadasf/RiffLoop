@@ -103,6 +103,10 @@ struct FilePracticeSettingsStore {
         }
     }
 
+    func containsFileSettings(kind: PracticeKind, fileName: String) -> Bool {
+        defaults.data(forKey: key(kind: kind, fileName: fileName)) != nil
+    }
+
     func remove(kind: PracticeKind, fileName: String) {
         defaults.removeObject(forKey: key(kind: kind, fileName: fileName))
     }

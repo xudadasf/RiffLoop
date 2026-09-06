@@ -30,12 +30,8 @@ final class DocumentLibraryModelTests: XCTestCase {
         XCTAssertTrue(model.deleteFile(pdf))
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: pdf.path))
-        XCTAssertNil(
-            try settingsStore.load(
-                PdfPracticeProfile.self,
-                kind: .pdf,
-                fileName: pdf.lastPathComponent
-            )
-        )
+        XCTAssertFalse(settingsStore.containsFileSettings(kind: .pdf, fileName: pdf.lastPathComponent))
+        XCTAssertEqual(try settingsStore.load(PdfPracticeProfile.self, kind: .pdf, fileName: "next.pdf")?.bpm, 88,
+                       "Deleting a document must retain the current mode preferences")
     }
 }

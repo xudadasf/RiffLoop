@@ -46,6 +46,8 @@ final class PdfPracticeViewModelTests: XCTestCase {
             store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
         }
         XCTAssertTrue(model.openPdf(at: pdf))
+        XCTAssertFalse(model.followLoopEnabled, "Opening a file clears its previous temporary loop")
+        model.setFollowLoopEnabled(true)
         model.startReadingTrackRecording()
         try await Task.sleep(for: .milliseconds(300))
         model.setVerticalProgress(0.4)
@@ -53,7 +55,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
         let during = try store.load(PdfPracticeProfile.self, kind: .pdf, fileName: pdf.lastPathComponent)
         XCTAssertEqual(during?.readingPoints, original.readingPoints)
         XCTAssertEqual(during?.readingStartCue, original.readingStartCue)
-        XCTAssertEqual(during?.followLoopEnabled, true)
+        XCTAssertEqual(during?.followLoopEnabled, false, "Temporary loops are never restored from disk")
         XCTAssertFalse(model.hasUsableReadingTrack, "Draft must not be playable as a saved track")
         model.cancelReadingTrackRecording()
         XCTAssertEqual(model.readingPoints, original.readingPoints)
@@ -241,6 +243,8 @@ final class PdfPracticeViewModelTests: XCTestCase {
         let model = PdfPracticeViewModel()
         XCTAssertTrue(model.openPdf(at: pdf))
         model.bindAudio(at: audio)
+        XCTAssertFalse(model.followLoopEnabled, "A reopened file starts without a loop")
+        model.setFollowLoopEnabled(true)
         model.startAutoFollowFromBeginning()
         defer { model.pause() }
         try await waitForTransport { model.isAudioPlaying && model.currentTime >= 0.4 }
@@ -274,6 +278,8 @@ final class PdfPracticeViewModelTests: XCTestCase {
         ], followLoopEnabled: true), kind: .pdf, fileName: pdf.lastPathComponent)
         let model = PdfPracticeViewModel()
         XCTAssertTrue(model.openPdf(at: pdf))
+        XCTAssertFalse(model.followLoopEnabled, "A reopened file starts without a loop")
+        model.setFollowLoopEnabled(true)
         model.startAutoFollowFromBeginning()
         defer { model.pause() }
         try await waitForTransport { model.isPlaying }
@@ -305,6 +311,8 @@ final class PdfPracticeViewModelTests: XCTestCase {
         let model = PdfPracticeViewModel()
         XCTAssertTrue(model.openPdf(at: pdf))
         model.bindAudio(at: audio)
+        XCTAssertFalse(model.followLoopEnabled, "A reopened file starts without a loop")
+        model.setFollowLoopEnabled(true)
         model.startAutoFollowFromBeginning()
         defer { model.pause() }
         // Do not count the initial 0 -> first-point seek as a completed round.
@@ -383,13 +391,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.pdfWasDeleted(at: pdf))
         viewModel.pause()
 
-        XCTAssertNil(
-            try settingsStore.load(
-                PdfPracticeProfile.self,
-                kind: .pdf,
-                fileName: pdf.lastPathComponent
-            )
-        )
+        XCTAssertFalse(settingsStore.containsFileSettings(kind: .pdf, fileName: pdf.lastPathComponent))
     }
 
     func testOpeningPdfClampsPersistedTransportValues() throws {
