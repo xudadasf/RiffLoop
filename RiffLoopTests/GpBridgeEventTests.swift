@@ -2,6 +2,35 @@ import XCTest
 @testable import RiffLoop
 
 final class GpBridgeEventTests: XCTestCase {
+    @MainActor
+    func testCountInSharesVolumeWhileMetronomeIsDisabled() {
+        let viewModel = GpWebViewModel()
+        viewModel.setMetronomeVolume(1.7)
+        viewModel.setCountInEnabled(true)
+        XCTAssertFalse(viewModel.metronomeEnabled)
+        XCTAssertEqual(viewModel.countInVolume, 1.7)
+        viewModel.setMetronomeEnabled(true)
+        viewModel.setMetronomeEnabled(false)
+        XCTAssertTrue(viewModel.countInEnabled)
+        XCTAssertEqual(viewModel.countInVolume, 1.7)
+        viewModel.setMetronomeVolume(0)
+        XCTAssertEqual(viewModel.countInVolume, 0)
+        viewModel.setMetronomeVolume(4)
+        XCTAssertEqual(viewModel.countInVolume, 3)
+    }
+
+    @MainActor
+    func testLoopOnlyCountInInitializesSharedVolumeWithoutEnablingMetronome() {
+        let viewModel = GpWebViewModel()
+        viewModel.setLoopCountInEnabled(true)
+        XCTAssertEqual(viewModel.metronomeVolume, 0.85)
+        XCTAssertEqual(viewModel.countInVolume, 0.85)
+        XCTAssertFalse(viewModel.metronomeEnabled)
+        XCTAssertFalse(viewModel.countInEnabled)
+        viewModel.setMetronomeVolume(1.2)
+        XCTAssertEqual(viewModel.countInVolume, 1.2)
+    }
+
     func testDecodesScoreMetadataSentByTheOfflineRenderer() throws {
         let event = try GpBridgeEvent.decode(messageBody: [
             "event": "scoreLoaded",

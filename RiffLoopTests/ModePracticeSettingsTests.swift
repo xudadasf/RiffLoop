@@ -3,6 +3,34 @@ import XCTest
 @testable import RiffLoop
 
 final class ModePracticeSettingsTests: XCTestCase {
+    @MainActor
+    func testRestoredCountInUsesCurrentModeVolumeInsteadOfLegacyIndependentVolume() throws {
+        let suite = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FilePracticeSettingsStore(defaults: defaults)
+        var profile = GpPracticeProfile()
+        profile.metronomeVolume = 1.4
+        profile.metronomeEnabled = false
+        profile.countInEnabled = true
+        profile.countInVolume = 0.2
+        try store.save(profile, kind: .guitarPro, fileName: "shared-volume.gp")
+        let viewModel = GpWebViewModel(settingsStore: store)
+        let metadata = GpScoreMetadata(title: "Volume", artist: "", bars: 1,
+                                      hasBackingTrack: false, tracks: [], initialBpm: 120)
+        viewModel.loadScore(data: Data(), fileName: "shared-volume.gp")
+        viewModel.receive(.scoreLoaded(metadata))
+        XCTAssertTrue(viewModel.countInEnabled)
+        XCTAssertFalse(viewModel.metronomeEnabled)
+        XCTAssertEqual(viewModel.countInVolume, 1.4)
+        viewModel.setMetronomeVolume(2.1)
+        viewModel.loadScore(data: Data(), fileName: "another.gp")
+        viewModel.receive(.scoreLoaded(metadata))
+        XCTAssertEqual(viewModel.countInVolume, 2.1)
+        XCTAssertTrue(viewModel.countInEnabled)
+        viewModel.leaveMode()
+    }
+
     func testCurrentGpPreferencesFollowAcrossFilesWithoutCopyingSongContext() throws {
         let suite = UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!

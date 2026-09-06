@@ -453,7 +453,7 @@ struct GpPracticeView: View {
                     get: { viewModel.metronomeEnabled },
                     set: { viewModel.setMetronomeEnabled($0) }
                 ))
-                if viewModel.metronomeEnabled {
+                if viewModel.metronomeEnabled || viewModel.countInEnabled || viewModel.loopCountInEnabled {
                     Slider(
                         value: Binding(
                             get: { viewModel.metronomeVolume },
@@ -464,7 +464,7 @@ struct GpPracticeView: View {
                         Text("节拍音量")
                     }
                     LabeledContent("节拍音量", value: percent(viewModel.metronomeVolume))
-                    Text("可增强至 300%；伴奏较响时可适当降低伴奏音量。")
+                    Text("节拍器和预备拍共用音量，可增强至 300%。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -506,16 +506,6 @@ struct GpPracticeView: View {
                     set: { viewModel.setCountInEnabled($0) }
                 ))
                 if viewModel.countInEnabled || viewModel.loopCountInEnabled {
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.countInVolume },
-                            set: { viewModel.setCountInVolume($0) }
-                        ),
-                        in: 0...4
-                    ) {
-                        Text("预备拍音量")
-                    }
-                    LabeledContent("预备拍音量", value: percent(viewModel.countInVolume))
                     ForEach(viewModel.countInAccents.indices, id: \.self) { index in
                         Button { viewModel.cycleCountInAccent(at: index) } label: {
                             LabeledContent("预备第 \(index + 1) 拍", value: viewModel.countInAccents[index].label)

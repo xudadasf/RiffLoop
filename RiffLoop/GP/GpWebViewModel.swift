@@ -36,7 +36,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var metronomeVolume = 0.0
     @Published private(set) var countInAccents = defaultGpBeatAccents(beatsPerMeasure: 4)
     @Published private(set) var countInEnabled = false
-    @Published private(set) var countInVolume = 0.0
+    var countInVolume: Double { metronomeVolume }
     @Published private(set) var metronomeSubdivisionFactor = 1
     @Published private(set) var beatAccents = defaultGpBeatAccents(beatsPerMeasure: 4)
     @Published private(set) var rangeLoopingEnabled = true
@@ -93,7 +93,7 @@ final class GpWebViewModel: ObservableObject {
     private var pendingScoreData: Data?
     private var didSendSoundFont = false
     private var loopSelection = GpLoopSelectionStateMachine()
-    private let settingsStore = FilePracticeSettingsStore()
+    private let settingsStore: FilePracticeSettingsStore
     private var currentFileName: String?
     private var pendingProfile = GpPracticeProfile()
     private var didApplyPendingProfile = false
@@ -106,6 +106,10 @@ final class GpWebViewModel: ObservableObject {
     private var nativeBackingAnchorMilliseconds = 0.0
     private var nativeBackingSyncPoints: [GpBackingSyncPoint] = []
     private var speedLadderBaseSpeed: Double?
+
+    init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
+        self.settingsStore = settingsStore
+    }
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -398,6 +402,7 @@ final class GpWebViewModel: ObservableObject {
         }
         metronomeVolume = min(max(volume, 0), 3)
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
 
@@ -411,6 +416,7 @@ final class GpWebViewModel: ObservableObject {
         metronomeEnabled = enabled
         if enabled, metronomeVolume == 0 { metronomeVolume = 0.85 }
         call("setMetronomeVolume", arguments: [enabled ? metronomeVolume : 0])
+        call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
 
@@ -422,19 +428,6 @@ final class GpWebViewModel: ObservableObject {
         ReproductionStore.shared.record("action", "gp.count_in_accent", ["beat": String(index), "accent": countInAccents[index].rawValue])
     }
 
-    func setCountInVolume(_ volume: Double) {
-        reproductionSnapshot()
-        let reproductionOperation = ReproductionRecorder.shared.begin("gp.setCountInVolume", details: ["volume": String(describing: volume)])
-        defer {
-            reproductionSnapshot()
-            ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
-        }
-        countInVolume = min(max(volume, 0), 4)
-        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
-        call("setCountInVolume", arguments: [effectiveCountInVolume])
-        saveProfile()
-    }
-
     func setCountInEnabled(_ enabled: Bool) {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setCountInEnabled", details: ["enabled": String(describing: enabled)])
@@ -443,7 +436,7 @@ final class GpWebViewModel: ObservableObject {
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
         countInEnabled = enabled
-        if enabled, countInVolume == 0 { countInVolume = 0.85 }
+        if enabled, metronomeVolume == 0 { setMetronomeVolume(0.85) }
         call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
@@ -519,7 +512,7 @@ final class GpWebViewModel: ObservableObject {
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
         loopCountInEnabled = enabled
-        if enabled, countInVolume == 0 { countInVolume = 0.85 }
+        if enabled, metronomeVolume == 0 { setMetronomeVolume(0.85) }
         call("setLoopCountInEnabled", arguments: [enabled])
         call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
@@ -984,7 +977,6 @@ final class GpWebViewModel: ObservableObject {
             pendingProfile.countInAccents.indices.contains(index) ? pendingProfile.countInAccents[index] : (index == 0 ? .strong : .normal)
         }
         countInEnabled = pendingProfile.countInEnabled
-        countInVolume = min(max(pendingProfile.countInVolume, 0), 4)
         metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
             ? pendingProfile.metronomeSubdivisionFactor
             : 1
