@@ -640,8 +640,18 @@
         synthApi,
         canUseBacking
     });
+    let fallbackCountInContext;
     const countIn = window.RiffLoopCountIn.create({
-        makeContext: () => new (window.AudioContext || window.webkitAudioContext)(),
+        makeContext: () => {
+            // Native toolbar taps do not unlock a separate WebAudio context on iPad.
+            // Use the synth output's already activated audio clock without playing the score.
+            const output = api.player?.output;
+            output?.activate();
+            const context = output?.context || synthApi.player?.output?.context
+                || (fallbackCountInContext ||= new (window.AudioContext || window.webkitAudioContext)());
+            postBackingDiagnostic("count-in-context", null, { state: context.state, shared: context === output?.context });
+            return context;
+        },
         settings: () => {
             let bar = api.score?.masterBars?.[0];
             for (const candidate of api.score?.masterBars || []) {

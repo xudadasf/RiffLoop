@@ -51,6 +51,17 @@ assert.equal(create({ makeContext: () => { throw Error('unavailable'); }, settin
     onError: () => errors++ }).start(() => completed++), false);
 assert.equal(errors, 1);
 
+let timeout, stalledErrors = 0, lateResume;
+const stalled = create({ makeContext: () => ({ state: 'suspended', resume: () => new Promise(resolve => { lateResume = resolve; }) }),
+    settings: () => ({ volume: 1 }), onError: () => stalledErrors++,
+    schedule: callback => { timeout = callback; return 1; }, unschedule() {} });
+stalled.start(() => completed++);
+timeout();
+assert.equal(stalled.active, false, 'A suspended iPad audio clock must not leave playback pending forever');
+assert.equal(stalledErrors, 1);
+lateResume(); await Promise.resolve();
+assert.equal(completed, 1, 'A late clock resume after timeout must not start the score');
+
 const source = read('riffloop-gp.js');
 function extract(name, next) {
     const start = source.indexOf(`    const ${name} =`);

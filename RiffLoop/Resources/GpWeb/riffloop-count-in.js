@@ -10,9 +10,10 @@
                 frequency: { strong: 1600, subAccent: 1100, normal: 750, muted: 750 }[accent] || 750 };
         }) };
     };
-    const create = ({ makeContext, settings, onError }) => {
-        let context, generation = 0, active = false, nodes = [], gains = [];
+    const create = ({ makeContext, settings, onError, schedule = setTimeout, unschedule = clearTimeout }) => {
+        let context, generation = 0, active = false, nodes = [], gains = [], watchdog;
         const cancel = () => {
+            unschedule(watchdog); watchdog = undefined;
             generation++; active = false;
             for (const node of nodes) { node.onended = null; try { node.stop(); } catch {} node.disconnect(); }
             for (const gain of gains) gain.disconnect();
@@ -25,10 +26,18 @@
             cancel(); active = true;
             const request = generation;
             try {
-                context ||= makeContext();
+                context = makeContext();
+                const fail = () => {
+                    if (request !== generation || !active) return;
+                    const state = context.state;
+                    cancel(); onError(new Error("音频时钟未启动或被中断 (" + state + ")，请重新播放。"));
+                };
+                watchdog = schedule(fail, 3000);
                 Promise.resolve(context.resume()).then(() => {
                     if (request !== generation) return;
+                    unschedule(watchdog);
                     const sequence = plan(options);
+                    watchdog = schedule(fail, sequence.duration * 1000 + 2000);
                     const origin = context.currentTime + 0.025;
                     for (const pulse of sequence.pulses) {
                         if (!pulse.gain) continue;
@@ -48,6 +57,7 @@
                     end.onended = () => {
                         end.disconnect(); silent.disconnect();
                         if (request !== generation) return;
+                        unschedule(watchdog); watchdog = undefined;
                         active = false; nodes = []; gains = []; completion();
                     };
                     end.start(origin); end.stop(origin + sequence.duration); nodes.push(end); gains.push(silent);
