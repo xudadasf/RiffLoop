@@ -25,10 +25,13 @@ final class GpPracticeProfileTests: XCTestCase {
         )
 
         try store.save(profile, kind: .guitarPro, fileName: "此生不换.gp")
+        var expected = profile
+        expected.loopRange = nil
+        expected.rangeLoopingEnabled = false
 
         XCTAssertEqual(
             try store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "此生不换.gp"),
-            profile
+            expected
         )
     }
 

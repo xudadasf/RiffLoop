@@ -79,6 +79,7 @@ struct GpPlaybackPosition: Codable, Equatable, Sendable {
 struct GpPlaybackState: Codable, Equatable, Sendable {
     let state: Int
     let stopped: Bool
+    var transitioning: Bool? = nil
 }
 
 struct GpBackingSyncPoint: Codable, Equatable, Sendable {

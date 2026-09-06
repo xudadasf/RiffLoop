@@ -35,12 +35,12 @@ assert.match(
 );
 assert.match(
     gpWeb,
-    /reportState: \(playing, stopped\) => post\("playerStateChanged", \{[\s\S]*?state: playing \? 1 : 0/,
+    /reportState: \(playing, stopped\) => post\("playerStateChanged", \{[\s\S]*?state: playing && !countIn.active \? 1 : 0,[\s\S]*?transitioning: loopTransitioning \|\| countIn.active/,
     "GP controls and paused-only loop actions must follow the coordinated transport state"
 );
 assert.match(
     gpWeb,
-    /api\.playerStateChanged\.on\(\(state\) => \{[\s\S]*?post\("playerStateChanged", \{[\s\S]*?state: transport\.isPlayingIntent\(\) \? 1 : 0/,
+    /api\.playerStateChanged\.on\(\(state\) => \{[\s\S]*?post\("playerStateChanged", \{[\s\S]*?state: transport\.isPlayingIntent\(\) && !countIn.active \? 1 : 0,[\s\S]*?transitioning: loopTransitioning \|\| countIn.active/,
     "late alphaTab state events must not overwrite the coordinated GP transport state"
 );
 assert.match(

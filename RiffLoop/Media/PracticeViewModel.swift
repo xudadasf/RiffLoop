@@ -153,6 +153,11 @@ final class PracticeViewModel: ObservableObject {
         isPlaying ? pause() : preparePlaybackAndStart(at: currentTime)
     }
 
+    func leaveMode() {
+        pause()
+        clearLoop()
+    }
+
     func pause() {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("video.pause", details: [:])

@@ -143,7 +143,7 @@ struct GpPracticeView: View {
                     recentProjects.opened(kind: .guitarPro, fileName: currentFileName)
                 }
             }
-            .onDisappear(perform: viewModel.pause)
+            .onDisappear(perform: viewModel.leaveMode)
             .keepPracticeScreenAwake(hasFile: viewModel.score != nil)
     }
 
@@ -511,11 +511,18 @@ struct GpPracticeView: View {
                             get: { viewModel.countInVolume },
                             set: { viewModel.setCountInVolume($0) }
                         ),
-                        in: 0...2
+                        in: 0...4
                     ) {
                         Text("预备拍音量")
                     }
                     LabeledContent("预备拍音量", value: percent(viewModel.countInVolume))
+                    ForEach(viewModel.countInAccents.indices, id: \.self) { index in
+                        Button { viewModel.cycleCountInAccent(at: index) } label: {
+                            LabeledContent("预备第 \(index + 1) 拍", value: viewModel.countInAccents[index].label)
+                        }
+                    }
+                    Text("点按每一拍切换强、次强、普通、静音；开始播放和循环预备拍共用此设置。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -533,7 +540,7 @@ struct GpPracticeView: View {
                         get: { viewModel.masterVolume },
                         set: { viewModel.setMasterVolume($0) }
                     ),
-                    in: 0...2
+                    in: 0...4
                 ) {
                     Text("合成总音量")
                 }
@@ -551,7 +558,7 @@ struct GpPracticeView: View {
                             get: { viewModel.backingVolume },
                             set: { viewModel.setBackingVolume($0) }
                         ),
-                        in: 0...2
+                        in: 0...4
                     ) {
                         Text("伴奏音量")
                     }
@@ -619,7 +626,7 @@ struct GpPracticeView: View {
                                     get: { viewModel.trackVolumes[track.index] ?? Double(track.volume) / 16 },
                                     set: { viewModel.setTrackVolume(index: track.index, volume: $0) }
                                 ),
-                                in: 0...2
+                                in: 0...4
                             ) {
                                 Text("\(track.name)音量")
                             }

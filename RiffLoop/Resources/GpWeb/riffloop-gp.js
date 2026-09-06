@@ -229,7 +229,7 @@
         const requestedMutes = new Map();
         let enabled = true;
         let masterVolume = 0.75;
-        const clampVolume = (value) => Math.min(2, Math.max(0, Number(value) || 0));
+        const clampVolume = (value) => Math.min(4, Math.max(0, Number(value) || 0));
         const applyVolume = (track) => {
             const requested = requestedVolumes.get(track.index) ?? 1;
             playerApi.changeTrackVolume([track], requested * masterVolume);
@@ -291,6 +291,8 @@
     let metronomeSubdivisionFactor = 1;
     let metronomeMasterVolume = 0;
     let countInMasterVolume = 0;
+    let countInAccents = ["strong", "normal", "normal", "normal"];
+    let loopTransitioning = false;
     let beatAccents = ["strong", "normal", "normal", "normal"];
     let scoreHasLoaded = false;
     let didNotifyPlayerReady = false;
@@ -523,6 +525,7 @@
         const pause = (manual = false) => {
             resetMainBeforePlay = resetMainBeforePlay || manual;
             wantsPlayback = false;
+            deps.cancelCountIn?.();
             resetBackingPriming();
             const generation = ++pauseGeneration;
             pauseNow();
@@ -533,7 +536,13 @@
             schedule(pauseAgain, 80);
             schedule(pauseAgain, 240);
         };
-        const play = () => {
+        const play = (skipCountIn = false) => {
+            if (!skipCountIn && deps.startCountIn?.(() => play(true))) {
+                wantsPlayback = true;
+                pauseGeneration += 1;
+                reportState(true, false);
+                return true;
+            }
             if (resetMainBeforePlay) {
                 // WebAudio drops buffered samples on pause. A count-in interrupted
                 // by the user must not keep waiting for those discarded samples.
@@ -598,6 +607,7 @@
         const stop = () => {
             resetMainBeforePlay = false;
             wantsPlayback = false;
+            deps.cancelCountIn?.();
             resetBackingPriming();
             pauseGeneration += 1;
             api.stop();
@@ -607,6 +617,7 @@
         };
         const markStopped = () => {
             wantsPlayback = false;
+            deps.cancelCountIn?.();
             resetBackingPriming();
             pauseGeneration += 1;
             reportState(false, true);
@@ -629,7 +640,23 @@
         synthApi,
         canUseBacking
     });
+    const countIn = window.RiffLoopCountIn.create({
+        makeContext: () => new (window.AudioContext || window.webkitAudioContext)(),
+        settings: () => {
+            let bar = api.score?.masterBars?.[0];
+            for (const candidate of api.score?.masterBars || []) {
+                const tick = api.tickCache?.getMasterBar(candidate);
+                if (tick && api.tickPosition >= tick.start && api.tickPosition < tick.end) { bar = candidate; break; }
+            }
+            return { volume: countInMasterVolume, accents: countInAccents,
+                beats: bar?.timeSignatureNumerator || 4, unit: bar?.timeSignatureDenominator || 4,
+                bpm: (bar?.tempoAutomations?.[0]?.value || api.score?.tempo || 120) * (api.playbackSpeed || 1) };
+        },
+        onError: error => { transport.pause(true); post("error", { message: "预备拍播放失败：" + errorMessage(error) }); }
+    });
     const transport = createTransportController({
+        startCountIn: action => countIn.start(action),
+        cancelCountIn: () => countIn.cancel(),
         api,
         synthApi,
         canUseBacking,
@@ -646,7 +673,8 @@
         },
         schedule: window.setTimeout.bind(window),
         reportState: (playing, stopped) => post("playerStateChanged", {
-            state: playing ? 1 : 0,
+            state: playing && !countIn.active ? 1 : 0,
+            transitioning: loopTransitioning || countIn.active,
             stopped
         })
     });
@@ -701,9 +729,9 @@
             lastBounds.y + lastBounds.h,
             viewportElement.clientHeight
         );
-        const scrollMode = plan.mode === "locked"
-            ? alphaTab.ScrollMode.Off
-            : alphaTab.ScrollMode.Smooth;
+        // Own scrolling throughout a range: a delayed native smooth scroll must not
+        // drag A offscreen after the B-to-A jump.
+        const scrollMode = alphaTab.ScrollMode.Off;
         if (api.settings.player.scrollMode !== scrollMode) {
             api.settings.player.scrollMode = scrollMode;
             api.settings.player.scrollSpeed = 450;
@@ -716,7 +744,33 @@
             api.updateSettings();
         }
         if (plan.targetTop !== null && Math.abs(viewportElement.scrollTop - plan.targetTop) > 2) {
-            viewportElement.scrollTo({ top: plan.targetTop, behavior: "smooth" });
+            viewportElement.scrollTo({ top: plan.targetTop, behavior: "auto" });
+        }
+    };
+    const visibleBarScrollTop = (top, bottom, scrollTop, height) => {
+        const margin = 24;
+        if (bottom - top > height - margin * 2) return Math.max(0, top - margin);
+        if (top < scrollTop + margin) return Math.max(0, top - margin);
+        if (bottom > scrollTop + height - margin) return Math.max(0, bottom - height + margin);
+        return scrollTop;
+    };
+    const revealLoopTick = (tick) => {
+        if (!rangeLoopingEnabled || !committedRange) return;
+        const lookup = api.renderer?.boundsLookup;
+        const first = lookup?.findMasterBarByIndex(committedRange.firstBar)?.realBounds;
+        const last = lookup?.findMasterBarByIndex(committedRange.lastBar)?.realBounds;
+        if (!first || !last) return;
+        const plan = loopScrollPlan(first.y, last.y + last.h, viewportElement.clientHeight);
+        if (plan.mode === "locked") { applyRangeScrollPolicy(committedRange.firstBar, committedRange.lastBar); return; }
+        for (let index = committedRange.firstBar; index <= committedRange.lastBar; index++) {
+            const bar = api.score?.masterBars?.[index];
+            const range = bar && api.tickCache?.getMasterBar(bar);
+            if (!range || tick < range.start || tick >= range.end) continue;
+            const bounds = lookup.findMasterBarByIndex(index)?.realBounds;
+            if (!bounds) break;
+            const top = visibleBarScrollTop(bounds.y, bounds.y + bounds.h, viewportElement.scrollTop, viewportElement.clientHeight);
+            if (Math.abs(viewportElement.scrollTop - top) > 1) viewportElement.scrollTo({ top, behavior: "auto" });
+            break;
         }
     };
     const restoreScoreScrollPolicy = () => {
@@ -731,8 +785,10 @@
         synthApi.tickPosition = position;
         refreshPendingRangeHighlight();
         if (options.reveal === false) return;
+        if (rangeLoopingEnabled && committedRange) revealLoopTick(position);
         window.setTimeout(() => {
-            if (api.isReadyForPlayback) api.scrollToCursor();
+            if (rangeLoopingEnabled && committedRange) revealLoopTick(position);
+            else if (api.isReadyForPlayback) api.scrollToCursor();
             refreshPendingRangeHighlight();
         }, 50);
     };
@@ -778,6 +834,7 @@
         let resumeRequested = false;
         let targetTick = null;
         const cancel = () => {
+            deps.onTransition?.(false);
             generation += 1;
             phase = "idle";
             resumeRequested = false;
@@ -796,6 +853,7 @@
                 resumeRequested = false;
                 targetTick = null;
                 transport.play();
+                deps.onTransition?.(false);
             }, 0);
             return true;
         };
@@ -822,6 +880,7 @@
             if (!Number.isFinite(target)) return false;
             generation += 1;
             phase = "waitingForPause";
+            deps.onTransition?.(true);
             resumeRequested = false;
             targetTick = target;
             transport.pause();
@@ -841,6 +900,7 @@
         });
     };
     const rangeCountInRestarter = createRangeCountInRestarter({
+        onTransition: active => { loopTransitioning = active; },
         transport,
         seekBoth,
         schedule: scheduleAfterCursorPaint,
@@ -850,7 +910,9 @@
         )
     });
     const playPauseBoth = () => {
+        const transitioning = loopTransitioning || countIn.active;
         rangeCountInRestarter.cancel();
+        if (transitioning) { transport.pause(true); return; }
         transport.toggle();
     };
 
@@ -1014,6 +1076,7 @@
         // alphaTab's native range can be lost when its internal player is rebuilt.
         // Keep the visible synth and embedded backing transport inside the committed range.
         if (enforceCommittedRange(position)) return;
+        revealLoopTick(Number(position.currentTick));
         const now = performance.now();
         if (!position.isSeek && now - lastPositionPostTime < POSITION_POST_INTERVAL_MILLISECONDS) return;
         lastPositionPostTime = now;
@@ -1097,7 +1160,8 @@
         refreshPendingRangeHighlight();
         rangeCountInRestarter.handlePlayerState(state);
         post("playerStateChanged", {
-            state: transport.isPlayingIntent() ? 1 : 0,
+            state: transport.isPlayingIntent() && !countIn.active ? 1 : 0,
+            transitioning: loopTransitioning || countIn.active,
             stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
         });
     });
@@ -1292,6 +1356,11 @@
     };
 
     window.riffloop = {
+        setViewportInsets(top, bottom) {
+            document.documentElement.style.setProperty("--safe-top", `${Math.max(0, Number(top) || 0)}px`);
+            document.documentElement.style.setProperty("--safe-bottom", `${Math.max(0, Number(bottom) || 0)}px`);
+            window.requestAnimationFrame(() => revealLoopTick(Number(api.tickPosition)));
+        },
         loadSoundFont(base64) {
             try {
                 soundFontBytes = decodeBase64(base64);
@@ -1382,10 +1451,11 @@
                 synthApi.load(loadedScoreBytes.slice());
             }
         },
+        setCountInAccents(accents) { countInAccents = Array.isArray(accents) ? accents.slice(0, 32) : []; },
         setCountInVolume(volume) {
             const value = Number(volume);
             countInMasterVolume = Number.isFinite(value) ? Math.max(0, value) : 0;
-            api.countInVolume = countInMasterVolume;
+            api.countInVolume = 0; // Count-in uses separately scheduled, editable accented clicks.
             synthApi.countInVolume = 0;
         },
         setLoopCountInEnabled(enabled) {

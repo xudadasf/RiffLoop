@@ -14,7 +14,8 @@ struct GpWebView: UIViewRepresentable {
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator, name: "riffloop")
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = GpViewportWebView(frame: .zero, configuration: configuration)
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
@@ -85,6 +86,10 @@ struct GpWebView: UIViewRepresentable {
             }
         }
 
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            (webView as? GpViewportWebView)?.syncViewport(force: true)
+        }
+
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             ReproductionStore.shared.record("incident", "web_content.process_terminated")
         }
@@ -108,5 +113,28 @@ struct GpWebView: UIViewRepresentable {
                 viewModel.receive(.error("GP 页面加载失败：\(error.localizedDescription)"))
             }
         }
+    }
+}
+
+/// The HTML scroller must use the area above SwiftUI's transport deck, not the full
+/// WKWebView bounds. Automatic UIScrollView insets do not shrink a nested HTML scroller.
+@MainActor
+final class GpViewportWebView: WKWebView {
+    private var lastViewport = ""
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        syncViewport()
+    }
+    override func safeAreaInsetsDidChange() {
+        super.safeAreaInsetsDidChange()
+        syncViewport()
+    }
+    func syncViewport(force: Bool = false) {
+        let top = max(0, safeAreaInsets.top)
+        let bottom = max(0, safeAreaInsets.bottom)
+        let identity = "\(bounds.size):\(top):\(bottom)"
+        guard force || identity != lastViewport else { return }
+        lastViewport = identity
+        evaluateJavaScript("window.riffloop?.setViewportInsets(\(top), \(bottom))", completionHandler: nil)
     }
 }

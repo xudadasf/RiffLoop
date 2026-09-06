@@ -135,7 +135,7 @@ struct PracticeView: View {
                     open(url)
                 }
             }
-            .onDisappear(perform: viewModel.pause)
+            .onDisappear(perform: viewModel.leaveMode)
             .keepPracticeScreenAwake(hasFile: viewModel.hasMedia)
     }
 

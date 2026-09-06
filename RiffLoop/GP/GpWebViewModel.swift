@@ -34,6 +34,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var backingEnabled = true
     @Published private(set) var metronomeEnabled = false
     @Published private(set) var metronomeVolume = 0.0
+    @Published private(set) var countInAccents = defaultGpBeatAccents(beatsPerMeasure: 4)
     @Published private(set) var countInEnabled = false
     @Published private(set) var countInVolume = 0.0
     @Published private(set) var metronomeSubdivisionFactor = 1
@@ -181,6 +182,12 @@ final class GpWebViewModel: ObservableObject {
         call("playPause")
     }
 
+    func leaveMode() {
+        pause()
+        clearLoop()
+        setWholeSongLoopingEnabled(false)
+    }
+
     func pause() {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.pause", details: [:])
@@ -323,7 +330,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        trackVolumes[index] = min(max(volume, 0), 2)
+        trackVolumes[index] = min(max(volume, 0), 4)
         call("setTrackVolume", arguments: [index, trackVolumes[index] ?? 1])
         saveProfile()
     }
@@ -335,7 +342,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        masterVolume = min(max(volume, 0), 2)
+        masterVolume = min(max(volume, 0), 4)
         call("setMasterVolume", arguments: [masterVolume])
         saveProfile()
     }
@@ -347,7 +354,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        backingVolume = min(max(volume, 0), 2)
+        backingVolume = min(max(volume, 0), 4)
         nativeBackingPlayer.setVolume(backingVolume)
         call("setBackingVolume", arguments: [backingVolume])
         saveProfile()
@@ -407,6 +414,14 @@ final class GpWebViewModel: ObservableObject {
         saveProfile()
     }
 
+    func cycleCountInAccent(at index: Int) {
+        guard countInAccents.indices.contains(index) else { return }
+        countInAccents[index] = countInAccents[index].next
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
+        saveProfile()
+        ReproductionStore.shared.record("action", "gp.count_in_accent", ["beat": String(index), "accent": countInAccents[index].rawValue])
+    }
+
     func setCountInVolume(_ volume: Double) {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setCountInVolume", details: ["volume": String(describing: volume)])
@@ -414,7 +429,8 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        countInVolume = min(max(volume, 0), 2)
+        countInVolume = min(max(volume, 0), 4)
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -428,6 +444,7 @@ final class GpWebViewModel: ObservableObject {
         }
         countInEnabled = enabled
         if enabled, countInVolume == 0 { countInVolume = 0.85 }
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -472,6 +489,7 @@ final class GpWebViewModel: ObservableObject {
         if enabled { wholeSongLoopingEnabled = false }
         completedLoops = 0
         call("setRangeLoopingEnabled", arguments: [enabled])
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -488,6 +506,7 @@ final class GpWebViewModel: ObservableObject {
         if enabled { rangeLoopingEnabled = false }
         completedLoops = 0
         call("setWholeSongLoopingEnabled", arguments: [enabled])
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -502,6 +521,7 @@ final class GpWebViewModel: ObservableObject {
         loopCountInEnabled = enabled
         if enabled, countInVolume == 0 { countInVolume = 0.85 }
         call("setLoopCountInEnabled", arguments: [enabled])
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -575,6 +595,7 @@ final class GpWebViewModel: ObservableObject {
         rangeLoopingEnabled = false
         completedLoops = 0
         call("clearPlaybackRange")
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
     }
@@ -663,8 +684,8 @@ final class GpWebViewModel: ObservableObject {
                 saveProfile()
             }
         case let .playerStateChanged(state):
-            isPlaying = state.state == 1
-            if isPlaying {
+            isPlaying = state.state == 1 || state.transitioning == true
+            if state.state == 1 {
                 if !nativeBackingPlaybackRequested {
                     nativeBackingAnchorMilliseconds = position.currentTime
                     nativeBackingStarted = false
@@ -926,6 +947,7 @@ final class GpWebViewModel: ObservableObject {
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
             )
+            call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
             call("setCountInVolume", arguments: [effectiveCountInVolume])
             loopSelectionMessage = "已按音符循环第 \(range.firstBar + 1)–\(range.lastBar + 1) 小节内选定范围"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -952,14 +974,17 @@ final class GpWebViewModel: ObservableObject {
             max(pendingProfile.baseBpm ?? metadata.initialBpm ?? 120, bpmRange.lowerBound),
             bpmRange.upperBound
         )
-        masterVolume = min(max(pendingProfile.masterVolume, 0), 2)
-        backingVolume = min(max(pendingProfile.backingVolume, 0), 2)
+        masterVolume = min(max(pendingProfile.masterVolume, 0), 4)
+        backingVolume = min(max(pendingProfile.backingVolume, 0), 4)
         synthEnabled = pendingProfile.synthEnabled
         backingEnabled = pendingProfile.backingEnabled
         metronomeEnabled = pendingProfile.metronomeEnabled
         metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 3)
+        countInAccents = (0..<max(1, metadata.beatsPerMeasure ?? 4)).map { index in
+            pendingProfile.countInAccents.indices.contains(index) ? pendingProfile.countInAccents[index] : (index == 0 ? .strong : .normal)
+        }
         countInEnabled = pendingProfile.countInEnabled
-        countInVolume = min(max(pendingProfile.countInVolume, 0), 2)
+        countInVolume = min(max(pendingProfile.countInVolume, 0), 4)
         metronomeSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.metronomeSubdivisionFactor)
             ? pendingProfile.metronomeSubdivisionFactor
             : 1
@@ -1011,6 +1036,7 @@ final class GpWebViewModel: ObservableObject {
         call("setBackingEnabled", arguments: [backingEnabled])
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
         call("setLoopCountInEnabled", arguments: [loopCountInEnabled])
+        call("setCountInAccents", arguments: [countInAccents.map(\.rawValue)])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         for index in mutedTracks { call("setTrackMute", arguments: [index, true]) }
         if let soloTrack { call("setTrackSolo", arguments: [soloTrack, true]) }
@@ -1104,6 +1130,7 @@ final class GpWebViewModel: ObservableObject {
                 backingEnabled: backingEnabled,
                 metronomeEnabled: metronomeEnabled,
                 metronomeVolume: metronomeVolume,
+                countInAccents: countInAccents,
                 countInEnabled: countInEnabled,
                 countInVolume: countInVolume,
                 metronomeSubdivisionFactor: metronomeSubdivisionFactor,

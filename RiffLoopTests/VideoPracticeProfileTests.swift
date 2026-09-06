@@ -27,6 +27,9 @@ final class VideoPracticeProfileTests: XCTestCase {
         profile.lastPosition = 42
 
         try store.save(profile, kind: .video, fileName: "练习.mp4")
+        profile.pointA = nil
+        profile.pointB = nil
+        profile.loopEnabled = false
 
         XCTAssertEqual(
             try store.load(VideoPracticeProfile.self, kind: .video, fileName: "练习.mp4"),

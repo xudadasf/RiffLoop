@@ -385,6 +385,13 @@ final class PdfPracticeViewModel: ObservableObject {
         )
     }
 
+    func leaveMode() {
+        pause()
+        pointA = nil; pointB = nil; loopEnabled = false
+        followLoopEnabled = false
+        save()
+    }
+
     func pause() {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pause", details: [:])

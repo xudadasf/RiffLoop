@@ -1,4 +1,5 @@
 import './test-gp-transport-recovery.mjs';
+import './test-gp-count-in.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";

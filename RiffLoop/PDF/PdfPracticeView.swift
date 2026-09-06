@@ -141,7 +141,7 @@ struct PdfPracticeView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { viewModel.pause() }
         }
-        .onDisappear(perform: viewModel.pause)
+        .onDisappear(perform: viewModel.leaveMode)
             .keepPracticeScreenAwake(hasFile: viewModel.document != nil)
     }
 
