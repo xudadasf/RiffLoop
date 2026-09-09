@@ -6,15 +6,13 @@
         return magnitude <= 0.75 ? value
             : Math.sign(value) * (0.75 + 0.23 * Math.tanh((magnitude - 0.75) / 0.23));
     };
-    const latency = (context, nativeLatency, now) => {
-        const timestamp = context.getOutputTimestamp?.();
-        if (timestamp?.contextTime > 0 && timestamp.performanceTime > 0) {
-            const age = Math.max(0, (now - timestamp.performanceTime) / 1000);
-            const measured = context.currentTime - timestamp.contextTime - age;
-            if (Number.isFinite(measured) && measured >= 0 && measured < 0.5) return measured;
-        }
-        const reported = Number(context.outputLatency) + Number(context.baseLatency || 0);
-        return Math.min(0.5, Math.max(0, reported > 0 ? reported : nativeLatency || 0));
+    const latency = (context, nativeLatency) => {
+        const positive = value => Number.isFinite(value) && value > 0 ? value : 0;
+        // Web Audio specifies outputLatency for this estimate: currentTime minus
+        // getOutputTimestamp().contextTime fluctuates with rendering quanta.
+        const device = positive(context.outputLatency);
+        const reported = device > 0 ? device + positive(context.baseLatency) : positive(nativeLatency);
+        return Math.min(0.5, reported);
     };
     const install = (output, { nativeLatency = () => 0, report = () => {},
         now = () => performance.now(), schedule = setTimeout, unschedule = clearTimeout } = {}) => {
@@ -44,7 +42,7 @@
         };
         output.onSamplesPlayed = samples => {
             if (!(samples > 0)) return;
-            const time = now(), delay = latency(context, nativeLatency(), time);
+            const time = now(), delay = latency(context, nativeLatency());
             if (time - lastReport >= 1000) {
                 lastReport = time;
                 report({ state: context.state, time: context.currentTime, sampleRate: context.sampleRate,

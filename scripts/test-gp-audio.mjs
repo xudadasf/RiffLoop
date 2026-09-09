@@ -10,8 +10,15 @@ const { limit, latency, install } = window.RiffLoopAudio;
 assert.equal(limit(0.2), 0.2);
 assert.equal(limit(-0.5), -0.5);
 assert.ok(limit(16) < 1 && limit(-16) > -1);
-assert.ok(Math.abs(latency({ currentTime: 10, getOutputTimestamp: () => ({ contextTime: 9.85, performanceTime: 950 }) }, 0, 1000) - 0.1) < 1e-8);
-assert.equal(latency({}, 0.12, 0), 0.12);
+const latencyContext = { currentTime: 10, outputLatency: 0.08, baseLatency: 0.02,
+    getOutputTimestamp: () => { throw Error('Timestamp differences are not reliable latency estimates'); } };
+assert.equal(latency(latencyContext, 0.2), 0.1);
+latencyContext.currentTime += 0.1;
+assert.equal(latency(latencyContext, 0.2), 0.1, 'Render clock increments must not move the cursor compensation');
+assert.equal(latency({ baseLatency: 0.01 }, 0.12), 0.12, 'Native fallback already includes its IO buffer');
+assert.equal(latency({ outputLatency: NaN }, 0.12), 0.12);
+assert.equal(latency({}, NaN), 0);
+assert.equal(latency({ outputLatency: 1 }, 0.12), 0.5);
 
 let time = 0, next = 0;
 const timers = new Map(), delivered = [];
