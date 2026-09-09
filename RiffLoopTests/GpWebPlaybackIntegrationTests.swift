@@ -135,6 +135,8 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         let controller = UIHostingController(rootView: GpWebView(viewModel: model))
         window.rootViewController = controller
         window.makeKeyAndVisible()
+        let documentFolder = RiffLoopDocumentStore().folderURL(for: .guitarPro)
+        try FileManager.default.createDirectory(at: documentFolder, withIntermediateDirectories: true)
         let names = ["transport-test-\(UUID().uuidString).gp", "transport-test-\(UUID().uuidString).gp"]
         defer {
             model.pause()
@@ -142,12 +144,16 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             controller.endAppearanceTransition()
             window.isHidden = true
             window.rootViewController = nil
-            for name in names { FilePracticeSettingsStore().remove(kind: .guitarPro, fileName: name) }
+            for name in names {
+                FilePracticeSettingsStore().remove(kind: .guitarPro, fileName: name)
+                try? FileManager.default.removeItem(at: documentFolder.appendingPathComponent(name))
+            }
         }
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
         let data = try Data(contentsOf: url)
         for name in names {
             print("GP integration loading \(name)")
+            try data.write(to: documentFolder.appendingPathComponent(name))
             model.loadScore(data: data, fileName: name)
             try await waitUntil("GP readiness: \(model.errorMessage ?? "no error")") { model.playerReady }
             model.setScoreZoom(1.5)
@@ -155,6 +161,7 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             model.setScoreZoom(0.8)
             model.setScoreZoom(1)
             model.setPlaybackSpeed(0.9)
+            model.setCountInEnabled(true)
             model.setLoopCountInEnabled(true)
             for bar in [0, 2] {
                 print("GP integration selecting bar \(bar), ready=\(model.playerReady), error=\(model.errorMessage ?? "none")")
@@ -170,7 +177,10 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
                 model.togglePlayback()
                 // Interrupt the initial prebuffered count-in as well as completed loops.
                 try await Task.sleep(for: .milliseconds(250))
-                model.pause()
+                XCTAssertTrue(model.isPlaying)
+                model.handleAudioRouteChange(reason: 2)
+                XCTAssertFalse(model.isPlaying)
+                XCTAssertNil(model.errorMessage)
                 try await Task.sleep(for: .milliseconds(300))
                 model.togglePlayback()
                 try await waitUntil("GP must advance after count-in at 0.9x") {
@@ -188,6 +198,16 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
                 XCTAssertFalse(model.isPlaying)
             }
         }
+        model.recoverWebContent()
+        XCTAssertFalse(model.playerReady)
+        try await waitUntil("Terminated WebContent must reload the saved GP") { model.playerReady }
+        XCTAssertEqual(try Data(contentsOf: documentFolder.appendingPathComponent(names[1])), data)
+        model.setCountInEnabled(false)
+        let recoveredTick = model.position.currentTick
+        model.togglePlayback()
+        try await waitUntil("Recovered WebContent must play without reopening the library") { model.position.currentTick > recoveredTick + 300 }
+        model.pause()
+        XCTAssertNil(model.errorMessage)
         let image = UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
             controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
         }

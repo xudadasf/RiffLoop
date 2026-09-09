@@ -92,6 +92,7 @@ struct GpWebView: UIViewRepresentable {
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             ReproductionStore.shared.record("incident", "web_content.process_terminated")
+            viewModel.recoverWebContent()
         }
 
         func webView(

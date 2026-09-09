@@ -1,4 +1,5 @@
 import XCTest
+import AVFAudio
 @testable import RiffLoop
 
 final class GpBridgeEventTests: XCTestCase {
@@ -15,8 +16,8 @@ final class GpBridgeEventTests: XCTestCase {
         XCTAssertEqual(viewModel.countInVolume, 1.7)
         viewModel.setMetronomeVolume(0)
         XCTAssertEqual(viewModel.countInVolume, 0)
-        viewModel.setMetronomeVolume(4)
-        XCTAssertEqual(viewModel.countInVolume, 3)
+        viewModel.setMetronomeVolume(9)
+        XCTAssertEqual(viewModel.countInVolume, 6)
     }
 
     @MainActor
@@ -29,6 +30,23 @@ final class GpBridgeEventTests: XCTestCase {
         XCTAssertFalse(viewModel.countInEnabled)
         viewModel.setMetronomeVolume(1.2)
         XCTAssertEqual(viewModel.countInVolume, 1.2)
+    }
+
+    @MainActor
+    func testDisconnectCancelsCountInIntentAndExpandedGainIsBounded() {
+        let model = GpWebViewModel()
+        model.receive(.playerStateChanged(GpPlaybackState(state: 0, stopped: false, transitioning: true)))
+        XCTAssertTrue(model.isPlaying)
+        model.handleAudioRouteChange(reason: AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue)
+        XCTAssertTrue(model.isPlaying)
+        model.handleAudioRouteChange(reason: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue)
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertNil(model.errorMessage)
+        model.setMasterVolume(100)
+        XCTAssertEqual(model.masterVolume, 16)
+        model.setMetronomeVolume(100)
+        XCTAssertEqual(model.metronomeVolume, 6)
+        XCTAssertEqual(model.countInVolume, 6)
     }
 
     func testDecodesScoreMetadataSentByTheOfflineRenderer() throws {

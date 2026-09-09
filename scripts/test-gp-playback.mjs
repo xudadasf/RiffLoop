@@ -1,3 +1,4 @@
+import './test-gp-audio.mjs';
 import './test-gp-transport-recovery.mjs';
 import './test-gp-count-in.mjs';
 import assert from "node:assert/strict";

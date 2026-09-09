@@ -89,6 +89,7 @@ final class ReproductionRecorder: NSObject, MXMetricManagerSubscriber, @unchecke
             "audioRoute": session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ","),
             "audioSampleRate": String(session.sampleRate),
             "audioIOBuffer": String(session.ioBufferDuration),
+            "audioOutputLatency": String(session.outputLatency),
             "audioCategory": session.category.rawValue,
             "thermal": String(ProcessInfo.processInfo.thermalState.rawValue),
             "orientation": String(UIDevice.current.orientation.rawValue)

@@ -49,6 +49,8 @@ final class ReproductionStore: @unchecked Sendable {
     private var buffer: [(event: ReproductionEvent, bytes: Int)] = []
     private var bufferBytes = 0
     private var lastCheckpoint = 0.0
+    private var lastCheckpointSequence = 0
+    private var checkpointStarted = 0.0
     private var recordingUntil = 0.0
     private var incidentMaterialNames = Set<String>()
     private var lastArchivedSequence = 0
@@ -78,9 +80,20 @@ final class ReproductionStore: @unchecked Sendable {
                 try root.setResourceValues(excluded)
                 let previous = self.readSessions().first
                 if let previous, previous.phase == "active" || previous.phase == "starting" {
-                    let checkpoint = self.directory(previous.id).appendingPathComponent("checkpoint.jsonl")
-                    if let data = try? Data(contentsOf: checkpoint), !data.isEmpty {
-                        try data.write(to: self.directory(previous.id).appendingPathComponent("events-recovered.jsonl"), options: .atomic)
+                    let checkpointDirectory = self.directory(previous.id)
+                    let files = (try? FileManager.default.contentsOfDirectory(at: checkpointDirectory, includingPropertiesForKeys: nil)) ?? []
+                    var events: [Int: ReproductionEvent] = [:]
+                    for file in files where file.lastPathComponent.hasPrefix("checkpoint") && file.pathExtension == "jsonl" {
+                        for line in (try? Data(contentsOf: file))?.split(separator: 10) ?? [] {
+                            if let event = try? JSONDecoder().decode(ReproductionEvent.self, from: Data(line)) { events[event.sequence] = event }
+                        }
+                    }
+                    var recoveredData = Data()
+                    for event in events.values.sorted(by: { $0.sequence < $1.sequence }) {
+                        recoveredData.append(try JSONEncoder().encode(event)); recoveredData.append(10)
+                    }
+                    if !recoveredData.isEmpty {
+                        try recoveredData.write(to: checkpointDirectory.appendingPathComponent("events-recovered.jsonl"), options: .atomic)
                     }
                     var recovered = previous
                     recovered.incidents += 1
@@ -246,6 +259,22 @@ final class ReproductionStore: @unchecked Sendable {
         }
         session = current
         if kind == "incident" {
+            // Keep a small index even when detailed prelude/aftermath parts rotate.
+            // It is explicitly an index, not a complete replay of an evicted incident.
+            let indexURL = directory(current.id).appendingPathComponent("incident-index.json")
+            do {
+                var index = (try? JSONDecoder().decode([ReproductionEvent].self, from: Data(contentsOf: indexURL))) ?? []
+                let shortDetails = details.mapValues { String($0.prefix(2_000)) }
+                let state = event.state.filter { $0.key.hasSuffix("FileName") || $0.key == "audioRoute" || $0.key == "gp.position" }
+                index.append(ReproductionEvent(sequence: event.sequence, date: event.date, elapsed: event.elapsed,
+                    kind: kind, name: name, details: shortDetails, state: state))
+                index = Array(index.suffix(64))
+                var data = try JSONEncoder().encode(index)
+                while data.count > 128_000 && index.count > 1 {
+                    index.removeFirst(); data = try JSONEncoder().encode(index)
+                }
+                try data.write(to: indexURL, options: .atomic)
+            } catch { session?.recordingErrors += 1 }
             recordingUntil = uptime + 15
             // Flush the prelude once, then append only the 15-second aftermath.
             for item in buffer where item.event.sequence > lastArchivedSequence { persistEvent(item.event) }
@@ -262,16 +291,38 @@ final class ReproductionStore: @unchecked Sendable {
         } else if uptime < recordingUntil {
             persistEvent(event)
         }
-        // Tiny crash-recovery checkpoint, overwritten every three seconds; normal history is not accumulated.
+        // Append only new steps every three seconds. Three rotating parts preserve
+        // the recent crash prelude without rewriting the entire 60-second buffer.
         if kind == "incident" || kind == "lifecycle" || uptime - lastCheckpoint >= 3 {
             do {
+                let folder = directory(current.id)
+                let checkpoint = folder.appendingPathComponent("checkpoint.jsonl")
+                let previous = folder.appendingPathComponent("checkpoint-1.jsonl")
+                let older = folder.appendingPathComponent("checkpoint-2.jsonl")
                 var data = Data()
-                for item in buffer where item.event.sequence > lastArchivedSequence {
+                for item in buffer where item.event.sequence > max(lastCheckpointSequence, lastArchivedSequence) {
                     data.append(try JSONEncoder().encode(item.event)); data.append(10)
                 }
-                try data.write(to: directory(current.id).appendingPathComponent("checkpoint.jsonl"), options: .atomic)
-                try JSONEncoder().encode(session).write(to: directory(current.id).appendingPathComponent("manifest.json"), options: .atomic)
+                let bytes = (try? checkpoint.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                if kind == "incident" {
+                    // These steps have just been archived with the incident.
+                    for file in [checkpoint, previous, older] { if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) } }
+                    checkpointStarted = uptime
+                } else if bytes + data.count > 170_000 || uptime - checkpointStarted >= 20 {
+                    if FileManager.default.fileExists(atPath: older.path) { try FileManager.default.removeItem(at: older) }
+                    if FileManager.default.fileExists(atPath: previous.path) { try FileManager.default.moveItem(at: previous, to: older) }
+                    if FileManager.default.fileExists(atPath: checkpoint.path) { try FileManager.default.moveItem(at: checkpoint, to: previous) }
+                    checkpointStarted = uptime
+                }
+                if !FileManager.default.fileExists(atPath: checkpoint.path) { try Data().write(to: checkpoint) }
+                if !data.isEmpty {
+                    let handle = try FileHandle(forWritingTo: checkpoint)
+                    defer { try? handle.close() }
+                    try handle.seekToEnd(); try handle.write(contentsOf: data)
+                }
+                try JSONEncoder().encode(session).write(to: folder.appendingPathComponent("manifest.json"), options: .atomic)
                 lastCheckpoint = uptime
+                lastCheckpointSequence = event.sequence
             } catch { session?.recordingErrors += 1 }
         }
     }
@@ -299,10 +350,9 @@ final class ReproductionStore: @unchecked Sendable {
             let handle = try FileHandle(forWritingTo: file)
             defer { try? handle.close() }
             try handle.seekToEnd(); try handle.write(contentsOf: data)
-            if event.kind != "sample" { try handle.synchronize() }
+            if event.kind == "incident" { try handle.synchronize() }
             partBytes += data.count
             lastArchivedSequence = event.sequence
-            try JSONEncoder().encode(current).write(to: directory(current.id).appendingPathComponent("manifest.json"), options: .atomic)
         } catch { current.recordingErrors += 1 }
         session = current
     }

@@ -78,6 +78,13 @@
             enableUserInteraction: false
         }
     });
+    const beginInvoke = api.uiFacade.beginInvoke.bind(api.uiFacade);
+    api.uiFacade.beginInvoke = action => beginInvoke(() => {
+        try { action(); } catch (error) {
+            post("reproductionError", { type: "renderer_callback", message: String(error), stack: String(error?.stack || "") });
+            throw error;
+        }
+    });
     // Temporary diagnostics for GP backing audio on a physical iPad. Remove after
     // the WebKit/native output breakpoint has been identified.
     const mediaSnapshot = (media) => {
@@ -229,7 +236,7 @@
         const requestedMutes = new Map();
         let enabled = true;
         let masterVolume = 0.75;
-        const clampVolume = (value) => Math.min(4, Math.max(0, Number(value) || 0));
+        const clampVolume = (value) => Math.min(16, Math.max(0, Number(value) || 0));
         const applyVolume = (track) => {
             const requested = requestedVolumes.get(track.index) ?? 1;
             playerApi.changeTrackVolume([track], requested * masterVolume);
@@ -640,11 +647,17 @@
         synthApi,
         canUseBacking
     });
+    let nativeOutputLatency = 0;
+    const configureAudioOutput = () => window.RiffLoopAudio.install(api.player?.output, {
+        nativeLatency: () => nativeOutputLatency,
+        report: details => post("reproductionAudio", details)
+    });
     let fallbackCountInContext;
     const countIn = window.RiffLoopCountIn.create({
         makeContext: () => {
             // Native toolbar taps do not unlock a separate WebAudio context on iPad.
             // Use the synth output's already activated audio clock without playing the score.
+            configureAudioOutput();
             const output = api.player?.output;
             output?.activate();
             const context = output?.context || synthApi.player?.output?.context
@@ -652,6 +665,8 @@
             postBackingDiagnostic("count-in-context", null, { state: context.state, shared: context === output?.context });
             return context;
         },
+        destination: context => api.player?.output?.riffloopDestination || context.destination,
+        onInterrupted: () => { rangeCountInRestarter.cancel(); transport.pause(true); },
         settings: () => {
             let bar = api.score?.masterBars?.[0];
             for (const candidate of api.score?.masterBars || []) {
@@ -1047,6 +1062,7 @@
         });
     });
     api.playerReady.on(() => {
+        configureAudioOutput();
         mainPlayerReadyForScore = true;
         notifyPlayerReady();
     });
@@ -1076,11 +1092,24 @@
             transport.markBackingStarted(api.timePosition);
         }
     });
+    let playbackProgressAt = 0;
+    api.playerStateChanged.on(state => { if (state.state === 1) playbackProgressAt = performance.now(); });
+    window.setInterval(() => {
+        if (!transport.isPlayingIntent() || countIn.active || loopTransitioning) return;
+        if (performance.now() - playbackProgressAt < 3500) return;
+        const output = api.player?.output;
+        post("reproductionError", { type: "playback_stalled", tick: api.tickPosition,
+            audioState: output?.context?.state, audioTime: output?.context?.currentTime });
+        rangeCountInRestarter.cancel();
+        transport.pause(true);
+        post("error", { message: "音频播放未能继续，已暂停；请重新点击播放。" });
+    }, 500);
     document.addEventListener("playing", (event) => {
         if (event.target !== backingMediaElement()) return;
         transport.markBackingStarted(api.timePosition);
     }, true);
     api.playerPositionChanged.on((position) => {
+        if (!position.isSeek) playbackProgressAt = performance.now();
         if (!position.isSeek) transport.startDeferredBacking(position.currentTime);
         rangeCountInRestarter.handlePlayerPosition(position);
         // alphaTab's native range can be lost when its internal player is rebuilt.
@@ -1398,12 +1427,13 @@
                 restoreScoreScrollPolicy();
                 loadedScoreBytes = decodeBase64(base64);
                 api.load(loadedScoreBytes.slice());
-                synthApi.load(loadedScoreBytes.slice());
+                if (!usesNativeBacking) synthApi.load(loadedScoreBytes.slice());
             } catch (error) {
                 post("error", { message: `乐谱加载失败：${errorMessage(error)}` });
             }
         },
-        playPause() { playPauseBoth(); },
+        setOutputLatency(seconds) { nativeOutputLatency = Math.max(0, Math.min(0.5, Number(seconds) || 0)); },
+        playPause() { configureAudioOutput(); playPauseBoth(); },
         pause() { rangeCountInRestarter.cancel(); transport.pause(true); },
         stop() { rangeCountInRestarter.cancel(); transport.stop(); seekBoth(stopTick()); },
         seekTick(tick) { seekBoth(tick); },
@@ -1446,7 +1476,7 @@
                 transport.pause();
                 resetPlaybackReadiness();
                 api.load(loadedScoreBytes.slice());
-                synthApi.load(loadedScoreBytes.slice());
+                if (!usesNativeBacking) synthApi.load(loadedScoreBytes.slice());
             }
         },
         setBeatAccents(accents, reloadPlayer = false) {
@@ -1458,7 +1488,7 @@
                 transport.pause();
                 resetPlaybackReadiness();
                 api.load(loadedScoreBytes.slice());
-                synthApi.load(loadedScoreBytes.slice());
+                if (!usesNativeBacking) synthApi.load(loadedScoreBytes.slice());
             }
         },
         setCountInAccents(accents) { countInAccents = Array.isArray(accents) ? accents.slice(0, 32) : []; },

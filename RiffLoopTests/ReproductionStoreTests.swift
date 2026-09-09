@@ -159,4 +159,26 @@ final class ReproductionStoreTests: XCTestCase {
         XCTAssertEqual(second.first?.incidents, 0)
     }
 
+    func testCheckpointAppendsEachStepOnceAndIncidentIndexSurvivesRotation() async throws {
+        let root = try root()
+        let store = ReproductionStore(root: root, partLimit: 512)
+        store.start(environment: [:])
+        for number in 0..<20 { store.record("lifecycle", "checkpoint", ["step": String(number)]) }
+        let first = await store.sessions()
+        let id = try XCTUnwrap(first.first?.id)
+        let folder = root.appendingPathComponent(id)
+        let checkpoint = try Data(contentsOf: folder.appendingPathComponent("checkpoint.jsonl"))
+            .split(separator: 10).map { try JSONDecoder().decode(ReproductionEvent.self, from: Data($0)) }
+        XCTAssertEqual(checkpoint.filter { $0.name == "checkpoint" }.count, 20)
+        XCTAssertEqual(Set(checkpoint.map(\.sequence)).count, checkpoint.count)
+        store.record("incident", "first_failure")
+        for number in 0..<80 { store.record("incident", "repeated_failure", ["step": String(number)]) }
+        _ = await store.sessions()
+        let indexData = try Data(contentsOf: folder.appendingPathComponent("incident-index.json"))
+        let index = try JSONDecoder().decode([ReproductionEvent].self, from: indexData)
+        XCTAssertEqual(index.count, 64)
+        XCTAssertEqual(index.last?.details["step"], "79")
+        XCTAssertLessThanOrEqual(indexData.count, 128_000)
+    }
+
 }

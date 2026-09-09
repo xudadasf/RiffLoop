@@ -106,9 +106,68 @@ final class GpWebViewModel: ObservableObject {
     private var nativeBackingAnchorMilliseconds = 0.0
     private var nativeBackingSyncPoints: [GpBackingSyncPoint] = []
     private var speedLadderBaseSpeed: Double?
+    private var audioObservers = Set<AnyCancellable>()
+    private var recoveryAttempts = 0
 
     init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
         self.settingsStore = settingsStore
+        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue ?? 0
+                self?.handleAudioRouteChange(reason: reason)
+            }.store(in: &audioObservers)
+        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue
+                if type == AVAudioSession.InterruptionType.began.rawValue { self?.interruptPlayback(reason: "session_interruption") }
+            }.store(in: &audioObservers)
+        NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.recoverWebContent() }
+            .store(in: &audioObservers)
+    }
+
+    func handleAudioRouteChange(reason: UInt) {
+        if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
+            interruptPlayback(reason: "output_disconnected")
+        }
+    }
+
+    private func interruptPlayback(reason: String) {
+        guard isPlaying else { return }
+        ReproductionStore.shared.record("incident", "gp.audio_interrupted", ["reason": reason])
+        pause()
+    }
+
+    func recoverWebContent() {
+        updatePracticeClock(isPlaying: false)
+        nativeBackingPlayer.reset()
+        nativeBackingPlaybackRequested = false
+        nativeBackingStarted = false
+        isPlaying = false
+        playerReady = false
+        rendererReady = false
+        didSendSoundFont = false
+        guard recoveryAttempts < 1 else {
+            errorMessage = "谱面进程再次中断，请重新打开文件。"
+            return
+        }
+        recoveryAttempts += 1
+        guard let currentFileName, let webView else { return }
+        let url = RiffLoopDocumentStore().folderURL(for: .guitarPro).appendingPathComponent(currentFileName)
+        Task { [weak self] in
+            do {
+                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
+                guard let self, self.currentFileName == currentFileName else { return }
+                self.loadScore(data: data, fileName: currentFileName)
+                self.recoveryAttempts = 1
+                webView.reload()
+            } catch {
+                self?.errorMessage = "谱面进程已中断，重新读取失败：\(error.localizedDescription)"
+            }
+        }
     }
 
     func attach(webView: WKWebView) {
@@ -116,6 +175,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        recoveryAttempts = 0
         if let previous = reproductionLoad { ReproductionRecorder.shared.end(previous, result: "superseded_by_file_switch") }
         reproductionLoad = ReproductionRecorder.shared.begin("gp.load_until_player_ready", details: ["file": fileName])
         ReproductionStore.shared.update(["gp.loadID": reproductionLoad ?? ""])
@@ -183,6 +243,17 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
+        if !isPlaying {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                try session.setActive(true)
+                call("setOutputLatency", arguments: [session.outputLatency + session.ioBufferDuration])
+            } catch {
+                errorMessage = "音频输出暂不可用：\(error.localizedDescription)"
+                return
+            }
+        }
         call("playPause")
     }
 
@@ -202,6 +273,8 @@ final class GpWebViewModel: ObservableObject {
         nativeBackingPlayer.pause()
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
+        isPlaying = false
+        updatePracticeClock(isPlaying: false)
         call("pause")
     }
 
@@ -346,7 +419,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        masterVolume = min(max(volume, 0), 4)
+        masterVolume = min(max(volume, 0), 16)
         call("setMasterVolume", arguments: [masterVolume])
         saveProfile()
     }
@@ -400,7 +473,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        metronomeVolume = min(max(volume, 0), 3)
+        metronomeVolume = min(max(volume, 0), 6)
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
@@ -667,6 +740,7 @@ final class GpWebViewModel: ObservableObject {
                 )
             }
         case let .positionChanged(position):
+            if position.isSeek != true && isPlaying { recoveryAttempts = 0 }
             self.position = position
             synchronizeNativeBacking(to: position)
             if
@@ -735,19 +809,8 @@ final class GpWebViewModel: ObservableObject {
             if backingDiagnosticLines.count > 12 {
                 backingDiagnosticLines.removeFirst(backingDiagnosticLines.count - 12)
             }
-            let session = AVAudioSession.sharedInstance()
-            let routes = session.currentRoute.outputs
-                .map { $0.portType.rawValue }
-                .joined(separator: ",")
-            let diagnosticLine = "\(ISO8601DateFormatter().string(from: Date())) js=\(message) "
-                + "category=\(session.category.rawValue) mode=\(session.mode.rawValue) "
-                + "outputVolume=\(session.outputVolume) "
-                + "secondarySilenced=\(session.secondaryAudioShouldBeSilencedHint) routes=\(routes)"
-            persistBackingDiagnostic(diagnosticLine, reset: message.contains("\"stage\":\"synth-score-loaded\""))
-            NSLog(
-                "%@",
-                "[DEBUG-gp-audio-56] \(diagnosticLine)"
-            )
+            // The bridge already journals this event off the main thread. Synchronous
+            // NSLog blocked scene updates in the 0.25.59 MetricKit watchdog report.
         case let .error(message):
             ReproductionStore.shared.record("incident", "gp.error", ["message": message])
             if let operation = reproductionLoad { ReproductionRecorder.shared.end(operation, result: "error: " + message) }
@@ -758,24 +821,6 @@ final class GpWebViewModel: ObservableObject {
 
     func receiveBridgeFailure(_ error: Error) {
         errorMessage = "GP 消息解析失败：\(error.localizedDescription)"
-    }
-
-    private func persistBackingDiagnostic(_ line: String, reset: Bool) {
-        do {
-            let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let fileURL = directory.appendingPathComponent("gp-audio-diagnostic.log")
-            let data = Data((line + "\n").utf8)
-            if reset || !FileManager.default.fileExists(atPath: fileURL.path) {
-                try data.write(to: fileURL, options: .atomic)
-                return
-            }
-            let handle = try FileHandle(forWritingTo: fileURL)
-            try handle.seekToEnd()
-            try handle.write(contentsOf: data)
-            try handle.close()
-        } catch {
-            NSLog("%@", "[DEBUG-gp-audio-56] log-write-failed=\(error.localizedDescription)")
-        }
     }
 
     private func synchronizeNativeBacking(to position: GpPlaybackPosition) {
@@ -831,7 +876,7 @@ final class GpWebViewModel: ObservableObject {
         if backingDiagnosticLines.count > 12 {
             backingDiagnosticLines.removeFirst(backingDiagnosticLines.count - 12)
         }
-        NSLog("%@", "[DEBUG-gp-native-backing] \(line)")
+        ReproductionStore.shared.record("event", "gp.native_audio", ["message": line])
     }
 
     private func compactBackingDiagnostic(_ message: String) -> String {
@@ -967,12 +1012,12 @@ final class GpWebViewModel: ObservableObject {
             max(pendingProfile.baseBpm ?? metadata.initialBpm ?? 120, bpmRange.lowerBound),
             bpmRange.upperBound
         )
-        masterVolume = min(max(pendingProfile.masterVolume, 0), 4)
+        masterVolume = min(max(pendingProfile.masterVolume, 0), 16)
         backingVolume = min(max(pendingProfile.backingVolume, 0), 4)
         synthEnabled = pendingProfile.synthEnabled
         backingEnabled = pendingProfile.backingEnabled
         metronomeEnabled = pendingProfile.metronomeEnabled
-        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 3)
+        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 6)
         countInAccents = (0..<max(1, metadata.beatsPerMeasure ?? 4)).map { index in
             pendingProfile.countInAccents.indices.contains(index) ? pendingProfile.countInAccents[index] : (index == 0 ? .strong : .normal)
         }
