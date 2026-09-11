@@ -151,11 +151,23 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         }
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
         let data = try Data(contentsOf: url)
+        func findWebView(_ view: UIView) -> WKWebView? {
+            if let webView = view as? WKWebView { return webView }
+            return view.subviews.compactMap { findWebView($0) }.first
+        }
         for name in names {
             print("GP integration loading \(name)")
             try data.write(to: documentFolder.appendingPathComponent(name))
             model.loadScore(data: data, fileName: name)
             try await waitUntil("GP readiness: \(model.errorMessage ?? "no error")") { model.playerReady }
+            let webView = try XCTUnwrap(findWebView(controller.view))
+            _ = try await webView.evaluateJavaScript("""
+                if (!window.testPlaybackErrors) {
+                    window.testPlaybackErrors = [];
+                    window.addEventListener('error', event => window.testPlaybackErrors.push(String(event.message)));
+                    window.addEventListener('unhandledrejection', event => window.testPlaybackErrors.push(String(event.reason)));
+                }
+                """)
             model.setScoreZoom(1.5)
             XCTAssertEqual(model.scoreZoom, 1.5)
             model.setScoreZoom(0.8)
@@ -198,6 +210,27 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
                 XCTAssertFalse(model.isPlaying)
             }
         }
+        // The 60 BPM count-in exceeds the 3.5 s stall threshold. A paused seek
+        // must receive a fresh playback grace period after the count-in ends.
+        model.clearLoop()
+        model.setPlaybackSpeed(1)
+        model.setBaseBpm(60)
+        model.setMetronomeVolume(1)
+        model.setCountInEnabled(true)
+        for _ in 0..<3 {
+            model.seek(to: 3840)
+            try await Task.sleep(for: .milliseconds(300))
+            model.togglePlayback()
+            try await waitUntil("Four-second count-in must resume at the selected beat") {
+                model.position.currentTick > 4140 && model.isPlaying
+            }
+            XCTAssertNil(model.errorMessage)
+            model.pause()
+            try await Task.sleep(for: .milliseconds(300))
+        }
+        let webView = try XCTUnwrap(findWebView(controller.view))
+        let scriptErrors = try await webView.evaluateJavaScript("window.testPlaybackErrors")
+        XCTAssertEqual(scriptErrors as? [String], [], "Range reselection and replacement must not throw script errors")
         model.recoverWebContent()
         XCTAssertFalse(model.playerReady)
         try await waitUntil("Terminated WebContent must reload the saved GP") { model.playerReady }

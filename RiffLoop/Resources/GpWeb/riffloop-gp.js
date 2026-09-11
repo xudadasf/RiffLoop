@@ -679,6 +679,7 @@
         },
         onError: error => { transport.pause(true); post("error", { message: "预备拍播放失败：" + errorMessage(error) }); }
     });
+    let playbackProgressAt = 0;
     const transport = createTransportController({
         startCountIn: action => countIn.start(action),
         cancelCountIn: () => countIn.cancel(),
@@ -697,11 +698,16 @@
             }
         },
         schedule: window.setTimeout.bind(window),
-        reportState: (playing, stopped) => post("playerStateChanged", {
-            state: playing && !countIn.active ? 1 : 0,
-            transitioning: loopTransitioning || countIn.active,
-            stopped
-        })
+        reportState: (playing, stopped) => {
+            // The worker's Playing receipt can arrive after the next watchdog tick.
+            // Start the grace period when score playback is requested after count-in.
+            if (playing && !countIn.active) playbackProgressAt = performance.now();
+            post("playerStateChanged", {
+                state: playing && !countIn.active ? 1 : 0,
+                transitioning: loopTransitioning || countIn.active,
+                stopped
+            });
+        }
     });
     const isPlaybackReady = (state) => state.hasLoaded
         && state.mainReady
@@ -1092,7 +1098,6 @@
             transport.markBackingStarted(api.timePosition);
         }
     });
-    let playbackProgressAt = 0;
     api.playerStateChanged.on(state => { if (state.state === 1) playbackProgressAt = performance.now(); });
     window.setInterval(() => {
         if (!transport.isPlayingIntent() || countIn.active || loopTransitioning) return;
@@ -1421,6 +1426,7 @@
                 window.riffloopCommittedBars = null;
                 pendingRangeHighlight = null;
                 committedRange = null;
+                api.clearPlaybackRangeHighlight();
                 rangeLoopingEnabled = false;
                 wholeSongLoopingEnabled = false;
                 rangeCompletionAwaitingReset = false;

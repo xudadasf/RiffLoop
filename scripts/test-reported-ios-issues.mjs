@@ -35,7 +35,7 @@ assert.match(
 );
 assert.match(
     gpWeb,
-    /reportState: \(playing, stopped\) => post\("playerStateChanged", \{[\s\S]*?state: playing && !countIn.active \? 1 : 0,[\s\S]*?transitioning: loopTransitioning \|\| countIn.active/,
+    /reportState: \(playing, stopped\) => \{[\s\S]*?post\("playerStateChanged", \{[\s\S]*?state: playing && !countIn.active \? 1 : 0,[\s\S]*?transitioning: loopTransitioning \|\| countIn.active/,
     "GP controls and paused-only loop actions must follow the coordinated transport state"
 );
 assert.match(

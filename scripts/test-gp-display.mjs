@@ -1,5 +1,38 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+
+// Exercise the shipped alphaTab callbacks: clearing a range must release the
+// selected beats before a replacement score's post-render callback runs.
+{
+    const { AlphaTabApi } = createRequire(import.meta.url)("../RiffLoop/Resources/GpWeb/alphaTab.min.js");
+    const prototype = AlphaTabApi.prototype;
+    const calls = [];
+    const player = {
+        Oy: (...args) => calls.push(args),
+        highlightPlaybackRange: prototype.highlightPlaybackRange,
+        Bw: {}, vy() {}, postRenderFinished: { trigger() {} },
+        uiFacade: { triggerEvent() {} }
+    };
+    prototype.highlightPlaybackRange.call(player, { id: 'old-start' }, { id: 'old-end' });
+    prototype.clearPlaybackRangeHighlight.call(player);
+    calls.length = 0;
+    prototype.Lw.call(player);
+    assert.equal(calls.length, 0, 'Post-render must not restore beats from a cleared or replaced score');
+
+    // A pending render can legitimately have no bounds for the selected beats.
+    let cleared = 0, notified = 0;
+    const renderingPlayer = {
+        Nw: { boundsLookup: { findBeat: () => undefined } },
+        iy: { clear() { cleared++; } },
+        playbackRangeHighlightChanged: { trigger() { notified++; } }
+    };
+    assert.doesNotThrow(() => prototype.Oy.call(renderingPlayer,
+        { beat: { absolutePlaybackStart: 0 } }, { beat: { absolutePlaybackStart: 960 } }),
+    'Missing render bounds must defer highlight instead of throwing realBounds');
+    assert.equal(cleared, 1);
+    assert.equal(notified, 1);
+}
 
 const html = readFileSync(
     new URL("../RiffLoop/Resources/GpWeb/index.html", import.meta.url),

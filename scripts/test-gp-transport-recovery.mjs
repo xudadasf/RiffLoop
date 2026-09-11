@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-const source = readFileSync(new URL('../RiffLoop/Resources/GpWeb/riffloop-gp.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../RiffLoop/Resources/GpWeb/riffloop-gp.js', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
 const alphaTab = createRequire(import.meta.url)('../RiffLoop/Resources/GpWeb/alphaTab.min.js');
 const implementation = source.slice(source.indexOf('    const createTransportController ='), source.indexOf('    const backingAligner ='));
 const createTransport = new Function('alphaTab', `${implementation}; return createTransportController;`)(alphaTab);
@@ -30,6 +30,60 @@ synth.qp = true;
 transport.toggle();
 assert.equal(acceptedStarts, 1, 'The first tap after replacement player readiness must play');
 console.log('GP replacement-player rejection and retry passed');
+
+// Device trace: pause, seek, four-second count-in, then the watchdog runs 7 ms
+// after play was requested, before the worker delivers its Playing receipt.
+{
+    let time = 1000, check, completeCountIn, playingReceipt;
+    const reports = [];
+    const countIn = { active: false, cancel() { this.active = false; } };
+    const api = {
+        timePosition: 212000, tickPosition: 203520, playerState: 0,
+        playerStateChanged: { on(fn) { playingReceipt = fn; } },
+        play() { return true; }, pause() {}, stop() {}
+    };
+    const reportStart = source.indexOf('        reportState:', source.indexOf('    const transport ='));
+    const reportEnd = source.indexOf('\n    });\n    const isPlaybackReady', reportStart);
+    const report = source.slice(reportStart + '        reportState:'.length, reportEnd);
+    const watchStart = source.indexOf('    api.playerStateChanged.on(state =>');
+    const watchEnd = source.indexOf('    document.addEventListener("playing"', watchStart);
+    assert.ok(reportStart > 0 && reportEnd > reportStart && watchEnd > watchStart);
+    const controller = new Function('createTransport', 'api', 'countIn', 'performance', 'window', 'post', `
+        let playbackProgressAt = 0;
+        const loopTransitioning = false;
+        const rangeCountInRestarter = { cancel() {} };
+        const transport = createTransport({ api, synthApi: { pause() {}, stop() {} },
+            canUseBacking: () => false, schedule: () => {},
+            startCountIn: action => { countIn.active = true; window.complete = action; return true; },
+            cancelCountIn: () => countIn.cancel(), reportState: ${report} });
+        ${source.slice(watchStart, watchEnd)}
+        return transport;
+    `)(createTransport, api, countIn, { now: () => time }, {
+        setInterval(fn) { check = fn; }, set complete(fn) { completeCountIn = fn; }
+    }, (name, details) => reports.push({ name, details }));
+    controller.pause(true);
+    controller.play();
+    time += 4025;
+    check();
+    assert.equal(reports.some(e => e.name === 'error'), false, 'Count-in is not a stall');
+    countIn.active = false;
+    completeCountIn();
+    time += 7;
+    check();
+    assert.equal(reports.some(e => e.name === 'error'), false,
+        'A fresh start must get its own grace period before the worker Playing receipt');
+    time += 13;
+    playingReceipt({ state: 1 });
+    time += 3499;
+    check();
+    assert.equal(reports.some(e => e.name === 'error'), false);
+    time += 1;
+    check();
+    assert.equal(reports.filter(e => e.name === 'error').length, 1,
+        'A real lack of playback progress must still pause and report after 3.5 seconds');
+    assert.equal(controller.isPlayingIntent(), false);
+    console.log('GP four-second count-in/worker receipt race and real stall detection passed');
+}
 
 const readyEvents = [];
 const readiness = source.slice(source.indexOf('    const isPlaybackReady ='), source.indexOf('    const applyLoopMode ='));
