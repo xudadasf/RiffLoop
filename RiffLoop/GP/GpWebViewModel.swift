@@ -108,6 +108,7 @@ final class GpWebViewModel: ObservableObject {
     private var speedLadderBaseSpeed: Double?
     private var audioObservers = Set<AnyCancellable>()
     private var recoveryAttempts = 0
+    private var sceneActive = true
 
     init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
         self.settingsStore = settingsStore
@@ -681,6 +682,8 @@ final class GpWebViewModel: ObservableObject {
             updatePracticeClock(isPlaying: false)
             saveProfile()
         }
+        sceneActive = isActive
+        guard rendererReady else { return }
         call("lifecycle", arguments: [isActive])
     }
 
@@ -708,6 +711,7 @@ final class GpWebViewModel: ObservableObject {
         switch event {
         case .ready:
             rendererReady = true
+            call("lifecycle", arguments: [sceneActive])
             guard sendBundledSoundFont() else { return }
             if let pendingScoreData {
                 self.pendingScoreData = nil
