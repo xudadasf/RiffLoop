@@ -231,10 +231,16 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         let webView = try XCTUnwrap(findWebView(controller.view))
         let scriptErrors = try await webView.evaluateJavaScript("window.testPlaybackErrors")
         XCTAssertEqual(scriptErrors as? [String], [], "Range reselection and replacement must not throw script errors")
+        // A terminated WebContent process has no bridge while the replacement page
+        // is loading. Foreground notifications can arrive inside that gap.
+        _ = try await webView.evaluateJavaScript("window.riffloop = undefined")
         model.recoverWebContent()
+        model.setSceneActive(false)
+        model.setSceneActive(true)
         XCTAssertFalse(model.playerReady)
         try await waitUntil("Terminated WebContent must reload the saved GP") { model.playerReady }
         XCTAssertEqual(try Data(contentsOf: documentFolder.appendingPathComponent(names[1])), data)
+        XCTAssertNil(model.errorMessage, "Recovery-time lifecycle updates must not leave a user-visible error")
         model.setCountInEnabled(false)
         let recoveredTick = model.position.currentTick
         model.togglePlayback()
