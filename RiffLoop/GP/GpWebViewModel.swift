@@ -108,6 +108,7 @@ final class GpWebViewModel: ObservableObject {
     private var speedLadderBaseSpeed: Double?
     private var audioObservers = Set<AnyCancellable>()
     private var recoveryAttempts = 0
+    private var webContentRequiresReloadOnNextScore = false
     private var sceneActive = true
 
     init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
@@ -152,6 +153,7 @@ final class GpWebViewModel: ObservableObject {
         rendererReady = false
         didSendSoundFont = false
         guard recoveryAttempts < 1 else {
+            webContentRequiresReloadOnNextScore = true
             errorMessage = "谱面进程再次中断，请重新打开文件。"
             return
         }
@@ -230,6 +232,11 @@ final class GpWebViewModel: ObservableObject {
         backingDiagnosticLines = []
         backingProbeDiagnostic = nil
 
+        if webContentRequiresReloadOnNextScore, let webView {
+            pendingScoreData = data
+            webView.reload()
+            return
+        }
         guard rendererReady else {
             pendingScoreData = data
             return
@@ -710,6 +717,7 @@ final class GpWebViewModel: ObservableObject {
     func receive(_ event: GpBridgeEvent) {
         switch event {
         case .ready:
+            webContentRequiresReloadOnNextScore = false
             rendererReady = true
             call("lifecycle", arguments: [sceneActive])
             guard sendBundledSoundFont() else { return }
@@ -1234,6 +1242,10 @@ final class GpWebViewModel: ObservableObject {
                 ReproductionRecorder.shared.end(operation, result: error?.localizedDescription ?? String(describing: result))
                 Task { @MainActor [weak self] in
                     if let error {
+                        ReproductionStore.shared.record("incident", "gp.command_failed", [
+                            "command": function,
+                            "message": error.localizedDescription,
+                        ])
                         self?.errorMessage = "GP 命令 \(function) 执行失败：\(error.localizedDescription)"
                         return
                     }
@@ -1242,11 +1254,19 @@ final class GpWebViewModel: ObservableObject {
                         result["ok"] as? Bool == false
                     else { return }
                     let message = result["message"] as? String ?? "未知 JavaScript 异常"
+                    ReproductionStore.shared.record("incident", "gp.command_failed", [
+                        "command": function,
+                        "message": message,
+                    ])
                     self?.errorMessage = "GP 命令 \(function) 执行失败：\(message)"
                 }
             }
         } catch {
             ReproductionRecorder.shared.end(operation, result: "encoding_failed: " + error.localizedDescription)
+            ReproductionStore.shared.record("incident", "gp.command_failed", [
+                "command": function,
+                "message": "编码失败：" + error.localizedDescription,
+            ])
             errorMessage = "GP 命令 \(function) 编码失败：\(error.localizedDescription)"
         }
     }

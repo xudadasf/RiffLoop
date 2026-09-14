@@ -19,6 +19,17 @@ const app = read("RiffLoop/App/RiffLoopApp.swift");
 const practiceHistory = read("RiffLoop/Library/PracticeHistoryStore.swift");
 
 assert.match(
+    gpViewModel,
+    /guard recoveryAttempts < 1 else \{[\s\S]*?webContentRequiresReloadOnNextScore = true[\s\S]*?return[\s\S]*?func loadScore[\s\S]*?if webContentRequiresReloadOnNextScore, let webView \{[\s\S]*?webView\.reload\(\)/,
+    "reopening a GP after repeated WebContent termination must reload the dead page"
+);
+assert.equal(
+    gpViewModel.match(/record\("incident", "gp\.command_failed"/g)?.length,
+    3,
+    "all three GP command failure paths must create an incident archive"
+);
+
+assert.match(
     gpWeb,
     /const scoreFollowOffset = \(height\) => -Math\.round\(Math\.max\(0, Number\(height\) \|\| 0\) \* 0\.42\);[\s\S]*?scrollOffsetY: scoreFollowOffset/,
     "the active GP row must be vertically centered with room for following rows"

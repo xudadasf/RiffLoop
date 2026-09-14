@@ -241,6 +241,19 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         try await waitUntil("Terminated WebContent must reload the saved GP") { model.playerReady }
         XCTAssertEqual(try Data(contentsOf: documentFolder.appendingPathComponent(names[1])), data)
         XCTAssertNil(model.errorMessage, "Recovery-time lifecycle updates must not leave a user-visible error")
+
+        // A second termination before playback makes automatic recovery stop. The
+        // user-facing instruction to reopen a file must rebuild the dead page.
+        _ = try await webView.evaluateJavaScript("window.riffloop = undefined")
+        model.recoverWebContent()
+        XCTAssertFalse(model.rendererReady)
+        XCTAssertNotNil(model.errorMessage)
+        model.loadScore(data: data, fileName: names[0])
+        try await waitUntil("Reopening a GP after repeated WebContent termination must reload the page") {
+            model.playerReady
+        }
+        XCTAssertNil(model.errorMessage)
+
         model.setCountInEnabled(false)
         let recoveredTick = model.position.currentTick
         model.togglePlayback()
