@@ -20,7 +20,7 @@ const practiceHistory = read("RiffLoop/Library/PracticeHistoryStore.swift");
 
 assert.match(
     gpViewModel,
-    /guard recoveryAttempts < 1 else \{[\s\S]*?webContentRequiresReloadOnNextScore = true[\s\S]*?return[\s\S]*?func loadScore[\s\S]*?if webContentRequiresReloadOnNextScore, let webView \{[\s\S]*?webView\.reload\(\)/,
+    /func recoverWebContent\(\)[\s\S]*?webContentRequiresReloadOnNextScore = true[\s\S]*?guard recoveryAttempts < 1[\s\S]*?func loadScore[\s\S]*?if webContentRequiresReloadOnNextScore, let webView \{[\s\S]*?webView\.reload\(\)/,
     "reopening a GP after repeated WebContent termination must reload the dead page"
 );
 assert.equal(

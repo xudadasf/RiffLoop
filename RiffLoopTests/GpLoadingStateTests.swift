@@ -22,6 +22,7 @@ final class GpLoadingStateTests: XCTestCase {
             XCTAssertEqual(saved.lastPositionTick, 9121)
             XCTAssertEqual(saved.totalPracticeMilliseconds, 3420776)
             XCTAssertEqual(saved.totalCompletedLoops, 123)
+            model.leaveMode()
         }
     }
 
@@ -59,5 +60,23 @@ final class GpLoadingStateTests: XCTestCase {
         model.leaveMode()
         try await Task.sleep(for: .milliseconds(500))
         XCTAssertNil(model.errorMessage, "Leaving while the bridge is unavailable must not create command errors")
+    }
+
+    func testMetadataLoadedBeforeResumeKeepsSavedPositionAndAllowsBpmEdits() throws {
+        let suite = "GpLoadingStateTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FilePracticeSettingsStore(defaults: defaults)
+        try store.save(GpPracticeProfile(baseBpm: 70, lastPositionTick: 9121), kind: .guitarPro, fileName: "resume.gp")
+        let model = GpWebViewModel(settingsStore: store)
+        model.loadScore(data: Data(), fileName: "resume.gp")
+        model.receive(.scoreLoaded(GpScoreMetadata(title: "Resume", artist: "", bars: 10,
+            hasBackingTrack: false, tracks: [], initialBpm: 70)))
+        model.setBaseBpm(80)
+        model.setSceneActive(false)
+        let saved = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "resume.gp"))
+        XCTAssertEqual(saved.baseBpm, 80, "User edits after profile application must still persist")
+        XCTAssertEqual(saved.lastPositionTick, 9121, "Metadata readiness is earlier than the resume seek")
+        model.leaveMode()
     }
 }

@@ -260,6 +260,40 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         try await waitUntil("Recovered WebContent must play without reopening the library") { model.position.currentTick > recoveredTick + 300 }
         model.pause()
         XCTAssertNil(model.errorMessage)
+
+        // Leave before the asynchronous recovery read finishes, then reopen. The
+        // old task must neither reload the abandoned page nor replace saved settings.
+        model.setBaseBpm(70)
+        model.seek(to: 3840)
+        try await waitUntil("Save a nonzero practice position before recovery") {
+            abs(model.position.currentTick - 3840) < 2
+        }
+        model.setBaseBpm(70)
+        let store = FilePracticeSettingsStore()
+        let beforeExit = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: names[0]))
+        _ = try await webView.evaluateJavaScript("window.riffloop = undefined")
+        model.recoverWebContent()
+        model.leaveMode()
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertFalse(model.playerReady, "Leaving must cancel automatic recovery")
+        XCTAssertNil(model.errorMessage, "Leaving recovery must not send commands into a missing bridge")
+        let afterExit = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: names[0]))
+        XCTAssertEqual(afterExit.baseBpm, beforeExit.baseBpm)
+        XCTAssertEqual(afterExit.lastPositionTick, beforeExit.lastPositionTick)
+        model.loadScore(data: data, fileName: names[0])
+        try await waitUntil("Reopening after cancelled recovery must retain BPM and position") {
+            model.playerReady && abs(model.position.currentTick - beforeExit.lastPositionTick) < 2
+        }
+        XCTAssertEqual(model.baseBpm, 70)
+
+        // A user file selection supersedes a pending recovery read.
+        let nextProfile = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: names[1]))
+        _ = try await webView.evaluateJavaScript("window.riffloop = undefined")
+        model.recoverWebContent()
+        model.loadScore(data: data, fileName: names[1])
+        try await waitUntil("Selecting another GP during recovery must load the selected file") { model.playerReady }
+        XCTAssertEqual(model.baseBpm, nextProfile.baseBpm)
+        XCTAssertNil(model.errorMessage)
         let image = UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
             controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
         }

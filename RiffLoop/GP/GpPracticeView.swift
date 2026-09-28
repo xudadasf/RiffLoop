@@ -37,6 +37,8 @@ struct GpPracticeView: View {
     @State private var didOpenInitialURL = false
     @State private var activePanel: GpControlPanel?
     @State private var currentFileName: String?
+    @State private var scoreReadTask: Task<Void, Never>?
+    @State private var isReadingScore = false
 
     let initialURL: URL?
 
@@ -53,7 +55,11 @@ struct GpPracticeView: View {
                 TapGesture().onEnded { activePanel = nil }
             )
             .overlay {
-                if viewModel.score == nil {
+                if isReadingScore {
+                    ProgressView("正在读取乐谱…")
+                        .padding()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                } else if viewModel.score == nil {
                     emptyScoreView
                 }
             }
@@ -143,7 +149,12 @@ struct GpPracticeView: View {
                     recentProjects.opened(kind: .guitarPro, fileName: currentFileName)
                 }
             }
-            .onDisappear(perform: viewModel.leaveMode)
+            .onDisappear {
+                scoreReadTask?.cancel()
+                scoreReadTask = nil
+                isReadingScore = false
+                viewModel.leaveMode()
+            }
             .keepPracticeScreenAwake(hasFile: viewModel.score != nil)
     }
 
@@ -369,6 +380,7 @@ struct GpPracticeView: View {
             }
 
             Section("速度") {
+                Text("原谱 BPM：\(Int(viewModel.originalBaseBpm.rounded()))")
                 Stepper(
                     value: Binding(
                         get: { viewModel.baseBpm },
@@ -391,6 +403,11 @@ struct GpPracticeView: View {
                 Button("恢复导入 BPM", action: viewModel.resetBaseBpm)
                     .disabled(!viewModel.playerReady || abs(viewModel.baseBpm - viewModel.originalBaseBpm) < 0.5)
 
+                if viewModel.score != nil, abs(viewModel.baseBpm - viewModel.originalBaseBpm) >= 0.5 {
+                    Text("练习基准已调整，谱面仍显示原谱速度。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("1.00× 以当前基准 BPM 为准；变速谱按原 tempo map 等比例缩放。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -706,15 +723,29 @@ struct GpPracticeView: View {
     }
 
     private func importScore(from url: URL) {
+        scoreReadTask?.cancel()
+        viewModel.pause()
+        isReadingScore = true
         ReproductionStore.shared.expectLoadedInput(url, role: "gp")
-        let operation = ReproductionRecorder.shared.begin("gp.read_file", details: ["file": url.lastPathComponent])
-        defer { ReproductionRecorder.shared.end(operation, result: "read_method_returned; see load/error") }
         ReproductionStore.shared.record("action", "gp.select_file", ["file": url.lastPathComponent])
-        do {
-            currentFileName = url.lastPathComponent
-            viewModel.loadScore(data: try Data(contentsOf: url), fileName: url.lastPathComponent)
-        } catch {
-            viewModel.reportImportError(error)
+        scoreReadTask = Task { @MainActor in
+            let operation = ReproductionRecorder.shared.begin("gp.read_file", details: ["file": url.lastPathComponent])
+            defer {
+                ReproductionRecorder.shared.end(operation, result: Task.isCancelled ? "cancelled" : "read_finished; see load/error")
+                if !Task.isCancelled {
+                    isReadingScore = false
+                    scoreReadTask = nil
+                }
+            }
+            do {
+                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
+                guard !Task.isCancelled else { return }
+                currentFileName = url.lastPathComponent
+                viewModel.loadScore(data: data, fileName: url.lastPathComponent)
+            } catch {
+                guard !Task.isCancelled else { return }
+                viewModel.reportImportError(error)
+            }
         }
     }
 

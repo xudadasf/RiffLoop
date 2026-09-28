@@ -108,6 +108,7 @@ final class GpWebViewModel: ObservableObject {
     private var speedLadderBaseSpeed: Double?
     private var audioObservers = Set<AnyCancellable>()
     private var recoveryAttempts = 0
+    private var recoveryTask: Task<Void, Never>?
     private var webContentRequiresReloadOnNextScore = false
     private var sceneActive = true
 
@@ -144,6 +145,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func recoverWebContent() {
+        recoveryTask?.cancel()
+        recoveryTask = nil
         updatePracticeClock(isPlaying: false)
         nativeBackingPlayer.reset()
         nativeBackingPlaybackRequested = false
@@ -152,22 +155,24 @@ final class GpWebViewModel: ObservableObject {
         playerReady = false
         rendererReady = false
         didSendSoundFont = false
+        webContentRequiresReloadOnNextScore = true
         guard recoveryAttempts < 1 else {
-            webContentRequiresReloadOnNextScore = true
             errorMessage = "谱面进程再次中断，请重新打开文件。"
             return
         }
         recoveryAttempts += 1
-        guard let currentFileName, let webView else { return }
+        guard let currentFileName, webView != nil else { return }
         let url = RiffLoopDocumentStore().folderURL(for: .guitarPro).appendingPathComponent(currentFileName)
-        Task { [weak self] in
+        recoveryTask = Task { [weak self] in
             do {
                 let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
-                guard let self, self.currentFileName == currentFileName else { return }
+                guard !Task.isCancelled, let self, self.currentFileName == currentFileName else { return }
+                self.recoveryTask = nil
                 self.loadScore(data: data, fileName: currentFileName)
                 self.recoveryAttempts = 1
-                webView.reload()
             } catch {
+                guard !Task.isCancelled else { return }
+                self?.recoveryTask = nil
                 self?.errorMessage = "谱面进程已中断，重新读取失败：\(error.localizedDescription)"
             }
         }
@@ -178,6 +183,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        recoveryTask?.cancel()
+        recoveryTask = nil
         recoveryAttempts = 0
         if let previous = reproductionLoad { ReproductionRecorder.shared.end(previous, result: "superseded_by_file_switch") }
         reproductionLoad = ReproductionRecorder.shared.begin("gp.load_until_player_ready", details: ["file": fileName])
@@ -266,6 +273,13 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func leaveMode() {
+        recoveryTask?.cancel()
+        recoveryTask = nil
+        pendingScoreData = nil
+        if let operation = reproductionLoad {
+            ReproductionRecorder.shared.end(operation, result: "cancelled: left_gp_mode")
+            reproductionLoad = nil
+        }
         pause()
         clearLoop()
         setWholeSongLoopingEnabled(false)
@@ -1161,13 +1175,15 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func saveProfile() {
-        guard let currentFileName else { return }
+        // loadScore temporarily clears BPM and position before scoreLoaded applies
+        // the saved profile. Scene/exit callbacks must never persist that placeholder.
+        guard let currentFileName, didApplyPendingProfile else { return }
         try? settingsStore.save(
             GpPracticeProfile(
                 scoreZoom: scoreZoom,
                 playbackSpeed: playbackSpeed,
                 baseBpm: baseBpm,
-                lastPositionTick: position.currentTick.isFinite ? max(0, position.currentTick) : 0,
+                lastPositionTick: pendingResumeTick ?? (position.currentTick.isFinite ? max(0, position.currentTick) : 0),
                 displayedTrack: displayedTrack,
                 mutedTracks: mutedTracks,
                 soloTrack: soloTrack,
@@ -1202,6 +1218,9 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func call(_ function: String, arguments: [Any] = []) {
+        // Native cleanup still runs while WebContent is unavailable. Settings are
+        // sent again by the ready/scoreLoaded flow once the replacement page exists.
+        guard rendererReady else { return }
         // Binary load arguments are already preserved as material snapshots; never duplicate base64 in the journal.
         let safeArguments = function == "loadScore" || function == "loadSoundFont"
             ? "binary omitted; see materials" : String(describing: arguments)
