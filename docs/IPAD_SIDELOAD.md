@@ -40,6 +40,28 @@ pwsh -File scripts/download-ipa.ps1 -AllowOlderCommit  # 最近一次成功构�
 
 ## 安装新版或恢复失败的续签
 
+### 本机一键续签入口
+
+在这台已配置好的 Windows 电脑上，双击桌面的 **RiffLoop 一键续签**：
+
+1. USB 连接并解锁 iPad，电脑保持联网；出现“信任此电脑”时确认。
+2. 双击入口，等待 Sideloadly 完成。Apple 密码或验证码只在 Sideloadly 窗口输入。
+3. 窗口显示续签安装完成后，在 iPad 打开 RiffLoop 检查。
+
+入口调用 `scripts/renew-ipad.ps1`，读取 iPad 的实际版本，从本地 `output/release-*` 找到同版本、同构建号的原安装包，检查内部版本、Git 提交及哈希。点击安装前核对 Sideloadly 所选设备和原 Apple 账号；安装后再次读取设备版本。不匹配或缺少原安装包时停止，不自动升级或降级，不卸载应用。复用 Sideloadly 的账号会话，不保存密码。
+
+用 `scripts/create-renew-shortcut.ps1` 可重新创建桌面快捷方式。快捷方式依赖当前工作副本及其中的安装包，不能删除或移动该目录。`pwsh -File scripts/renew-ipad.ps1 -DryRun` 仅做设备与安装包检查，不启动签名；Sideloadly 中当前所选账号与设备只在实际安装前核对。
+
+### iPad 提示“未受信任的开发者”
+
+前往 **设置 → 通用 → VPN 与设备管理 → 开发者 App → 原安装账号 → 信任/验证 App**，保持 iPad 联网，按系统提示操作。信任步骤必须由用户在 iPad 上完成，电脑脚本不能代替。
+
+信任状态、描述文件有效期和应用能否实际启动需要分别确认；安装信息中的 `ProfileValidated` 不能独自证明三者都正常。若仍无法验证，先换用可正常联网的网络重试，并核对有效期；不要删除 RiffLoop。
+
+参考：[Sideloadly FAQ](https://sideloadly.io/faq.html)、[Apple 手动信任开发者说明](https://help.apple.com/xcode/mac/current/en.lproj/dev96a12fb84.html)。
+
+### 手动覆盖安装
+
 - 新版不会由 Daemon 自动升级。下载新 IPA 后，使用同一侧载账号、保持 Use automatic bundle ID 开启并直接覆盖安装，继续启用 Automatic Refresh。
 - 不要先删除旧版。卸载会删除应用沙箱中的文件与设置。
 - 若自动刷新未完成，在签名过期前或过期后都可以 USB 连接并用相同配置覆盖安装；只要没有卸载，应用数据应继续保留。

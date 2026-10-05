@@ -20,6 +20,8 @@
 param(
     [string]$IpaPath = "",
     [string]$ExpectedRef = 'HEAD',
+    [string]$ExpectedAppleId = '',
+    [string]$ExpectedUdid = '',
     [int]$TimeoutMinutes = 20,
     [switch]$DryRun
 )
@@ -134,6 +136,9 @@ while ((Get-Date) -lt $deadline -and -not $deviceName) {
 }
 if (-not $deviceName) { throw "等待超时仍未检测到 iPad：请确认 USB 连接并在 iPad 上点「信任」后重试" }
 Write-Host "设备：$deviceName"
+if ($ExpectedUdid -and $deviceName -notlike "*$ExpectedUdid*") {
+    throw 'Sideloadly 当前选择的设备与待续签 iPad 不一致；请在窗口选择正确设备后重试。'
+}
 
 # 4. Verify an Apple ID is remembered (a non-empty account combo beyond the add option).
 $win = Get-MainWindow
@@ -143,6 +148,7 @@ $acct = $win.FindAll([System.Windows.Automation.TreeScope]::Descendants, $acctCo
     Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ComboBox } |
     Select-Object -First 1
 $acctOk = $false
+$accountValue = ''
 if ($acct) {
     try {
         $accountValue = $acct.GetCurrentPattern(
@@ -155,6 +161,9 @@ if ($acct) {
     }
 }
 if (-not $acctOk) { throw "Sideloadly 没有记住的 Apple 账号，请先在 GUI 中登录一次" }
+if ($ExpectedAppleId -and $accountValue.Trim() -ne $ExpectedAppleId) {
+    throw 'Sideloadly 当前选择的 Apple 账号与原安装账号不一致；请在窗口选择原账号后重试。'
+}
 Write-Host "Apple 账号已记住"
 
 # Sideloadly 0.60 automatically mangles the bundle ID on current iOS versions.
