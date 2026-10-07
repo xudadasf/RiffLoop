@@ -16,7 +16,7 @@ const tracks = score.tracks.flatMap(t => t.staves.map((s, si) => ({
         meter: [score.masterBars[i].timeSignatureNumerator, score.masterBars[i].timeSignatureDenominator],
         beats: bar.voices.flatMap((v, vi) => v.beats.map(b => ({
             voice:vi, duration:b.duration, dots:b.dots, grace:b.graceType !== 0,
-            fullBarRest:b.isEmpty, rest:b.isRest, tuplet:[b.tupletNumerator,b.tupletDenominator],
+            fullBarRest:b.isFullBarRest, empty:b.isEmpty, rest:b.isRest, tuplet:[b.tupletNumerator,b.tupletDenominator],
             notes:b.notes.map(n => ({string:s.tuning.length+1-n.string, fret:n.isDead?null:n.fret,
                 dead:n.isDead, tie:n.isTieDestination, ghost:n.isGhost, bend:n.hasBend, harmonic:n.harmonicType}))
                 .sort((a,b)=>a.string-b.string)

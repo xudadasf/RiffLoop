@@ -9,6 +9,8 @@ const requested = selection === 'all' ? null : new Set(selection.split(',').flat
     return Array.from({length:b-a+1},(_,i)=>a+i);
 }));
 const bars = data.systems.flatMap(s=>s.bars).filter(b=>!requested || requested.has(b.number));
+if(!requested && (data.structure_issues?.length || bars.some((b,i)=>b.number!==i+1)))
+    throw Error('Missing, duplicated or reordered PDF bars: full-score export blocked');
 if (!bars.length || new Set(bars.map(b=>b.number)).size !== bars.length ||
     (requested && bars.length !== requested.size)) throw Error('Ambiguous or missing PDF bars');
 if (bars.some(b=>b.issues.length)) throw Error('Unresolved rhythm: export blocked. Inspect recognized.json and overlay.pdf.');
@@ -19,6 +21,7 @@ const track = new alpha.model.Track(); score.addTrack(track);
 track.name = 'PDF tablature'; track.playbackInfo.program = 25;
 const staff = new alpha.model.Staff(); track.addStaff(staff);
 staff.stringTuning.tunings = data.tuning;
+let previousNotes = new Map();
 for (const source of bars) {
     const master = new alpha.model.MasterBar();
     [master.timeSignatureNumerator,master.timeSignatureDenominator] = source.meter;
@@ -31,11 +34,20 @@ for (const source of bars) {
         beat.duration = item.duration; beat.dots = item.dots;
         [beat.tupletNumerator,beat.tupletDenominator] = item.tuplet;
         if(item.grace) beat.graceType = alpha.model.GraceType.BeforeBeat;
+        const currentNotes = new Map();
         for(const raw of item.notes) {
             const note = new alpha.model.Note(); note.string = 7-raw.string;
             note.fret = raw.fret ?? 0; note.isDead = raw.dead;
+            if(raw.tie) {
+                const prior = previousNotes.get(raw.string);
+                if(!prior || prior.fret !== raw.fret || prior.bar !== raw.tie_source_bar)
+                    throw Error('Tie origin is missing from this export selection');
+                note.isTieDestination = true;
+            }
+            currentNotes.set(raw.string,{fret:raw.fret,bar:source.number});
             beat.addNote(note);
         }
+        if(!item.grace) previousNotes = currentNotes;
     }
 }
 const settings = new alpha.Settings(); score.finish(settings);
@@ -55,9 +67,12 @@ for(let i=0;i<bars.length;i++) {
     for(let j=0;j<expected.length;j++) {
         const e=expected[j], a=received[j];
         const notes=a.notes.map(n=>[7-n.string,n.isDead?null:n.fret]).sort((a,b)=>a[0]-b[0]);
+        const ties=a.notes.map(n=>[7-n.string,n.isTieDestination]).sort((a,b)=>a[0]-b[0]);
         if(a.duration!==e.duration || a.dots!==e.dots || (a.graceType!==alpha.model.GraceType.None)!==e.grace ||
             (e.tuplet[0]!==1 && (a.tupletNumerator!==e.tuplet[0] || a.tupletDenominator!==e.tuplet[1])) ||
-            JSON.stringify(notes)!==JSON.stringify(e.notes.map(n=>[n.string,n.fret]))) throw Error(`Roundtrip mismatch at bar ${i+1}, beat ${j+1}`);
+            JSON.stringify(notes)!==JSON.stringify(e.notes.map(n=>[n.string,n.fret]).sort((a,b)=>a[0]-b[0])) ||
+            JSON.stringify(ties)!==JSON.stringify(e.notes.map(n=>[n.string,!!n.tie]).sort((a,b)=>a[0]-b[0])) ||
+            (e.fullBarRest && !a.isFullBarRest)) throw Error(`Roundtrip mismatch at bar ${i+1}, beat ${j+1}`);
     }
 }
 fs.writeFileSync(output,bytes);

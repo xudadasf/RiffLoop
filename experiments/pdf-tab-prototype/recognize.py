@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import fitz
+from symbols import outline_spans
 
 
 def lines_and_shapes(page):
@@ -51,7 +52,19 @@ def staves(lines, width):
             i += len(ys)
         else:
             i += 1
-    return groups
+    # Sparse ledger lines can interrupt the five-line sequence. Recover only
+    # standard staves here: TAB lines themselves may have large digit cutouts.
+    dense=[y for y in rows if any(g['count']==6 and 0<g['ys'][0]-y<90
+           and sum(b-a for a,b in horizontal[y])>(g['right']-g['left'])*.65 for g in groups)]
+    for i in range(len(dense)-4):
+        ys=dense[i:i+5]; gaps=[b-a for a,b in zip(ys,ys[1:])]
+        if not (3<min(gaps)<15 and max(gaps)-min(gaps)<.3): continue
+        if any(g['ys'][0]-.2<=ys[-1] and ys[0]<=g['ys'][-1]+.2 for g in groups): continue
+        if not any(g['count']==6 and 0<g['ys'][0]-ys[-1]<90 for g in groups): continue
+        intervals=[v for y in ys for v in horizontal[y]]
+        groups.append({'ys':ys,'left':min(a for a,b in intervals),
+                       'right':max(b for a,b in intervals),'count':5})
+    return sorted(groups,key=lambda g:g['ys'][0])
 
 
 def clusters(values, tolerance=1):
@@ -84,6 +97,8 @@ def recognize(pdf):
     for pi, page in enumerate(document):
         lines, shapes = lines_and_shapes(page)
         spans = text_spans(page)
+        if not any('bravura' in s['font'].lower() for s in spans):
+            spans += outline_spans(shapes)
         text = page.get_text()
         if 'Standard tuning' in text:
             result['tuning'] = [64,59,55,50,45,40]
@@ -118,6 +133,7 @@ def recognize(pdf):
                 notes.append({'x':x,'y':ys[si],'string':si+1,
                               'fret':None if token.upper()=='X' else int(token.strip('()')),
                               'dead':token.upper()=='X','parenthesized':token.startswith('('),
+                              'tie':False,
                               'size':span['size'],'bbox':list(span['bbox'])})
             normal_size = collections.Counter(round(n['size'],1) for n in notes).most_common(1)
             normal_size = normal_size[0][0] if normal_size else 7
@@ -140,6 +156,12 @@ def recognize(pdf):
                         digits.append(''.join(str(ord(c)-0xe080) for c in s['text'] if '\ue080'<=c<='\ue089'))
                     previous_meter=[int(digits[0]),int(digits[1])]
                     meter_source='pdf'
+                common=[s for s in spans if left<s['bbox'][0]<left+50 and s['size']>=12
+                        and (standard['ys'][0]-10 if standard else ys[0]-10)<s['origin'][1]<ys[-1]
+                        and s['text'] in ('\ue08a','\ue08b')]
+                if common:
+                    previous_meter=[4,4] if common[0]['text']=='\ue08a' else [2,2]
+                    meter_source='pdf'
                 bar={'number':number,'left':left,'right':right,'meter':previous_meter[:],
                      'meter_source':meter_source,'beats':[], 'issues':[]}
                 bar_notes=[n for n in notes if left<=n['x']<right]
@@ -151,29 +173,100 @@ def recognize(pdf):
                     bar['beats'].append(beat)
                 add_rests(bar,staff,standard,spans,shapes)
                 bar['beats'].sort(key=lambda b:b['x'])
-                read_tuplets(bar,staff,standard,spans)
-                for beat in bar['beats']:
-                    if beat['duration'] is None:
-                        bar['issues'].append('存在未识别时值')
-                if not bar['issues']:
-                    total=sum(4/b['duration']*(2-2**(-b['dots']))*b['tuplet'][1]/b['tuplet'][0]
-                              for b in bar['beats'] if not b['grace'])
-                    expected=bar['meter'][0]*4/bar['meter'][1]
-                    if abs(total-expected)>.005:
-                        bar['issues'].append(f'时值合计 {total:g} 拍，拍号需要 {expected:g} 拍')
-                bar['issues']=list(dict.fromkeys(bar['issues']))
                 system['bars'].append(bar)
+            read_ties(system,spans,lines,shapes)
+            for bar in system['bars']:
+                # New hidden tie destinations must participate in tuplet grouping.
+                for beat in bar['beats']:
+                    beat['notes'].sort(key=lambda n:n['string'])
+                    beat['tuplet']=[1,1]
+                read_tuplets(bar,staff,standard,spans)
+                validate_bar(bar)
             result['systems'].append(system)
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
+    numbers=[b['number'] for s in result['systems'] for b in s['bars']]
+    result['structure_issues']=[]
+    if len(numbers)!=len(set(numbers)): result['structure_issues'].append('重复小节号或多分谱')
+    if numbers and numbers!=list(range(1,len(numbers)+1)):
+        result['structure_issues'].append('小节号缺失、顺序异常或谱子为节选；禁止作为完整曲目导出')
     if not result['tuning']:
         result['warnings'].append('未确认标准定弦，导出前须人工确认定弦。')
     if not result['tempo']:
         result['warnings'].append('未识别 BPM，导出前须人工确认。')
     if any(b['meter_source']=='assumed-4/4' for s in result['systems'] for b in s['bars']):
-        result['warnings'].append('部分小节未识别到拍号，使用了 4/4 假设，须人工核对。')
+        result['warnings'].append('部分小节未识别到拍号，4/4 仅用于诊断，这些小节禁止导出。')
     document.close()
     return result
+
+
+def validate_bar(bar):
+    if any(b['duration'] is None for b in bar['beats']): bar['issues'].append('存在未识别时值')
+    if not bar['issues']:
+        expected=bar['meter'][0]*4/bar['meter'][1]
+        total=sum(expected if b.get('fullBarRest') else
+                  4/b['duration']*(2-2**(-b['dots']))*b['tuplet'][1]/b['tuplet'][0]
+                  for b in bar['beats'] if not b['grace'])
+        if abs(total-expected)>.005: bar['issues'].append(f'时值合计 {total:g} 拍，拍号需要 {expected:g} 拍')
+    if bar['meter_source']!='pdf': bar['issues'].append('拍号未识别，禁止按默认拍号导出')
+    bar['issues']=list(dict.fromkeys(bar['issues']))
+
+
+def read_ties(system,spans,lines,shapes):
+    """Use an actual connecting curve and equal pitch; never parentheses alone."""
+    top,bottom=system['ys'][0],system['ys'][-1]; gap=(bottom-top)/5
+    staff={'ys':system['ys']}; standard=system['standard']
+    arcs=[sh['items'][0] for sh in shapes if sh['type']=='f' and len(sh['items'])==2
+          and all(i[0]=='c' for i in sh['items']) and sh['rect'].width>4
+          and sh['rect'].height<gap*2]
+    def notes():
+        return [(b,v,n) for b in system['bars'] for v in b['beats'] for n in v['notes']]
+    for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
+        start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
+        if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
+        sources=[(b,v,n) for b,v,n in notes() if abs(n['x']-start.x)<7
+                 and abs(n['y']-start.y)<gap*.8 and n['x']<end.x-3 and not n['dead']]
+        if not sources: continue
+        sb,sv,sn=min(sources,key=lambda t:abs(t[2]['x']-start.x)+abs(t[2]['y']-start.y))
+        # An existing different fret is a slur/hammer-on, not a tie.
+        targets=[(b,v,n) for b,v,n in notes() if abs(n['x']-end.x)<7
+                 and n['string']==sn['string'] and n['x']>sn['x']+3]
+        if targets:
+            tb,tv,tn=min(targets,key=lambda t:abs(t[2]['x']-end.x))
+            if tn['fret']!=sn['fret']: continue
+            if not tn['parenthesized'] and not tn.get('inferred_from'): continue
+        else:
+            # GP often suppresses a tied fret number but retains its rhythm stem.
+            stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<7
+                            and bottom+gap*.8<max(y,y1)<bottom+gap*5
+                            and top-2<min(y,y1)<bottom+gap*3],.5)
+            if len(stems)!=1: continue
+            x=stems[0]
+            if any(not n.get('inferred_from') and n['bbox'][0]-1<x<n['bbox'][2]+1
+                   for b,v,n in notes()): continue
+            tb=next((b for b in system['bars'] if b['left']<x<b['right']),None)
+            if not tb or x<=sn['x']+3: continue
+            tn={**sn,'x':x,'bbox':[x-1,sn['y']-2,x+1,sn['y']+2],
+                'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
+            tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
+            if tv: tv['notes'].append(tn)
+            else:
+                tv={'x':x,'notes':[tn],'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
+                read_rhythm(tv,staff,standard,spans,lines,shapes,tb['left'],tb['right'])
+                tb['beats'].append(tv); tb['beats'].sort(key=lambda v:v['x'])
+        tn['tie']=True; tn['tie_source_bar']=sb['number']
+    if not standard: return
+    # Visible parenthesized continuations may have their tie in the standard
+    # staff. Restrict to equal frets on the same string and a connecting arc.
+    previous={}
+    for b,v,n in notes():
+        prior=previous.get(n['string'])
+        if n['parenthesized'] and prior and n['fret']==prior[2]['fret']:
+            for arc in arcs:
+                a,z=sorted((arc[1],arc[4]),key=lambda p:p.x)
+                if abs(a.x-prior[2]['x'])<12 and abs(z.x-n['x'])<12 and standard['ys'][0]-35<a.y<top-5:
+                    n['tie']=True; n['tie_source_bar']=prior[0]['number']; break
+        previous[n['string']]=(b,v,n)
 
 
 def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
@@ -208,6 +301,14 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
         dots=[s for s in spans if '\ue1e7' in s['text'] and x<s['bbox'][0]<x+12
               and bottom<s['origin'][1]<bottom+gap*4]
         beat['dots']=len(dots)
+    # Guitar Pro prints a closed ellipse around half/whole TAB notes, and uses
+    # a short detached stem for half notes. Parentheses are separate open paths.
+    rings=[sh for sh in shapes if sh['type']=='s' and len(sh['items'])==4
+           and all(i[0]=='c' for i in sh['items'])
+           and abs((sh['rect'].x0+sh['rect'].x1)/2-x)<1
+           and 5<sh['rect'].width<16
+           and all(sh['rect'].y0<n['y']<sh['rect'].y1 for n in beat['notes'])]
+    if rings: beat['duration']=2 if stems else 1
     # When present, use the standard staff's noteheads to disambiguate whole/half.
     if standard:
         upper=standard['ys'][0]-30
@@ -233,14 +334,19 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
                             cross=beam_cross_section(sh,stem[0])
                             if cross and stem[1]-1<cross<stem[2]+1: beams.append(cross)
                     beat['duration']=4*2**len(clusters(beams,.5))
-                    flags=[s for s in spans if abs(s['bbox'][0]-sx)<7 and upper<s['origin'][1]<top-4
+                    flags=[s for s in spans if standard_stems and not beams
+                           and abs(s['origin'][0]-stem[0])<1.5 and upper<s['origin'][1]<top-4
                            and any(0xe240<=ord(c)<=0xe247 for c in s['text'])]
                     if flags:
                         c=next(c for c in flags[0]['text'] if 0xe240<=ord(c)<=0xe247)
                         beat['duration']=8*2**((ord(c)-0xe240)//2)
-            beat['dots']=head['text'].count('\ue1e7')+sum(s['text'].count('\ue1e7') for s in spans
-                         if s is not head and head['bbox'][2]-1<s['bbox'][0]<head['bbox'][2]+6
-                         and abs(s['origin'][1]-head['origin'][1])<5)
+            # Dots on staff-line notes are shifted into the adjacent space.
+            # Chord tones can draw several dots vertically at the same X; that
+            # is one augmentation dot, not a doubly dotted note.
+            dot_columns=[s['bbox'][0] for s in spans if s is not head and '\ue1e7' in s['text']
+                         and head['bbox'][2]-1<s['bbox'][0]<head['bbox'][2]+6
+                         and abs(s['origin'][1]-head['origin'][1])<5]
+            beat['dots']=head['text'].count('\ue1e7')+len(clusters(dot_columns,.8))
 
 
 def beam_cross_section(shape,x):
@@ -261,7 +367,8 @@ def read_tuplets(bar,staff,standard,spans):
     top,bottom=staff['ys'][0],staff['ys'][-1]
     low=standard['ys'][-1] if standard else bottom
     high=top-4 if standard else bottom+55
-    labels=[s for s in spans if s['text'] in ('3','6') and s['size']<=10
+    ratios={3:2,5:4,6:4,7:4}
+    labels=[s for s in spans if s['text'] in ('3','5','6','7') and 7<=s['size']<=10
             and 'arial' not in s['font'].lower() and low<s['origin'][1]<high
             and bar['left']<s['origin'][0]<bar['right']]
     used=set()
@@ -270,7 +377,7 @@ def read_tuplets(bar,staff,standard,spans):
         nearest=sorted(((abs(b['x']-x),i) for i,b in enumerate(bar['beats']) if not b['grace']),key=lambda a:a[0])[:count]
         ids=[i for _,i in nearest]
         if len(ids)==count and not used.intersection(ids):
-            for i in ids: bar['beats'][i]['tuplet']=[count,2 if count==3 else 4]
+            for i in ids: bar['beats'][i]['tuplet']=[count,ratios[count]]
             used.update(ids)
 
 
@@ -283,10 +390,51 @@ def add_rests(bar,staff,standard,spans,shapes):
                 duration=2**(ord(c)-0xe4e3)
                 x=(s['bbox'][0]+s['bbox'][2])/2
                 if any(abs(b['x']-x)<5 and not b['notes'] for b in bar['beats']): continue
-                bar['beats'].append({'x':x,'notes':[],'grace':False,'duration':duration,'dots':s['text'].count('\ue1e7'),'tuplet':[1,1]})
-    # Older PDFs draw rest glyphs as paths. Leave unidentified rests unresolved.
+                dots=s['text'].count('\ue1e7')+sum(z['text'].count('\ue1e7') for z in spans
+                     if z is not s and s['bbox'][2]-1<z['bbox'][0]<s['bbox'][2]+6
+                     and abs(z['origin'][1]-s['origin'][1])<(bottom-top)/5*.6)
+                bar['beats'].append({'x':x,'notes':[],'grace':False,'duration':duration,'dots':dots,'tuplet':[1,1]})
+    if not bar['beats'] and bar['meter_source']=='pdf' and visually_empty(bar,staff,standard,spans,shapes):
+        bar['beats'].append({'x':(bar['left']+bar['right'])/2,'notes':[],'grace':False,
+                             'duration':1,'dots':0,'tuplet':[1,1],'fullBarRest':True,
+                             'evidence':'empty-staff-region'})
     if not bar['beats']:
         bar['issues'].append('空小节或休止符尚未识别')
+
+
+def visually_empty(bar,staff,standard,spans,shapes):
+    """Only infer a silent bar when its notation area contains no unknown marks."""
+    left,right=bar['left']+2,bar['right']-2
+    top=(standard['ys'][0]-12 if standard else staff['ys'][0]-4)
+    bottom=staff['ys'][-1]+20
+    ignored=[s for s in spans if any(c in s['text'] for c in ('\ue050','\ue06d','\ue08a','\ue08b'))
+             or all('\ue080'<=c<='\ue089' for c in s['text'])]
+    for s in spans:
+        x,y=s['origin']
+        if left<x<right and top<y<bottom and s not in ignored:
+            # Bar numbers sit above the top staff, outside its notation region.
+            if s['text'].isdigit() and s['size']<7 and y<(standard or staff)['ys'][0]: continue
+            if s['text'].strip(): return False
+    for sh in shapes:
+        r=sh['rect']
+        if r.x1<=left or r.x0>=right or r.y1<=top or r.y0>=bottom: continue
+        parts=[]
+        for item in sh['items']:
+            if item[0] in ('l','c'):
+                pts=item[1:]; parts.append(fitz.Rect(min(p.x for p in pts),min(p.y for p in pts),
+                                                   max(p.x for p in pts),max(p.y for p in pts)))
+            elif item[0]=='re': parts.append(item[1])
+            else: parts.append(r)
+        if not any(p.x1>left and p.x0<right and p.y1>top and p.y0<bottom for p in parts): continue
+        if r.height<.8 and r.width>20: continue  # staff/ledger lines
+        if r.width<1.5 and r.height>=staff['ys'][-1]-staff['ys'][0]-.5: continue
+        if sh['type']=='s' and all(i[0]=='l' for i in sh['items']):
+            relevant=[fitz.Rect(i[1],i[2]).normalize() for i in sh['items']]
+            relevant=[p for p in relevant if p.x1>left and p.x0<right and p.y1>top and p.y0<bottom]
+            if all(p.height<.8 and p.width>20 for p in relevant): continue
+        if any(s.get('source')=='font-outline' and s['bbox']==list(r) for s in ignored): continue
+        return False
+    return True
 
 
 def overlay(pdf,result,out):

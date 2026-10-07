@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from evaluate import rhythm
+from evaluate import core_events
 
 
 def main():
@@ -35,20 +35,16 @@ def main():
     if received['tuning']!=expected['tuning']: differences.append('tuning')
     if actual['tempo']!=original['tempo']: differences.append('initial tempo')
 
-    def beats(bar):
-        return [(tuple((n['string'],n['fret'],n['dead']) for n in b['notes']),rhythm(b))
-                for b in bar['beats'] if b['voice']==0]
-
     for a,b in zip(received['bars'],chosen):
         if any(v['notes'] for v in b['beats'] if v['voice']!=0):
             differences.append(f"bar {b['number']}: multiple voices unsupported")
-        if beats(a)!=beats(b) or a['meter']!=b['meter']:
-            differences.append(f"bar {b['number']}: notes, rhythm, rests or meter differ")
+        if core_events(a)!=core_events(b) or a['meter']!=b['meter']:
+            differences.append(f"bar {b['number']}: notes, rhythm, rests, ties or meter differ")
     result={'reference':args.reference.name,'track':args.track,'source_bars':args.bars,
             'bars':len(chosen),'notes':sum(len(v['notes']) for b in chosen for v in b['beats'] if v['voice']==0),
             'passed':not differences,'differences':differences,
-            'checked':['string/fret/dead','duration/dots/tuplet/grace flag','voice-0 beat sequence including rests','meter','tuning','initial tempo'],
-            'not_checked':['techniques','ties','repeat structures','tempo changes','audible playback']}
+            'checked':['string/fret/dead/tie','rational duration/dots/tuplet/grace flag','voice-0 beat sequence including full-bar silence','meter','tuning','initial tempo'],
+            'not_checked':['techniques','repeat structures','tempo changes','audible playback']}
     args.out.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(result,ensure_ascii=False))
     return 0 if result['passed'] else 1

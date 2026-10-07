@@ -20,8 +20,9 @@ path=args.out/'recognized.json'
 path.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
 overlay(args.pdf,result,args.out/'overlay.pdf')
 bars=[b for s in result['systems'] for b in s['bars']]
-rows=''.join('<tr><td>'+str(b['number'])+'</td><td>'+str(sum(len(x['notes']) for x in b['beats']))+'</td><td>'+html.escape(('拍号暂按 4/4；' if b['meter_source']=='assumed-4/4' else '')+('；'.join(b['issues']) or '拍数检查通过，仍需核对音符与技巧'))+'</td></tr>' for b in bars)
-(args.out/'review.html').write_text('<!doctype html><meta charset="utf-8"><title>识别结果</title><style>body{font:16px system-ui;margin:36px}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}p{max-width:900px;line-height:1.7}</style><h1>PDF 六线谱识别实验稿</h1><p>'+html.escape(args.pdf.name)+'</p><p>只识别电子 PDF。当前尚未完整支持演奏技巧、延音、休止符和多声部；4/4 拍是未识别拍号时的假设，须对照原谱确认。绿色小节仅说明时值合计通过，不代表完全正确。</p><p><a href="overlay.pdf">查看原谱标记：蓝框音符、红框待核对小节</a></p><table><tr><th>小节</th><th>识别音符数</th><th>状态</th></tr>'+rows+'</table>',encoding='utf-8')
+rows=''.join('<tr><td>'+str(b['number'])+'</td><td>'+str(sum(len(x['notes']) for x in b['beats']))+'</td><td>'+html.escape('；'.join(b['issues']) or '拍数检查通过，仍不代表音符与技巧全部正确')+'</td></tr>' for b in bars)
+warnings=''.join('<li>'+html.escape(w)+'</li>' for w in result['warnings']+result.get('structure_issues',[]))
+(args.out/'review.html').write_text('<!doctype html><meta charset="utf-8"><title>识别结果</title><style>body{font:16px system-ui;margin:36px}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}p{max-width:900px;line-height:1.7}</style><h1>PDF 六线谱识别实验稿</h1><p>'+html.escape(args.pdf.name)+'</p><p>只识别电子 PDF。支持部分休止符、延音、附点及变拍号；扫描谱、多声部和完整演奏技巧仍不支持。拍号未识别时阻止导出。绿色小节仅说明时值合计通过，不代表完全正确。</p><ul>'+warnings+'</ul><p><a href="overlay.pdf">查看原谱标记：蓝框音符、红框待核对小节</a></p><table><tr><th>小节</th><th>识别音符数</th><th>状态</th></tr>'+rows+'</table>',encoding='utf-8')
 completed=subprocess.run(['node',str(Path(__file__).with_name('gp-export.cjs')),str(path),
                           str(output),args.bars])
 raise SystemExit(completed.returncode)
