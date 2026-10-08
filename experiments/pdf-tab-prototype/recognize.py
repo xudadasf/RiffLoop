@@ -94,6 +94,7 @@ def recognize(pdf):
     previous_meter = [4, 4]
     meter_source = 'assumed-4/4'
     previous_number = 0
+    previous_shapes = []
     for pi, page in enumerate(document):
         lines, shapes = lines_and_shapes(page)
         spans = text_spans(page)
@@ -175,6 +176,8 @@ def recognize(pdf):
                 bar['beats'].sort(key=lambda b:b['x'])
                 system['bars'].append(bar)
             read_ties(system,spans,lines,shapes)
+            if result['systems']:
+                read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
             for bar in system['bars']:
                 # New hidden tie destinations must participate in tuplet grouping.
                 for beat in bar['beats']:
@@ -183,6 +186,7 @@ def recognize(pdf):
                 read_tuplets(bar,staff,standard,spans)
                 validate_bar(bar)
             result['systems'].append(system)
+            previous_shapes = shapes
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
     numbers=[b['number'] for s in result['systems'] for b in s['bars']]
@@ -267,6 +271,62 @@ def read_ties(system,spans,lines,shapes):
                 if abs(a.x-prior[2]['x'])<12 and abs(z.x-n['x'])<12 and standard['ys'][0]-35<a.y<top-5:
                     n['tie']=True; n['tie_source_bar']=prior[0]['number']; break
         previous[n['string']]=(b,v,n)
+
+
+def read_boundary_ties(previous,current,previous_shapes,current_shapes):
+    """Join visible continuations only when both printed boundary arcs agree."""
+    if not previous['bars'] or not current['bars']: return
+    source_bar,target_bar=previous['bars'][-1],current['bars'][0]
+    if source_bar['number']+1!=target_bar['number'] or source_bar['issues']: return
+    if not source_bar['beats'] or not target_bar['beats']: return
+    source,target=source_bar['beats'][-1],target_bar['beats'][0]
+    if source['grace'] or target['grace'] or not source['notes'] or not target['notes']: return
+    key=lambda n:(n['string'],n['fret'])
+    if any(n['dead'] for n in source['notes']+target['notes']): return
+    if not all(n['parenthesized'] for n in target['notes']): return
+    if sorted(map(key,source['notes']))!=sorted(map(key,target['notes'])): return
+
+    def boundary_arcs(system,shapes,beat,outgoing):
+        gap=(system['ys'][-1]-system['ys'][0])/5
+        arcs=[]
+        for sh in shapes:
+            if sh['type']!='f' or len(sh['items'])!=2 or sh['rect'].width<=4: continue
+            if sh['rect'].height>=gap*2 or not all(i[0]=='c' for i in sh['items']): continue
+            a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+            if outgoing:
+                if abs(z.x-system['right'])>2 or abs(a.x-beat['x'])>12: continue
+                point=a
+            else:
+                if not system['left']<a.x<system['left']+32 or abs(z.x-beat['x'])>12: continue
+                point=z
+            if abs(a.y-z.y)<1: arcs.append(point)
+        return arcs
+
+    outgoing=boundary_arcs(previous,previous_shapes,source,True)
+    incoming=boundary_arcs(current,current_shapes,target,False)
+    # Standard notation does not identify TAB strings by Y. Only accept the
+    # entire identical chord, with one distinct boundary arc per chord tone.
+    standard_match=False
+    if previous['standard'] and current['standard']:
+        def standard_count(system,arcs):
+            return len(clusters([p.y for p in arcs
+                       if system['standard']['ys'][0]-35<p.y<system['ys'][0]-5],1))
+        standard_match=(standard_count(previous,outgoing)==len(source['notes'])
+                        and standard_count(current,incoming)==len(target['notes']))
+    def tab_offsets(arcs,notes,note):
+        return [p.y-note['y'] for p in arcs if abs(p.y-note['y'])<4.5
+                and sum(abs(p.y-n['y'])<4.5 for n in notes)==1]
+    for note in target['notes']:
+        origin=next(n for n in source['notes'] if key(n)==key(note))
+        # TAB curves must belong to the same string, at the same vertical
+        # offset on each side. Do not attach a neighbouring string's curve.
+        offsets_out=tab_offsets(outgoing,source['notes'],origin)
+        offsets_in=tab_offsets(incoming,target['notes'],note)
+        tab_match=any(abs(a-b)<.6 for a in offsets_out for b in offsets_in)
+        if standard_match or tab_match:
+            note['tie']=True
+            note['tie_source_bar']=source_bar['number']
+            note['tie_evidence']='paired-system-boundary-curves'
 
 
 def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):

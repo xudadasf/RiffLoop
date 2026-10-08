@@ -40,7 +40,80 @@ def fixture(path,missing_stem=False,meter=True,empty=False,hidden_tie=False,slur
     doc.close()
 
 
+def boundary_fixture(path,page_break=False,standard=False,arcs='both',changed_pitch=False,
+                     number_gap=False,source_rest=False,partial_chord=False,ambiguous_arc=False,
+                     parentheses=True):
+    doc=fitz.open(); page=doc.new_page(width=400,height=500)
+    page.insert_text((30,25),'Standard tuning = 90',fontname='Times-Roman',fontsize=9)
+    for index in range(2):
+        if index and page_break: page=doc.new_page(width=400,height=500)
+        top=100 if not index or page_break else 280
+        page.insert_font(fontname='music',fontbuffer=font_buffer())
+        for y in range(top,top+31,6): page.draw_line((30,y),(350,y),width=.4)
+        for x in (30,350): page.draw_line((x,top),(x,top+30),width=.5)
+        if standard:
+            for i in range(5): page.draw_line((30,top-40+i*4.25),(350,top-40+i*4.25),width=.4)
+        page.insert_text((30,top-(42 if standard else 2)),str(index+1+(1 if index and number_gap else 0)),
+                         fontname='Times-Roman',fontsize=6)
+        if not index:
+            for y in (top+10,top+18.5):page.insert_text((38,y),'\ue084',fontsize=17,fontname='music')
+        for beat,x in enumerate((70,140,210,280)):
+            if not index and beat==3 and source_rest:
+                page.insert_text((x,top+12),'\ue4e5',fontsize=17,fontname='music');continue
+            for string,fret in ([(2,5),(3,7)] if standard or ambiguous_arc else [(3,7)]):
+                token=str(fret+(1 if index and beat==0 and changed_pitch else 0))
+                if index and beat==0 and parentheses:token='('+token+')'
+                width=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                page.insert_text((x-width/2,top+(string-1)*6+2.4),token,fontname='helv',fontsize=7)
+            page.draw_line((x,top+17),(x,top+50),width=.5)
+        draw_arc=(not index and arcs in ('both','outgoing')) or (index and arcs in ('both','incoming'))
+        if draw_arc:
+            for y in ([top-28,top-24] if standard else [top+(9 if ambiguous_arc else 12)]):
+                if partial_chord and standard and index and y==top-24:continue
+                a,z=(283,349) if not index else (40,62)
+                sh=page.new_shape()
+                sh.draw_bezier((a,y),(a+4,y+4),(z-4,y+4),(z,y))
+                sh.draw_bezier((z,y),(z-4,y+3),(a+4,y+3),(a,y))
+                sh.finish(color=None,fill=(0,0,0));sh.commit()
+    doc.save(path);doc.close()
+
+
 class PrototypeTests(unittest.TestCase):
+    def test_boundary_ties_same_page_and_next_page_roundtrip(self):
+        for page_break in (False,True):
+            for standard in (False,True):
+                with self.subTest(page_break=page_break,standard=standard), tempfile.TemporaryDirectory() as folder:
+                    pdf=Path(folder)/'boundary.pdf'
+                    boundary_fixture(pdf,page_break=page_break,standard=standard)
+                    result=recognize(pdf)
+                    self.assertEqual(len(result['systems']),2)
+                    target=result['systems'][1]['bars'][0]
+                    self.assertEqual(target['issues'],[])
+                    self.assertTrue(all(n['tie'] and n['tie_source_bar']==1 for n in target['beats'][0]['notes']))
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],
+                                       capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_boundary_ties_require_both_arcs_pitch_continuity_and_origin(self):
+        cases=[{'arcs':'none'},{'arcs':'outgoing'},{'arcs':'incoming'},
+               {'changed_pitch':True},{'number_gap':True},{'source_rest':True},
+               {'standard':True,'partial_chord':True},{'ambiguous_arc':True},{'parentheses':False}]
+        for options in cases:
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'boundary.pdf';boundary_fixture(pdf,**options)
+                result=recognize(pdf)
+                self.assertFalse(any(n['tie'] for b in result['systems'][1]['bars'][0]['beats'] for n in b['notes']))
+
+    def test_boundary_tie_cannot_export_without_previous_system(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pdf=Path(folder)/'boundary.pdf';boundary_fixture(pdf,page_break=True)
+            data=Path(folder)/'recognized.json';data.write_text(json.dumps(recognize(pdf)),encoding='utf-8')
+            run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp'),'2-2'],
+                               capture_output=True,text=True)
+            self.assertNotEqual(run.returncode,0)
+            self.assertFalse((Path(folder)/'out.gp').exists())
+
     def test_cross_string_slur_does_not_invent_tied_note(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'slur.pdf';fixture(path,slur=True)
