@@ -13,7 +13,8 @@ from recognize import recognize, overlay
 CALIBRATION_FILES={'此生不换 (2).pdf','《默》-那英-DaMingBai313.pdf','PDF 谱.pdf','七重人格.pdf',
                    '《灰色轨迹》 间奏-大毛笔.pdf','双截棍.pdf','变相怪杰 吉他2.pdf','好想爱这个世界啊 吉他4.pdf',
                    '一路向北-大明白313.pdf','千万次奔向 木吉他.pdf','向阳而生 尾奏.pdf',
-                   '好想爱这个世界啊 吉他3.pdf','晨光里有你.pdf','好想我回来啊.pdf'}
+                   '好想爱这个世界啊 吉他3.pdf','晨光里有你.pdf','好想我回来啊.pdf',
+                   '「青鸟」火影忍者OP3-大明白313.pdf'}
 
 
 def normalized(s):

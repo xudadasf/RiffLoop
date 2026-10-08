@@ -78,7 +78,54 @@ def boundary_fixture(path,page_break=False,standard=False,arcs='both',changed_pi
     doc.save(path);doc.close()
 
 
+def wide_tie_fixture(path,mode='chain'):
+    fixture(path,empty=True)
+    with fitz.open(path) as doc:
+        page=doc[0];boxes=[]
+        for i,token in enumerate(['14','(14)','(14)','12']):
+            x=70+i*70;y=112
+            if i==1:
+                if mode=='rest':
+                    page.insert_font(fontname='music',fontbuffer=font_buffer())
+                    page.insert_text((x,y),'\ue4e5',fontsize=17,fontname='music');boxes.append(None);continue
+                if mode=='intervening_note':token='8'
+                if mode=='different_pitch':token='(15)'
+                if mode=='plain':token='14'
+                if mode=='cross_string':y=118
+            width=fitz.get_text_length(token,fontname='helv',fontsize=7)
+            page.insert_text((x-width/2,y+2.4),token,fontname='helv',fontsize=7)
+            page.draw_line((x,y+5),(x,150),width=.5)
+            boxes.append((x-width/2,x+width/2))
+        pairs=[] if mode=='no_arc' else ([(0,1),(1,2)] if mode=='chain' else
+              [(0,2)] if mode in ('rest','intervening_note') else [(0,1)])
+        for start,end in pairs:
+            a=boxes[start][1]+1.4;z=boxes[end][0]-1.4
+            sh=page.new_shape()
+            sh.draw_bezier((a,112),(a+4,108),(z-4,108),(z,112))
+            sh.draw_bezier((z,112),(z-4,109),(a+4,109),(a,112))
+            sh.finish(color=None,fill=(0,0,0));sh.commit()
+        doc.saveIncr()
+
+
 class PrototypeTests(unittest.TestCase):
+    def test_wide_parenthesized_tie_chain_and_gp_roundtrip(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pdf=Path(folder)/'wide.pdf';wide_tie_fixture(pdf)
+            result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+            self.assertEqual(bar['issues'],[])
+            self.assertEqual([b['notes'][0]['tie'] for b in bar['beats']],[False,True,True,False])
+            data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+            run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],
+                               capture_output=True,text=True)
+            self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_wide_tie_does_not_join_rest_other_note_or_slur(self):
+        for mode in ['rest','intervening_note','different_pitch','plain','cross_string','no_arc']:
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'wide.pdf';wide_tie_fixture(pdf,mode)
+                bar=recognize(pdf)['systems'][0]['bars'][0]
+                self.assertFalse(any(n['tie'] for b in bar['beats'] for n in b['notes']))
+
     def test_boundary_ties_same_page_and_next_page_roundtrip(self):
         for page_break in (False,True):
             for standard in (False,True):

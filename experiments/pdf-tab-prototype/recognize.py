@@ -228,17 +228,24 @@ def read_ties(system,spans,lines,shapes):
     for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
         start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
         if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
-        sources=[(b,v,n) for b,v,n in notes() if abs(n['x']-start.x)<7
+        sources=[(b,v,n) for b,v,n in notes() if (abs(n['x']-start.x)<7
+                 or n['parenthesized'] and abs(n['bbox'][2]-start.x)<2)
                  and abs(n['y']-start.y)<gap*.8 and n['x']<end.x-3 and not n['dead']]
         if not sources: continue
         sb,sv,sn=min(sources,key=lambda t:abs(t[2]['x']-start.x)+abs(t[2]['y']-start.y))
         # An existing different fret is a slur/hammer-on, not a tie.
-        targets=[(b,v,n) for b,v,n in notes() if abs(n['x']-end.x)<7
+        targets=[(b,v,n) for b,v,n in notes() if (abs(n['x']-end.x)<7
+                 or n['parenthesized'] and abs(n['bbox'][0]-end.x)<2)
                  and n['string']==sn['string'] and n['x']>sn['x']+3]
         if targets:
             tb,tv,tn=min(targets,key=lambda t:abs(t[2]['x']-end.x))
             if tn['fret']!=sn['fret']: continue
             if not tn['parenthesized'] and not tn.get('inferred_from'): continue
+            # Parenthesized two-digit frets are wider than the old centre
+            # tolerance. Use their printed edge, but require adjacent beats:
+            # an arc over a rest or another attack is not a single-voice tie.
+            if sv['grace'] or tv['grace'] or tb['number'] not in (sb['number'],sb['number']+1): continue
+            if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
             # GP often suppresses a tied fret number but retains its rhythm stem.
             stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<7
