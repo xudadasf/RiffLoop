@@ -107,7 +107,55 @@ def wide_tie_fixture(path,mode='chain'):
         doc.saveIncr()
 
 
+def hidden_staff_chord_fixture(path,mode='single'):
+    fixture(path,empty=True)
+    with fitz.open(path) as doc:
+        page=doc[0];page.insert_font(fontname='music',fontbuffer=font_buffer())
+        for i in range(5):page.draw_line((30,50+i*4.25),(350,50+i*4.25),width=.4)
+        for i,x in enumerate((70,140,210,280)):
+            hidden=i==1 or mode=='chain' and i==2
+            for tone,y in enumerate((50,58.5)):
+                hy=y+(2.125 if mode=='shifted_head' and i==1 and tone==0 else 0)
+                page.insert_text((x-2.5,hy),'\ue0a4',fontname='music',fontsize=17)
+                if not hidden or mode=='visible_target':
+                    token='X' if mode=='dead_source' and i==0 else str(tone+5)
+                    width=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                    page.insert_text((x-width/2,102.4+tone*6),token,fontname='helv',fontsize=7)
+            if not (mode=='missing_stem' and i==1):page.draw_line((x+2.2,40),(x+2.2,58),width=.5)
+        if mode=='rest_between':page.insert_text((105,112),'\ue4e5',fontname='music',fontsize=17)
+        for source,target in ([(70,140),(140,210)] if mode=='chain' else [(70,140)]):
+            for tone,y in enumerate((50.8,59.3)):
+                if mode=='no_arcs' or mode=='partial_arcs' and tone==1:continue
+                sh=page.new_shape();a=source+3;z=target-3
+                sh.draw_bezier((a,y),(a+5,y+3),(z-5,y+3),(z,y))
+                sh.draw_bezier((z,y),(z-5,y+2),(a+5,y+2),(a,y))
+                sh.finish(color=None,fill=(0,0,0));sh.commit()
+        doc.saveIncr()
+
+
 class PrototypeTests(unittest.TestCase):
+    def test_hidden_staff_chord_and_chain_survive_gp_roundtrip(self):
+        for mode in ('single','chain'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'chord.pdf';hidden_staff_chord_fixture(pdf,mode)
+                result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+                self.assertEqual(bar['issues'],[])
+                self.assertEqual(len(bar['beats']),4)
+                self.assertEqual([len(b['notes']) for b in bar['beats']],[2]*4)
+                self.assertTrue(all(n['tie'] for n in bar['beats'][1]['notes']))
+                self.assertEqual(sum(n['tie'] for b in bar['beats'] for n in b['notes']),4 if mode=='chain' else 2)
+                data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_hidden_staff_chord_needs_every_tone_arc_head_and_stem(self):
+        for mode in ('partial_arcs','no_arcs','shifted_head','missing_stem','rest_between','dead_source','visible_target'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'chord.pdf';hidden_staff_chord_fixture(pdf,mode)
+                result=recognize(pdf)
+                self.assertFalse(any(n.get('inferred_from')=='standard-heads-and-tie-curves'
+                                     for s in result['systems'] for b in s['bars'] for v in b['beats'] for n in v['notes']))
+
     def test_wide_parenthesized_tie_chain_and_gp_roundtrip(self):
         with tempfile.TemporaryDirectory() as folder:
             pdf=Path(folder)/'wide.pdf';wide_tie_fixture(pdf)

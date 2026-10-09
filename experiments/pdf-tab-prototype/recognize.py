@@ -175,6 +175,7 @@ def recognize(pdf):
                 add_rests(bar,staff,standard,spans,shapes)
                 bar['beats'].sort(key=lambda b:b['x'])
                 system['bars'].append(bar)
+            read_hidden_standard_ties(system,spans,lines,shapes)
             read_ties(system,spans,lines,shapes)
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
@@ -214,6 +215,57 @@ def validate_bar(bar):
         if abs(total-expected)>.005: bar['issues'].append(f'时值合计 {total:g} 拍，拍号需要 {expected:g} 拍')
     if bar['meter_source']!='pdf': bar['issues'].append('拍号未识别，禁止按默认拍号导出')
     bar['issues']=list(dict.fromkeys(bar['issues']))
+
+
+def read_hidden_standard_ties(system,spans,lines,shapes):
+    """Recover a suppressed TAB chord only from a complete matching staff chord."""
+    standard=system['standard']
+    if not standard: return
+    top=system['ys'][0]; upper=standard['ys'][0]-35
+    heads=[s for s in spans if s['text'] in ('\ue0a2','\ue0a3','\ue0a4') and s['size']>=14
+           and upper<s['origin'][1]<top-5 and system['left']<s['bbox'][0]<system['right']]
+    center=lambda s:(s['bbox'][0]+s['bbox'][2])/2
+    columns=[[s for s in heads if abs(center(s)-x)<1] for x in clusters([center(s) for s in heads],1)]
+    arcs=[sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+          for sh in shapes if sh['type']=='f' and len(sh['items'])==2
+          and all(i[0]=='c' for i in sh['items']) and sh['rect'].width>4
+          and sh['rect'].height<12 and upper<sh['rect'].y0<top-5]
+    for before,after in zip(columns,columns[1:]):
+        x=sum(map(center,after))/len(after)
+        beats=[(b,v) for b in system['bars'] for v in b['beats']]
+        if any(abs(v['x']-x)<4.5 for b,v in beats): continue
+        prior=[(b,v) for b,v in beats if v['x']<x]
+        if not prior: continue
+        sb,source=max(prior,key=lambda t:t[1]['x'])
+        tb=next((b for b in system['bars'] if b['left']<x<b['right']),None)
+        if not tb or tb['number'] not in (sb['number'],sb['number']+1): continue
+        if source['grace'] or source['duration'] is None or not source['notes']: continue
+        if any(n['dead'] for n in source['notes']): continue
+        if len(before)!=len(after) or len(after)!=len(source['notes']): continue
+        if any(abs(center(h)-source['x'])>=4.5 for h in before): continue
+        pairs=list(zip(sorted(before,key=lambda s:s['origin'][1]),sorted(after,key=lambda s:s['origin'][1])))
+        if any(abs(a['origin'][1]-z['origin'][1])>.25 for a,z in pairs): continue
+        # Every tone needs its own horizontal arc, terminating at the two
+        # notehead edges. One chord-level slur cannot imply several tied notes.
+        connections=[]
+        for a,z in pairs:
+            matches=[i for i,(p,q) in enumerate(arcs) if abs(p.x-a['bbox'][2])<2
+                     and abs(q.x-z['bbox'][0])<2 and abs(p.y-q.y)<.5
+                     and abs(p.y-a['origin'][1])<1.5 and abs(q.y-z['origin'][1])<1.5]
+            connections.append(matches)
+        if any(len(m)!=1 for m in connections): continue
+        if len({m[0] for m in connections})!=len(pairs): continue
+        if not any(abs(x0-x1)<.2 and min(h['bbox'][0] for h in after)-1<x0<max(h['bbox'][2] for h in after)+1
+                   and abs(y1-y0)>9 and upper-15<min(y0,y1)<max(y0,y1)<top-4
+                   for x0,y0,x1,y1 in lines): continue
+        notes=[{**n,'x':x,'bbox':[x-1,n['y']-2,x+1,n['y']+2],'parenthesized':False,
+                'tie':True,'tie_source_bar':sb['number'],'inferred_from':'standard-heads-and-tie-curves'}
+               for n in source['notes']]
+        beat={'x':x,'notes':notes,'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
+        read_rhythm(beat,system,standard,spans,lines,shapes,tb['left'],tb['right'])
+        if beat['duration'] is None: continue
+        tb['beats'].append(beat);tb['beats'].sort(key=lambda v:v['x'])
+        tb['issues']=[issue for issue in tb['issues'] if issue!='空小节或休止符尚未识别']
 
 
 def read_ties(system,spans,lines,shapes):
