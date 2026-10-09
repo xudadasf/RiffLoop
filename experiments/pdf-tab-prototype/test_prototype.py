@@ -134,10 +134,14 @@ def hidden_staff_chord_fixture(path,mode='single'):
 
 
 def outlined_meter(page,meter):
+    outlined_music(page,[(0xe080+value,38,y,17) for value,y in zip(meter,(110,118.5))])
+
+
+def outlined_music(page,symbols):
     font=TTFont(io.BytesIO(font_buffer()));glyphs=font.getGlyphSet();paths=[]
-    for value,y in zip(meter,(110,118.5)):
-        pen=SVGPathPen(glyphs);glyphs[font.getBestCmap()[0xe080+value]].draw(pen)
-        paths.append(f'<path transform="translate(38 {y}) scale({17/font["head"].unitsPerEm} {-17/font["head"].unitsPerEm})" d="{pen.getCommands()}"/>')
+    for code,x,y,size in symbols:
+        pen=SVGPathPen(glyphs);glyphs[font.getBestCmap()[code]].draw(pen)
+        paths.append(f'<path transform="translate({x} {y}) scale({size/font["head"].unitsPerEm} {-size/font["head"].unitsPerEm})" d="{pen.getCommands()}"/>')
     svg='<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250">'+''.join(paths)+'</svg>'
     with fitz.open(stream=svg.encode(),filetype='svg') as source:
         with fitz.open(stream=source.convert_to_pdf(),filetype='pdf') as vector:
@@ -146,6 +150,48 @@ def outlined_meter(page,meter):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_outlined_half_heads_and_dead_note_beams_roundtrip(self):
+        for dead,tones in [(False,1),(True,1),(True,3)]:
+            with self.subTest(dead=dead,tones=tones),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'heads.pdf';fixture(pdf,empty=True,meter=False)
+                with fitz.open(pdf) as doc:
+                    page=doc[0];outlined_meter(page,(2,4) if dead else (4,4))
+                    for i in range(5):page.draw_line((30,50+i*4.25),(350,50+i*4.25),width=.4)
+                    xs=[70+i*34 for i in range(8)] if dead else [100,230]
+                    for x in xs:
+                        token='X' if dead else '7';w=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                        for tone in range(tones):
+                            page.insert_text((x-w/2,114.4+tone*6),token,fontname='helv',fontsize=7)
+                            outlined_music(page,[(0xe0a9 if dead else 0xe0a3,x-2.5,58.5+tone*4.25,17)])
+                        page.draw_line((x-2.25,59),(x-2.25,80),width=.5)
+                    if dead:
+                        for y in (76,79):
+                            sh=page.new_shape();a,z=xs[0]-2.25,xs[-1]-2.25
+                            sh.draw_polyline([(a,y),(z,y),(z,y+1),(a,y+1),(a,y)])
+                            sh.finish(color=None,fill=(0,0,0));sh.commit()
+                    doc.saveIncr()
+                result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+                self.assertEqual([b['duration'] for b in bar['beats']],[16]*8 if dead else [2,2])
+                self.assertEqual(bar['issues'],[])
+                data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_cross_head_without_stem_or_matching_tab_dead_note_stays_unknown(self):
+        for stem,token in [(False,'X'),(True,'7')]:
+            with self.subTest(stem=stem,token=token),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'cross.pdf';fixture(pdf,empty=True,meter=False)
+                with fitz.open(pdf) as doc:
+                    page=doc[0];outlined_meter(page,(4,4))
+                    for i in range(5):page.draw_line((30,50+i*4.25),(350,50+i*4.25),width=.4)
+                    page.insert_text((98,114.4),token,fontname='helv',fontsize=7)
+                    outlined_music(page,[(0xe0a9,97.5,58.5,17)])
+                    if stem:page.draw_line((97.75,59),(97.75,80),width=.5)
+                    doc.saveIncr()
+                bar=recognize(pdf)['systems'][0]['bars'][0]
+                self.assertIsNone(bar['beats'][0]['duration'])
+                self.assertTrue(bar['issues'])
+
     def test_short_beam_touching_stem_is_not_a_rest(self):
         for edge in ('left','right'):
             with self.subTest(edge=edge),tempfile.TemporaryDirectory() as folder:

@@ -34,14 +34,16 @@ def font_buffer():
 @lru_cache(maxsize=1)
 def templates():
     result=[]
-    codes=list(range(0xe080,0xe08c))+[0xe0a2,0xe0a3,0xe0a4,0xe1e7]+list(range(0xe240,0xe248))+list(range(0xe4e3,0xe4ea))
+    codes=list(range(0xe080,0xe08c))+[0xe0a2,0xe0a3,0xe0a4,0xe0a9,0xe1e7]+list(range(0xe240,0xe248))+list(range(0xe4e3,0xe4ea))
     for code in codes:
         with fitz.open() as doc:
             page=doc.new_page(width=300,height=300)
             page.insert_font(fontname='music',fontbuffer=font_buffer())
             page.insert_text((100,150),chr(code),fontname='music',fontsize=100)
-            bits,rect=mask(page.get_pixmap(colorspace=fitz.csGRAY))
-            result.append((code,bits,rect))
+            # Supersampling keeps the thin hollow-head contour from aliasing
+            # before normalization; retain bounds in PDF points for placement.
+            bits,rect=mask(page.get_pixmap(matrix=fitz.Matrix(2,2),colorspace=fitz.csGRAY))
+            result.append((code,bits,tuple(v/2 for v in rect)))
     return result
 
 

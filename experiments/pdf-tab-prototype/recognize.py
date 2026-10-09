@@ -438,7 +438,8 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
     if standard:
         upper=standard['ys'][0]-30
         heads=[s for s in spans if upper<s['origin'][1]<top-4 and abs((s['bbox'][0]+s['bbox'][2])/2-x)<4.5
-               and any(c in s['text'] for c in ('\ue0a2','\ue0a3','\ue0a4'))
+               and (any(c in s['text'] for c in ('\ue0a2','\ue0a3','\ue0a4'))
+                    or '\ue0a9' in s['text'] and all(n['dead'] for n in beat['notes']))
                and s['size']>=14]
         if heads:
             head=min(heads,key=lambda s:abs((s['bbox'][0]+s['bbox'][2])/2-x))
@@ -452,6 +453,7 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
                                     if abs(x0-x1)<.2 and sx-1<x0<head['bbox'][2]+1
                                     and abs(y1-y0)>9 and upper-25<min(y0,y1)<top-4
                                     and max(y0,y1)<top-4]
+                    if '\ue0a9' in head['text'] and not standard_stems:return
                     beams=[]
                     if standard_stems:
                         stem=min(standard_stems,key=lambda line:abs((line[1]+line[2])/2-head['origin'][1]))

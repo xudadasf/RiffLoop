@@ -1,0 +1,2601 @@
+{
+  "date": "2026-10-09",
+  "baseline_commit": "f179cba",
+  "scope": "Standalone offline PDF experiment; cross noteheads and supersampled glyph templates",
+  "limitations": [
+    "Repeated regression corpus, not a blind test",
+    "Automatic pairing does not prove matching editions",
+    "Reference track chosen only in evaluation",
+    "Core checks exclude full techniques, repeats, tempo changes, timbre and audible playback"
+  ],
+  "statuses": {
+    "evaluated": 50,
+    "unsupported-multiple-parts-or-repeated-bar-numbers": 14,
+    "unsupported-no-six-line-staff": 4,
+    "error": 14
+  },
+  "baseline_aggregate": {
+    "recognized": 27121,
+    "reference": 27850,
+    "matched": 25933,
+    "matched_with_rhythm": 25606,
+    "core_exact_bars": 3770,
+    "bars": 4391,
+    "predicted_ties": 1470,
+    "matched_ties": 1463,
+    "reference_ties": 2235
+  },
+  "aggregate": {
+    "recognized": 27122,
+    "reference": 27850,
+    "matched": 25934,
+    "matched_with_rhythm": 25692,
+    "core_exact_bars": 3786,
+    "bars": 4391,
+    "predicted_ties": 1472,
+    "matched_ties": 1465,
+    "reference_ties": 2235
+  },
+  "pairing_basis": "benchmark-20261008-wide-ties",
+  "baseline_diagnostic_groups": {
+    "consistent": {
+      "cases": 37,
+      "bars": 3498,
+      "counts": {
+        "pass": 3132,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 77,
+        "notes": 239,
+        "rhythm_rests": 18,
+        "ties_only": 32,
+        "validation": 0
+      }
+    },
+    "uncertain": {
+      "cases": 13,
+      "bars": 893,
+      "counts": {
+        "pass": 638,
+        "missing_bar": 80,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 9,
+        "notes": 163,
+        "rhythm_rests": 3,
+        "ties_only": 0,
+        "validation": 0
+      }
+    }
+  },
+  "diagnostic_groups": {
+    "consistent": {
+      "cases": 37,
+      "bars": 3498,
+      "counts": {
+        "pass": 3148,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 61,
+        "notes": 239,
+        "rhythm_rests": 18,
+        "ties_only": 32,
+        "validation": 0
+      }
+    },
+    "uncertain": {
+      "cases": 13,
+      "bars": 893,
+      "counts": {
+        "pass": 638,
+        "missing_bar": 80,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 9,
+        "notes": 163,
+        "rhythm_rests": 3,
+        "ties_only": 0,
+        "validation": 0
+      }
+    }
+  },
+  "audit": {
+    "baseline": {
+      "recognized": 27121,
+      "reference": 27850,
+      "matched": 25933,
+      "matched_with_rhythm": 25606,
+      "core_exact_bars": 3770,
+      "bars": 4391,
+      "predicted_ties": 1470,
+      "matched_ties": 1463,
+      "reference_ties": 2235
+    },
+    "current": {
+      "recognized": 27122,
+      "reference": 27850,
+      "matched": 25934,
+      "matched_with_rhythm": 25692,
+      "core_exact_bars": 3786,
+      "bars": 4391,
+      "predicted_ties": 1472,
+      "matched_ties": 1465,
+      "reference_ties": 2235
+    },
+    "regressions": [],
+    "new_pass_bars": [
+      {
+        "case": "case-026",
+        "bar": 1
+      },
+      {
+        "case": "case-026",
+        "bar": 5
+      },
+      {
+        "case": "case-026",
+        "bar": 6
+      },
+      {
+        "case": "case-026",
+        "bar": 7
+      },
+      {
+        "case": "case-026",
+        "bar": 9
+      },
+      {
+        "case": "case-026",
+        "bar": 14
+      },
+      {
+        "case": "case-026",
+        "bar": 21
+      },
+      {
+        "case": "case-026",
+        "bar": 22
+      },
+      {
+        "case": "case-026",
+        "bar": 23
+      },
+      {
+        "case": "case-026",
+        "bar": 28
+      },
+      {
+        "case": "case-036",
+        "bar": 91
+      },
+      {
+        "case": "case-036",
+        "bar": 93
+      },
+      {
+        "case": "case-036",
+        "bar": 95
+      },
+      {
+        "case": "case-036",
+        "bar": 97
+      },
+      {
+        "case": "case-036",
+        "bar": 106
+      },
+      {
+        "case": "case-036",
+        "bar": 107
+      }
+    ],
+    "lost_pass_bars": [],
+    "changed_cases": [
+      {
+        "case": "case-026",
+        "pdf": "此生不换 (2).pdf",
+        "core_before": 21,
+        "core_after": 31
+      },
+      {
+        "case": "case-036",
+        "pdf": "不重逢 节奏吉他.pdf",
+        "core_before": 146,
+        "core_after": 152
+      }
+    ],
+    "new_known_durations": [
+      {
+        "case": "case-026",
+        "bar": 1,
+        "duration": 8,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 5,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 5,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 6,
+        "duration": 8,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 9,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 13,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [
+          "时值合计 3.75 拍，拍号需要 4 拍"
+        ],
+        "bar_difference": "notes"
+      },
+      {
+        "case": "case-026",
+        "bar": 14,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 21,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 22,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 23,
+        "duration": 4,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-026",
+        "bar": 28,
+        "duration": 2,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 91,
+        "duration": 8,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 93,
+        "duration": 8,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 95,
+        "duration": 8,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 95,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 95,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 97,
+        "duration": 8,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 97,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 97,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 106,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      },
+      {
+        "case": "case-036",
+        "bar": 107,
+        "duration": 16,
+        "exact_position_match": true,
+        "issues": [],
+        "bar_difference": "pass"
+      }
+    ],
+    "lost_known_durations": [],
+    "added_notes": [
+      {
+        "case": "case-026",
+        "bar": 7,
+        "exact_beat_position_match": true,
+        "issues": []
+      }
+    ],
+    "new_known_duration_count": 35,
+    "new_known_duration_exact_matches": 35
+  },
+  "blocked_exports": [
+    {
+      "case": "case-026",
+      "bar": 13,
+      "export_blocked": true
+    },
+    {
+      "case": "case-037",
+      "bar": 4,
+      "export_blocked": true
+    }
+  ],
+  "tests_passed": 31,
+  "full_score_exports": [
+    {
+      "reference": "不重逢.gp",
+      "track": "节奏",
+      "source_bars": "1-152",
+      "bars": 152,
+      "notes": 1058,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "变相怪杰.gp",
+      "track": "吉他2",
+      "source_bars": "1-105",
+      "bars": 105,
+      "notes": 775,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "好想爱这个世界啊.gp",
+      "track": "吉他2",
+      "source_bars": "1-87",
+      "bars": 87,
+      "notes": 736,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "好想爱这个世界啊.gp",
+      "track": "吉他3",
+      "source_bars": "1-87",
+      "bars": 87,
+      "notes": 249,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "好想爱这个世界啊.gp",
+      "track": "吉他4",
+      "source_bars": "1-87",
+      "bars": 87,
+      "notes": 376,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "小镇里的花 solo.gp",
+      "track": "Overdriven Guitar",
+      "source_bars": "1-16",
+      "bars": 16,
+      "notes": 49,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "那些我尚未知道的美丽.gp",
+      "track": "Distortion Guitar",
+      "source_bars": "1-32",
+      "bars": 32,
+      "notes": 402,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    }
+  ],
+  "excerpt_exports": [
+    {
+      "reference": "此生不换.gp",
+      "track": "电吉他",
+      "source_bars": "5-6",
+      "bars": 2,
+      "notes": 17,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "reference": "此生不换.gp",
+      "track": "电吉他",
+      "source_bars": "21-23",
+      "bars": 3,
+      "notes": 23,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case": "case-000",
+      "calibration": true,
+      "prediction_sha256": "b866f64902300e6b634de61397c30058f046fe094b23f2c6ac7aa6726f53c282",
+      "status": "evaluated",
+      "track": "Solo",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 65,
+        "reference": 70,
+        "matched": 65,
+        "matched_with_rhythm": 64,
+        "exact_bars": 5,
+        "bars": 9,
+        "core_exact_bars": 5,
+        "predicted_ties": 5,
+        "matched_ties": 5,
+        "reference_ties": 10,
+        "precision": 1.0,
+        "recall": 0.9285714285714286,
+        "rhythm_recall": 0.9142857142857143,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.8888888888888888,
+        "note_overlap": 0.9285714285714286,
+        "status": "uncertain"
+      },
+      "pdf": "《灰色轨迹》 间奏-大毛笔.pdf",
+      "gp": "《灰色轨迹》 间奏-大毛笔.gp"
+    },
+    {
+      "case": "case-001",
+      "calibration": false,
+      "prediction_sha256": "07f0cd6d075366cfebbd7a790d149c1e68d6f669c7fe07fbdd61950c0a728967",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "《灰色轨迹》尾奏-大毛笔.pdf",
+      "gp": "《灰色轨迹》尾奏-大毛笔.gp"
+    },
+    {
+      "case": "case-002",
+      "calibration": false,
+      "prediction_sha256": "c03152e586c3c6e11ef09805c02aa125050ce5021adaebb24a51aeb61fc6fb11",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 456,
+        "reference": 463,
+        "matched": 456,
+        "matched_with_rhythm": 455,
+        "exact_bars": 63,
+        "bars": 67,
+        "core_exact_bars": 62,
+        "predicted_ties": 20,
+        "matched_ties": 20,
+        "reference_ties": 31,
+        "precision": 1.0,
+        "recall": 0.9848812095032398,
+        "rhythm_recall": 0.9827213822894169,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9848812095032398,
+        "status": "consistent"
+      },
+      "pdf": "《残酷天使纲领》-DMB313.pdf",
+      "gp": "《残酷天使纲领》-DMB313.gp"
+    },
+    {
+      "case": "case-003",
+      "calibration": false,
+      "prediction_sha256": "448e7571d4bd353563287b1210ce2836de9400d4392d5d629eee6e3167cd6dda",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "Reason-全职猎人-大明白313.pdf",
+      "gp": "Reason-全职猎人-大明白313.gp"
+    },
+    {
+      "case": "case-004",
+      "calibration": true,
+      "prediction_sha256": "4ea9615baaa1cd1fa5ff79aa4537eaf42b13883b328e3f0eb658bf1170e44e63",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 352,
+        "reference": 371,
+        "matched": 352,
+        "matched_with_rhythm": 351,
+        "exact_bars": 82,
+        "bars": 95,
+        "core_exact_bars": 80,
+        "predicted_ties": 75,
+        "matched_ties": 75,
+        "reference_ties": 98,
+        "precision": 1.0,
+        "recall": 0.9487870619946092,
+        "rhythm_recall": 0.9460916442048517,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9487870619946092,
+        "status": "consistent"
+      },
+      "pdf": "《TheLoner》GaryMoore-大明白313.pdf",
+      "gp": "《TheLoner》GaryMoore-大明白313.gp"
+    },
+    {
+      "case": "case-005",
+      "calibration": false,
+      "prediction_sha256": "cb889dc105de6b63a3c1dee91bf0feb3dca847038480ae98fd28737e0f8a825b",
+      "status": "evaluated",
+      "track": "Steel Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 226,
+        "reference": 231,
+        "matched": 226,
+        "matched_with_rhythm": 222,
+        "exact_bars": 65,
+        "bars": 74,
+        "core_exact_bars": 65,
+        "predicted_ties": 33,
+        "matched_ties": 33,
+        "reference_ties": 37,
+        "precision": 1.0,
+        "recall": 0.9783549783549783,
+        "rhythm_recall": 0.961038961038961,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9783549783549783,
+        "status": "consistent"
+      },
+      "pdf": "《一生所爱》-DaMingBai313.pdf",
+      "gp": "《一生所爱》-DaMingBai313.gp"
+    },
+    {
+      "case": "case-006",
+      "calibration": true,
+      "prediction_sha256": "31ed9415694e7feb06fc49daeba1f4573e85d0a83e778b6340e4b71cdfd79137",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 774,
+        "reference": 785,
+        "matched": 774,
+        "matched_with_rhythm": 773,
+        "exact_bars": 72,
+        "bars": 82,
+        "core_exact_bars": 69,
+        "predicted_ties": 44,
+        "matched_ties": 44,
+        "reference_ties": 61,
+        "precision": 1.0,
+        "recall": 0.9859872611464968,
+        "rhythm_recall": 0.9847133757961783,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9859872611464968,
+        "status": "consistent"
+      },
+      "pdf": "一路向北-大明白313.pdf",
+      "gp": "一路向北-大明白313.gp"
+    },
+    {
+      "case": "case-007",
+      "calibration": false,
+      "prediction_sha256": "8e7c2cb01fb4ad785e4723f7c1bee9ae30212af9c3379013a9b28d95d05346ba",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "《凡人歌》en版 - DMB33.pdf",
+      "gp": "《凡人歌》en版 - DMB33.gp"
+    },
+    {
+      "case": "case-008",
+      "calibration": false,
+      "prediction_sha256": "ce4871414e32b12eef5b5a8f6ca4866422d4a575c2cc369a5f10a412ad62bb65",
+      "status": "evaluated",
+      "track": "Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 552,
+        "reference": 554,
+        "matched": 552,
+        "matched_with_rhythm": 551,
+        "exact_bars": 99,
+        "bars": 101,
+        "core_exact_bars": 99,
+        "predicted_ties": 29,
+        "matched_ties": 29,
+        "reference_ties": 31,
+        "precision": 1.0,
+        "recall": 0.9963898916967509,
+        "rhythm_recall": 0.9945848375451264,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9900990099009901,
+        "note_overlap": 0.9963898916967509,
+        "status": "uncertain"
+      },
+      "pdf": "《刀剑如梦》-大毛笔.pdf",
+      "gp": "《刀剑如梦》-大毛笔.gp"
+    },
+    {
+      "case": "case-009",
+      "calibration": false,
+      "prediction_sha256": "ef3c5d1bfd0bc30e4e42f3401b48fd1c363e4af54c884f0bbbd10b3aed7ca9dc",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 414,
+        "reference": 421,
+        "matched": 414,
+        "matched_with_rhythm": 405,
+        "exact_bars": 77,
+        "bars": 87,
+        "core_exact_bars": 77,
+        "predicted_ties": 27,
+        "matched_ties": 27,
+        "reference_ties": 38,
+        "precision": 1.0,
+        "recall": 0.9833729216152018,
+        "rhythm_recall": 0.9619952494061758,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9833729216152018,
+        "status": "consistent"
+      },
+      "pdf": "张紫豪-可不可以-大明白313.pdf",
+      "gp": "张紫豪-可不可以-大明白313.gp"
+    },
+    {
+      "case": "case-010",
+      "calibration": false,
+      "prediction_sha256": "390f4821306dec9024351207b44891c715dddca902610520ae2add369f132546",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "哪吒2-就是哪吒-大毛笔.pdf",
+      "gp": "哪吒2-就是哪吒-大毛笔.gp"
+    },
+    {
+      "case": "case-011",
+      "calibration": false,
+      "prediction_sha256": "9995457f05a9d044c9d94a0274ce8e76fa5d3aec8a496443001bc427b64789ce",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 507,
+        "reference": 508,
+        "matched": 507,
+        "matched_with_rhythm": 507,
+        "exact_bars": 97,
+        "bars": 98,
+        "core_exact_bars": 96,
+        "predicted_ties": 38,
+        "matched_ties": 38,
+        "reference_ties": 40,
+        "precision": 1.0,
+        "recall": 0.9980314960629921,
+        "rhythm_recall": 0.9980314960629921,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9980314960629921,
+        "status": "consistent"
+      },
+      "pdf": "哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "gp": "哪吒2-我乃哪吒三太子-大毛笔.gp"
+    },
+    {
+      "case": "case-012",
+      "calibration": true,
+      "prediction_sha256": "440ead801046089c676d091f38f24b5e072635aa77121fcc557e26bf8f2a3093",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 294,
+        "reference": 302,
+        "matched": 294,
+        "matched_with_rhythm": 287,
+        "exact_bars": 75,
+        "bars": 87,
+        "core_exact_bars": 75,
+        "predicted_ties": 39,
+        "matched_ties": 39,
+        "reference_ties": 49,
+        "precision": 1.0,
+        "recall": 0.9735099337748344,
+        "rhythm_recall": 0.9503311258278145,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9735099337748344,
+        "status": "consistent"
+      },
+      "pdf": "《天空之城》 DaMingBai313.pdf",
+      "gp": "《天空之城》 DaMingBai313.gp"
+    },
+    {
+      "case": "case-013",
+      "calibration": true,
+      "prediction_sha256": "bbb556a1445a5a92687cd102b1091d1529441bd75995a0455535ddac49d37700",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 329,
+        "reference": 340,
+        "matched": 329,
+        "matched_with_rhythm": 326,
+        "exact_bars": 77,
+        "bars": 87,
+        "core_exact_bars": 76,
+        "predicted_ties": 30,
+        "matched_ties": 30,
+        "reference_ties": 41,
+        "precision": 1.0,
+        "recall": 0.9676470588235294,
+        "rhythm_recall": 0.9588235294117647,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9676470588235294,
+        "status": "consistent"
+      },
+      "pdf": "《如愿》-DaMingBai313.pdf",
+      "gp": "《如愿》-DaMingBai313.gp"
+    },
+    {
+      "case": "case-014",
+      "calibration": false,
+      "prediction_sha256": "eb778c774698a1c00a51e86b00ed3977fdfdc785ddaeba58381bfe1017c5dca8",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "《星星点灯》-大毛笔.pdf",
+      "gp": "《星星点灯》-大毛笔.gp"
+    },
+    {
+      "case": "case-015",
+      "calibration": false,
+      "prediction_sha256": "a9cdfa64746f5d8ae2f9efe61ebfceb11d406889d6825972acc4fe6fca98b80d",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "柯南《如果有你在》-大毛笔.pdf",
+      "gp": "柯南《如果有你在》-大毛笔.gp"
+    },
+    {
+      "case": "case-016",
+      "calibration": false,
+      "prediction_sha256": "3eb87aa16b9bb3249d178b55ed820de7646122f267db0b18b2ef7ab19a8c1e02",
+      "status": "evaluated",
+      "track": "Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 212,
+        "reference": 272,
+        "matched": 212,
+        "matched_with_rhythm": 209,
+        "exact_bars": 48,
+        "bars": 66,
+        "core_exact_bars": 47,
+        "predicted_ties": 14,
+        "matched_ties": 14,
+        "reference_ties": 16,
+        "precision": 1.0,
+        "recall": 0.7794117647058824,
+        "rhythm_recall": 0.7683823529411765,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.7794117647058824,
+        "status": "consistent"
+      },
+      "pdf": "《沧海一声笑》-大毛笔.pdf",
+      "gp": "《沧海一声笑》-大毛笔.gp"
+    },
+    {
+      "case": "case-017",
+      "calibration": false,
+      "prediction_sha256": "33862498a395456d230d4068a3bf2fb752e3664ca736356bc1637f88209d9c89",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "灌篮高手ED-双吉他-大毛笔.pdf",
+      "gp": "灌篮高手ED-双吉他-大毛笔.gp"
+    },
+    {
+      "case": "case-018",
+      "calibration": false,
+      "prediction_sha256": "42aa459d7ee889e7f94ce9098b22d6592c2d95c084219aa68a1e50b905d295fa",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "直到世界的尽头-DaMingBai313.pdf",
+      "gp": "直到世界的尽头-DaMingBai313.gp"
+    },
+    {
+      "case": "case-019",
+      "calibration": false,
+      "prediction_sha256": "0b707ff562835badc4ad4e045ea6600e0eb59078b08dae2150aaa53c988f60f8",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 582,
+        "reference": 585,
+        "matched": 582,
+        "matched_with_rhythm": 578,
+        "exact_bars": 90,
+        "bars": 96,
+        "core_exact_bars": 81,
+        "predicted_ties": 72,
+        "matched_ties": 72,
+        "reference_ties": 89,
+        "precision": 1.0,
+        "recall": 0.9948717948717949,
+        "rhythm_recall": 0.9880341880341881,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9948717948717949,
+        "status": "consistent"
+      },
+      "pdf": "捕捉闪耀的瞬间-大明白313.pdf",
+      "gp": "捕捉闪耀的瞬间-大明白313.gp"
+    },
+    {
+      "case": "case-020",
+      "calibration": false,
+      "prediction_sha256": "0081569f0859559938b3461be375ccd81056f2696ea237cf8a594d47eacd7c8a",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "逐空-DaMingBai313.pdf",
+      "gp": "逐空-DaMingBai313.gp"
+    },
+    {
+      "case": "case-021",
+      "calibration": false,
+      "prediction_sha256": "3ee4736700fad8c086fa647324bc820762673fc79451ba67de861107445e3462",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "逐空-Rap歌词.pdf",
+      "gp": "逐空-DaMingBai313.gp"
+    },
+    {
+      "case": "case-022",
+      "calibration": false,
+      "prediction_sha256": "d40559b02fdb37c8037e14dc1e90866f1e75f247319fa1100039afb1b76890af",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 389,
+        "reference": 389,
+        "matched": 389,
+        "matched_with_rhythm": 388,
+        "exact_bars": 80,
+        "bars": 81,
+        "core_exact_bars": 80,
+        "predicted_ties": 24,
+        "matched_ties": 24,
+        "reference_ties": 24,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9974293059125964,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "醉拳-成龙-DaMingBai313.pdf",
+      "gp": "醉拳-成龙-DaMingBai313.gp"
+    },
+    {
+      "case": "case-023",
+      "calibration": true,
+      "prediction_sha256": "6cf977e0429ba3698a08ea8cc1420e5cbff3d90c6cadd72e6c5832442179b41a",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 560,
+        "reference": 575,
+        "matched": 560,
+        "matched_with_rhythm": 556,
+        "exact_bars": 85,
+        "bars": 95,
+        "core_exact_bars": 82,
+        "predicted_ties": 54,
+        "matched_ties": 54,
+        "reference_ties": 78,
+        "precision": 1.0,
+        "recall": 0.9739130434782609,
+        "rhythm_recall": 0.9669565217391304,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9739130434782609,
+        "status": "consistent"
+      },
+      "pdf": "「青鸟」火影忍者OP3-大明白313.pdf",
+      "gp": "「青鸟」火影忍者OP3-大明白313.gp"
+    },
+    {
+      "case": "case-024",
+      "calibration": false,
+      "prediction_sha256": "44241c02318bec00246f58e4380096ddbe08eab5f34b7b7c5f1bca7b80e42c34",
+      "status": "evaluated",
+      "track": "Clean Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 371,
+        "reference": 377,
+        "matched": 371,
+        "matched_with_rhythm": 368,
+        "exact_bars": 60,
+        "bars": 66,
+        "core_exact_bars": 60,
+        "predicted_ties": 2,
+        "matched_ties": 2,
+        "reference_ties": 10,
+        "precision": 1.0,
+        "recall": 0.9840848806366048,
+        "rhythm_recall": 0.9761273209549072,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9840848806366048,
+        "status": "consistent"
+      },
+      "pdf": "鬼灭之刃-无限城-大毛笔.pdf",
+      "gp": "鬼灭之刃-无限城-大毛笔.gp"
+    },
+    {
+      "case": "case-025",
+      "calibration": false,
+      "prediction_sha256": "ae51b14132d265fbd9d5468ffe2b624de708efe90f7f7e7b7478fe5fa928cb9d",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 338,
+        "reference": 339,
+        "matched": 338,
+        "matched_with_rhythm": 336,
+        "exact_bars": 54,
+        "bars": 56,
+        "core_exact_bars": 54,
+        "predicted_ties": 17,
+        "matched_ties": 17,
+        "reference_ties": 18,
+        "precision": 1.0,
+        "recall": 0.9970501474926253,
+        "rhythm_recall": 0.9911504424778761,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9970501474926253,
+        "status": "consistent"
+      },
+      "pdf": "鬼灭之刃 - 红莲华-大毛笔.pdf",
+      "gp": "鬼灭之刃 - 红莲华-大毛笔.gp"
+    },
+    {
+      "case": "case-026",
+      "calibration": true,
+      "prediction_sha256": "a7e27c966239db10af5dae605e196c429ce7fd033579788192b709c8f97a7006",
+      "status": "evaluated",
+      "track": "电吉他",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 286,
+        "reference": 290,
+        "matched": 277,
+        "matched_with_rhythm": 271,
+        "exact_bars": 32,
+        "bars": 38,
+        "core_exact_bars": 31,
+        "predicted_ties": 26,
+        "matched_ties": 26,
+        "reference_ties": 31,
+        "precision": 0.9685314685314685,
+        "recall": 0.9551724137931035,
+        "rhythm_recall": 0.9344827586206896,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9551724137931035,
+        "status": "consistent"
+      },
+      "pdf": "此生不换 (2).pdf",
+      "gp": "此生不换.gp"
+    },
+    {
+      "case": "case-027",
+      "calibration": false,
+      "prediction_sha256": "a690dd15121037856cb6ea4c24ef0a181503f13c2f42e8d65fdf779b437fce33",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1091,
+        "reference": 306,
+        "matched": 0,
+        "matched_with_rhythm": 0,
+        "exact_bars": 9,
+        "bars": 34,
+        "core_exact_bars": 0,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 170,
+        "precision": 0.0,
+        "recall": 0.0,
+        "rhythm_recall": 0.0,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.0,
+        "status": "uncertain"
+      },
+      "pdf": "新手12分钟 合集.pdf",
+      "gp": "新手12分钟 延展性.gp"
+    },
+    {
+      "case": "case-028",
+      "calibration": true,
+      "prediction_sha256": "cff8a97f4307cf1db2f77fe27cc3e9c9eabf465d35bc7745bff2450071805404",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 238,
+        "reference": 239,
+        "matched": 238,
+        "matched_with_rhythm": 226,
+        "exact_bars": 21,
+        "bars": 22,
+        "core_exact_bars": 21,
+        "predicted_ties": 1,
+        "matched_ties": 1,
+        "reference_ties": 2,
+        "precision": 1.0,
+        "recall": 0.99581589958159,
+        "rhythm_recall": 0.9456066945606695,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.99581589958159,
+        "status": "uncertain"
+      },
+      "pdf": "七重人格.pdf",
+      "gp": "七重人格尾奏.gp"
+    },
+    {
+      "case": "case-029",
+      "calibration": false,
+      "prediction_sha256": "52ea9494076bd9ad160f30027770b7ee5e1e97940da46f4adc5474820bb12ce2",
+      "status": "error",
+      "pdf": "不朽吉他1.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-030",
+      "calibration": false,
+      "prediction_sha256": "282aecf91e9fcfed1eb048990e10491efb27848a9b51e4f245aebcfb6f9e36e3",
+      "status": "error",
+      "pdf": "不朽吉他2.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-031",
+      "calibration": false,
+      "prediction_sha256": "823aab8bd135fe26a4033ec01b162b1c39468153e9189ef8fab5b8742b26a6c7",
+      "status": "error",
+      "pdf": "不朽吉他3.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-032",
+      "calibration": false,
+      "prediction_sha256": "bb493301c77490060f8282a086112eef2c52b0c5a6d54839f9b64f1321d845b0",
+      "status": "error",
+      "pdf": "不朽贝斯.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-033",
+      "calibration": false,
+      "prediction_sha256": "f851e493922225a06946794b39613600ea0fdc6e83d1a84d1f06d97651ed198d",
+      "status": "error",
+      "pdf": "不朽鼓.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-034",
+      "calibration": false,
+      "prediction_sha256": "f5671c937b0080dff72fe7c0034bfb0e26e5ce6c3c1b3d3b3e0341646d9b2b5e",
+      "status": "evaluated",
+      "track": "主音",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 367,
+        "reference": 486,
+        "matched": 367,
+        "matched_with_rhythm": 367,
+        "exact_bars": 54,
+        "bars": 152,
+        "core_exact_bars": 54,
+        "predicted_ties": 4,
+        "matched_ties": 4,
+        "reference_ties": 77,
+        "precision": 1.0,
+        "recall": 0.7551440329218106,
+        "rhythm_recall": 0.7551440329218106,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.7551440329218106,
+        "status": "consistent"
+      },
+      "pdf": "不重逢 主音吉他.pdf",
+      "gp": "不重逢.gp"
+    },
+    {
+      "case": "case-035",
+      "calibration": false,
+      "prediction_sha256": "00a48c1bbbb95bd83e4bfe4f0bb640bbea563a3ef85a9c8006fbd8803cd58ec5",
+      "status": "evaluated",
+      "track": "分解",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 295,
+        "reference": 295,
+        "matched": 279,
+        "matched_with_rhythm": 279,
+        "exact_bars": 146,
+        "bars": 152,
+        "core_exact_bars": 146,
+        "predicted_ties": 40,
+        "matched_ties": 38,
+        "reference_ties": 40,
+        "precision": 0.9457627118644067,
+        "recall": 0.9457627118644067,
+        "rhythm_recall": 0.9457627118644067,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9736842105263158,
+        "note_overlap": 0.9457627118644067,
+        "status": "uncertain"
+      },
+      "pdf": "不重逢 吉他3.pdf",
+      "gp": "不重逢.gp"
+    },
+    {
+      "case": "case-036",
+      "calibration": false,
+      "prediction_sha256": "db09bd4c8de04125be59b9740b0064d542fc541148d6b381c43850102743bb8e",
+      "status": "evaluated",
+      "track": "节奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1058,
+        "reference": 1058,
+        "matched": 1058,
+        "matched_with_rhythm": 1058,
+        "exact_bars": 152,
+        "bars": 152,
+        "core_exact_bars": 152,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 12,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "不重逢 节奏吉他.pdf",
+      "gp": "不重逢.gp"
+    },
+    {
+      "case": "case-037",
+      "calibration": false,
+      "prediction_sha256": "12910a1f23c396f814cb70a14d855c03397f2c624d19fbd24f266c6e0ff8298e",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 875,
+        "reference": 875,
+        "matched": 875,
+        "matched_with_rhythm": 860,
+        "exact_bars": 128,
+        "bars": 143,
+        "core_exact_bars": 128,
+        "predicted_ties": 22,
+        "matched_ties": 22,
+        "reference_ties": 22,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9828571428571429,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 吉他1.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-038",
+      "calibration": false,
+      "prediction_sha256": "d82936be40d12d6f4e09aaa8e8794122cba33cfd6ed777d4cdddeabf4a05244d",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1181,
+        "reference": 1187,
+        "matched": 1165,
+        "matched_with_rhythm": 1163,
+        "exact_bars": 137,
+        "bars": 143,
+        "core_exact_bars": 136,
+        "predicted_ties": 4,
+        "matched_ties": 4,
+        "reference_ties": 12,
+        "precision": 0.9864521591871296,
+        "recall": 0.9814658803706824,
+        "rhythm_recall": 0.9797809604043808,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9814658803706824,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 吉他2.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-039",
+      "calibration": false,
+      "prediction_sha256": "e312910648b753a3efd21b915fd80ee015c7e89c9894e47c41d53526dd54df8c",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 26,
+        "reference": 26,
+        "matched": 26,
+        "matched_with_rhythm": 24,
+        "exact_bars": 141,
+        "bars": 143,
+        "core_exact_bars": 141,
+        "predicted_ties": 8,
+        "matched_ties": 8,
+        "reference_ties": 8,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9230769230769231,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 吉他3.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-040",
+      "calibration": true,
+      "prediction_sha256": "7a74072654c8ce7996fb705373f4b194bfb4b9f5039a65e250eb6084b67086c3",
+      "status": "evaluated",
+      "track": "木吉他",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 2787,
+        "reference": 2842,
+        "matched": 2787,
+        "matched_with_rhythm": 2787,
+        "exact_bars": 132,
+        "bars": 143,
+        "core_exact_bars": 128,
+        "predicted_ties": 373,
+        "matched_ties": 373,
+        "reference_ties": 452,
+        "precision": 1.0,
+        "recall": 0.9806474313863477,
+        "rhythm_recall": 0.9806474313863477,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9806474313863477,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 木吉他.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-041",
+      "calibration": false,
+      "prediction_sha256": "596f98543059734cc0c591777a76a84baa14669daef08392742a28308e9546cc",
+      "status": "evaluated",
+      "track": "尾奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 60,
+        "reference": 60,
+        "matched": 60,
+        "matched_with_rhythm": 57,
+        "exact_bars": 71,
+        "bars": 74,
+        "core_exact_bars": 71,
+        "predicted_ties": 9,
+        "matched_ties": 9,
+        "reference_ties": 9,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.95,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "uncertain"
+      },
+      "pdf": "卡西莫多的礼物 主音吉他.pdf",
+      "gp": "卡西莫多的礼物 间奏尾奏.gp"
+    },
+    {
+      "case": "case-042",
+      "calibration": false,
+      "prediction_sha256": "cfe2d726780765acfd5c6601641c006ec1fb6a100a2e9d4d53e69c5f25f079ca",
+      "status": "evaluated",
+      "track": "节奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1017,
+        "reference": 1017,
+        "matched": 1017,
+        "matched_with_rhythm": 1005,
+        "exact_bars": 70,
+        "bars": 74,
+        "core_exact_bars": 70,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 15,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9882005899705014,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "uncertain"
+      },
+      "pdf": "卡西莫多的礼物 节奏吉他.pdf",
+      "gp": "卡西莫多的礼物 间奏尾奏.gp"
+    },
+    {
+      "case": "case-043",
+      "calibration": false,
+      "prediction_sha256": "a1ba6204bcbad3bb4d901e998d3f2d18ef3f191b4914e91eea075837927b34c7",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "卡西莫多的礼物 贝斯.pdf",
+      "gp": "卡西莫多的礼物 间奏尾奏.gp"
+    },
+    {
+      "case": "case-044",
+      "calibration": true,
+      "prediction_sha256": "bfdba51f028ce7b88b4e8df060a188169b808cdbc91b556cc5483d30dd8e0f22",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 755,
+        "reference": 782,
+        "matched": 755,
+        "matched_with_rhythm": 703,
+        "exact_bars": 158,
+        "bars": 172,
+        "core_exact_bars": 157,
+        "predicted_ties": 20,
+        "matched_ties": 20,
+        "reference_ties": 48,
+        "precision": 1.0,
+        "recall": 0.9654731457800512,
+        "rhythm_recall": 0.8989769820971867,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9654731457800512,
+        "status": "consistent"
+      },
+      "pdf": "双截棍.pdf",
+      "gp": "双截棍.gp"
+    },
+    {
+      "case": "case-045",
+      "calibration": false,
+      "prediction_sha256": "db4fc8137789186bf49cd24897228ced068bae7091a6ff9e89f0f559a34b23e5",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 548,
+        "reference": 554,
+        "matched": 548,
+        "matched_with_rhythm": 548,
+        "exact_bars": 101,
+        "bars": 105,
+        "core_exact_bars": 101,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 18,
+        "precision": 1.0,
+        "recall": 0.9891696750902527,
+        "rhythm_recall": 0.9891696750902527,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9891696750902527,
+        "status": "consistent"
+      },
+      "pdf": "变相怪杰 吉他1.pdf",
+      "gp": "变相怪杰.gp"
+    },
+    {
+      "case": "case-046",
+      "calibration": true,
+      "prediction_sha256": "5df2793d065e0771a97f5c5f7b8c5d664018cb54145fde1191836d99ab7d7dd3",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 775,
+        "reference": 775,
+        "matched": 775,
+        "matched_with_rhythm": 775,
+        "exact_bars": 105,
+        "bars": 105,
+        "core_exact_bars": 105,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "变相怪杰 吉他2.pdf",
+      "gp": "变相怪杰.gp"
+    },
+    {
+      "case": "case-047",
+      "calibration": true,
+      "prediction_sha256": "a6f165c8320f287591971e04fe67e60c28c245074f83f6a9fc865ef8448cc2f6",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 255,
+        "reference": 256,
+        "matched": 255,
+        "matched_with_rhythm": 255,
+        "exact_bars": 77,
+        "bars": 79,
+        "core_exact_bars": 76,
+        "predicted_ties": 48,
+        "matched_ties": 48,
+        "reference_ties": 50,
+        "precision": 1.0,
+        "recall": 0.99609375,
+        "rhythm_recall": 0.99609375,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.99609375,
+        "status": "consistent"
+      },
+      "pdf": "向阳而生 尾奏.pdf",
+      "gp": "向阳而生 尾奏.gp"
+    },
+    {
+      "case": "case-048",
+      "calibration": false,
+      "prediction_sha256": "292c46814d2fdaab87507c0e61f6e3a0ac88d7a8e5abf4283137e5330996f30f",
+      "status": "error",
+      "pdf": "向阳而生 日出吉他1(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-049",
+      "calibration": false,
+      "prediction_sha256": "3ec2ddc2c581e24d085df22f76657cab08e122e49ac7c2fd0b5d4f2e1ab35f51",
+      "status": "error",
+      "pdf": "向阳而生 日出吉他2(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-050",
+      "calibration": false,
+      "prediction_sha256": "3d19667d20353954cbef249194484a89687f5eda1871f36a2cedc47e7981834e",
+      "status": "error",
+      "pdf": "向阳而生 日出吉他3(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-051",
+      "calibration": false,
+      "prediction_sha256": "73bf65e38a8ca2791e0b4b0bb8923b3845dc74f71c4f6b75e0ee0bb5ac877e7d",
+      "status": "error",
+      "pdf": "向阳而生 日出总谱(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-052",
+      "calibration": false,
+      "prediction_sha256": "fae2c6ab2ad1f2cce7b26431d6f300d5635f37c1f6a3d427af2c457daafa33f5",
+      "status": "error",
+      "pdf": "向阳而生 日出笛子(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-053",
+      "calibration": false,
+      "prediction_sha256": "1c8c9ff8b53550107bac87281c60c1fe2aab7183470063eb64e89262d1b1b483",
+      "status": "error",
+      "pdf": "向阳而生 日出贝斯(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-054",
+      "calibration": false,
+      "prediction_sha256": "6177006dbfac852dc0840741754f50b72a2b7bc0d9b34466c45e7f8c7b530a0f",
+      "status": "error",
+      "pdf": "向阳而生 日出钢琴(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-055",
+      "calibration": false,
+      "prediction_sha256": "3b7dc7a3ae44f564da153f7952e7caeb9b73d0b5a57594044ce23a7b615147b2",
+      "status": "error",
+      "pdf": "向阳而生 日出风琴(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-056",
+      "calibration": false,
+      "prediction_sha256": "846d6a30fe73928ecd31dc234a55fa3a273f40a3219a456c2bd2a192c2e8d27e",
+      "status": "error",
+      "pdf": "向阳而生 日出鼓谱(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-057",
+      "calibration": false,
+      "prediction_sha256": "376a05b8c81330f8b6602d4e48a00869829bbb96b3b89475940eacf414860852",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 666,
+        "reference": 794,
+        "matched": 666,
+        "matched_with_rhythm": 666,
+        "exact_bars": 75,
+        "bars": 79,
+        "core_exact_bars": 75,
+        "predicted_ties": 52,
+        "matched_ties": 52,
+        "reference_ties": 52,
+        "precision": 1.0,
+        "recall": 0.8387909319899244,
+        "rhythm_recall": 0.8387909319899244,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9493670886075949,
+        "note_overlap": 0.8387909319899244,
+        "status": "uncertain"
+      },
+      "pdf": "好想我回来啊 吉他1.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-058",
+      "calibration": false,
+      "prediction_sha256": "08112894963e34c97fa60be47027addf090f9a48b3a420364c0b540fbc25d4ac",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 238,
+        "reference": 344,
+        "matched": 238,
+        "matched_with_rhythm": 238,
+        "exact_bars": 68,
+        "bars": 79,
+        "core_exact_bars": 68,
+        "predicted_ties": 8,
+        "matched_ties": 8,
+        "reference_ties": 18,
+        "precision": 1.0,
+        "recall": 0.6918604651162791,
+        "rhythm_recall": 0.6918604651162791,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9620253164556962,
+        "note_overlap": 0.6918604651162791,
+        "status": "uncertain"
+      },
+      "pdf": "好想我回来啊 吉他2.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-059",
+      "calibration": false,
+      "prediction_sha256": "598b2c81230e553f6a3013cb1b439933ddf76250c35dbc6b2fef3a68cbd3f26b",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 88,
+        "reference": 98,
+        "matched": 88,
+        "matched_with_rhythm": 87,
+        "exact_bars": 69,
+        "bars": 79,
+        "core_exact_bars": 69,
+        "predicted_ties": 5,
+        "matched_ties": 5,
+        "reference_ties": 15,
+        "precision": 1.0,
+        "recall": 0.8979591836734694,
+        "rhythm_recall": 0.8877551020408163,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.8979591836734694,
+        "status": "consistent"
+      },
+      "pdf": "好想我回来啊 吉他3.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-060",
+      "calibration": true,
+      "prediction_sha256": "8d024d9da09da6f25cf092eb7c64ad20a01f9db172c0239de4c0963b9b43f6a9",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 58,
+        "reference": 794,
+        "matched": 2,
+        "matched_with_rhythm": 1,
+        "exact_bars": 0,
+        "bars": 79,
+        "core_exact_bars": 0,
+        "predicted_ties": 5,
+        "matched_ties": 0,
+        "reference_ties": 52,
+        "precision": 0.034482758620689655,
+        "recall": 0.0025188916876574307,
+        "rhythm_recall": 0.0012594458438287153,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.1518987341772152,
+        "note_overlap": 0.0025188916876574307,
+        "status": "uncertain"
+      },
+      "pdf": "好想我回来啊.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-061",
+      "calibration": false,
+      "prediction_sha256": "45065a650e07fb5d62e72f6e506bdc42eaad5118f8c4e54aa6214f7a68f7afe6",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 563,
+        "reference": 586,
+        "matched": 563,
+        "matched_with_rhythm": 563,
+        "exact_bars": 64,
+        "bars": 87,
+        "core_exact_bars": 64,
+        "predicted_ties": 8,
+        "matched_ties": 8,
+        "reference_ties": 31,
+        "precision": 1.0,
+        "recall": 0.9607508532423208,
+        "rhythm_recall": 0.9607508532423208,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9607508532423208,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他1.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-062",
+      "calibration": false,
+      "prediction_sha256": "72d997d2a4d1314f156d848c2fc38c72d7972912d87c47bb868e077c27aae9e1",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 736,
+        "reference": 736,
+        "matched": 736,
+        "matched_with_rhythm": 736,
+        "exact_bars": 87,
+        "bars": 87,
+        "core_exact_bars": 87,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他2.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-063",
+      "calibration": true,
+      "prediction_sha256": "cf83b2387709bf1c485583ea1e31a3ccc3c5b702ff414c82f3eee2e291c7b15d",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 249,
+        "reference": 249,
+        "matched": 249,
+        "matched_with_rhythm": 249,
+        "exact_bars": 87,
+        "bars": 87,
+        "core_exact_bars": 87,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他3.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-064",
+      "calibration": true,
+      "prediction_sha256": "c1db8b6205579144a44c14e2cac3d2e29f6c718ce5fdbd56018086e0e2ac68e2",
+      "status": "evaluated",
+      "track": "吉他4",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 376,
+        "reference": 376,
+        "matched": 376,
+        "matched_with_rhythm": 376,
+        "exact_bars": 87,
+        "bars": 87,
+        "core_exact_bars": 87,
+        "predicted_ties": 14,
+        "matched_ties": 14,
+        "reference_ties": 14,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他4.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-065",
+      "calibration": false,
+      "prediction_sha256": "62ae25208b08b796b3a2d943ba1355e0b7ec7ef6304d8405b96525c6e046111b",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 49,
+        "reference": 49,
+        "matched": 49,
+        "matched_with_rhythm": 49,
+        "exact_bars": 16,
+        "bars": 16,
+        "core_exact_bars": 16,
+        "predicted_ties": 5,
+        "matched_ties": 5,
+        "reference_ties": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "uncertain"
+      },
+      "pdf": "小镇里的花.pdf",
+      "gp": "小镇里的花 solo.gp"
+    },
+    {
+      "case": "case-066",
+      "calibration": false,
+      "prediction_sha256": "86a177aea27700ebef2fb48fb873dc3ff522cb6dbb6819131ef39b43a5773035",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "怪诞心理学.pdf",
+      "gp": "怪诞心理学.gp"
+    },
+    {
+      "case": "case-067",
+      "calibration": true,
+      "prediction_sha256": "864ab830145bf49e393ea705653f33cb2197b4a68fcf7e8e1941323da7977fa2",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 70,
+        "reference": 70,
+        "matched": 70,
+        "matched_with_rhythm": 70,
+        "exact_bars": 20,
+        "bars": 21,
+        "core_exact_bars": 20,
+        "predicted_ties": 13,
+        "matched_ties": 13,
+        "reference_ties": 13,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "晨光里有你.pdf",
+      "gp": "晨光里有你.gp"
+    },
+    {
+      "case": "case-068",
+      "calibration": false,
+      "prediction_sha256": "a1a6ba6c299ebefdfb682a136014dcd24d88e1e20fc598bdc0573ab7c4798fd0",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "永不熄灭的火焰.pdf",
+      "gp": "永不熄灭的火焰.gp"
+    },
+    {
+      "case": "case-069",
+      "calibration": false,
+      "prediction_sha256": "b141848b582eb91497137b02807e713db4427f18c3e43210def5ca7052bf9100",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 46,
+        "reference": 64,
+        "matched": 46,
+        "matched_with_rhythm": 44,
+        "exact_bars": 13,
+        "bars": 22,
+        "core_exact_bars": 13,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 30,
+        "precision": 1.0,
+        "recall": 0.71875,
+        "rhythm_recall": 0.6875,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.71875,
+        "status": "uncertain"
+      },
+      "pdf": "温暖的房子.pdf",
+      "gp": "温暖的房子.gp"
+    },
+    {
+      "case": "case-070",
+      "calibration": false,
+      "prediction_sha256": "655aa46ca356b12c55e2b84d4a145fa57faccdbad78d29946047f3c8c9aa5c02",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "烟火里的尘埃 主音吉他.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-071",
+      "calibration": false,
+      "prediction_sha256": "e1837ef7ccfd2510a3cb75294af2067f24a6b3a10f9ecee3596b9300c3eb64bc",
+      "status": "evaluated",
+      "track": "分解",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1015,
+        "reference": 1020,
+        "matched": 1015,
+        "matched_with_rhythm": 1007,
+        "exact_bars": 53,
+        "bars": 62,
+        "core_exact_bars": 53,
+        "predicted_ties": 18,
+        "matched_ties": 18,
+        "reference_ties": 23,
+        "precision": 1.0,
+        "recall": 0.9950980392156863,
+        "rhythm_recall": 0.9872549019607844,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9950980392156863,
+        "status": "consistent"
+      },
+      "pdf": "烟火里的尘埃 分解吉他.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-072",
+      "calibration": false,
+      "prediction_sha256": "27305d3753c987b52ffdee845c6018a17d9f08c014ffc2776d958f48ae427d82",
+      "status": "evaluated",
+      "track": "节奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1302,
+        "reference": 1302,
+        "matched": 1302,
+        "matched_with_rhythm": 1299,
+        "exact_bars": 61,
+        "bars": 62,
+        "core_exact_bars": 61,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 12,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9976958525345622,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "烟火里的尘埃 节奏吉他.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-073",
+      "calibration": false,
+      "prediction_sha256": "a7d4f50e55ec45b3d9caeafb66d7e69f9a450c7b9d3010ffeaf23a19dc65337a",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "烟火里的尘埃 贝斯.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-074",
+      "calibration": false,
+      "prediction_sha256": "8ad771be66f1279f85fb68c0bf28f73c76c23e08971f148fadf178ff9858d4d6",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "烟火里的尘埃 鼓.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-075",
+      "calibration": false,
+      "prediction_sha256": "f1deb9682726c95b87bfbbdf34ac4faa44dcf2b598ca4bcb282078a03787445a",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "虚幻与现实.pdf",
+      "gp": "虚幻与现实.gp"
+    },
+    {
+      "case": "case-076",
+      "calibration": false,
+      "prediction_sha256": "fe4edcdbcfa9a700e0cddf7124485fd67414736d984c297b335de970634e8e1f",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "趁你还年轻.pdf",
+      "gp": "趁你还年轻 不插电SOLO.gp"
+    },
+    {
+      "case": "case-077",
+      "calibration": false,
+      "prediction_sha256": "0260934ab3ad4964997ba3b9608d05ffe42de7d40a63a7485dcc1f550d70dc00",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 402,
+        "reference": 402,
+        "matched": 402,
+        "matched_with_rhythm": 402,
+        "exact_bars": 32,
+        "bars": 32,
+        "core_exact_bars": 32,
+        "predicted_ties": 11,
+        "matched_ties": 11,
+        "reference_ties": 11,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "那些我尚未知道的美丽.pdf",
+      "gp": "那些我尚未知道的美丽.gp"
+    },
+    {
+      "case": "case-078",
+      "calibration": false,
+      "prediction_sha256": "0e6d0134cdc829c118030448251ce3c0d43a6f240fc52bea7a53dae1a6eaab51",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1509,
+        "reference": 1544,
+        "matched": 1509,
+        "matched_with_rhythm": 1470,
+        "exact_bars": 111,
+        "bars": 148,
+        "core_exact_bars": 111,
+        "predicted_ties": 39,
+        "matched_ties": 39,
+        "reference_ties": 78,
+        "precision": 1.0,
+        "recall": 0.9773316062176166,
+        "rhythm_recall": 0.9520725388601037,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9773316062176166,
+        "status": "consistent"
+      },
+      "pdf": "黑白艺术家 吉他1.pdf",
+      "gp": "黑白艺术家.gp"
+    },
+    {
+      "case": "case-079",
+      "calibration": false,
+      "prediction_sha256": "e94ab45248a0d4f1c8d9d37b28b38df5a06a2797ae30c6ac772ea71d93cb8c8b",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 540,
+        "reference": 553,
+        "matched": 540,
+        "matched_with_rhythm": 528,
+        "exact_bars": 123,
+        "bars": 148,
+        "core_exact_bars": 123,
+        "predicted_ties": 43,
+        "matched_ties": 43,
+        "reference_ties": 56,
+        "precision": 1.0,
+        "recall": 0.976491862567812,
+        "rhythm_recall": 0.9547920433996383,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.976491862567812,
+        "status": "consistent"
+      },
+      "pdf": "黑白艺术家 吉他2.pdf",
+      "gp": "黑白艺术家.gp"
+    },
+    {
+      "case": "case-080",
+      "calibration": false,
+      "prediction_sha256": "f7b2e0523d8fca928842a868881c822d0b0386b3d80532096cc845c86ccc91e3",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 632,
+        "reference": 632,
+        "matched": 632,
+        "matched_with_rhythm": 619,
+        "exact_bars": 144,
+        "bars": 148,
+        "core_exact_bars": 144,
+        "predicted_ties": 51,
+        "matched_ties": 51,
+        "reference_ties": 51,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9794303797468354,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "黑白艺术家 吉他3.pdf",
+      "gp": "黑白艺术家.gp"
+    },
+    {
+      "case": "case-081",
+      "calibration": true,
+      "prediction_sha256": "f5e06b18eb218127797c354a3792a726a4aa34ee6aa13b0814fd3d91180ff164",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 548,
+        "reference": 607,
+        "matched": 548,
+        "matched_with_rhythm": 534,
+        "exact_bars": 54,
+        "bars": 90,
+        "core_exact_bars": 51,
+        "predicted_ties": 62,
+        "matched_ties": 62,
+        "reference_ties": 137,
+        "precision": 1.0,
+        "recall": 0.9028006589785832,
+        "rhythm_recall": 0.8797364085667215,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9028006589785832,
+        "status": "consistent"
+      },
+      "pdf": "《默》-那英-DaMingBai313.pdf",
+      "gp": "《默》-那英-DaMingBai313.gp"
+    }
+  ]
+}
