@@ -1,7 +1,8 @@
 """Recognize outlined music glyphs against the repository's own Bravura font.
 
 Templates come from the font, never from reference scores. Low-confidence or
-ambiguous silhouettes remain unrecognized; no bar-length fitting is performed.
+ambiguous silhouettes remain unrecognized. Whole/half-rest ambiguity is passed
+to the staff-position reader; no bar-length fitting is performed.
 """
 import io
 from functools import lru_cache
@@ -66,8 +67,12 @@ def classify(key):
         scores.append((score,code,bounds))
     scores.sort(reverse=True)
     if not scores or scores[0][0]<.85: return None
-    if len(scores)>1 and scores[0][0]-scores[1][0]<.04: return None
-    return scores[0],rect
+    ambiguous_rest=False
+    if len(scores)>1 and scores[0][0]-scores[1][0]<.04:
+        ambiguous_rest=({scores[0][1],scores[1][1]}=={0xe4e3,0xe4e4}
+                        and (len(scores)<3 or scores[0][0]-scores[2][0]>=.04))
+        if not ambiguous_rest:return None
+    return {'match':scores[0],'ink':rect,'ambiguous_rest':ambiguous_rest}
 
 
 def outline_spans(shapes):
@@ -81,11 +86,13 @@ def outline_spans(shapes):
         key=tuple((i[0],(point(i[1].tl),point(i[1].br)) if i[0]=='re' else tuple(point(p) for p in i[1:])) for i in sh['items'])
         match=classify(key)
         if not match: continue
-        (confidence,code,bounds),ink=match
+        confidence,code,bounds=match['match'];ink=match['ink']
         glyph_scale=(ink[3]-ink[1])/scale/(bounds[3]-bounds[1])
         origin=(r.x0+(ink[0]-2)/scale+(100-bounds[0])*glyph_scale,
                 r.y0+(ink[1]-2)/scale+(150-bounds[1])*glyph_scale)
-        spans.append({'text':chr(code),'origin':origin,'bbox':list(r),
+        span={'text':'\ufffd' if match['ambiguous_rest'] else chr(code),'origin':origin,'bbox':list(r),
                       'font':'GPBravuraOutline','size':100*glyph_scale,
-                      'source':'font-outline','confidence':round(confidence,3)})
+                      'source':'font-outline','confidence':round(confidence,3)}
+        if match['ambiguous_rest']:span['rest_candidates']=[1,2]
+        spans.append(span)
     return spans

@@ -172,7 +172,7 @@ def recognize(pdf):
                     beat={'x':x,'notes':chord,'grace':grace,'duration':None,'dots':0,'tuplet':[1,1]}
                     read_rhythm(beat,staff,standard,spans,lines,shapes,left,right)
                     bar['beats'].append(beat)
-                add_rests(bar,staff,standard,spans,shapes)
+                add_rests(bar,staff,standard,spans,lines,shapes)
                 bar['beats'].sort(key=lambda b:b['x'])
                 system['bars'].append(bar)
             read_hidden_standard_ties(system,spans,lines,shapes)
@@ -417,6 +417,12 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
                 beat['duration']=8*2**((ord(c)-0xe240)//2)
             else:
                 beat['duration']=4
+                # GP shortens a half-note continuation to one staff-space of
+                # detached stem; a quarter continuation is about 1.75 spaces.
+                if len(stems)==1 and all(n['parenthesized'] or n.get('inferred_from') for n in beat['notes']):
+                    start,finish=stems[0]
+                    if (1.3<(start-bottom)/gap<1.7 and 2.3<(finish-bottom)/gap<2.7
+                            and .8<(finish-start)/gap<1.2): beat['duration']=2
         dots=[s for s in spans if '\ue1e7' in s['text'] and x<s['bbox'][0]<x+12
               and bottom<s['origin'][1]<bottom+gap*4]
         beat['dots']=len(dots)
@@ -500,10 +506,24 @@ def read_tuplets(bar,staff,standard,spans):
             used.update(ids)
 
 
-def add_rests(bar,staff,standard,spans,shapes):
+def add_rests(bar,staff,standard,spans,lines,shapes):
     top,bottom=staff['ys'][0],staff['ys'][-1]
     low=standard['ys'][0]-15 if standard else top-2
     for s in spans:
+        if s.get('rest_candidates')==[1,2]:
+            # The two silhouettes are nearly identical: a whole rest hangs
+            # from the second staff line, a half rest sits on the third.
+            ys=(standard or staff)['ys'];space=ys[1]-ys[0]
+            x0,y0,x1,y1=s['bbox']
+            if not (.6*space<x1-x0<1.4*space and .3*space<y1-y0<.7*space):continue
+            whole=abs(y0-ys[1])<space*.08
+            half=abs(y1-ys[2])<space*.08
+            if whole==half:continue
+            # A short beam can have the same silhouette and staff position,
+            # but it touches a long vertical stem. Rest rectangles do not.
+            if any(abs(a-c)<.5 and x0-.6<a<x1+.6 and abs(d-b)>space*1.5
+                   and min(b,d)<y1+.5 and max(b,d)>y0-.5 for a,b,c,d in lines):continue
+            s={**s,'text':'\ue4e3' if whole else '\ue4e4','origin':(x0,ys[1] if whole else ys[2])}
         for c in s['text']:
             if 0xe4e3<=ord(c)<=0xe4e9 and bar['left']<s['bbox'][0]<bar['right'] and low<s['origin'][1]<bottom+5:
                 duration=2**(ord(c)-0xe4e3)
@@ -513,6 +533,9 @@ def add_rests(bar,staff,standard,spans,shapes):
                      if z is not s and s['bbox'][2]-1<z['bbox'][0]<s['bbox'][2]+6
                      and abs(z['origin'][1]-s['origin'][1])<(bottom-top)/5*.6)
                 bar['beats'].append({'x':x,'notes':[],'grace':False,'duration':duration,'dots':dots,'tuplet':[1,1]})
+    if (len(bar['beats'])==1 and not bar['beats'][0]['notes'] and bar['beats'][0]['duration']==1
+            and not bar['beats'][0]['dots'] and bar['meter_source']=='pdf'):
+        bar['beats'][0]['fullBarRest']=True
     if not bar['beats'] and bar['meter_source']=='pdf' and visually_empty(bar,staff,standard,spans,shapes):
         bar['beats'].append({'x':(bar['left']+bar['right'])/2,'notes':[],'grace':False,
                              'duration':1,'dots':0,'tuplet':[1,1],'fullBarRest':True,

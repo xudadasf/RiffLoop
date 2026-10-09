@@ -133,7 +133,94 @@ def hidden_staff_chord_fixture(path,mode='single'):
         doc.saveIncr()
 
 
+def outlined_meter(page,meter):
+    font=TTFont(io.BytesIO(font_buffer()));glyphs=font.getGlyphSet();paths=[]
+    for value,y in zip(meter,(110,118.5)):
+        pen=SVGPathPen(glyphs);glyphs[font.getBestCmap()[0xe080+value]].draw(pen)
+        paths.append(f'<path transform="translate(38 {y}) scale({17/font["head"].unitsPerEm} {-17/font["head"].unitsPerEm})" d="{pen.getCommands()}"/>')
+    svg='<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250">'+''.join(paths)+'</svg>'
+    with fitz.open(stream=svg.encode(),filetype='svg') as source:
+        with fitz.open(stream=source.convert_to_pdf(),filetype='pdf') as vector:
+            page.show_pdf_page(page.rect,vector,0)
+    font.close()
+
+
 class PrototypeTests(unittest.TestCase):
+    def test_short_beam_touching_stem_is_not_a_rest(self):
+        for edge in ('left','right'):
+            with self.subTest(edge=edge),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'beam.pdf';fixture(pdf,empty=True,meter=False)
+                with fitz.open(pdf) as doc:
+                    page=doc[0];outlined_meter(page,(4,4))
+                    for i in range(5):page.draw_line((30,50+i*4.25),(350,50+i*4.25),width=.4)
+                    page.draw_rect(fitz.Rect(120,54.25,123.74,56.38),color=None,fill=(0,0,0))
+                    x=119.75 if edge=='left' else 123.99
+                    page.draw_line((x,44),(x,59.3),width=.5)
+                    doc.saveIncr()
+                bar=recognize(pdf)['systems'][0]['bars'][0]
+                self.assertEqual(bar['beats'],[])
+                self.assertTrue(bar['issues'])
+
+    def test_outlined_whole_and_half_rests_use_staff_position(self):
+        cases=[(kind,meter,standard) for kind,meter in [('whole',(4,4)),('whole',(3,4)),('half',(4,4))]
+               for standard in (False,True)]
+        for kind,meter,standard in cases:
+            with self.subTest(kind=kind,meter=meter,standard=standard),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'rests.pdf';fixture(pdf,empty=True,meter=False)
+                with fitz.open(pdf) as doc:
+                    page=doc[0];outlined_meter(page,meter)
+                    if standard:
+                        for i in range(5):page.draw_line((30,50+i*4.25),(350,50+i*4.25),width=.4)
+                    for x in ([120] if kind=='whole' else [120,250]):
+                        y=(54.25 if kind=='whole' else 56.1) if standard else (106 if kind=='whole' else 109.6)
+                        page.draw_rect(fitz.Rect(x,y,x+4.8,y+2.4),color=None,fill=(0,0,0))
+                    doc.saveIncr()
+                result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+                self.assertEqual(bar['issues'],[])
+                self.assertEqual([b['duration'] for b in bar['beats']],[1] if kind=='whole' else [2,2])
+                self.assertEqual(bar['meter'],list(meter))
+                data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_ambiguous_rest_position_or_missing_meter_stays_blocked(self):
+        for y,meter in [(115,(4,4)),(148,(4,4)),(106,None)]:
+            with self.subTest(y=y,meter=meter),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'ambiguous.pdf';fixture(pdf,empty=True,meter=False)
+                with fitz.open(pdf) as doc:
+                    if meter:outlined_meter(doc[0],meter)
+                    doc[0].draw_rect(fitz.Rect(120,y,124.8,y+2.4),color=None,fill=(0,0,0));doc.saveIncr()
+                bar=recognize(pdf)['systems'][0]['bars'][0]
+                self.assertTrue(bar['issues'])
+                if meter:self.assertEqual(bar['beats'],[])
+
+    def test_detached_half_stem_is_not_a_quarter(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pdf=Path(folder)/'halves.pdf';fixture(pdf,empty=True)
+            with fitz.open(pdf) as doc:
+                page=doc[0]
+                for x,length in [(100,6),(200,10.5),(280,10.5)]:
+                    token='(7)';w=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                    page.insert_text((x-w/2,114.4),token,fontname='helv',fontsize=7)
+                    page.draw_line((x,145-length),(x,145),width=.4)
+                doc.saveIncr()
+            result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+            self.assertEqual([b['duration'] for b in bar['beats']],[2,4,4])
+            self.assertEqual(bar['issues'],[])
+            data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+            run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+            self.assertEqual(run.returncode,0,run.stderr)
+
+    def test_short_line_at_other_height_is_not_a_half_stem(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pdf=Path(folder)/'short-line.pdf';fixture(pdf,empty=True)
+            with fitz.open(pdf) as doc:
+                page=doc[0];page.insert_text((97,114.4),'(7)',fontname='helv',fontsize=7)
+                page.draw_line((100,132),(100,138),width=.4);doc.saveIncr()
+            bar=recognize(pdf)['systems'][0]['bars'][0]
+            self.assertNotEqual(bar['beats'][0]['duration'],2)
+            self.assertTrue(bar['issues'])
+
     def test_hidden_staff_chord_and_chain_survive_gp_roundtrip(self):
         for mode in ('single','chain'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
