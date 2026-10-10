@@ -112,6 +112,10 @@ def recognize(pdf):
             if staff['count'] != 6:
                 continue
             ys = staff['ys']; gap = (ys[-1]-ys[0])/5
+            # Keep the next system's high notes and bends out of this system's
+            # otherwise empty rhythm area.
+            staff['notation_bottom']=min(ys[-1]+gap*5,
+                (ys[-1]+groups[gi+1]['ys'][0])/2 if gi+1<len(groups) else page.rect.height)
             standard = groups[gi-1] if gi and groups[gi-1]['count'] == 5 and ys[0]-groups[gi-1]['ys'][-1] < 90 else None
             system = {'page':pi+1,'ys':ys,'left':staff['left'],'right':staff['right'],
                       'standard':standard,'bars':[]}
@@ -179,13 +183,16 @@ def recognize(pdf):
             read_ties(system,spans,lines,shapes)
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
+            previous_bar=result['systems'][-1]['bars'][-1] if result['systems'] else None
             for bar in system['bars']:
                 # New hidden tie destinations must participate in tuplet grouping.
                 for beat in bar['beats']:
                     beat['notes'].sort(key=lambda n:n['string'])
                     beat['tuplet']=[1,1]
                 read_tuplets(bar,staff,standard,spans)
+                read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes)
                 validate_bar(bar)
+                previous_bar=bar
             result['systems'].append(system)
             previous_shapes = shapes
     if not result['systems']:
@@ -557,11 +564,45 @@ def add_rests(bar,staff,standard,spans,lines,shapes):
         bar['issues'].append('空小节或休止符尚未识别')
 
 
-def visually_empty(bar,staff,standard,spans,shapes):
+def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes):
+    """Read GP's stemless parenthesized whole-note continuation, not a beat deficit."""
+    if standard or not previous or previous['issues'] or previous['number']+1!=bar['number']:return
+    if bar['meter_source']!='pdf' or len(bar['beats'])!=1 or not previous['beats']:return
+    beat=bar['beats'][0];notes=beat['notes']
+    if beat['duration'] is not None or beat['grace'] or not notes:return
+    source={(n['string'],n['fret']) for n in previous['beats'][-1]['notes']}
+    if not all(n['parenthesized'] and n['tie'] and not n['dead']
+               and n.get('tie_source_bar')==previous['number']
+               and (n['string'],n['fret']) in source for n in notes):return
+    gap=(staff['ys'][-1]-staff['ys'][0])/5
+    incoming=set()
+    for note in notes:
+        matches=[]
+        for i,sh in enumerate(shapes):
+            if sh['type']!='f' or len(sh['items'])!=2 or not all(it[0]=='c' for it in sh['items']):continue
+            a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+            if (a.x<bar['left'] or note.get('tie_evidence')=='paired-system-boundary-curves'
+                    and a.x<bar['left']+32) and abs(z.x-note['bbox'][0])<2:
+                if abs(a.y-note['y'])<gap*.25 and abs(z.y-note['y'])<gap*.25:matches.append(i)
+        if len(matches)!=1 or matches[0] in incoming:return
+        incoming.add(matches[0])
+    remaining_spans=[s for s in spans if not any(list(s['bbox'])==n['bbox'] for n in notes)]
+    remaining_shapes=[sh for i,sh in enumerate(shapes) if i not in incoming]
+    if not visually_empty(bar,staff,None,remaining_spans,remaining_shapes,bottom=staff['notation_bottom']):return
+    beat['duration']=1
+    beat['evidence']='stemless-whole-tab-continuation'
+
+
+def visually_empty(bar,staff,standard,spans,shapes,bottom=None):
     """Only infer a silent bar when its notation area contains no unknown marks."""
     left,right=bar['left']+2,bar['right']-2
     top=(standard['ys'][0]-12 if standard else staff['ys'][0]-4)
-    bottom=staff['ys'][-1]+20
+    bottom=min(staff['ys'][-1]+20 if bottom is None else bottom,staff.get('notation_bottom',float('inf')))
+    rows=staff['ys']+(standard['ys'] if standard else [])
+    # Printed fret cutouts can leave very short pieces of an established line.
+    def staff_segment(rect):
+        return rect.height<.8 and (rect.width>20 or rect.width>1
+                                  and any(abs((rect.y0+rect.y1)/2-y)<.15 for y in rows))
     ignored=[s for s in spans if any(c in s['text'] for c in ('\ue050','\ue06d','\ue08a','\ue08b'))
              or all('\ue080'<=c<='\ue089' for c in s['text'])]
     for s in spans:
@@ -581,12 +622,12 @@ def visually_empty(bar,staff,standard,spans,shapes):
             elif item[0]=='re': parts.append(item[1])
             else: parts.append(r)
         if not any(p.x1>left and p.x0<right and p.y1>top and p.y0<bottom for p in parts): continue
-        if r.height<.8 and r.width>20: continue  # staff/ledger lines
+        if sh['type']=='s' and staff_segment(r): continue
         if r.width<1.5 and r.height>=staff['ys'][-1]-staff['ys'][0]-.5: continue
         if sh['type']=='s' and all(i[0]=='l' for i in sh['items']):
             relevant=[fitz.Rect(i[1],i[2]).normalize() for i in sh['items']]
             relevant=[p for p in relevant if p.x1>left and p.x0<right and p.y1>top and p.y0<bottom]
-            if all(p.height<.8 and p.width>20 for p in relevant): continue
+            if all(staff_segment(p) for p in relevant): continue
         if any(s.get('source')=='font-outline' and s['bbox']==list(r) for s in ignored): continue
         return False
     return True

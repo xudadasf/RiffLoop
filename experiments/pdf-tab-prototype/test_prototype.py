@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import fitz
 from recognize import recognize
@@ -150,6 +151,94 @@ def outlined_music(page,symbols):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_export_verification_requires_explicit_index_for_duplicate_track_names(self):
+        import verify_export
+        beat={'voice':0,'duration':1,'dots':0,'grace':False,'tuplet':[1,1],
+              'notes':[{'string':3,'fret':7,'dead':False,'tie':False}]}
+        track={'name':'Guitar','track':0,'staff':0,'tuning':[64,59,55,50,45,40],
+               'bars':[{'number':1,'meter':[4,4],'beats':[beat]}]}
+        actual={'tempo':90,'tracks':[track]}
+        empty={**track,'track':1,'bars':[{'number':1,'meter':[4,4],'beats':[{**beat,'notes':[]}]}]}
+        reference={'tempo':90,'tracks':[track,empty]}
+        with tempfile.TemporaryDirectory() as folder:
+            output=Path(folder)/'verification.json'
+            def import_score(command,**kwargs):
+                data=actual if command[-2]=='actual.gp' else reference
+                Path(command[-1]).write_text(json.dumps(data),encoding='utf-8')
+            base=['verify_export.py','actual.gp','reference.gp','--track','Guitar','--bars','1-1','--out',str(output)]
+            for index,code in [(None,None),(0,0),(1,1),(2,None)]:
+                args=base+([] if index is None else ['--track-index',str(index)])
+                with self.subTest(index=index),patch.object(sys,'argv',args),patch.object(verify_export.subprocess,'run',side_effect=import_score):
+                    if code is None:
+                        with self.assertRaises(ValueError):verify_export.main()
+                    else:
+                        self.assertEqual(verify_export.main(),code)
+
+    def test_stemless_whole_continuation_requires_clean_notation_and_proven_ties(self):
+        modes=('single','chord','cutout','off_staff_line','no_arc','different_pitch','plain_number','unknown_mark',
+               'short_line','extra_beat','invalid_source','three_four')
+        for mode in modes:
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'whole-tie.pdf';fixture(pdf,empty=True,meter=(3,4) if mode=='three_four' else True)
+                with fitz.open(pdf) as doc:
+                    page=doc[0];page.draw_line((190,100),(190,130),width=.5)
+                    tones=[(3,7),(4,9)] if mode=='chord' else [(3,7)]
+                    xs=(70,115,160) if mode=='three_four' else (70,100,130,160)
+                    for x in (*xs,260):
+                        for string,fret in tones:
+                            token=str(fret+(1 if x==260 and mode=='different_pitch' else 0))
+                            if x==260 and mode!='plain_number':token='('+token+')'
+                            w=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                            page.insert_text((x-w/2,100+(string-1)*6+2.4),token,fontname='helv',fontsize=7)
+                        if x!=260 and not (mode=='invalid_source' and x==100):page.draw_line((x,123),(x,150),width=.5)
+                    if mode!='no_arc':
+                        for string,fret in tones:
+                            y=100+(string-1)*6;token='('+str(fret)+')'
+                            z=260-fitz.get_text_length(token,fontname='helv',fontsize=7)/2-1.4
+                            sh=page.new_shape();sh.draw_bezier((164,y),(170,y+4),(z-6,y+4),(z,y))
+                            sh.draw_bezier((z,y),(z-6,y+3),(170,y+3),(164,y))
+                            sh.finish(color=None,fill=(0,0,0));sh.commit()
+                    if mode=='unknown_mark':page.draw_circle((300,143),2,color=None,fill=(0,0,0))
+                    if mode in ('cutout','off_staff_line'):
+                        y=112 if mode=='cutout' else 115
+                        page.draw_line((193,y),(202,y),width=.4)
+                    if mode=='short_line':page.draw_line((260,155),(260,158),width=.5)
+                    if mode=='extra_beat':
+                        page.insert_text((307,114.4),'9',fontname='helv',fontsize=7)
+                        page.draw_line((310,123),(310,150),width=.5)
+                    doc.saveIncr()
+                result=recognize(pdf);bars=result['systems'][0]['bars'];bar=bars[1]
+                if mode in ('single','chord','cutout','three_four'):
+                    self.assertEqual(bar['beats'][0]['duration'],1)
+                    if mode=='three_four':self.assertTrue(bar['issues']);continue
+                    self.assertTrue(all(not b['issues'] for b in bars))
+                    self.assertTrue(all(n['tie'] for n in bar['beats'][0]['notes']))
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+                else:
+                    self.assertIsNone(bar['beats'][0]['duration'])
+                    self.assertTrue(bar['issues'])
+
+    def test_next_system_ink_does_not_block_an_empty_bar(self):
+        for local_mark in (False,True):
+            with self.subTest(local_mark=local_mark),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'nearby-system.pdf';fixture(pdf,empty=True)
+                with fitz.open(pdf) as doc:
+                    page=doc[0]
+                    for i in range(5):page.draw_line((30,166+i*4.25),(350,166+i*4.25),width=.4)
+                    for y in range(210,241,6):page.draw_line((30,y),(350,y),width=.4)
+                    for x in (30,350):page.draw_line((x,210),(x,240),width=.5)
+                    sh=page.new_shape();sh.draw_polyline([(70,155),(90,149),(110,155)])
+                    sh.finish(color=(0,0,0),width=.5);sh.commit()
+                    if local_mark:page.draw_line((140,139),(145,143),width=.5)
+                    doc.saveIncr()
+                bar=recognize(pdf)['systems'][0]['bars'][0]
+                if local_mark:self.assertTrue(bar['issues'])
+                else:
+                    self.assertEqual(bar['issues'],[])
+                    self.assertTrue(bar['beats'][0]['fullBarRest'])
+
     def test_hidden_tab_tie_can_join_a_partly_visible_chord(self):
         for mode in ('chord','hidden_chord','single_visible','displaced_arc','visible_same_string','rest_between','note_between','target_rest'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:

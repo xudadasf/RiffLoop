@@ -15,7 +15,8 @@ CALIBRATION_FILES={'此生不换 (2).pdf','《默》-那英-DaMingBai313.pdf','P
                    '一路向北-大明白313.pdf','千万次奔向 木吉他.pdf','向阳而生 尾奏.pdf',
                    '好想爱这个世界啊 吉他3.pdf','晨光里有你.pdf','好想我回来啊.pdf',
                    '「青鸟」火影忍者OP3-大明白313.pdf','《TheLoner》GaryMoore-大明白313.pdf',
-                   '《天空之城》 DaMingBai313.pdf','《如愿》-DaMingBai313.pdf','黑白艺术家 吉他1.pdf'}
+                   '《天空之城》 DaMingBai313.pdf','《如愿》-DaMingBai313.pdf','黑白艺术家 吉他1.pdf',
+                   '醉拳-成龙-DaMingBai313.pdf','烟火里的尘埃 节奏吉他.pdf'}
 
 
 def normalized(s):

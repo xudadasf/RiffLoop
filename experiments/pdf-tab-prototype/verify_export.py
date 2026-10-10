@@ -13,6 +13,7 @@ def main():
     parser.add_argument('exported',type=Path)
     parser.add_argument('reference',type=Path)
     parser.add_argument('--track',required=True)
+    parser.add_argument('--track-index',type=int,help='Optional zero-based original GP track index to resolve duplicate names')
     parser.add_argument('--bars',required=True,help='Contiguous original bar range, e.g. 10-13')
     parser.add_argument('--out',type=Path,required=True)
     args=parser.parse_args()
@@ -25,7 +26,8 @@ def main():
             subprocess.run(['node',str(Path(__file__).with_name('gp-reference.cjs')),str(path),str(output)],check=True)
             scores.append(json.loads(output.read_text(encoding='utf-8')))
     actual,original=scores
-    tracks=[t for t in original['tracks'] if t['name']==args.track and len(t['tuning'])==6]
+    tracks=[t for t in original['tracks'] if t['name']==args.track and len(t['tuning'])==6
+            and (args.track_index is None or t['track']==args.track_index)]
     if len(tracks)!=1: raise ValueError('Reference track is missing or ambiguous')
     expected=tracks[0]
     chosen=expected['bars'][first-1:last]
@@ -41,6 +43,7 @@ def main():
         if core_events(a)!=core_events(b) or a['meter']!=b['meter']:
             differences.append(f"bar {b['number']}: notes, rhythm, rests, ties or meter differ")
     result={'reference':args.reference.name,'track':args.track,'source_bars':args.bars,
+            'reference_track_index':expected['track'],'reference_staff_index':expected['staff'],
             'bars':len(chosen),'notes':sum(len(v['notes']) for b in chosen for v in b['beats'] if v['voice']==0),
             'passed':not differences,'differences':differences,
             'checked':['string/fret/dead/tie','rational duration/dots/tuplet/grace flag','voice-0 beat sequence including full-bar silence','meter','tuning','initial tempo'],
