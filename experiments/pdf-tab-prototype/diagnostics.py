@@ -19,6 +19,8 @@ REASONS={
     'validation':'其他导出校验未通过',
 }
 GROUPS={'consistent':'配对有一致性支持','uncertain':'配对证据不足'}
+RHYTHM_REASONS={k:REASONS[k] for k in ('pass','missing_bar','multiple_voices','meter','unknown_duration','validation')}
+RHYTHM_REASONS.update({'pass':'节奏序列检查通过','timing_attack_rest':'时值、起音、延续或休止差异'})
 
 
 def failure_reason(bar,reference):
@@ -36,13 +38,25 @@ def failure_reason(bar,reference):
     return 'validation' if bar['issues'] else 'pass'
 
 
+def rhythm_reason(bar,reference):
+    """Compare beat timing and attack/hold/rest presence independently of pitch."""
+    reason=failure_reason(bar,reference)
+    if reason in ('missing_bar','multiple_voices','meter','unknown_duration'):return reason
+    def sequence(score):
+        return [(duration,grace,any(not tie for s,f,d,tie in notes),any(tie for s,f,d,tie in notes))
+                for duration,grace,notes in core_events(score)]
+    if sequence(bar)!=sequence(reference):return 'timing_attack_rest'
+    return 'validation' if bar['issues'] else 'pass'
+
+
 def diagnose(folder,pairing_baseline=None):
     read=lambda path:json.loads(path.read_text(encoding='utf-8'))
     rows=read(folder/'results.json')
     pairing_rows=rows if pairing_baseline is None else read(pairing_baseline/'results.json')
     pairing={r['case']:r for r in pairing_rows}
     if set(pairing)!={r['case'] for r in rows}:raise ValueError('Pairing baseline has a different candidate set')
-    groups={g:{'cases':0,'bars':0,'counts':dict.fromkeys(REASONS,0)} for g in GROUPS}
+    groups={g:{'cases':0,'bars':0,'counts':dict.fromkeys(REASONS,0),
+               'rhythm_counts':dict.fromkeys(RHYTHM_REASONS,0)} for g in GROUPS}
     cases=[]
     for row in rows:
         if row['status']!='evaluated':continue
@@ -55,9 +69,12 @@ def diagnose(folder,pairing_baseline=None):
         if len({b['number'] for b in bars})!=len(bars):raise ValueError('Repeated PDF bar numbers: '+row['case'])
         by_number={b['number']:b for b in bars}
         counts=dict.fromkeys(REASONS,0);differences=[]
+        rhythm_counts=dict.fromkeys(RHYTHM_REASONS,0);rhythm_differences=[]
         for rb in tracks[0]['bars']:
             bar=by_number.get(rb['number']);reason=failure_reason(bar,rb);counts[reason]+=1
             if reason!='pass':differences.append({'bar':rb['number'],'reason':reason})
+            rhythm=rhythm_reason(bar,rb);rhythm_counts[rhythm]+=1
+            if rhythm!='pass':rhythm_differences.append({'bar':rb['number'],'reason':rhythm})
         if counts['pass']!=row['metrics']['core_exact_bars']:
             raise ValueError('Classification disagrees with frozen evaluation: '+row['case'])
         basis=pairing[row['case']]
@@ -67,13 +84,16 @@ def diagnose(folder,pairing_baseline=None):
         if group not in GROUPS:group='uncertain'
         groups[group]['cases']+=1;groups[group]['bars']+=len(tracks[0]['bars'])
         for reason,count in counts.items():groups[group]['counts'][reason]+=count
+        for reason,count in rhythm_counts.items():groups[group]['rhythm_counts'][reason]+=count
         cases.append({'case':row['case'],'pdf':Path(row['pdf']).name,'group':group,
                       'current_pairing_status':row.get('pairing_checks',{}).get('status','uncertain'),
-                      'bars':len(tracks[0]['bars']),'counts':counts,'differences':differences})
+                      'bars':len(tracks[0]['bars']),'counts':counts,'differences':differences,
+                      'rhythm_counts':rhythm_counts,'rhythm_differences':rhythm_differences})
     return {'candidate_count':len(rows),'pairing_basis':pairing_baseline.name if pairing_baseline else 'current-results',
             'statuses':dict(collections.Counter(r['status'] for r in rows)),
             'groups':groups,'cases':cases,
             'method':'One first differing layer per reference bar: missing, voices, meter, unknown duration, notes, rhythm/rests, ties, validation. Counts are not independent root causes.',
+            'rhythm_method':'Exact voice-0 beat durations, grace flags and attack/hold/rest presence with confirmed meter and validation. Ignores pitch and chord size; does not establish tempo, repeats, grace placement or audible timing.',
             'pairing_caution':'Consistency is an automatic check, not proof of matching editions. Keep both groups; do not use the supported subset as overall success.'}
 
 
@@ -100,6 +120,10 @@ def write_report(result,folder):
     if result['pairing_basis']!='current-results':
         page+='<p>本报告固定采用历史评估 '+html.escape(result['pairing_basis'])+' 的配对分组，避免识别提升使素材跨组、改变比较范围。当前自动配对检查仍保留在完整评估报告和分类数据中。</p>'
     page+=summary+'<table><tr><th>分类</th>'+''.join('<th>'+v+'</th>' for v in GROUPS.values())+'</tr>'+counts+'</table>'+cases
+    page+='<h2>节奏优先检查</h2><p>逐拍比较时值、装饰音标志，以及是否起音、延续或休止，并检查拍号。即使总拍数相同，起音位置或休止位置不同也不通过。此项忽略品位、弦位及和弦音符数量，不替代核心检查；不验证速度、中途变速、反复、装饰音具体落点或实际听感。详细失败小节保存在分类数据的 rhythm_differences 中。</p>'
+    page+='<table><tr><th>节奏分类</th>'+''.join('<th>'+v+'</th>' for v in GROUPS.values())+'</tr>'
+    page+=''.join('<tr><td>'+label+'</td>'+''.join(f'<td>{groups[g]["rhythm_counts"][reason]}</td>' for g in GROUPS)+'</tr>'
+                  for reason,label in RHYTHM_REASONS.items())+'</table>'
     (folder/'diagnostics.html').write_text(page,encoding='utf-8')
 
 

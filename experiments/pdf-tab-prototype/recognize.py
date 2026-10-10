@@ -288,7 +288,9 @@ def read_ties(system,spans,lines,shapes):
         start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
         if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
         sources=[(b,v,n) for b,v,n in notes() if (abs(n['x']-start.x)<7
-                 or n['parenthesized'] and abs(n['bbox'][2]-start.x)<2)
+                 or n['parenthesized'] and abs(n['bbox'][2]-start.x)<2
+                 or n.get('tie_outgoing_x') is not None and abs(n['tie_outgoing_x']-start.x)<.6
+                    and abs(n['y']-start.y)<gap*.25)
                  and abs(n['y']-start.y)<gap*.8 and n['x']<end.x-3 and not n['dead']]
         if not sources: continue
         sb,sv,sn=min(sources,key=lambda t:abs(t[2]['x']-start.x)+abs(t[2]['y']-start.y))
@@ -307,9 +309,25 @@ def read_ties(system,spans,lines,shapes):
             if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
             # GP often suppresses a tied fret number but retains its rhythm stem.
-            stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<7
+            def paired_outgoing(x):
+                # A wider invisible fret cutout needs symmetric incoming and
+                # outgoing curves on this string, ending at a printed equal fret.
+                if not 0<x-end.x<gap*1.5 or any(abs(p.y-sn['y'])>gap*.25 for p in (start,end)):return None
+                matches=[]
+                for other in arcs:
+                    a,z=sorted((other[1],other[4]),key=lambda p:p.x)
+                    if not a.x>x or abs(a.x-x-(x-end.x))>=.6:continue
+                    if any(abs(p.y-sn['y'])>gap*.25 for p in (a,z)):continue
+                    if any(n['parenthesized'] and not n['dead'] and not v['grace']
+                           and n['string']==sn['string'] and n['fret']==sn['fret']
+                           and abs(n['bbox'][0]-z.x)<2 and n['x']>a.x+3
+                           and not any(x<w['x']<v['x'] for bar in system['bars'] for w in bar['beats'])
+                           for b,v,n in notes()):matches.append(a.x)
+                return matches[0] if len(matches)==1 else None
+            stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<max(7,gap*1.5)
                             and bottom+gap*.8<max(y,y1)<bottom+gap*5
                             and top-2<min(y,y1)<bottom+gap*3],.5)
+            stems=[x for x in stems if abs(x-end.x)<7 or paired_outgoing(x) is not None]
             if len(stems)!=1: continue
             x=stems[0]
             # Visible notes on other strings may share this stem; only ink on
@@ -330,6 +348,8 @@ def read_ties(system,spans,lines,shapes):
             if any(sv['x']<v['x']<x-1.5 for b in system['bars'] for v in b['beats']): continue
             tn={**sn,'x':x,'bbox':[x-1,sn['y']-2,x+1,sn['y']+2],
                 'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
+            tn.pop('tie_outgoing_x',None)
+            if abs(x-end.x)>=7:tn['tie_outgoing_x']=paired_outgoing(x)
             if tv: tv['notes'].append(tn)
             else:
                 tv={'x':x,'notes':[tn],'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}

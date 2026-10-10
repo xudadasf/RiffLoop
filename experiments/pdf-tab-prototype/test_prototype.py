@@ -151,6 +151,69 @@ def outlined_music(page,symbols):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_rhythm_diagnostic_checks_timeline_not_only_total_or_pitch(self):
+        from diagnostics import rhythm_reason
+        import copy
+        beat={'voice':0,'duration':4,'dots':0,'grace':False,'tuplet':[1,1],
+              'notes':[{'string':3,'fret':7,'dead':False,'tie':False}]}
+        reference={'meter':[4,4],'meter_source':'pdf','issues':[],
+                   'beats':[copy.deepcopy(beat) for _ in range(4)]}
+        for mode in ('same','pitch','shifted_onset','rest','reattack','unknown','meter'):
+            with self.subTest(mode=mode):
+                actual=copy.deepcopy(reference);expected=copy.deepcopy(reference)
+                if mode=='pitch':actual['beats'][0]['notes'][0]['fret']=9
+                if mode=='shifted_onset':
+                    actual['beats'][0]['duration']=8;actual['beats'][1]['dots']=1
+                if mode=='rest':actual['beats'][1]['notes']=[]
+                if mode=='reattack':expected['beats'][1]['notes'][0]['tie']=True
+                if mode=='unknown':actual['beats'][0]['duration']=None
+                if mode=='meter':actual['meter']=[3,4]
+                reason='pass' if mode in ('same','pitch') else {'unknown':'unknown_duration','meter':'meter'}.get(mode,'timing_attack_rest')
+                self.assertEqual(rhythm_reason(actual,expected),reason)
+
+    def test_wide_hidden_chord_cutout_requires_paired_arcs_and_same_pitch(self):
+        for mode in ('valid','no_outgoing','wrong_pitch','asymmetric','shifted_string','no_stem','intervening','outgoing_rest'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'wide-cutout.pdf';fixture(pdf,empty=True)
+                with fitz.open(pdf) as doc:
+                    p=doc[0];p.draw_line((190,100),(190,130),width=.5)
+                    p.insert_font(fontname='music',fontbuffer=font_buffer())
+                    p.insert_text((70,112),'\ue4e5',fontsize=17,fontname='music')
+                    for string,fret in ((2,12),(3,13)):
+                        y=100+(string-1)*6
+                        for x in (110,260):
+                            token=str(fret+(1 if mode=='wrong_pitch' and x==260 else 0))
+                            if x==260:token='('+token+')'
+                            width=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                            p.insert_text((x-width/2,y+2.4),token,fontname='helv',fontsize=7)
+                        z=260-width/2-1.4
+                        pairs=[(116,152.2)]
+                        if mode!='no_outgoing':pairs.append((169 if mode=='asymmetric' else 167.8,z))
+                        for a,b in pairs:
+                            ay=y+2 if mode=='shifted_string' else y
+                            sh=p.new_shape();sh.draw_bezier((a,ay),(a+8,ay+4),(b-8,ay+4),(b,ay))
+                            sh.draw_bezier((b,ay),(b-8,ay+3),(a+8,ay+3),(a,ay))
+                            sh.finish(color=None,fill=(0,0,0));sh.commit()
+                    p.draw_oval(fitz.Rect(104,101,116,117),width=.4)
+                    p.draw_line((110,139),(110,145),width=.5)
+                    if mode!='no_stem':p.draw_line((160,134.5),(160,145),width=.5)
+                    if mode=='intervening':p.insert_text((140,112),'\ue4e5',fontsize=17,fontname='music')
+                    if mode=='outgoing_rest':p.insert_text((225,112),'\ue4e5',fontsize=17,fontname='music')
+                    doc.saveIncr()
+                result=recognize(pdf);bars=result['systems'][0]['bars']
+                inferred=[n for b in bars for beat in b['beats'] for n in beat['notes'] if n.get('inferred_from')]
+                if mode=='valid':
+                    self.assertEqual(len(inferred),2)
+                    self.assertEqual([b['issues'] for b in bars],[[],[]])
+                    self.assertEqual([beat['duration'] for b in bars for beat in b['beats']],[4,2,4,1])
+                    self.assertTrue(all(n['tie'] for n in bars[1]['beats'][0]['notes']))
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+                else:
+                    self.assertFalse(inferred)
+                    self.assertTrue(bars[1]['issues'])
+
     def test_export_verification_requires_explicit_index_for_duplicate_track_names(self):
         import verify_export
         beat={'voice':0,'duration':1,'dots':0,'grace':False,'tuplet':[1,1],
