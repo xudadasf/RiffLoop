@@ -150,6 +150,48 @@ def outlined_music(page,symbols):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_hidden_tab_tie_can_join_a_partly_visible_chord(self):
+        for mode in ('chord','hidden_chord','single_visible','displaced_arc','visible_same_string','rest_between','note_between','target_rest'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'partial-chord.pdf';fixture(pdf,empty=True)
+                with fitz.open(pdf) as doc:
+                    page=doc[0]
+                    for i,x in enumerate((70,140,210,280)):
+                        if mode in ('rest_between','target_rest') and i==1:
+                            page.insert_font(fontname='music',fontbuffer=font_buffer())
+                            w=fitz.Font(fontbuffer=font_buffer()).text_length('\ue4e5',fontsize=17)
+                            page.insert_text((x-w/2,112),'\ue4e5',fontname='music',fontsize=17)
+                            # Nearby vertical ink must not turn a rest into a note.
+                            if mode=='target_rest':page.draw_line((x,120),(x,150),width=.5)
+                            continue
+                        tones=[(3,7)] if i==0 else [(1,5),(2,6)] if i==1 else [(3,8)]
+                        if mode=='hidden_chord' and i<2:tones=[(3,7),(4,9)] if i==0 else []
+                        if mode=='single_visible' and i==1:tones=[(2,5)]
+                        if mode in ('rest_between','note_between','target_rest'):
+                            tones=[(3,7)] if i==0 else [(1,5),(2,6)]
+                        if mode=='visible_same_string' and i==1:tones.append((3,8))
+                        for string,fret in tones:
+                            token=str(fret);w=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                            page.insert_text((x-w/2,100+(string-1)*6+2.4),token,fontname='helv',fontsize=7)
+                        page.draw_line((x,120),(x,150),width=.5)
+                    target=210 if mode in ('rest_between','note_between') else 140
+                    for y in ([112,118] if mode=='hidden_chord' else [116] if mode=='displaced_arc' else [112]):
+                        sh=page.new_shape();a,z=74,target-5
+                        sh.draw_bezier((a,y),(a+5,y+4),(z-5,y+4),(z,y))
+                        sh.draw_bezier((z,y),(z-5,y+3),(a+5,y+3),(a,y))
+                        sh.finish(color=None,fill=(0,0,0));sh.commit()
+                    doc.saveIncr()
+                result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+                inferred=[n for v in bar['beats'] for n in v['notes'] if n.get('inferred_from')]
+                self.assertEqual(len(inferred),2 if mode=='hidden_chord' else 1 if mode=='chord' else 0)
+                if mode in ('chord','hidden_chord'):
+                    self.assertEqual((inferred[0]['string'],inferred[0]['fret'],inferred[0]['tie']),(3,7,True))
+                    self.assertEqual(len(bar['beats']),4)
+                    self.assertEqual(bar['issues'],[])
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+
     def test_outlined_half_heads_and_dead_note_beams_roundtrip(self):
         for dead,tones in [(False,1),(True,1),(True,3)]:
             with self.subTest(dead=dead,tones=tones),tempfile.TemporaryDirectory() as folder:

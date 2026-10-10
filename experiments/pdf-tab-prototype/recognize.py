@@ -305,13 +305,24 @@ def read_ties(system,spans,lines,shapes):
                             and top-2<min(y,y1)<bottom+gap*3],.5)
             if len(stems)!=1: continue
             x=stems[0]
-            if any(not n.get('inferred_from') and n['bbox'][0]-1<x<n['bbox'][2]+1
+            # Visible notes on other strings may share this stem; only ink on
+            # the source string rules out its suppressed continuation.
+            if any(n['string']==sn['string'] and not n.get('inferred_from') and n['bbox'][0]-1<x<n['bbox'][2]+1
                    for b,v,n in notes()): continue
             tb=next((b for b in system['bars'] if b['left']<x<b['right']),None)
-            if not tb or x<=sn['x']+3: continue
+            if not tb or x<=sn['x']+3 or tb['number'] not in (sb['number'],sb['number']+1): continue
+            tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
+            if sv['grace'] or tv and (tv['grace'] or not tv['notes']): continue
+            # A short tie mark can end near the next unrelated single note.
+            # Only extend a chord already evidenced by two printed notes.
+            visible_target=[n for n in tv['notes'] if not n.get('inferred_from')] if tv else []
+            if len(visible_target)==1: continue
+            # With visible notes on another string, a displaced arc may be a
+            # cross-string slur. Require both endpoints on the source string.
+            if visible_target and (abs(start.y-sn['y'])>gap*.25 or abs(end.y-sn['y'])>gap*.25): continue
+            if any(sv['x']<v['x']<x-1.5 for b in system['bars'] for v in b['beats']): continue
             tn={**sn,'x':x,'bbox':[x-1,sn['y']-2,x+1,sn['y']+2],
                 'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
-            tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
             if tv: tv['notes'].append(tn)
             else:
                 tv={'x':x,'notes':[tn],'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
