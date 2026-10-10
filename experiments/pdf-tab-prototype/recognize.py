@@ -461,7 +461,12 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
                     start,finish=stems[0]
                     if (1.3<(start-bottom)/gap<1.7 and 2.3<(finish-bottom)/gap<2.7
                             and .8<(finish-start)/gap<1.2): beat['duration']=2
-        dots=[s for s in spans if '\ue1e7' in s['text'] and x<s['bbox'][0]<x+12
+        # A nearby following stem owns dots to its right; dense rhythms can
+        # put its dot inside this beat's ordinary 12-point search window.
+        next_stem=min((x0 for x0,y0,x1,y1 in lines if x+1.5<x0<right and abs(x1-x0)<.2
+                       and bottom+gap*.8<max(y0,y1)<bottom+gap*5
+                       and top-2<min(y0,y1)<bottom+gap*3),default=right)
+        dots=[s for s in spans if '\ue1e7' in s['text'] and x<s['bbox'][0]<min(x+12,next_stem)
               and bottom<s['origin'][1]<bottom+gap*4]
         beat['dots']=len(dots)
     # Guitar Pro prints a closed ellipse around half/whole TAB notes, and uses

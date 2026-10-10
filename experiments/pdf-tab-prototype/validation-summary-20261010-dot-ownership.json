@@ -1,0 +1,5370 @@
+{
+  "date": "2026-10-10",
+  "baseline_commit": "28acd80",
+  "scope": "Standalone offline PDF experiment; prevent augmentation dots from crossing the next rhythm stem",
+  "priority": "Practice timing: beat placement, duration, rests and tied continuation before techniques",
+  "limitations": [
+    "Repeated regression corpus, not a blind test",
+    "Automatic pairing does not prove identical editions",
+    "Best reference track chosen only for evaluation",
+    "Rhythm diagnostics ignore pitch and chord size and do not replace full core validation",
+    "Techniques, repeats, tempo changes, grace placement, timbre and audible playback excluded"
+  ],
+  "statuses": {
+    "evaluated": 50,
+    "unsupported-multiple-parts-or-repeated-bar-numbers": 14,
+    "unsupported-no-six-line-staff": 4,
+    "error": 14
+  },
+  "baseline_aggregate": {
+    "recognized": 27179,
+    "reference": 27850,
+    "matched": 25991,
+    "matched_with_rhythm": 25853,
+    "core_exact_bars": 3886,
+    "bars": 4391,
+    "predicted_ties": 1555,
+    "matched_ties": 1548,
+    "reference_ties": 2235
+  },
+  "aggregate": {
+    "recognized": 27179,
+    "reference": 27850,
+    "matched": 25991,
+    "matched_with_rhythm": 25867,
+    "core_exact_bars": 3896,
+    "bars": 4391,
+    "predicted_ties": 1556,
+    "matched_ties": 1549,
+    "reference_ties": 2235
+  },
+  "pairing_basis": "benchmark-20261008-wide-ties",
+  "baseline_diagnostic_groups": {
+    "consistent": {
+      "cases": 37,
+      "bars": 3498,
+      "counts": {
+        "pass": 3244,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 16,
+        "notes": 188,
+        "rhythm_rests": 17,
+        "ties_only": 33,
+        "validation": 0
+      },
+      "rhythm_counts": {
+        "pass": 3255,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 16,
+        "validation": 0,
+        "timing_attack_rest": 227
+      }
+    },
+    "uncertain": {
+      "cases": 13,
+      "bars": 893,
+      "counts": {
+        "pass": 642,
+        "missing_bar": 80,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 7,
+        "notes": 163,
+        "rhythm_rests": 1,
+        "ties_only": 0,
+        "validation": 0
+      },
+      "rhythm_counts": {
+        "pass": 642,
+        "missing_bar": 80,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 7,
+        "validation": 0,
+        "timing_attack_rest": 164
+      }
+    }
+  },
+  "diagnostic_groups": {
+    "consistent": {
+      "cases": 37,
+      "bars": 3498,
+      "counts": {
+        "pass": 3254,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 16,
+        "notes": 188,
+        "rhythm_rests": 8,
+        "ties_only": 32,
+        "validation": 0
+      },
+      "rhythm_counts": {
+        "pass": 3265,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 16,
+        "validation": 0,
+        "timing_attack_rest": 217
+      }
+    },
+    "uncertain": {
+      "cases": 13,
+      "bars": 893,
+      "counts": {
+        "pass": 642,
+        "missing_bar": 80,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 7,
+        "notes": 163,
+        "rhythm_rests": 1,
+        "ties_only": 0,
+        "validation": 0
+      },
+      "rhythm_counts": {
+        "pass": 642,
+        "missing_bar": 80,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 7,
+        "validation": 0,
+        "timing_attack_rest": 164
+      }
+    }
+  },
+  "rhythm_method": "Exact voice-0 beat durations, grace flags and attack/hold/rest presence with confirmed meter and validation. Ignores pitch and chord size; does not establish tempo, repeats, grace placement or audible timing.",
+  "audit": {
+    "baseline": {
+      "recognized": 27179,
+      "reference": 27850,
+      "matched": 25991,
+      "matched_with_rhythm": 25853,
+      "core_exact_bars": 3886,
+      "bars": 4391,
+      "predicted_ties": 1555,
+      "matched_ties": 1548,
+      "reference_ties": 2235
+    },
+    "current": {
+      "recognized": 27179,
+      "reference": 27850,
+      "matched": 25991,
+      "matched_with_rhythm": 25867,
+      "core_exact_bars": 3896,
+      "bars": 4391,
+      "predicted_ties": 1556,
+      "matched_ties": 1549,
+      "reference_ties": 2235
+    },
+    "regressions": [],
+    "new_pass_bars": [
+      {
+        "case": "case-006",
+        "bar": 70
+      },
+      {
+        "case": "case-016",
+        "bar": 25
+      },
+      {
+        "case": "case-016",
+        "bar": 33
+      },
+      {
+        "case": "case-019",
+        "bar": 36
+      },
+      {
+        "case": "case-019",
+        "bar": 37
+      },
+      {
+        "case": "case-081",
+        "bar": 16
+      },
+      {
+        "case": "case-081",
+        "bar": 19
+      },
+      {
+        "case": "case-081",
+        "bar": 23
+      },
+      {
+        "case": "case-081",
+        "bar": 61
+      },
+      {
+        "case": "case-081",
+        "bar": 68
+      }
+    ],
+    "lost_pass_bars": [],
+    "changed_cases": [
+      {
+        "case": "case-006",
+        "pdf": "一路向北-大明白313.pdf",
+        "core_before": 71,
+        "core_after": 72
+      },
+      {
+        "case": "case-016",
+        "pdf": "《沧海一声笑》-大毛笔.pdf",
+        "core_before": 47,
+        "core_after": 49
+      },
+      {
+        "case": "case-019",
+        "pdf": "捕捉闪耀的瞬间-大明白313.pdf",
+        "core_before": 82,
+        "core_after": 84
+      },
+      {
+        "case": "case-081",
+        "pdf": "《默》-那英-DaMingBai313.pdf",
+        "core_before": 58,
+        "core_after": 63
+      }
+    ],
+    "new_known_durations": [],
+    "lost_known_durations": [],
+    "added_notes": [],
+    "removed_notes": [],
+    "new_known_duration_count": 0,
+    "new_known_duration_exact_matches": 0,
+    "dot_changes": [
+      {
+        "case": "case-006",
+        "bar": 70,
+        "beat": 6,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-016",
+        "bar": 25,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-016",
+        "bar": 33,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-016",
+        "bar": 41,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-019",
+        "bar": 36,
+        "beat": 5,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 16,
+        "beat": 3,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 19,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 23,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 23,
+        "beat": 5,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 24,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 61,
+        "beat": 3,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 68,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 68,
+        "beat": 5,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      },
+      {
+        "case": "case-081",
+        "bar": 69,
+        "beat": 0,
+        "dots_before": 1,
+        "dots_after": 0,
+        "new_beat_at_exact_position_matches": true
+      }
+    ],
+    "lost_rhythm_pass_bars": []
+  },
+  "tests_passed": 38,
+  "full_score_exports": [
+    {
+      "case": "case-022",
+      "pdf": "醉拳-成龙-DaMingBai313.pdf",
+      "reference": "醉拳-成龙-DaMingBai313.gp",
+      "track": "Distortion Guitar",
+      "source_bars": "1-81",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 81,
+      "notes": 389,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-036",
+      "pdf": "不重逢 节奏吉他.pdf",
+      "reference": "不重逢.gp",
+      "track": "节奏",
+      "source_bars": "1-152",
+      "reference_track_index": 1,
+      "reference_staff_index": 0,
+      "bars": 152,
+      "notes": 1058,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-037",
+      "pdf": "千万次奔向 吉他1.pdf",
+      "reference": "千万次奔向.gp",
+      "track": "吉他1",
+      "source_bars": "1-143",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 143,
+      "notes": 875,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-039",
+      "pdf": "千万次奔向 吉他3.pdf",
+      "reference": "千万次奔向.gp",
+      "track": "吉他3",
+      "source_bars": "1-143",
+      "reference_track_index": 2,
+      "reference_staff_index": 0,
+      "bars": 143,
+      "notes": 26,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-046",
+      "pdf": "变相怪杰 吉他2.pdf",
+      "reference": "变相怪杰.gp",
+      "track": "吉他2",
+      "source_bars": "1-105",
+      "reference_track_index": 1,
+      "reference_staff_index": 0,
+      "bars": 105,
+      "notes": 775,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-062",
+      "pdf": "好想爱这个世界啊 吉他2.pdf",
+      "reference": "好想爱这个世界啊.gp",
+      "track": "吉他2",
+      "source_bars": "1-87",
+      "reference_track_index": 1,
+      "reference_staff_index": 0,
+      "bars": 87,
+      "notes": 736,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-063",
+      "pdf": "好想爱这个世界啊 吉他3.pdf",
+      "reference": "好想爱这个世界啊.gp",
+      "track": "吉他3",
+      "source_bars": "1-87",
+      "reference_track_index": 2,
+      "reference_staff_index": 0,
+      "bars": 87,
+      "notes": 249,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-064",
+      "pdf": "好想爱这个世界啊 吉他4.pdf",
+      "reference": "好想爱这个世界啊.gp",
+      "track": "吉他4",
+      "source_bars": "1-87",
+      "reference_track_index": 3,
+      "reference_staff_index": 0,
+      "bars": 87,
+      "notes": 376,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-065",
+      "pdf": "小镇里的花.pdf",
+      "reference": "小镇里的花 solo.gp",
+      "track": "Overdriven Guitar",
+      "source_bars": "1-16",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 16,
+      "notes": 49,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-067",
+      "pdf": "晨光里有你.pdf",
+      "reference": "晨光里有你.gp",
+      "track": "Overdriven Guitar",
+      "source_bars": "1-21",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 21,
+      "notes": 70,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-072",
+      "pdf": "烟火里的尘埃 节奏吉他.pdf",
+      "reference": "烟火里的尘埃.gp",
+      "track": "节奏",
+      "source_bars": "1-62",
+      "reference_track_index": 2,
+      "reference_staff_index": 0,
+      "bars": 62,
+      "notes": 1302,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-077",
+      "pdf": "那些我尚未知道的美丽.pdf",
+      "reference": "那些我尚未知道的美丽.gp",
+      "track": "Distortion Guitar",
+      "source_bars": "1-32",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 32,
+      "notes": 402,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-078",
+      "pdf": "黑白艺术家 吉他1.pdf",
+      "reference": "黑白艺术家.gp",
+      "track": "吉他1",
+      "source_bars": "1-148",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 148,
+      "notes": 1544,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    },
+    {
+      "case": "case-080",
+      "pdf": "黑白艺术家 吉他3.pdf",
+      "reference": "黑白艺术家.gp",
+      "track": "吉他3",
+      "source_bars": "1-148",
+      "reference_track_index": 2,
+      "reference_staff_index": 0,
+      "bars": 148,
+      "notes": 632,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case": "case-000",
+      "calibration": true,
+      "prediction_sha256": "b866f64902300e6b634de61397c30058f046fe094b23f2c6ac7aa6726f53c282",
+      "status": "evaluated",
+      "track": "Solo",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 65,
+        "reference": 70,
+        "matched": 65,
+        "matched_with_rhythm": 64,
+        "exact_bars": 5,
+        "bars": 9,
+        "core_exact_bars": 5,
+        "predicted_ties": 5,
+        "matched_ties": 5,
+        "reference_ties": 10,
+        "precision": 1.0,
+        "recall": 0.9285714285714286,
+        "rhythm_recall": 0.9142857142857143,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.8888888888888888,
+        "note_overlap": 0.9285714285714286,
+        "status": "uncertain"
+      },
+      "pdf": "《灰色轨迹》 间奏-大毛笔.pdf",
+      "gp": "《灰色轨迹》 间奏-大毛笔.gp"
+    },
+    {
+      "case": "case-001",
+      "calibration": false,
+      "prediction_sha256": "fee9fe1821478735717dfc2beb93f666f6fb49bad4fac7483403d3d9792a8328",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "《灰色轨迹》尾奏-大毛笔.pdf",
+      "gp": "《灰色轨迹》尾奏-大毛笔.gp"
+    },
+    {
+      "case": "case-002",
+      "calibration": false,
+      "prediction_sha256": "09cb50cab00324445053155e830b11958c147fbcb46504e387d7a335f2a5b991",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 457,
+        "reference": 463,
+        "matched": 457,
+        "matched_with_rhythm": 456,
+        "exact_bars": 64,
+        "bars": 67,
+        "core_exact_bars": 63,
+        "predicted_ties": 22,
+        "matched_ties": 22,
+        "reference_ties": 31,
+        "precision": 1.0,
+        "recall": 0.9870410367170627,
+        "rhythm_recall": 0.9848812095032398,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9870410367170627,
+        "status": "consistent"
+      },
+      "pdf": "《残酷天使纲领》-DMB313.pdf",
+      "gp": "《残酷天使纲领》-DMB313.gp"
+    },
+    {
+      "case": "case-003",
+      "calibration": false,
+      "prediction_sha256": "1cbdfe7571d552b4d5ae14933eb83aafec2edb9950a402c869d0acc120859092",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "Reason-全职猎人-大明白313.pdf",
+      "gp": "Reason-全职猎人-大明白313.gp"
+    },
+    {
+      "case": "case-004",
+      "calibration": true,
+      "prediction_sha256": "518a0ceeb5d9e50ebe11340de88ea45643e5bc47d2ee903a2e30b583a691f6a8",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 355,
+        "reference": 371,
+        "matched": 355,
+        "matched_with_rhythm": 355,
+        "exact_bars": 85,
+        "bars": 95,
+        "core_exact_bars": 84,
+        "predicted_ties": 81,
+        "matched_ties": 81,
+        "reference_ties": 98,
+        "precision": 1.0,
+        "recall": 0.9568733153638814,
+        "rhythm_recall": 0.9568733153638814,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9568733153638814,
+        "status": "consistent"
+      },
+      "pdf": "《TheLoner》GaryMoore-大明白313.pdf",
+      "gp": "《TheLoner》GaryMoore-大明白313.gp"
+    },
+    {
+      "case": "case-005",
+      "calibration": false,
+      "prediction_sha256": "cb889dc105de6b63a3c1dee91bf0feb3dca847038480ae98fd28737e0f8a825b",
+      "status": "evaluated",
+      "track": "Steel Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 226,
+        "reference": 231,
+        "matched": 226,
+        "matched_with_rhythm": 222,
+        "exact_bars": 65,
+        "bars": 74,
+        "core_exact_bars": 65,
+        "predicted_ties": 33,
+        "matched_ties": 33,
+        "reference_ties": 37,
+        "precision": 1.0,
+        "recall": 0.9783549783549783,
+        "rhythm_recall": 0.961038961038961,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9783549783549783,
+        "status": "consistent"
+      },
+      "pdf": "《一生所爱》-DaMingBai313.pdf",
+      "gp": "《一生所爱》-DaMingBai313.gp"
+    },
+    {
+      "case": "case-006",
+      "calibration": true,
+      "prediction_sha256": "9a82ea631c517951b90947c2a39af23b66a5a29939fafe58df7853cb91fae478",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 776,
+        "reference": 785,
+        "matched": 776,
+        "matched_with_rhythm": 776,
+        "exact_bars": 75,
+        "bars": 82,
+        "core_exact_bars": 72,
+        "predicted_ties": 48,
+        "matched_ties": 48,
+        "reference_ties": 61,
+        "precision": 1.0,
+        "recall": 0.9885350318471338,
+        "rhythm_recall": 0.9885350318471338,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9885350318471338,
+        "status": "consistent"
+      },
+      "pdf": "一路向北-大明白313.pdf",
+      "gp": "一路向北-大明白313.gp"
+    },
+    {
+      "case": "case-007",
+      "calibration": false,
+      "prediction_sha256": "4e8d68be535fdb61b4edb7a0346def0c6438490c274fafcea4a2771ce8a7f8dc",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "《凡人歌》en版 - DMB33.pdf",
+      "gp": "《凡人歌》en版 - DMB33.gp"
+    },
+    {
+      "case": "case-008",
+      "calibration": false,
+      "prediction_sha256": "ce4871414e32b12eef5b5a8f6ca4866422d4a575c2cc369a5f10a412ad62bb65",
+      "status": "evaluated",
+      "track": "Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 552,
+        "reference": 554,
+        "matched": 552,
+        "matched_with_rhythm": 551,
+        "exact_bars": 99,
+        "bars": 101,
+        "core_exact_bars": 99,
+        "predicted_ties": 29,
+        "matched_ties": 29,
+        "reference_ties": 31,
+        "precision": 1.0,
+        "recall": 0.9963898916967509,
+        "rhythm_recall": 0.9945848375451264,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9900990099009901,
+        "note_overlap": 0.9963898916967509,
+        "status": "uncertain"
+      },
+      "pdf": "《刀剑如梦》-大毛笔.pdf",
+      "gp": "《刀剑如梦》-大毛笔.gp"
+    },
+    {
+      "case": "case-009",
+      "calibration": false,
+      "prediction_sha256": "ef3c5d1bfd0bc30e4e42f3401b48fd1c363e4af54c884f0bbbd10b3aed7ca9dc",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 414,
+        "reference": 421,
+        "matched": 414,
+        "matched_with_rhythm": 405,
+        "exact_bars": 77,
+        "bars": 87,
+        "core_exact_bars": 77,
+        "predicted_ties": 27,
+        "matched_ties": 27,
+        "reference_ties": 38,
+        "precision": 1.0,
+        "recall": 0.9833729216152018,
+        "rhythm_recall": 0.9619952494061758,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9833729216152018,
+        "status": "consistent"
+      },
+      "pdf": "张紫豪-可不可以-大明白313.pdf",
+      "gp": "张紫豪-可不可以-大明白313.gp"
+    },
+    {
+      "case": "case-010",
+      "calibration": false,
+      "prediction_sha256": "1019ab44102bcd82f64f78d27d66364b617404c93c7d8edbf1f61bc7450b710b",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "哪吒2-就是哪吒-大毛笔.pdf",
+      "gp": "哪吒2-就是哪吒-大毛笔.gp"
+    },
+    {
+      "case": "case-011",
+      "calibration": false,
+      "prediction_sha256": "9995457f05a9d044c9d94a0274ce8e76fa5d3aec8a496443001bc427b64789ce",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 507,
+        "reference": 508,
+        "matched": 507,
+        "matched_with_rhythm": 507,
+        "exact_bars": 97,
+        "bars": 98,
+        "core_exact_bars": 96,
+        "predicted_ties": 38,
+        "matched_ties": 38,
+        "reference_ties": 40,
+        "precision": 1.0,
+        "recall": 0.9980314960629921,
+        "rhythm_recall": 0.9980314960629921,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9980314960629921,
+        "status": "consistent"
+      },
+      "pdf": "哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "gp": "哪吒2-我乃哪吒三太子-大毛笔.gp"
+    },
+    {
+      "case": "case-012",
+      "calibration": true,
+      "prediction_sha256": "440ead801046089c676d091f38f24b5e072635aa77121fcc557e26bf8f2a3093",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 294,
+        "reference": 302,
+        "matched": 294,
+        "matched_with_rhythm": 287,
+        "exact_bars": 75,
+        "bars": 87,
+        "core_exact_bars": 75,
+        "predicted_ties": 39,
+        "matched_ties": 39,
+        "reference_ties": 49,
+        "precision": 1.0,
+        "recall": 0.9735099337748344,
+        "rhythm_recall": 0.9503311258278145,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9735099337748344,
+        "status": "consistent"
+      },
+      "pdf": "《天空之城》 DaMingBai313.pdf",
+      "gp": "《天空之城》 DaMingBai313.gp"
+    },
+    {
+      "case": "case-013",
+      "calibration": true,
+      "prediction_sha256": "5f9f2de304494344bbd49e7a9d4c80d5a058ddd295f9fd7572c27281069032d0",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 330,
+        "reference": 340,
+        "matched": 330,
+        "matched_with_rhythm": 328,
+        "exact_bars": 78,
+        "bars": 87,
+        "core_exact_bars": 77,
+        "predicted_ties": 32,
+        "matched_ties": 32,
+        "reference_ties": 41,
+        "precision": 1.0,
+        "recall": 0.9705882352941176,
+        "rhythm_recall": 0.9647058823529412,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9705882352941176,
+        "status": "consistent"
+      },
+      "pdf": "《如愿》-DaMingBai313.pdf",
+      "gp": "《如愿》-DaMingBai313.gp"
+    },
+    {
+      "case": "case-014",
+      "calibration": false,
+      "prediction_sha256": "501be2bb0f74954d665086b1e3eb5741b2f0f372d2216e2b739c8fc079529a08",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "《星星点灯》-大毛笔.pdf",
+      "gp": "《星星点灯》-大毛笔.gp"
+    },
+    {
+      "case": "case-015",
+      "calibration": false,
+      "prediction_sha256": "a618b1aa82b8749b0d80f719ea6186deac7223e9d823f83df207999f5f5d9d54",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "柯南《如果有你在》-大毛笔.pdf",
+      "gp": "柯南《如果有你在》-大毛笔.gp"
+    },
+    {
+      "case": "case-016",
+      "calibration": false,
+      "prediction_sha256": "db5f6007304db5cf228cbd1ce096f348e3a2a6fe9458f738c4d17b364c4f2968",
+      "status": "evaluated",
+      "track": "Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 212,
+        "reference": 272,
+        "matched": 212,
+        "matched_with_rhythm": 212,
+        "exact_bars": 50,
+        "bars": 66,
+        "core_exact_bars": 49,
+        "predicted_ties": 14,
+        "matched_ties": 14,
+        "reference_ties": 16,
+        "precision": 1.0,
+        "recall": 0.7794117647058824,
+        "rhythm_recall": 0.7794117647058824,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.7794117647058824,
+        "status": "consistent"
+      },
+      "pdf": "《沧海一声笑》-大毛笔.pdf",
+      "gp": "《沧海一声笑》-大毛笔.gp"
+    },
+    {
+      "case": "case-017",
+      "calibration": false,
+      "prediction_sha256": "3f18f4d965f98f089237064a3ffed75e4fc71e944b819689d051ececedd9cdff",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "灌篮高手ED-双吉他-大毛笔.pdf",
+      "gp": "灌篮高手ED-双吉他-大毛笔.gp"
+    },
+    {
+      "case": "case-018",
+      "calibration": false,
+      "prediction_sha256": "67105c5ee517fba2e2cc86e2fa66841745b7d0eb41ecabeded2380d84ed53dfe",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "直到世界的尽头-DaMingBai313.pdf",
+      "gp": "直到世界的尽头-DaMingBai313.gp"
+    },
+    {
+      "case": "case-019",
+      "calibration": false,
+      "prediction_sha256": "975b08c1dccf6494b9f6c89d1ebd5a5043ed097447271ad719848e364fceada8",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 583,
+        "reference": 585,
+        "matched": 583,
+        "matched_with_rhythm": 580,
+        "exact_bars": 92,
+        "bars": 96,
+        "core_exact_bars": 84,
+        "predicted_ties": 75,
+        "matched_ties": 75,
+        "reference_ties": 89,
+        "precision": 1.0,
+        "recall": 0.9965811965811966,
+        "rhythm_recall": 0.9914529914529915,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9965811965811966,
+        "status": "consistent"
+      },
+      "pdf": "捕捉闪耀的瞬间-大明白313.pdf",
+      "gp": "捕捉闪耀的瞬间-大明白313.gp"
+    },
+    {
+      "case": "case-020",
+      "calibration": false,
+      "prediction_sha256": "0081569f0859559938b3461be375ccd81056f2696ea237cf8a594d47eacd7c8a",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "逐空-DaMingBai313.pdf",
+      "gp": "逐空-DaMingBai313.gp"
+    },
+    {
+      "case": "case-021",
+      "calibration": false,
+      "prediction_sha256": "3ee4736700fad8c086fa647324bc820762673fc79451ba67de861107445e3462",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "逐空-Rap歌词.pdf",
+      "gp": "逐空-DaMingBai313.gp"
+    },
+    {
+      "case": "case-022",
+      "calibration": true,
+      "prediction_sha256": "a68f496988f835b8430dcef2357c93e5a8f7af1c833ae19a1b318704ff383fd6",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 389,
+        "reference": 389,
+        "matched": 389,
+        "matched_with_rhythm": 389,
+        "exact_bars": 81,
+        "bars": 81,
+        "core_exact_bars": 81,
+        "predicted_ties": 24,
+        "matched_ties": 24,
+        "reference_ties": 24,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "醉拳-成龙-DaMingBai313.pdf",
+      "gp": "醉拳-成龙-DaMingBai313.gp"
+    },
+    {
+      "case": "case-023",
+      "calibration": true,
+      "prediction_sha256": "3ff78f5ff93c8982c5ad03ca331f26e81368bcb232af30446f36ab46b82e744c",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 564,
+        "reference": 575,
+        "matched": 564,
+        "matched_with_rhythm": 561,
+        "exact_bars": 87,
+        "bars": 95,
+        "core_exact_bars": 84,
+        "predicted_ties": 62,
+        "matched_ties": 62,
+        "reference_ties": 78,
+        "precision": 1.0,
+        "recall": 0.9808695652173913,
+        "rhythm_recall": 0.9756521739130435,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9808695652173913,
+        "status": "consistent"
+      },
+      "pdf": "「青鸟」火影忍者OP3-大明白313.pdf",
+      "gp": "「青鸟」火影忍者OP3-大明白313.gp"
+    },
+    {
+      "case": "case-024",
+      "calibration": false,
+      "prediction_sha256": "44241c02318bec00246f58e4380096ddbe08eab5f34b7b7c5f1bca7b80e42c34",
+      "status": "evaluated",
+      "track": "Clean Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 371,
+        "reference": 377,
+        "matched": 371,
+        "matched_with_rhythm": 368,
+        "exact_bars": 60,
+        "bars": 66,
+        "core_exact_bars": 60,
+        "predicted_ties": 2,
+        "matched_ties": 2,
+        "reference_ties": 10,
+        "precision": 1.0,
+        "recall": 0.9840848806366048,
+        "rhythm_recall": 0.9761273209549072,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9840848806366048,
+        "status": "consistent"
+      },
+      "pdf": "鬼灭之刃-无限城-大毛笔.pdf",
+      "gp": "鬼灭之刃-无限城-大毛笔.gp"
+    },
+    {
+      "case": "case-025",
+      "calibration": false,
+      "prediction_sha256": "ae51b14132d265fbd9d5468ffe2b624de708efe90f7f7e7b7478fe5fa928cb9d",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 338,
+        "reference": 339,
+        "matched": 338,
+        "matched_with_rhythm": 336,
+        "exact_bars": 54,
+        "bars": 56,
+        "core_exact_bars": 54,
+        "predicted_ties": 17,
+        "matched_ties": 17,
+        "reference_ties": 18,
+        "precision": 1.0,
+        "recall": 0.9970501474926253,
+        "rhythm_recall": 0.9911504424778761,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9970501474926253,
+        "status": "consistent"
+      },
+      "pdf": "鬼灭之刃 - 红莲华-大毛笔.pdf",
+      "gp": "鬼灭之刃 - 红莲华-大毛笔.gp"
+    },
+    {
+      "case": "case-026",
+      "calibration": true,
+      "prediction_sha256": "a7e27c966239db10af5dae605e196c429ce7fd033579788192b709c8f97a7006",
+      "status": "evaluated",
+      "track": "电吉他",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 286,
+        "reference": 290,
+        "matched": 277,
+        "matched_with_rhythm": 271,
+        "exact_bars": 32,
+        "bars": 38,
+        "core_exact_bars": 31,
+        "predicted_ties": 26,
+        "matched_ties": 26,
+        "reference_ties": 31,
+        "precision": 0.9685314685314685,
+        "recall": 0.9551724137931035,
+        "rhythm_recall": 0.9344827586206896,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9551724137931035,
+        "status": "consistent"
+      },
+      "pdf": "此生不换 (2).pdf",
+      "gp": "此生不换.gp"
+    },
+    {
+      "case": "case-027",
+      "calibration": false,
+      "prediction_sha256": "a690dd15121037856cb6ea4c24ef0a181503f13c2f42e8d65fdf779b437fce33",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1091,
+        "reference": 306,
+        "matched": 0,
+        "matched_with_rhythm": 0,
+        "exact_bars": 9,
+        "bars": 34,
+        "core_exact_bars": 0,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 170,
+        "precision": 0.0,
+        "recall": 0.0,
+        "rhythm_recall": 0.0,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.0,
+        "status": "uncertain"
+      },
+      "pdf": "新手12分钟 合集.pdf",
+      "gp": "新手12分钟 延展性.gp"
+    },
+    {
+      "case": "case-028",
+      "calibration": true,
+      "prediction_sha256": "cff8a97f4307cf1db2f77fe27cc3e9c9eabf465d35bc7745bff2450071805404",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 238,
+        "reference": 239,
+        "matched": 238,
+        "matched_with_rhythm": 226,
+        "exact_bars": 21,
+        "bars": 22,
+        "core_exact_bars": 21,
+        "predicted_ties": 1,
+        "matched_ties": 1,
+        "reference_ties": 2,
+        "precision": 1.0,
+        "recall": 0.99581589958159,
+        "rhythm_recall": 0.9456066945606695,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.99581589958159,
+        "status": "uncertain"
+      },
+      "pdf": "七重人格.pdf",
+      "gp": "七重人格尾奏.gp"
+    },
+    {
+      "case": "case-029",
+      "calibration": false,
+      "prediction_sha256": "52ea9494076bd9ad160f30027770b7ee5e1e97940da46f4adc5474820bb12ce2",
+      "status": "error",
+      "pdf": "不朽吉他1.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-030",
+      "calibration": false,
+      "prediction_sha256": "282aecf91e9fcfed1eb048990e10491efb27848a9b51e4f245aebcfb6f9e36e3",
+      "status": "error",
+      "pdf": "不朽吉他2.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-031",
+      "calibration": false,
+      "prediction_sha256": "823aab8bd135fe26a4033ec01b162b1c39468153e9189ef8fab5b8742b26a6c7",
+      "status": "error",
+      "pdf": "不朽吉他3.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-032",
+      "calibration": false,
+      "prediction_sha256": "bb493301c77490060f8282a086112eef2c52b0c5a6d54839f9b64f1321d845b0",
+      "status": "error",
+      "pdf": "不朽贝斯.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-033",
+      "calibration": false,
+      "prediction_sha256": "f851e493922225a06946794b39613600ea0fdc6e83d1a84d1f06d97651ed198d",
+      "status": "error",
+      "pdf": "不朽鼓.pdf",
+      "gp": "不朽.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-034",
+      "calibration": false,
+      "prediction_sha256": "07622a7a846cf157c1ec5dc5f45c1bf05cbe16f62b4634e51f20046bbf00e5a6",
+      "status": "evaluated",
+      "track": "主音",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 367,
+        "reference": 486,
+        "matched": 367,
+        "matched_with_rhythm": 367,
+        "exact_bars": 56,
+        "bars": 152,
+        "core_exact_bars": 56,
+        "predicted_ties": 4,
+        "matched_ties": 4,
+        "reference_ties": 77,
+        "precision": 1.0,
+        "recall": 0.7551440329218106,
+        "rhythm_recall": 0.7551440329218106,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.7551440329218106,
+        "status": "consistent"
+      },
+      "pdf": "不重逢 主音吉他.pdf",
+      "gp": "不重逢.gp"
+    },
+    {
+      "case": "case-035",
+      "calibration": false,
+      "prediction_sha256": "00a48c1bbbb95bd83e4bfe4f0bb640bbea563a3ef85a9c8006fbd8803cd58ec5",
+      "status": "evaluated",
+      "track": "分解",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 295,
+        "reference": 295,
+        "matched": 279,
+        "matched_with_rhythm": 279,
+        "exact_bars": 146,
+        "bars": 152,
+        "core_exact_bars": 146,
+        "predicted_ties": 40,
+        "matched_ties": 38,
+        "reference_ties": 40,
+        "precision": 0.9457627118644067,
+        "recall": 0.9457627118644067,
+        "rhythm_recall": 0.9457627118644067,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9736842105263158,
+        "note_overlap": 0.9457627118644067,
+        "status": "uncertain"
+      },
+      "pdf": "不重逢 吉他3.pdf",
+      "gp": "不重逢.gp"
+    },
+    {
+      "case": "case-036",
+      "calibration": false,
+      "prediction_sha256": "db09bd4c8de04125be59b9740b0064d542fc541148d6b381c43850102743bb8e",
+      "status": "evaluated",
+      "track": "节奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1058,
+        "reference": 1058,
+        "matched": 1058,
+        "matched_with_rhythm": 1058,
+        "exact_bars": 152,
+        "bars": 152,
+        "core_exact_bars": 152,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 12,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "不重逢 节奏吉他.pdf",
+      "gp": "不重逢.gp"
+    },
+    {
+      "case": "case-037",
+      "calibration": false,
+      "prediction_sha256": "be0057ba2ed80d3c8554bc754fa99a0bfdc57c56a0883b9af94f2da847d6ae6f",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 875,
+        "reference": 875,
+        "matched": 875,
+        "matched_with_rhythm": 875,
+        "exact_bars": 143,
+        "bars": 143,
+        "core_exact_bars": 143,
+        "predicted_ties": 22,
+        "matched_ties": 22,
+        "reference_ties": 22,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 吉他1.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-038",
+      "calibration": false,
+      "prediction_sha256": "d9d278bc409862505fbb1146985bfacd68de992902a0f441345ab0066f0d7d9a",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1181,
+        "reference": 1187,
+        "matched": 1165,
+        "matched_with_rhythm": 1165,
+        "exact_bars": 138,
+        "bars": 143,
+        "core_exact_bars": 137,
+        "predicted_ties": 4,
+        "matched_ties": 4,
+        "reference_ties": 12,
+        "precision": 0.9864521591871296,
+        "recall": 0.9814658803706824,
+        "rhythm_recall": 0.9814658803706824,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9814658803706824,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 吉他2.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-039",
+      "calibration": false,
+      "prediction_sha256": "b3f7a7f0154d0416e0526612a36a198b66146bfc93850b5e338bb6020fd159c4",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 26,
+        "reference": 26,
+        "matched": 26,
+        "matched_with_rhythm": 26,
+        "exact_bars": 143,
+        "bars": 143,
+        "core_exact_bars": 143,
+        "predicted_ties": 8,
+        "matched_ties": 8,
+        "reference_ties": 8,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 吉他3.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-040",
+      "calibration": true,
+      "prediction_sha256": "7a74072654c8ce7996fb705373f4b194bfb4b9f5039a65e250eb6084b67086c3",
+      "status": "evaluated",
+      "track": "木吉他",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 2787,
+        "reference": 2842,
+        "matched": 2787,
+        "matched_with_rhythm": 2787,
+        "exact_bars": 132,
+        "bars": 143,
+        "core_exact_bars": 128,
+        "predicted_ties": 373,
+        "matched_ties": 373,
+        "reference_ties": 452,
+        "precision": 1.0,
+        "recall": 0.9806474313863477,
+        "rhythm_recall": 0.9806474313863477,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9806474313863477,
+        "status": "consistent"
+      },
+      "pdf": "千万次奔向 木吉他.pdf",
+      "gp": "千万次奔向.gp"
+    },
+    {
+      "case": "case-041",
+      "calibration": false,
+      "prediction_sha256": "0d4ed6c38bef55e4dcaa606bc15e8f5b898be4d2ed9af481b1c5b9662cdbec33",
+      "status": "evaluated",
+      "track": "尾奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 60,
+        "reference": 60,
+        "matched": 60,
+        "matched_with_rhythm": 58,
+        "exact_bars": 72,
+        "bars": 74,
+        "core_exact_bars": 72,
+        "predicted_ties": 9,
+        "matched_ties": 9,
+        "reference_ties": 9,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9666666666666667,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "uncertain"
+      },
+      "pdf": "卡西莫多的礼物 主音吉他.pdf",
+      "gp": "卡西莫多的礼物 间奏尾奏.gp"
+    },
+    {
+      "case": "case-042",
+      "calibration": false,
+      "prediction_sha256": "cfe2d726780765acfd5c6601641c006ec1fb6a100a2e9d4d53e69c5f25f079ca",
+      "status": "evaluated",
+      "track": "节奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1017,
+        "reference": 1017,
+        "matched": 1017,
+        "matched_with_rhythm": 1005,
+        "exact_bars": 70,
+        "bars": 74,
+        "core_exact_bars": 70,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 15,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 0.9882005899705014,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "uncertain"
+      },
+      "pdf": "卡西莫多的礼物 节奏吉他.pdf",
+      "gp": "卡西莫多的礼物 间奏尾奏.gp"
+    },
+    {
+      "case": "case-043",
+      "calibration": false,
+      "prediction_sha256": "a1ba6204bcbad3bb4d901e998d3f2d18ef3f191b4914e91eea075837927b34c7",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "卡西莫多的礼物 贝斯.pdf",
+      "gp": "卡西莫多的礼物 间奏尾奏.gp"
+    },
+    {
+      "case": "case-044",
+      "calibration": true,
+      "prediction_sha256": "bfdba51f028ce7b88b4e8df060a188169b808cdbc91b556cc5483d30dd8e0f22",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 755,
+        "reference": 782,
+        "matched": 755,
+        "matched_with_rhythm": 703,
+        "exact_bars": 158,
+        "bars": 172,
+        "core_exact_bars": 157,
+        "predicted_ties": 20,
+        "matched_ties": 20,
+        "reference_ties": 48,
+        "precision": 1.0,
+        "recall": 0.9654731457800512,
+        "rhythm_recall": 0.8989769820971867,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9654731457800512,
+        "status": "consistent"
+      },
+      "pdf": "双截棍.pdf",
+      "gp": "双截棍.gp"
+    },
+    {
+      "case": "case-045",
+      "calibration": false,
+      "prediction_sha256": "db4fc8137789186bf49cd24897228ced068bae7091a6ff9e89f0f559a34b23e5",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 548,
+        "reference": 554,
+        "matched": 548,
+        "matched_with_rhythm": 548,
+        "exact_bars": 101,
+        "bars": 105,
+        "core_exact_bars": 101,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 18,
+        "precision": 1.0,
+        "recall": 0.9891696750902527,
+        "rhythm_recall": 0.9891696750902527,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9891696750902527,
+        "status": "consistent"
+      },
+      "pdf": "变相怪杰 吉他1.pdf",
+      "gp": "变相怪杰.gp"
+    },
+    {
+      "case": "case-046",
+      "calibration": true,
+      "prediction_sha256": "5df2793d065e0771a97f5c5f7b8c5d664018cb54145fde1191836d99ab7d7dd3",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 775,
+        "reference": 775,
+        "matched": 775,
+        "matched_with_rhythm": 775,
+        "exact_bars": 105,
+        "bars": 105,
+        "core_exact_bars": 105,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "变相怪杰 吉他2.pdf",
+      "gp": "变相怪杰.gp"
+    },
+    {
+      "case": "case-047",
+      "calibration": true,
+      "prediction_sha256": "a6f165c8320f287591971e04fe67e60c28c245074f83f6a9fc865ef8448cc2f6",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 255,
+        "reference": 256,
+        "matched": 255,
+        "matched_with_rhythm": 255,
+        "exact_bars": 77,
+        "bars": 79,
+        "core_exact_bars": 76,
+        "predicted_ties": 48,
+        "matched_ties": 48,
+        "reference_ties": 50,
+        "precision": 1.0,
+        "recall": 0.99609375,
+        "rhythm_recall": 0.99609375,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.99609375,
+        "status": "consistent"
+      },
+      "pdf": "向阳而生 尾奏.pdf",
+      "gp": "向阳而生 尾奏.gp"
+    },
+    {
+      "case": "case-048",
+      "calibration": false,
+      "prediction_sha256": "292c46814d2fdaab87507c0e61f6e3a0ac88d7a8e5abf4283137e5330996f30f",
+      "status": "error",
+      "pdf": "向阳而生 日出吉他1(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-049",
+      "calibration": false,
+      "prediction_sha256": "c00eb8d6f4fec59e3d08131400d4b7edd82556f5d3bef60eb91ec3264d521c87",
+      "status": "error",
+      "pdf": "向阳而生 日出吉他2(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-050",
+      "calibration": false,
+      "prediction_sha256": "3d19667d20353954cbef249194484a89687f5eda1871f36a2cedc47e7981834e",
+      "status": "error",
+      "pdf": "向阳而生 日出吉他3(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-051",
+      "calibration": false,
+      "prediction_sha256": "73bf65e38a8ca2791e0b4b0bb8923b3845dc74f71c4f6b75e0ee0bb5ac877e7d",
+      "status": "error",
+      "pdf": "向阳而生 日出总谱(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-052",
+      "calibration": false,
+      "prediction_sha256": "fae2c6ab2ad1f2cce7b26431d6f300d5635f37c1f6a3d427af2c457daafa33f5",
+      "status": "error",
+      "pdf": "向阳而生 日出笛子(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-053",
+      "calibration": false,
+      "prediction_sha256": "1c8c9ff8b53550107bac87281c60c1fe2aab7183470063eb64e89262d1b1b483",
+      "status": "error",
+      "pdf": "向阳而生 日出贝斯(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-054",
+      "calibration": false,
+      "prediction_sha256": "6177006dbfac852dc0840741754f50b72a2b7bc0d9b34466c45e7f8c7b530a0f",
+      "status": "error",
+      "pdf": "向阳而生 日出钢琴(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-055",
+      "calibration": false,
+      "prediction_sha256": "3b7dc7a3ae44f564da153f7952e7caeb9b73d0b5a57594044ce23a7b615147b2",
+      "status": "error",
+      "pdf": "向阳而生 日出风琴(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-056",
+      "calibration": false,
+      "prediction_sha256": "846d6a30fe73928ecd31dc234a55fa3a273f40a3219a456c2bd2a192c2e8d27e",
+      "status": "error",
+      "pdf": "向阳而生 日出鼓谱(1).pdf",
+      "gp": "向阳而生-日出场.gp",
+      "error": "Reference GP importer failed; details retained locally"
+    },
+    {
+      "case": "case-057",
+      "calibration": false,
+      "prediction_sha256": "376a05b8c81330f8b6602d4e48a00869829bbb96b3b89475940eacf414860852",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 666,
+        "reference": 794,
+        "matched": 666,
+        "matched_with_rhythm": 666,
+        "exact_bars": 75,
+        "bars": 79,
+        "core_exact_bars": 75,
+        "predicted_ties": 52,
+        "matched_ties": 52,
+        "reference_ties": 52,
+        "precision": 1.0,
+        "recall": 0.8387909319899244,
+        "rhythm_recall": 0.8387909319899244,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9493670886075949,
+        "note_overlap": 0.8387909319899244,
+        "status": "uncertain"
+      },
+      "pdf": "好想我回来啊 吉他1.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-058",
+      "calibration": false,
+      "prediction_sha256": "08112894963e34c97fa60be47027addf090f9a48b3a420364c0b540fbc25d4ac",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 238,
+        "reference": 344,
+        "matched": 238,
+        "matched_with_rhythm": 238,
+        "exact_bars": 68,
+        "bars": 79,
+        "core_exact_bars": 68,
+        "predicted_ties": 8,
+        "matched_ties": 8,
+        "reference_ties": 18,
+        "precision": 1.0,
+        "recall": 0.6918604651162791,
+        "rhythm_recall": 0.6918604651162791,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.9620253164556962,
+        "note_overlap": 0.6918604651162791,
+        "status": "uncertain"
+      },
+      "pdf": "好想我回来啊 吉他2.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-059",
+      "calibration": false,
+      "prediction_sha256": "598b2c81230e553f6a3013cb1b439933ddf76250c35dbc6b2fef3a68cbd3f26b",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 88,
+        "reference": 98,
+        "matched": 88,
+        "matched_with_rhythm": 87,
+        "exact_bars": 69,
+        "bars": 79,
+        "core_exact_bars": 69,
+        "predicted_ties": 5,
+        "matched_ties": 5,
+        "reference_ties": 15,
+        "precision": 1.0,
+        "recall": 0.8979591836734694,
+        "rhythm_recall": 0.8877551020408163,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.8979591836734694,
+        "status": "consistent"
+      },
+      "pdf": "好想我回来啊 吉他3.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-060",
+      "calibration": true,
+      "prediction_sha256": "8d024d9da09da6f25cf092eb7c64ad20a01f9db172c0239de4c0963b9b43f6a9",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 58,
+        "reference": 794,
+        "matched": 2,
+        "matched_with_rhythm": 1,
+        "exact_bars": 0,
+        "bars": 79,
+        "core_exact_bars": 0,
+        "predicted_ties": 5,
+        "matched_ties": 0,
+        "reference_ties": 52,
+        "precision": 0.034482758620689655,
+        "recall": 0.0025188916876574307,
+        "rhythm_recall": 0.0012594458438287153,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 0.1518987341772152,
+        "note_overlap": 0.0025188916876574307,
+        "status": "uncertain"
+      },
+      "pdf": "好想我回来啊.pdf",
+      "gp": "好想我回来啊.gp"
+    },
+    {
+      "case": "case-061",
+      "calibration": false,
+      "prediction_sha256": "45065a650e07fb5d62e72f6e506bdc42eaad5118f8c4e54aa6214f7a68f7afe6",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 563,
+        "reference": 586,
+        "matched": 563,
+        "matched_with_rhythm": 563,
+        "exact_bars": 64,
+        "bars": 87,
+        "core_exact_bars": 64,
+        "predicted_ties": 8,
+        "matched_ties": 8,
+        "reference_ties": 31,
+        "precision": 1.0,
+        "recall": 0.9607508532423208,
+        "rhythm_recall": 0.9607508532423208,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9607508532423208,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他1.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-062",
+      "calibration": false,
+      "prediction_sha256": "72d997d2a4d1314f156d848c2fc38c72d7972912d87c47bb868e077c27aae9e1",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 736,
+        "reference": 736,
+        "matched": 736,
+        "matched_with_rhythm": 736,
+        "exact_bars": 87,
+        "bars": 87,
+        "core_exact_bars": 87,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他2.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-063",
+      "calibration": true,
+      "prediction_sha256": "cf83b2387709bf1c485583ea1e31a3ccc3c5b702ff414c82f3eee2e291c7b15d",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 249,
+        "reference": 249,
+        "matched": 249,
+        "matched_with_rhythm": 249,
+        "exact_bars": 87,
+        "bars": 87,
+        "core_exact_bars": 87,
+        "predicted_ties": 0,
+        "matched_ties": 0,
+        "reference_ties": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他3.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-064",
+      "calibration": true,
+      "prediction_sha256": "c1db8b6205579144a44c14e2cac3d2e29f6c718ce5fdbd56018086e0e2ac68e2",
+      "status": "evaluated",
+      "track": "吉他4",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 376,
+        "reference": 376,
+        "matched": 376,
+        "matched_with_rhythm": 376,
+        "exact_bars": 87,
+        "bars": 87,
+        "core_exact_bars": 87,
+        "predicted_ties": 14,
+        "matched_ties": 14,
+        "reference_ties": 14,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "好想爱这个世界啊 吉他4.pdf",
+      "gp": "好想爱这个世界啊.gp"
+    },
+    {
+      "case": "case-065",
+      "calibration": false,
+      "prediction_sha256": "62ae25208b08b796b3a2d943ba1355e0b7ec7ef6304d8405b96525c6e046111b",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 49,
+        "reference": 49,
+        "matched": 49,
+        "matched_with_rhythm": 49,
+        "exact_bars": 16,
+        "bars": 16,
+        "core_exact_bars": 16,
+        "predicted_ties": 5,
+        "matched_ties": 5,
+        "reference_ties": 5,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": false,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "uncertain"
+      },
+      "pdf": "小镇里的花.pdf",
+      "gp": "小镇里的花 solo.gp"
+    },
+    {
+      "case": "case-066",
+      "calibration": false,
+      "prediction_sha256": "86a177aea27700ebef2fb48fb873dc3ff522cb6dbb6819131ef39b43a5773035",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "怪诞心理学.pdf",
+      "gp": "怪诞心理学.gp"
+    },
+    {
+      "case": "case-067",
+      "calibration": true,
+      "prediction_sha256": "080704931fd4f062c30641f235cffcfb5f433da9ee34305f92e76a3d2ca0e631",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 70,
+        "reference": 70,
+        "matched": 70,
+        "matched_with_rhythm": 70,
+        "exact_bars": 21,
+        "bars": 21,
+        "core_exact_bars": 21,
+        "predicted_ties": 13,
+        "matched_ties": 13,
+        "reference_ties": 13,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "晨光里有你.pdf",
+      "gp": "晨光里有你.gp"
+    },
+    {
+      "case": "case-068",
+      "calibration": false,
+      "prediction_sha256": "a1a6ba6c299ebefdfb682a136014dcd24d88e1e20fc598bdc0573ab7c4798fd0",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "永不熄灭的火焰.pdf",
+      "gp": "永不熄灭的火焰.gp"
+    },
+    {
+      "case": "case-069",
+      "calibration": false,
+      "prediction_sha256": "a0588b9db9bbc9aafc7fbde6e2c16799991113649f4eae7e2eb31957b6eeb6e4",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 46,
+        "reference": 64,
+        "matched": 46,
+        "matched_with_rhythm": 45,
+        "exact_bars": 14,
+        "bars": 22,
+        "core_exact_bars": 14,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 30,
+        "precision": 1.0,
+        "recall": 0.71875,
+        "rhythm_recall": 0.703125,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.71875,
+        "status": "uncertain"
+      },
+      "pdf": "温暖的房子.pdf",
+      "gp": "温暖的房子.gp"
+    },
+    {
+      "case": "case-070",
+      "calibration": false,
+      "prediction_sha256": "b11b9e00437dedb27ec34f58b84fd1f7df3125a65cf04a7e1075ba53baba312d",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "烟火里的尘埃 主音吉他.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-071",
+      "calibration": false,
+      "prediction_sha256": "fbbd096608758c98994e135b5976736a14d9cfb89bff3643adcc91d3149de291",
+      "status": "evaluated",
+      "track": "分解",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1015,
+        "reference": 1020,
+        "matched": 1015,
+        "matched_with_rhythm": 1015,
+        "exact_bars": 57,
+        "bars": 62,
+        "core_exact_bars": 57,
+        "predicted_ties": 18,
+        "matched_ties": 18,
+        "reference_ties": 23,
+        "precision": 1.0,
+        "recall": 0.9950980392156863,
+        "rhythm_recall": 0.9950980392156863,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9950980392156863,
+        "status": "consistent"
+      },
+      "pdf": "烟火里的尘埃 分解吉他.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-072",
+      "calibration": true,
+      "prediction_sha256": "71974855c1d512ea608600d9577ed735721d87da9ef9708fe7a93a1c7742036d",
+      "status": "evaluated",
+      "track": "节奏",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1302,
+        "reference": 1302,
+        "matched": 1302,
+        "matched_with_rhythm": 1302,
+        "exact_bars": 62,
+        "bars": 62,
+        "core_exact_bars": 62,
+        "predicted_ties": 12,
+        "matched_ties": 12,
+        "reference_ties": 12,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "烟火里的尘埃 节奏吉他.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-073",
+      "calibration": false,
+      "prediction_sha256": "a7d4f50e55ec45b3d9caeafb66d7e69f9a450c7b9d3010ffeaf23a19dc65337a",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "烟火里的尘埃 贝斯.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-074",
+      "calibration": false,
+      "prediction_sha256": "8ad771be66f1279f85fb68c0bf28f73c76c23e08971f148fadf178ff9858d4d6",
+      "status": "unsupported-no-six-line-staff",
+      "pdf": "烟火里的尘埃 鼓.pdf",
+      "gp": "烟火里的尘埃.gp"
+    },
+    {
+      "case": "case-075",
+      "calibration": false,
+      "prediction_sha256": "f1deb9682726c95b87bfbbdf34ac4faa44dcf2b598ca4bcb282078a03787445a",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "虚幻与现实.pdf",
+      "gp": "虚幻与现实.gp"
+    },
+    {
+      "case": "case-076",
+      "calibration": false,
+      "prediction_sha256": "fe4edcdbcfa9a700e0cddf7124485fd67414736d984c297b335de970634e8e1f",
+      "status": "unsupported-multiple-parts-or-repeated-bar-numbers",
+      "pdf": "趁你还年轻.pdf",
+      "gp": "趁你还年轻 不插电SOLO.gp"
+    },
+    {
+      "case": "case-077",
+      "calibration": false,
+      "prediction_sha256": "0260934ab3ad4964997ba3b9608d05ffe42de7d40a63a7485dcc1f550d70dc00",
+      "status": "evaluated",
+      "track": "Distortion Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 402,
+        "reference": 402,
+        "matched": 402,
+        "matched_with_rhythm": 402,
+        "exact_bars": 32,
+        "bars": 32,
+        "core_exact_bars": 32,
+        "predicted_ties": 11,
+        "matched_ties": 11,
+        "reference_ties": 11,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "那些我尚未知道的美丽.pdf",
+      "gp": "那些我尚未知道的美丽.gp"
+    },
+    {
+      "case": "case-078",
+      "calibration": true,
+      "prediction_sha256": "3626e2d71dd6108fb9c1e77ad8848c0f8b66e557c2f6784552678d4c05d2be24",
+      "status": "evaluated",
+      "track": "吉他1",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 1544,
+        "reference": 1544,
+        "matched": 1544,
+        "matched_with_rhythm": 1544,
+        "exact_bars": 148,
+        "bars": 148,
+        "core_exact_bars": 148,
+        "predicted_ties": 78,
+        "matched_ties": 78,
+        "reference_ties": 78,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "黑白艺术家 吉他1.pdf",
+      "gp": "黑白艺术家.gp"
+    },
+    {
+      "case": "case-079",
+      "calibration": false,
+      "prediction_sha256": "3a7221071011ead556891d71c180e6fa23010fb0c3eea0edf10102831aabd651",
+      "status": "evaluated",
+      "track": "吉他2",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 540,
+        "reference": 553,
+        "matched": 540,
+        "matched_with_rhythm": 540,
+        "exact_bars": 135,
+        "bars": 148,
+        "core_exact_bars": 135,
+        "predicted_ties": 43,
+        "matched_ties": 43,
+        "reference_ties": 56,
+        "precision": 1.0,
+        "recall": 0.976491862567812,
+        "rhythm_recall": 0.976491862567812,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.976491862567812,
+        "status": "consistent"
+      },
+      "pdf": "黑白艺术家 吉他2.pdf",
+      "gp": "黑白艺术家.gp"
+    },
+    {
+      "case": "case-080",
+      "calibration": false,
+      "prediction_sha256": "973061ea32da3004ddc5c051cbd4ccaea6a81c1182e19548effe1869bbff0819",
+      "status": "evaluated",
+      "track": "吉他3",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 632,
+        "reference": 632,
+        "matched": 632,
+        "matched_with_rhythm": 632,
+        "exact_bars": 148,
+        "bars": 148,
+        "core_exact_bars": 148,
+        "predicted_ties": 51,
+        "matched_ties": 51,
+        "reference_ties": 51,
+        "precision": 1.0,
+        "recall": 1.0,
+        "rhythm_recall": 1.0,
+        "core_complete": true
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 1.0,
+        "status": "consistent"
+      },
+      "pdf": "黑白艺术家 吉他3.pdf",
+      "gp": "黑白艺术家.gp"
+    },
+    {
+      "case": "case-081",
+      "calibration": true,
+      "prediction_sha256": "dff438427442f27f7e4475cb3cbcbfccb36e19828a00d41eec7620a0f734b085",
+      "status": "evaluated",
+      "track": "Overdriven Guitar",
+      "track_selection": "best matching GP track, evaluation only",
+      "metrics": {
+        "recognized": 558,
+        "reference": 607,
+        "matched": 558,
+        "matched_with_rhythm": 557,
+        "exact_bars": 68,
+        "bars": 90,
+        "core_exact_bars": 63,
+        "predicted_ties": 82,
+        "matched_ties": 82,
+        "reference_ties": 137,
+        "precision": 1.0,
+        "recall": 0.9192751235584844,
+        "rhythm_recall": 0.9176276771004942,
+        "core_complete": false
+      },
+      "pairing_checks": {
+        "filename_compatible": true,
+        "bar_coverage": 1.0,
+        "note_overlap": 0.9192751235584844,
+        "status": "consistent"
+      },
+      "pdf": "《默》-那英-DaMingBai313.pdf",
+      "gp": "《默》-那英-DaMingBai313.gp"
+    }
+  ],
+  "excerpt_exports": [
+    {
+      "reference": "《默》-那英-DaMingBai313.gp",
+      "track": "Overdriven Guitar",
+      "source_bars": "16-23",
+      "reference_track_index": 0,
+      "reference_staff_index": 0,
+      "bars": 8,
+      "notes": 55,
+      "passed": true,
+      "differences": [],
+      "checked": [
+        "string/fret/dead/tie",
+        "rational duration/dots/tuplet/grace flag",
+        "voice-0 beat sequence including full-bar silence",
+        "meter",
+        "tuning",
+        "initial tempo"
+      ],
+      "not_checked": [
+        "techniques",
+        "repeat structures",
+        "tempo changes",
+        "audible playback"
+      ]
+    }
+  ],
+  "blocked_exports": [
+    {
+      "case": "case-081",
+      "selection": "all",
+      "gp_generated": false,
+      "reason": "Unresolved bar validation issues"
+    }
+  ],
+  "rhythm_differences": [
+    {
+      "case": "case-000",
+      "pdf": "《灰色轨迹》 间奏-大毛笔.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 5,
+        "missing_bar": 1,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 3
+      },
+      "differences": [
+        {
+          "bar": 2,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "missing_bar"
+        }
+      ]
+    },
+    {
+      "case": "case-002",
+      "pdf": "《残酷天使纲领》-DMB313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 63,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 4
+      },
+      "differences": [
+        {
+          "bar": 6,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 19,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 30,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-004",
+      "pdf": "《TheLoner》GaryMoore-大明白313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 84,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 11
+      },
+      "differences": [
+        {
+          "bar": 22,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 30,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 63,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 64,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 65,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 66,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 71,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 78,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 84,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 85,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 94,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-005",
+      "pdf": "《一生所爱》-DaMingBai313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 65,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 4,
+        "validation": 0,
+        "timing_attack_rest": 5
+      },
+      "differences": [
+        {
+          "bar": 15,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 16,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 20,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 29,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 52,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 61,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 70,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 71,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 72,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-006",
+      "pdf": "一路向北-大明白313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 73,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 9
+      },
+      "differences": [
+        {
+          "bar": 27,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 28,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 31,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 39,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 56,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 57,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 60,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 64,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 65,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-008",
+      "pdf": "《刀剑如梦》-大毛笔.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 99,
+        "missing_bar": 1,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 1,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": [
+        {
+          "bar": 100,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 101,
+          "reason": "missing_bar"
+        }
+      ]
+    },
+    {
+      "case": "case-009",
+      "pdf": "张紫豪-可不可以-大明白313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 77,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 5,
+        "validation": 0,
+        "timing_attack_rest": 5
+      },
+      "differences": [
+        {
+          "bar": 56,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 66,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 72,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 73,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 75,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 77,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 80,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 83,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 84,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 85,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-011",
+      "pdf": "哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 97,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 1
+      },
+      "differences": [
+        {
+          "bar": 62,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-012",
+      "pdf": "《天空之城》 DaMingBai313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 75,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 3,
+        "validation": 0,
+        "timing_attack_rest": 9
+      },
+      "differences": [
+        {
+          "bar": 14,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 22,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 37,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 41,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 51,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 55,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 58,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 60,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 62,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 78,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 79,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 80,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-013",
+      "pdf": "《如愿》-DaMingBai313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 78,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 9
+      },
+      "differences": [
+        {
+          "bar": 38,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 39,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 61,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 66,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 67,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 76,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 77,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 78,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 79,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-016",
+      "pdf": "《沧海一声笑》-大毛笔.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 49,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 17
+      },
+      "differences": [
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 5,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 6,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 7,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 8,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 10,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 11,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 12,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 14,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 15,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 16,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 17,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 18,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 41,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 58,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-019",
+      "pdf": "捕捉闪耀的瞬间-大明白313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 84,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 2,
+        "validation": 0,
+        "timing_attack_rest": 10
+      },
+      "differences": [
+        {
+          "bar": 4,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 17,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 21,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 59,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 61,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 63,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 65,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 69,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 88,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 92,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 94,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-022",
+      "pdf": "醉拳-成龙-DaMingBai313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 81,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-023",
+      "pdf": "「青鸟」火影忍者OP3-大明白313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 88,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 1,
+        "validation": 0,
+        "timing_attack_rest": 6
+      },
+      "differences": [
+        {
+          "bar": 10,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 32,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 49,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 50,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 51,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 58,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 94,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-024",
+      "pdf": "鬼灭之刃-无限城-大毛笔.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 61,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 1,
+        "validation": 0,
+        "timing_attack_rest": 4
+      },
+      "differences": [
+        {
+          "bar": 37,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 41,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 45,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 54,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 66,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-025",
+      "pdf": "鬼灭之刃 - 红莲华-大毛笔.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 54,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 2
+      },
+      "differences": [
+        {
+          "bar": 23,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 43,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-026",
+      "pdf": "此生不换 (2).pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 32,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 6
+      },
+      "differences": [
+        {
+          "bar": 2,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 34,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 38,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-027",
+      "pdf": "新手12分钟 合集.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 0,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 34
+      },
+      "differences": [
+        {
+          "bar": 1,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 2,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 5,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 6,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 7,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 8,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 10,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 11,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 12,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 14,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 15,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 16,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 17,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 18,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 19,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 20,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 21,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 22,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 23,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 24,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 25,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 26,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 27,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 28,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 29,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 30,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 31,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 32,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 33,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 34,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-028",
+      "pdf": "七重人格.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 21,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 1
+      },
+      "differences": [
+        {
+          "bar": 21,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-034",
+      "pdf": "不重逢 主音吉他.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 56,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 96
+      },
+      "differences": [
+        {
+          "bar": 1,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 2,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 5,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 6,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 7,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 8,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 10,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 11,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 12,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 14,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 15,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 16,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 17,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 18,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 19,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 20,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 21,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 22,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 23,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 24,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 25,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 26,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 27,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 28,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 29,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 30,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 31,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 32,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 33,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 34,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 35,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 36,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 37,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 38,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 39,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 40,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 41,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 42,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 43,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 44,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 45,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 46,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 47,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 48,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 49,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 50,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 51,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 52,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 53,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 54,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 55,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 56,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 57,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 66,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 67,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 68,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 69,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 70,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 71,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 72,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 73,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 74,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 75,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 76,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 77,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 78,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 79,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 80,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 81,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 82,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 83,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 84,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 85,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 86,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 87,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 88,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 89,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 108,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 109,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 110,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 111,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 112,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 113,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 114,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 115,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 142,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 143,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 144,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 145,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 146,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 147,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 148,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-035",
+      "pdf": "不重逢 吉他3.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 146,
+        "missing_bar": 4,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 2
+      },
+      "differences": [
+        {
+          "bar": 64,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 65,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 66,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 88,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 89,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 90,
+          "reason": "missing_bar"
+        }
+      ]
+    },
+    {
+      "case": "case-036",
+      "pdf": "不重逢 节奏吉他.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 152,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-037",
+      "pdf": "千万次奔向 吉他1.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 143,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-038",
+      "pdf": "千万次奔向 吉他2.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 138,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 5
+      },
+      "differences": [
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 6,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 8,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 27,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 111,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-039",
+      "pdf": "千万次奔向 吉他3.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 143,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-040",
+      "pdf": "千万次奔向 木吉他.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 128,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 15
+      },
+      "differences": [
+        {
+          "bar": 25,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 43,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 51,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 52,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 61,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 69,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 70,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 83,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 91,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 99,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 100,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 115,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 123,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 124,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 131,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-041",
+      "pdf": "卡西莫多的礼物 主音吉他.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 72,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 2,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": [
+        {
+          "bar": 68,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 69,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-042",
+      "pdf": "卡西莫多的礼物 节奏吉他.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 70,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 4,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": [
+        {
+          "bar": 47,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 48,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 49,
+          "reason": "unknown_duration"
+        },
+        {
+          "bar": 50,
+          "reason": "unknown_duration"
+        }
+      ]
+    },
+    {
+      "case": "case-044",
+      "pdf": "双截棍.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 157,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 15
+      },
+      "differences": [
+        {
+          "bar": 92,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 93,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 94,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 95,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 96,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 97,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 98,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 99,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 100,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 101,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 102,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 103,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 104,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 128,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 129,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-045",
+      "pdf": "变相怪杰 吉他1.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 101,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 4
+      },
+      "differences": [
+        {
+          "bar": 66,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 69,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 94,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 97,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-046",
+      "pdf": "变相怪杰 吉他2.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 105,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-047",
+      "pdf": "向阳而生 尾奏.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 76,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 3
+      },
+      "differences": [
+        {
+          "bar": 53,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 54,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 75,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-057",
+      "pdf": "好想我回来啊 吉他1.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 75,
+        "missing_bar": 4,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": [
+        {
+          "bar": 65,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 66,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 67,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 68,
+          "reason": "missing_bar"
+        }
+      ]
+    },
+    {
+      "case": "case-058",
+      "pdf": "好想我回来啊 吉他2.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 68,
+        "missing_bar": 3,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 8
+      },
+      "differences": [
+        {
+          "bar": 29,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 30,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 31,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 33,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 35,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 37,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 39,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 40,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 67,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 68,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 69,
+          "reason": "missing_bar"
+        }
+      ]
+    },
+    {
+      "case": "case-059",
+      "pdf": "好想我回来啊 吉他3.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 69,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 10
+      },
+      "differences": [
+        {
+          "bar": 31,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 35,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 39,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 57,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 58,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 59,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 60,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 61,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 62,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 64,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-060",
+      "pdf": "好想我回来啊.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 0,
+        "missing_bar": 67,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 12
+      },
+      "differences": [
+        {
+          "bar": 1,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 2,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 5,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 6,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 7,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 8,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 10,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 11,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 12,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 14,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 15,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 16,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 17,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 18,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 19,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 20,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 21,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 22,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 23,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 24,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 25,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 26,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 27,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 28,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 29,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 30,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 31,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 32,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 33,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 34,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 35,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 36,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 37,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 38,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 39,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 40,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 41,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 42,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 43,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 44,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 45,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 46,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 47,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 48,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 49,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 50,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 51,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 52,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 53,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 54,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 55,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 56,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 57,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 58,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 59,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 60,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 61,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 62,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 63,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 64,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 65,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 66,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 67,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 68,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 69,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 70,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 71,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 72,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 73,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 74,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 75,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 76,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 77,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 78,
+          "reason": "missing_bar"
+        },
+        {
+          "bar": 79,
+          "reason": "missing_bar"
+        }
+      ]
+    },
+    {
+      "case": "case-061",
+      "pdf": "好想爱这个世界啊 吉他1.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 64,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 23
+      },
+      "differences": [
+        {
+          "bar": 1,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 3,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 5,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 7,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 11,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 15,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 17,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 21,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 23,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 25,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 32,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 34,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 36,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 38,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 40,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 42,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 44,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 46,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 48,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 50,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 52,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-062",
+      "pdf": "好想爱这个世界啊 吉他2.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 87,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-063",
+      "pdf": "好想爱这个世界啊 吉他3.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 87,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-064",
+      "pdf": "好想爱这个世界啊 吉他4.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 87,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-065",
+      "pdf": "小镇里的花.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 16,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-067",
+      "pdf": "晨光里有你.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 21,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-069",
+      "pdf": "温暖的房子.pdf",
+      "group": "uncertain",
+      "counts": {
+        "pass": 14,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 8
+      },
+      "differences": [
+        {
+          "bar": 4,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 8,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 9,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 10,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 11,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 12,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 14,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-071",
+      "pdf": "烟火里的尘埃 分解吉他.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 57,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 5
+      },
+      "differences": [
+        {
+          "bar": 13,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 14,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 17,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 18,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 19,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-072",
+      "pdf": "烟火里的尘埃 节奏吉他.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 62,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-077",
+      "pdf": "那些我尚未知道的美丽.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 32,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-078",
+      "pdf": "黑白艺术家 吉他1.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 148,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-079",
+      "pdf": "黑白艺术家 吉他2.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 135,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 13
+      },
+      "differences": [
+        {
+          "bar": 43,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 44,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 47,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 48,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 94,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 95,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 98,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 99,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 111,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 127,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 128,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 131,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 132,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    },
+    {
+      "case": "case-080",
+      "pdf": "黑白艺术家 吉他3.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 148,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 0
+      },
+      "differences": []
+    },
+    {
+      "case": "case-081",
+      "pdf": "《默》-那英-DaMingBai313.pdf",
+      "group": "consistent",
+      "counts": {
+        "pass": 64,
+        "missing_bar": 0,
+        "multiple_voices": 0,
+        "meter": 0,
+        "unknown_duration": 0,
+        "validation": 0,
+        "timing_attack_rest": 26
+      },
+      "differences": [
+        {
+          "bar": 24,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 25,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 26,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 33,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 34,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 35,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 37,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 38,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 41,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 42,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 43,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 50,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 51,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 69,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 75,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 77,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 78,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 79,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 80,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 81,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 82,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 83,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 85,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 86,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 87,
+          "reason": "timing_attack_rest"
+        },
+        {
+          "bar": 88,
+          "reason": "timing_attack_rest"
+        }
+      ]
+    }
+  ]
+}

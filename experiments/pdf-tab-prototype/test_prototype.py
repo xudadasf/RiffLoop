@@ -151,6 +151,28 @@ def outlined_music(page,symbols):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_tab_dot_belongs_to_nearest_preceding_stem(self):
+        for dot_x,expected in ((80,[0,1]),(73,[1,0])):
+            with self.subTest(dot_x=dot_x),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'close-dots.pdf';fixture(pdf,empty=True)
+                with fitz.open(pdf) as doc:
+                    p=doc[0];p.insert_font(fontname='music',fontbuffer=font_buffer())
+                    for x in (70,78,135,190,240,300):
+                        p.insert_text((x-1.95,114.4),'7',fontname='helv',fontsize=7)
+                        p.draw_line((x,117),(x,150),width=.4)
+                    for x0,x1,y in ((70,90,147),(70,73,144),(70,73,141),(78,90,144),(135,143,147)):
+                        p.draw_rect(fitz.Rect(x0,y,x1,y+1.5),color=None,fill=(0,0,0))
+                    p.insert_text((dot_x,139),'\ue1e7',fontsize=17,fontname='music')
+                    doc.saveIncr()
+                result=recognize(pdf);bar=result['systems'][0]['bars'][0]
+                self.assertEqual([b['dots'] for b in bar['beats'][:2]],expected)
+                self.assertEqual([b['duration'] for b in bar['beats'][:2]],[32,16])
+                if dot_x==80:
+                    self.assertEqual(bar['issues'],[])
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+
     def test_rhythm_diagnostic_checks_timeline_not_only_total_or_pitch(self):
         from diagnostics import rhythm_reason
         import copy
