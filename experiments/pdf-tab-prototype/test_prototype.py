@@ -151,6 +151,53 @@ def outlined_music(page,symbols):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_hidden_terminal_ties_require_consistent_printed_cutout_evidence(self):
+        for mode in ('valid','one_anchor','wrong_font','inconsistent','offset','cross_string','missing_stem','visible_pitch','rest_between'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'printed-cutout.pdf';fixture(pdf,empty=True)
+                with fitz.open(pdf) as doc:
+                    p=doc[0];p.insert_font(fontname='music',fontbuffer=font_buffer())
+                    font='cour' if mode=='wrong_font' else 'helv'
+                    width=fitz.get_text_length('(12)',fontname=font,fontsize=7)
+                    for x in (70,140,210,280):
+                        token='(12)' if x in (140,210) and not (mode=='one_anchor' and x==210) else '12'
+                        w=fitz.get_text_length(token,fontname=font,fontsize=7)
+                        p.insert_text((x-w/2,114.4),token,fontname=font,fontsize=7)
+                        p.draw_line((x,117),(x,150),width=.4)
+                    def arc(a,z,y):
+                        sh=p.new_shape();sh.draw_bezier((a,y),(a+5,y+4),(z-5,y+4),(z,y))
+                        sh.draw_bezier((z,y),(z-5,y+3),(a+5,y+3),(a,y))
+                        sh.finish(color=None,fill=(0,0,0));sh.commit()
+                    arc(75,140-width/2-1.4,112)
+                    arc(140+width/2+1.4,210-width/2-(.6 if mode=='inconsistent' else 1.4),112)
+                    for y in range(180,211,6):p.draw_line((30,y),(350,y),width=.4)
+                    for x in (30,350):p.draw_line((x,180),(x,210),width=.5)
+                    p.insert_text((30,178),'2',fontname='Times-Roman',fontsize=6)
+                    p.insert_text((70-fitz.get_text_length('12',fontname='helv',fontsize=7)/2,194.4),'12',fontname='helv',fontsize=7)
+                    p.draw_line((70,197),(70,230),width=.4)
+                    for x in (140,210):
+                        if mode!='missing_stem' or x!=140:p.draw_line((x,214.5),(x,225),width=.4)
+                    gap=fitz.get_text_length('(12)',fontname='helv',fontsize=7)/2+1.4
+                    if mode=='offset':gap+=1
+                    y=194 if mode=='cross_string' else 192
+                    arc(75,140-gap,y);arc(140+gap,210-gap,y)
+                    p.insert_text((280,192),'\ue4e5',fontname='music',fontsize=17)
+                    if mode=='rest_between':p.insert_text((110,192),'\ue4e5',fontname='music',fontsize=17)
+                    if mode=='visible_pitch':p.insert_text((136.107,194.4),'13',fontname='helv',fontsize=7)
+                    doc.saveIncr()
+                result=recognize(pdf);bar=result['systems'][1]['bars'][0]
+                hidden=[n for v in bar['beats'] for n in v['notes'] if n.get('inferred_from')]
+                if mode=='valid':
+                    self.assertEqual(len(hidden),2)
+                    self.assertEqual(bar['issues'],[])
+                    self.assertEqual([v['duration'] for v in bar['beats']],[4,4,4,4])
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+                else:
+                    self.assertFalse(hidden)
+                    self.assertTrue(bar['issues'])
+
     def test_hidden_tie_chain_requires_a_complete_path_to_printed_pitch(self):
         for mode in ('valid','missing_stem','missing_arc','wrong_pitch','no_parentheses','rest_between','asymmetric','duplicate_arc'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:

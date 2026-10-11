@@ -284,13 +284,33 @@ def read_ties(system,spans,lines,shapes):
           and sh['rect'].height<gap*2]
     def notes():
         return [(b,v,n) for b in system['bars'] for v in b['beats'] for n in v['notes']]
+    def printed_cutout(note):
+        if note.get('tie_cutout_half_width') is not None:return note['tie_cutout_half_width']
+        source=next((s for s in spans if list(s['bbox'])==note['bbox']),None)
+        if not source:return None
+        anchors={}
+        for s in spans:
+            if s['text']!=f"({note['fret']})" or s['font']!=source['font'] or abs(s['size']-note['size'])>.1:continue
+            x0,y0,x1,y1=s['bbox'];ends=[]
+            for arc in arcs:
+                a,z=sorted((arc[1],arc[4]),key=lambda p:p.x)
+                if (0<x0-z.x<2 and abs(z.y-(y0+y1)/2)<gap*.5
+                        and abs(a.y-z.y)<gap*.25):ends.append((x0+x1)/2-z.x)
+            if len(ends)==1:anchors[tuple(s['bbox'])]=ends[0]
+        widths=list(anchors.values())
+        if len(widths)>=2 and max(widths)-min(widths)<.3:
+            width=sum(widths)/len(widths)
+            if 7<=width<gap*1.5:return width
+        return None
     for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
         start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
         if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
         sources=[(b,v,n) for b,v,n in notes() if (abs(n['x']-start.x)<7
                  or n['parenthesized'] and abs(n['bbox'][2]-start.x)<2
                  or n.get('tie_outgoing_x') is not None and abs(n['tie_outgoing_x']-start.x)<.6
-                    and abs(n['y']-start.y)<gap*.25)
+                    and abs(n['y']-start.y)<gap*.25
+                 or n.get('tie_cutout_half_width') is not None
+                    and abs(n['x']+n['tie_cutout_half_width']-start.x)<.3 and abs(n['y']-start.y)<gap*.25)
                  and abs(n['y']-start.y)<gap*.8 and n['x']<end.x-3 and not n['dead']]
         if not sources: continue
         sb,sv,sn=min(sources,key=lambda t:abs(t[2]['x']-start.x)+abs(t[2]['y']-start.y))
@@ -344,7 +364,11 @@ def read_ties(system,spans,lines,shapes):
             stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<max(7,gap*1.5)
                             and bottom+gap*.8<max(y,y1)<bottom+gap*5
                             and top-2<min(y,y1)<bottom+gap*3],.5)
-            stems=[x for x in stems if abs(x-end.x)<7 or paired_outgoing(x) is not None]
+            cutout=printed_cutout(sn) if any(abs(x-end.x)>=7 for x in stems) else None
+            def matches_cutout(x):
+                return (cutout is not None and abs(x-end.x-cutout)<.3
+                        and all(abs(p.y-sn['y'])<gap*.25 for p in (start,end)))
+            stems=[x for x in stems if abs(x-end.x)<7 or paired_outgoing(x) is not None or matches_cutout(x)]
             if len(stems)!=1: continue
             x=stems[0]
             # Visible notes on other strings may share this stem; only ink on
@@ -367,6 +391,7 @@ def read_ties(system,spans,lines,shapes):
                 'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
             tn.pop('tie_outgoing_x',None)
             if abs(x-end.x)>=7:tn['tie_outgoing_x']=paired_outgoing(x)
+            if matches_cutout(x):tn['tie_cutout_half_width']=cutout
             if tv: tv['notes'].append(tn)
             else:
                 tv={'x':x,'notes':[tn],'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
