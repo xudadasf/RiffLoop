@@ -4,6 +4,8 @@
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
+新增的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为：18 份核心通过分谱中，仅《醉拳》通过全部所测播放时序项目。《默》等仍存在装饰音、连奏或其他技巧造成的发声差异，《变相怪杰》还缺少中途变速。因此核心通过不能视作播放完全还原；会改变起音或发声时长的技巧需要优先处理。
+
 ## 怎么识别
 
 只输入 PDF，不读取原 GP。用 PyMuPDF 提取 PDF 本身的文字绘制记录和线条：六条等距横线确定弦位，线上的数字确定品位，符干、横梁、附点和连音数字确定时值。然后按小节检查拍数。这里没有调用大模型，也没有上传素材。
@@ -138,6 +140,14 @@ python experiments/pdf-tab-prototype/verify_export.py output/pdf-tab-prototype/h
 原 GP 有同名轨道时必须额外指定 `--track-index`（原 GP 中从 0 开始的轨道编号），例如 `--track 'Overdriven Guitar' --track-index 0`。仍有歧义时停止验证，不自动挑选有利的对比结果；验证文件会记录轨道及谱表编号。
 
 当前自动测试已扩展至图形休止、变拍号整小节休止、隐藏延音、跨弦连奏防误判、和弦附点、圆圈二分音符、加线干扰、未知符号拒绝补休止等场景。最新批次命令可将输出目录设为 `output/pdf-tab-prototype/benchmark-20261007`，保留初版作为对照。
+
+完整单轨导出另做播放时序验证，第三个参数为原 GP 的轨道编号（从 0 开始，必须明确指定）：
+
+```powershell
+node experiments/pdf-tab-prototype/verify-playback.cjs output/pdf-tab-prototype/full-score-20261011-font-width-81/experimental.gp 'C:\Users\sadada\Desktop\素材\默-那英-大明白313\《默》-那英-DaMingBai313.gp' 0 output/pdf-tab-prototype/full-score-20261011-font-width-81/playback-verification.json
+```
+
+该命令比较完整播放小节顺序、速度时间线、发声音符的起止时刻及同时起音数量；不用于截取片段，不替代音高检查或实际听音。发现差异时保存报告并返回非零状态。读取失败会使旧报告失效，避免误读上次结果。
 
 后续应继续处理跨行/跨页延音、演奏技巧、速度变化及多声部；保持独立实验，不能把核心谱面验证等同于全部演奏信息正确。
 
