@@ -80,9 +80,15 @@ def clusters(values, tolerance=1):
 def text_spans(page):
     # Layout text extraction merges tightly spaced separate frets (14,15,14)
     # into "141514". Drawing operations retain their original glyph boundaries.
-    return [{'text': ''.join(chr(c[0]) for c in s['chars']),
-             'origin':s['chars'][0][2],'bbox':s['bbox'], 'font':s['font'],'size':s['size']}
-            for s in page.get_texttrace() if s['chars'] and s['opacity']>0 and s['dir'][0]>.9]
+    spans=[]
+    for s in page.get_texttrace():
+        if not s['chars'] or s['opacity']<=0 or s['dir'][0]<=.9:continue
+        token=''.join(chr(c[0]) for c in s['chars'])
+        span={'text':token,'origin':s['chars'][0][2],'bbox':s['bbox'],'font':s['font'],'size':s['size']}
+        if re.fullmatch(r'\(\d{1,2}\)',token):
+            span['fret_width']=s['chars'][-2][3][2]-s['chars'][1][3][0]
+        spans.append(span)
+    return spans
 
 
 def recognize(pdf):
@@ -288,9 +294,11 @@ def read_ties(system,spans,lines,shapes):
         if note.get('tie_cutout_half_width') is not None:return note['tie_cutout_half_width']
         source=next((s for s in spans if list(s['bbox'])==note['bbox']),None)
         if not source:return None
+        fret_width=source.get('fret_width',source['bbox'][2]-source['bbox'][0])
         anchors={}
         for s in spans:
-            if s['text']!=f"({note['fret']})" or s['font']!=source['font'] or abs(s['size']-note['size'])>.1:continue
+            if (s.get('fret_width') is None or abs(s['fret_width']-fret_width)>.1
+                    or s['font']!=source['font'] or abs(s['size']-note['size'])>.1):continue
             x0,y0,x1,y1=s['bbox'];ends=[]
             for arc in arcs:
                 a,z=sorted((arc[1],arc[4]),key=lambda p:p.x)
@@ -298,7 +306,10 @@ def read_ties(system,spans,lines,shapes):
                         and abs(a.y-z.y)<gap*.25):ends.append((x0+x1)/2-z.x)
             if len(ends)==1:anchors[tuple(s['bbox'])]=ends[0]
         widths=list(anchors.values())
-        if len(widths)>=2 and max(widths)-min(widths)<.3:
+        # Two strings in one printed chord are one layout sample, not two.
+        independent=any(abs((a[0]+a[2]-b[0]-b[2])/2)>.3 or abs(a[1]-b[1])>gap*5
+                        for a in anchors for b in anchors)
+        if independent and max(widths)-min(widths)<.3:
             width=sum(widths)/len(widths)
             if 7<=width<gap*1.5:return width
         return None
@@ -380,9 +391,12 @@ def read_ties(system,spans,lines,shapes):
             tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
             if sv['grace'] or tv and (tv['grace'] or not tv['notes']): continue
             # A short tie mark can end near the next unrelated single note.
-            # Only extend a chord already evidenced by two printed notes.
+            # A single printed destination needs its own confirmed tie from
+            # the source chord, plus measured cutout evidence for the missing note.
             visible_target=[n for n in tv['notes'] if not n.get('inferred_from')] if tv else []
-            if len(visible_target)==1: continue
+            if len(visible_target)==1 and not (matches_cutout(x) and visible_target[0]['parenthesized']
+                    and visible_target[0]['tie'] and any(n['string']==visible_target[0]['string']
+                    and n['fret']==visible_target[0]['fret'] for n in sv['notes'])):continue
             # With visible notes on another string, a displaced arc may be a
             # cross-string slur. Require both endpoints on the source string.
             if visible_target and (abs(start.y-sn['y'])>gap*.25 or abs(end.y-sn['y'])>gap*.25): continue

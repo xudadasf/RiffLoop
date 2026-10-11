@@ -152,17 +152,19 @@ def outlined_music(page,symbols):
 
 class PrototypeTests(unittest.TestCase):
     def test_hidden_terminal_ties_require_consistent_printed_cutout_evidence(self):
-        for mode in ('valid','one_anchor','wrong_font','inconsistent','offset','cross_string','missing_stem','visible_pitch','rest_between'):
+        for mode in ('valid','same_width','chord','untied_chord','mixed_width','wrong_width','wrong_size','one_anchor','wrong_font','inconsistent','offset','cross_string','missing_stem','visible_pitch','rest_between'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
                 pdf=Path(folder)/'printed-cutout.pdf';fixture(pdf,empty=True)
                 with fitz.open(pdf) as doc:
                     p=doc[0];p.insert_font(fontname='music',fontbuffer=font_buffer())
                     font='cour' if mode=='wrong_font' else 'helv'
-                    width=fitz.get_text_length('(12)',fontname=font,fontsize=7)
+                    anchor='19' if mode=='same_width' else '7' if mode in ('wrong_width','mixed_width') else '12'
+                    size=8 if mode=='wrong_size' else 7
+                    width=fitz.get_text_length('('+anchor+')',fontname=font,fontsize=size)
                     for x in (70,140,210,280):
-                        token='(12)' if x in (140,210) and not (mode=='one_anchor' and x==210) else '12'
-                        w=fitz.get_text_length(token,fontname=font,fontsize=7)
-                        p.insert_text((x-w/2,114.4),token,fontname=font,fontsize=7)
+                        token='('+anchor+')' if x in (140,210) and not (mode=='one_anchor' and x==210) else anchor
+                        w=fitz.get_text_length(token,fontname=font,fontsize=size)
+                        p.insert_text((x-w/2,114.4),token,fontname=font,fontsize=size)
                         p.draw_line((x,117),(x,150),width=.4)
                     def arc(a,z,y):
                         sh=p.new_shape();sh.draw_bezier((a,y),(a+5,y+4),(z-5,y+4),(z,y))
@@ -173,7 +175,8 @@ class PrototypeTests(unittest.TestCase):
                     for y in range(180,211,6):p.draw_line((30,y),(350,y),width=.4)
                     for x in (30,350):p.draw_line((x,180),(x,210),width=.5)
                     p.insert_text((30,178),'2',fontname='Times-Roman',fontsize=6)
-                    p.insert_text((70-fitz.get_text_length('12',fontname='helv',fontsize=7)/2,194.4),'12',fontname='helv',fontsize=7)
+                    pitch='7' if mode=='mixed_width' else '12'
+                    p.insert_text((70-fitz.get_text_length(pitch,fontname='helv',fontsize=7)/2,194.4),pitch,fontname='helv',fontsize=7)
                     p.draw_line((70,197),(70,230),width=.4)
                     for x in (140,210):
                         if mode!='missing_stem' or x!=140:p.draw_line((x,214.5),(x,225),width=.4)
@@ -181,19 +184,29 @@ class PrototypeTests(unittest.TestCase):
                     if mode=='offset':gap+=1
                     y=194 if mode=='cross_string' else 192
                     arc(75,140-gap,y);arc(140+gap,210-gap,y)
+                    if mode in ('chord','untied_chord'):
+                        p.insert_text((70-fitz.get_text_length('13',fontname='helv',fontsize=7)/2,200.4),'13',fontname='helv',fontsize=7)
+                        token='(12)' if mode=='chord' else '(14)'
+                        p.insert_text((210-fitz.get_text_length(token,fontname='helv',fontsize=7)/2,194.4),token,fontname='helv',fontsize=7)
+                        arc(75,140-gap,198);arc(140+gap,210-gap,198)
                     p.insert_text((280,192),'\ue4e5',fontname='music',fontsize=17)
                     if mode=='rest_between':p.insert_text((110,192),'\ue4e5',fontname='music',fontsize=17)
                     if mode=='visible_pitch':p.insert_text((136.107,194.4),'13',fontname='helv',fontsize=7)
                     doc.saveIncr()
                 result=recognize(pdf);bar=result['systems'][1]['bars'][0]
                 hidden=[n for v in bar['beats'] for n in v['notes'] if n.get('inferred_from')]
-                if mode=='valid':
-                    self.assertEqual(len(hidden),2)
+                if mode in ('valid','same_width','chord'):
+                    self.assertEqual(len(hidden),3 if mode=='chord' else 2)
+                    if mode=='chord':
+                        self.assertEqual([len(v['notes']) for v in bar['beats']],[2,2,2,0])
+                        self.assertTrue(all(n['tie'] for v in bar['beats'][1:3] for n in v['notes']))
                     self.assertEqual(bar['issues'],[])
                     self.assertEqual([v['duration'] for v in bar['beats']],[4,4,4,4])
                     data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
                     run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
                     self.assertEqual(run.returncode,0,run.stderr)
+                elif mode=='untied_chord':
+                    self.assertFalse(any(n['string']==4 and abs(n['x']-210)<1 for n in hidden))
                 else:
                     self.assertFalse(hidden)
                     self.assertTrue(bar['issues'])
