@@ -309,20 +309,37 @@ def read_ties(system,spans,lines,shapes):
             if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
             # GP often suppresses a tied fret number but retains its rhythm stem.
-            def paired_outgoing(x):
+            def paired_outgoing(x,incoming=end):
                 # A wider invisible fret cutout needs symmetric incoming and
-                # outgoing curves on this string, ending at a printed equal fret.
-                if not 0<x-end.x<gap*1.5 or any(abs(p.y-sn['y'])>gap*.25 for p in (start,end)):return None
+                # outgoing curves. Follow a complete hidden chain to printed
+                # equal pitch; every recursive step moves strictly rightward.
+                if not 0<x-incoming.x<gap*1.5 or any(abs(p.y-sn['y'])>gap*.25 for p in (start,incoming)):return None
+                here=next((b for b in system['bars'] if b['left']<x<b['right']),None)
+                if not here:return None
                 matches=[]
                 for other in arcs:
                     a,z=sorted((other[1],other[4]),key=lambda p:p.x)
-                    if not a.x>x or abs(a.x-x-(x-end.x))>=.6:continue
+                    if not a.x>x or abs(a.x-x-(x-incoming.x))>=.6:continue
                     if any(abs(p.y-sn['y'])>gap*.25 for p in (a,z)):continue
                     if any(n['parenthesized'] and not n['dead'] and not v['grace']
                            and n['string']==sn['string'] and n['fret']==sn['fret']
+                           and b['number'] in (here['number'],here['number']+1)
                            and abs(n['bbox'][0]-z.x)<2 and n['x']>a.x+3
                            and not any(x<w['x']<v['x'] for bar in system['bars'] for w in bar['beats'])
-                           for b,v,n in notes()):matches.append(a.x)
+                           for b,v,n in notes()):
+                        matches.append(a.x);continue
+                    following=clusters([sx for sx,y,sx1,y1 in lines if abs(sx-sx1)<.2 and sx>x+3
+                                        and 0<sx-z.x<gap*1.5
+                                        and bottom+gap*.8<max(y,y1)<bottom+gap*5
+                                        and top-2<min(y,y1)<bottom+gap*3],.5)
+                    if len(following)!=1:continue
+                    nx=following[0]
+                    target=next((b for b in system['bars'] if b['left']<nx<b['right']),None)
+                    if not target or target['number'] not in (here['number'],here['number']+1):continue
+                    # This extension only crosses wholly hidden beats. A rest,
+                    # printed attack or partial chord must not be skipped.
+                    if any(x<w['x']<nx+1.5 for b in system['bars'] for w in b['beats']):continue
+                    if paired_outgoing(nx,z) is not None:matches.append(a.x)
                 return matches[0] if len(matches)==1 else None
             stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<max(7,gap*1.5)
                             and bottom+gap*.8<max(y,y1)<bottom+gap*5

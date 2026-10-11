@@ -151,6 +151,44 @@ def outlined_music(page,symbols):
 
 
 class PrototypeTests(unittest.TestCase):
+    def test_hidden_tie_chain_requires_a_complete_path_to_printed_pitch(self):
+        for mode in ('valid','missing_stem','missing_arc','wrong_pitch','no_parentheses','rest_between','asymmetric','duplicate_arc'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'chain.pdf';fixture(pdf,empty=True)
+                with fitz.open(pdf) as doc:
+                    p=doc[0];p.draw_line((220,100),(220,130),width=.5)
+                    p.insert_font(fontname='music',fontbuffer=font_buffer())
+                    for x,token in ((70,'12'),(280,'13' if mode=='wrong_pitch' else '12')):
+                        if x==280 and mode!='no_parentheses':token='('+token+')'
+                        w=fitz.get_text_length(token,fontname='helv',fontsize=7)
+                        p.insert_text((x-w/2,114.4),token,fontname='helv',fontsize=7)
+                    p.draw_line((70,117),(70,150),width=.4)
+                    for x in (110,150,190):
+                        if mode!='missing_stem' or x!=150:p.draw_line((x,134.5),(x,145),width=.4)
+                    pairs=[(75,102.2),(117.8,142.2),(157.8,182.2),(197.8,280-w/2-1.4)]
+                    if mode=='missing_arc':pairs.pop(1)
+                    if mode=='asymmetric':pairs[2]=(160,182.2)
+                    if mode=='duplicate_arc':pairs.append(pairs[1])
+                    for a,z in pairs:
+                        sh=p.new_shape();sh.draw_bezier((a,112),(a+5,116),(z-5,116),(z,112))
+                        sh.draw_bezier((z,112),(z-5,115),(a+5,115),(a,112))
+                        sh.finish(color=None,fill=(0,0,0));sh.commit()
+                    if mode=='rest_between':p.insert_text((130,112),'\ue4e5',fontsize=17,fontname='music')
+                    doc.saveIncr()
+                result=recognize(pdf);bars=result['systems'][0]['bars']
+                hidden=[n for b in bars for v in b['beats'] for n in v['notes'] if n.get('inferred_from')]
+                if mode=='valid':
+                    self.assertEqual(len(hidden),3)
+                    self.assertEqual([b['issues'] for b in bars],[[],[]])
+                    self.assertEqual([v['duration'] for b in bars for v in b['beats']],[4,4,4,4,1])
+                    self.assertTrue(all(n['tie'] for n in hidden+bars[1]['beats'][0]['notes']))
+                    data=Path(folder)/'recognized.json';data.write_text(json.dumps(result),encoding='utf-8')
+                    run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(data),str(Path(folder)/'out.gp')],capture_output=True,text=True)
+                    self.assertEqual(run.returncode,0,run.stderr)
+                else:
+                    self.assertFalse(hidden)
+                    self.assertTrue(bars[0]['issues'])
+
     def test_tab_dot_belongs_to_nearest_preceding_stem(self):
         for dot_x,expected in ((80,[0,1]),(73,[1,0])):
             with self.subTest(dot_x=dot_x),tempfile.TemporaryDirectory() as folder:
