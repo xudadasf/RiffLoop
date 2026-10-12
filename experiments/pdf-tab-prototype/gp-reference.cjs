@@ -23,4 +23,7 @@ const tracks = score.tracks.flatMap(t => t.staves.map((s, si) => ({
         })))
     }))
 })));
-fs.writeFileSync(output, JSON.stringify({source:path.resolve(input),tempo:score.tempo,tracks},null,2));
+const tempo_events = score.masterBars.flatMap(m=>m.tempoAutomations.map(a=>({
+    bar:m.index+1,position:a.ratioPosition,bpm:a.value,linear:a.isLinear
+})));
+fs.writeFileSync(output, JSON.stringify({source:path.resolve(input),tempo:score.tempo,tempo_events,tracks},null,2));

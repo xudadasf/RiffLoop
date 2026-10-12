@@ -8,6 +8,19 @@ from pathlib import Path
 from evaluate import core_events
 
 
+def tempo_sequence(score,first,last):
+    active=score['tempo'];linear=False;changes=[]
+    for event in sorted(score.get('tempo_events',[]),key=lambda e:(e['bar'],e['position'])):
+        if event['bar']<first or event['bar']==first and event['position']==0:
+            active=event['bpm'];linear=event['linear']
+        elif first<=event['bar']<=last:
+            changes.append((event['bar']-first+1,event['position'],event['bpm'],event['linear']))
+    result=[(1,0,active,linear)]
+    for event in changes:
+        if event[2:]!=result[-1][2:] or event[3]:result.append(event)
+    return result
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('exported',type=Path)
@@ -35,7 +48,10 @@ def main():
     differences=[]
     if len(chosen)!=last-first+1 or len(chosen)!=len(received['bars']): differences.append('bar count')
     if received['tuning']!=expected['tuning']: differences.append('tuning')
-    if actual['tempo']!=original['tempo']: differences.append('initial tempo')
+    expected_tempos=tempo_sequence(original,first,last)
+    actual_tempos=tempo_sequence(actual,1,len(received['bars']))
+    if actual['tempo']!=expected_tempos[0][2]: differences.append('initial tempo')
+    if actual_tempos!=expected_tempos: differences.append('tempo changes')
 
     for a,b in zip(received['bars'],chosen):
         if any(v['notes'] for v in b['beats'] if v['voice']!=0):
@@ -46,8 +62,8 @@ def main():
             'reference_track_index':expected['track'],'reference_staff_index':expected['staff'],
             'bars':len(chosen),'notes':sum(len(v['notes']) for b in chosen for v in b['beats'] if v['voice']==0),
             'passed':not differences,'differences':differences,
-            'checked':['string/fret/dead/tie','rational duration/dots/tuplet/grace flag','voice-0 beat sequence including full-bar silence','meter','tuning','initial tempo'],
-            'not_checked':['techniques','repeat structures','tempo changes','audible playback']}
+            'checked':['string/fret/dead/tie','rational duration/dots/tuplet/grace flag','voice-0 beat sequence including full-bar silence','meter','tuning','initial tempo','tempo changes'],
+            'not_checked':['techniques','repeat structures','audible playback']}
     args.out.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(result,ensure_ascii=False))
     return 0 if result['passed'] else 1

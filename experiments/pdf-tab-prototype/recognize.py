@@ -101,11 +101,20 @@ def recognize(pdf):
     meter_source = 'assumed-4/4'
     previous_number = 0
     previous_shapes = []
+    tempo_marks=[]
     for pi, page in enumerate(document):
         lines, shapes = lines_and_shapes(page)
         spans = text_spans(page)
         if not any('bravura' in s['font'].lower() for s in spans):
             spans += outline_spans(shapes)
+        for span in spans:
+            if not re.search(r'=\s*\d',span['text']):continue
+            match=re.search(r'=\s*(\d{2,3})\s*$',span['text'])
+            units=[s for s in spans if 'bravura' in s['font'].lower()
+                   and 0<=span['bbox'][0]-s['bbox'][2]<12 and abs(s['origin'][1]-span['origin'][1])<3]
+            unit='quarter' if len(units)==1 and units[0]['text']=='\ue1d5' else 'unsupported' if units else None
+            tempo_marks.append({'page':pi+1,'x':units[0]['origin'][0] if unit=='quarter' else span['bbox'][0],
+                                'y':span['origin'][1],'bpm':int(match[1]) if match else None,'unit':unit})
         text = page.get_text()
         if 'Standard tuning' in text:
             result['tuning'] = [64,59,55,50,45,40]
@@ -201,6 +210,7 @@ def recognize(pdf):
                 previous_bar=bar
             result['systems'].append(system)
             previous_shapes = shapes
+    read_tempos(result,tempo_marks)
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
     numbers=[b['number'] for s in result['systems'] for b in s['bars']]
@@ -216,6 +226,36 @@ def recognize(pdf):
         result['warnings'].append('部分小节未识别到拍号，4/4 仅用于诊断，这些小节禁止导出。')
     document.close()
     return result
+
+
+def read_tempos(result,marks):
+    events={1:result['tempo']};issues=[]
+    for i,mark in enumerate(sorted(marks,key=lambda m:(m['page'],m['y'],m['x']))):
+        # Retain the documented legacy initial-BPM fallback, but never apply
+        # that assumption to a later tempo change.
+        if i==0 and mark['unit'] is None and mark['bpm']==result['tempo']:continue
+        if mark['unit']!='quarter' or mark['bpm'] is None:
+            issues.append(f"第 {mark['page']} 页速度标记的计拍单位或数值未确认");continue
+        candidates=[s for s in result['systems'] if s['page']==mark['page']
+                    and 0<(s['standard'] or s)['ys'][0]-mark['y']<80]
+        system=min(candidates,key=lambda s:(s['standard'] or s)['ys'][0]) if candidates else None
+        bar=next((b for b in system['bars'] if b['left']<=mark['x']<b['right']),None) if system else None
+        if i==0 and system and system is result['systems'][0]:bar=system['bars'][0]
+        beats=[v for v in bar['beats'] if not v['grace']] if bar else []
+        aligned=beats and (abs(beats[0]['x']-mark['x'])<2
+                          or len(beats)==1 and not beats[0]['notes'] and mark['x']<bar['left']+60)
+        if not bar or not (i==0 and bar['number']==1 or aligned):
+            issues.append(f"第 {mark['page']} 页速度标记未能明确对应小节起点");continue
+        if bar['number'] in events and events[bar['number']]!=mark['bpm']:
+            issues.append(f"第 {bar['number']} 小节速度标记冲突");continue
+        events[bar['number']]=mark['bpm']
+    result['tempo_events']=[{'bar':n,'bpm':bpm} for n,bpm in sorted(events.items()) if bpm is not None]
+    result['tempo_issues']=issues
+    result['warnings'].extend(issues)
+    active=result['tempo']
+    for system in result['systems']:
+        for bar in system['bars']:
+            active=events.get(bar['number'],active);bar['tempo']=active
 
 
 def validate_bar(bar):

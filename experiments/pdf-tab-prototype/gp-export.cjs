@@ -14,6 +14,7 @@ if(!requested && (data.structure_issues?.length || bars.some((b,i)=>b.number!==i
 if (!bars.length || new Set(bars.map(b=>b.number)).size !== bars.length ||
     (requested && bars.length !== requested.size)) throw Error('Ambiguous or missing PDF bars');
 if (bars.some(b=>b.issues.length)) throw Error('Unresolved rhythm: export blocked. Inspect recognized.json and overlay.pdf.');
+if (data.tempo_issues?.length) throw Error('Unresolved tempo marks: export blocked. Inspect recognized.json.');
 if (!data.tuning || !data.tempo) throw Error('Tuning and tempo must be confirmed from the PDF.');
 const score = new alpha.model.Score();
 score.title = 'PDF recognition EXPERIMENT - effects require review';
@@ -26,7 +27,9 @@ for (const source of bars) {
     const master = new alpha.model.MasterBar();
     [master.timeSignatureNumerator,master.timeSignatureDenominator] = source.meter;
     score.addMasterBar(master);
-    if (master.index === 0) master.tempoAutomations.push(alpha.model.Automation.buildTempoAutomation(false,0,data.tempo,2));
+    const tempo = source.tempo ?? data.tempo;
+    if (master.index === 0 || tempo !== (bars[master.index-1].tempo ?? data.tempo))
+        master.tempoAutomations.push(alpha.model.Automation.buildTempoAutomation(false,0,tempo,2));
     const bar = new alpha.model.Bar(); staff.addBar(bar);
     const voice = new alpha.model.Voice(); bar.addVoice(voice);
     for (const item of source.beats) {
@@ -56,10 +59,15 @@ const bytes = new alpha.exporter.Gp7Exporter().export(score,settings);
 const readback = alpha.importer.ScoreLoader.loadScoreFromBytes(bytes,settings);
 const actual = readback.tracks[0].staves[0].bars;
 if(actual.length !== bars.length) throw Error('Export roundtrip changed bar count');
-if(readback.tempo !== data.tempo || JSON.stringify(readback.tracks[0].staves[0].tuning) !== JSON.stringify(data.tuning))
+if(readback.tempo !== (bars[0].tempo ?? data.tempo) || JSON.stringify(readback.tracks[0].staves[0].tuning) !== JSON.stringify(data.tuning))
     throw Error('Export roundtrip changed tempo or tuning');
 for(let i=0;i<bars.length;i++) {
     const master = readback.masterBars[i];
+    const tempo = bars[i].tempo ?? data.tempo;
+    const changes = i === 0 || tempo !== (bars[i-1].tempo ?? data.tempo) ? [tempo] : [];
+    if (JSON.stringify(master.tempoAutomations.map(a=>a.value)) !== JSON.stringify(changes) ||
+        master.tempoAutomations.some(a=>a.ratioPosition !== 0 || a.isLinear))
+        throw Error(`Export roundtrip changed tempo at bar ${i+1}`);
     if(master.timeSignatureNumerator !== bars[i].meter[0] || master.timeSignatureDenominator !== bars[i].meter[1])
         throw Error('Export roundtrip changed time signature');
     const expected=bars[i].beats, received=actual[i].voices[0].beats;
