@@ -94,7 +94,7 @@ def text_spans(page):
 def recognize(pdf):
     document = fitz.open(pdf)
     result = {'input':str(Path(pdf).resolve()), 'format':'vector-pdf-experiment-v1',
-              'tempo':None,'tuning':None,'pages':len(document),'systems':[],
+              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],
               'warnings':['演奏技巧、延音、反复结构和速度变化尚未完整识别，所有导出均为实验稿。',
                           '初始 BPM 暂按四分音符计拍，须人工核对速度标记。']}
     previous_meter = [4, 4]
@@ -208,9 +208,12 @@ def recognize(pdf):
                 read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes)
                 validate_bar(bar)
                 previous_bar=bar
+            result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
             result['systems'].append(system)
             previous_shapes = shapes
     read_tempos(result,tempo_marks)
+    if any(m['status']=='unsupported' for m in result['slide_marks']):
+        result['warnings'].append('部分 sl. 滑音标记的连线或音符对应关系未确认，尚未还原；详见 slide_marks。')
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
     numbers=[b['number'] for s in result['systems'] for b in s['bars']]
@@ -226,6 +229,49 @@ def recognize(pdf):
         result['warnings'].append('部分小节未识别到拍号，4/4 仅用于诊断，这些小节禁止导出。')
     document.close()
     return result
+
+
+def read_slides(system,spans,lines,shapes):
+    """Require the label, slur and directional slide line between adjacent notes."""
+    top,bottom=system['ys'][0],system['ys'][-1];gap=(bottom-top)/5
+    labels=[s for s in spans if s['text'].strip().lower()=='sl.'
+            and system['left']<s['origin'][0]<system['right'] and top-25<s['origin'][1]<bottom+2]
+    arcs=[sh for sh in shapes if sh['type']=='f' and len(sh['items'])==2
+          and all(i[0]=='c' for i in sh['items']) and sh['rect'].height<gap*2]
+    beats=[(b,v) for b in system['bars'] for v in b['beats']]
+    marks=[]
+    for label in labels:
+        matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
+        for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
+            if sv['grace'] or tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
+            if tb['number'] not in (sb['number'],sb['number']+1):continue
+            sn,tn=sv['notes'][0],tv['notes'][0]
+            if sn['dead'] or tn['dead'] or tn['tie'] or sn['string']!=tn['string'] or sn['fret']==tn['fret']:continue
+            if not sn['x']<x<tn['x']:continue
+            curves=[]
+            for sh in arcs:
+                a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+                offset=sn['y']-a.y;target_offset=tn['y']-z.y
+                label_position=top-25<y<top+2 or abs(y-sh['rect'].y0)<gap*.5
+                if (abs(a.x-sn['x'])<1 and abs(z.x-tn['x'])<1 and label_position
+                        and 0<abs(offset)<gap*.8 and 0<abs(target_offset)<gap*.8
+                        and offset*target_offset>0 and abs(offset-target_offset)<gap*.25):curves.append(sh)
+            strokes=[]
+            for x0,y0,x1,y1 in lines:
+                if x0>x1:x0,y0,x1,y1=x1,y1,x0,y0
+                if (x1-x0>4 and abs(x0-sn['bbox'][2])<4 and abs(x1-tn['bbox'][0])<4
+                        and abs(y0-sn['y'])<gap*.6 and abs(y1-tn['y'])<gap*.6
+                        and gap*.15<abs(y1-y0)<gap*.8 and (y0-y1)*(tn['fret']-sn['fret'])>0):strokes.append(1)
+            if len(curves)==1 and len(strokes)==1:matches.append((sb,sn,tb,tn))
+        mark={'page':system['page'],'x':x,'y':y,'status':'unsupported'}
+        if len(matches)==1:
+            sb,sn,tb,tn=matches[0]
+            sn.update(legato_slide=True,slide_target_bar=tb['number'],slide_target_fret=tn['fret'])
+            tn['slide_source_bar']=sb['number']
+            mark.update(status='recognized',bar=sb['number'],target_bar=tb['number'],string=sn['string'])
+        else:mark['reason']='requires-unique-adjacent-same-string-notes-line-and-arc'
+        marks.append(mark)
+    return marks
 
 
 def read_tempos(result,marks):

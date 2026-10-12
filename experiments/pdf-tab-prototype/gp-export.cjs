@@ -16,6 +16,19 @@ if (!bars.length || new Set(bars.map(b=>b.number)).size !== bars.length ||
 if (bars.some(b=>b.issues.length)) throw Error('Unresolved rhythm: export blocked. Inspect recognized.json and overlay.pdf.');
 if (data.tempo_issues?.length) throw Error('Unresolved tempo marks: export blocked. Inspect recognized.json.');
 if (!data.tuning || !data.tempo) throw Error('Tuning and tempo must be confirmed from the PDF.');
+const events = bars.flatMap(b=>b.beats.map(v=>({bar:b.number,beat:v})));
+for (let i=0;i<events.length;i++) for (const raw of events[i].beat.notes) {
+    if (raw.legato_slide) {
+        const next=events[i+1],target=next?.beat.notes.find(n=>n.string===raw.string);
+        if(!target || next.bar!==raw.slide_target_bar || target.fret!==raw.slide_target_fret ||
+            target.slide_source_bar!==events[i].bar) throw Error('Slide target is missing from this export selection');
+    }
+    if (raw.slide_source_bar !== undefined) {
+        const prior=events[i-1],origin=prior?.beat.notes.find(n=>n.string===raw.string);
+        if(!origin?.legato_slide || prior.bar!==raw.slide_source_bar)
+            throw Error('Slide origin is missing from this export selection');
+    }
+}
 const score = new alpha.model.Score();
 score.title = 'PDF recognition EXPERIMENT - effects require review';
 const track = new alpha.model.Track(); score.addTrack(track);
@@ -41,6 +54,7 @@ for (const source of bars) {
         for(const raw of item.notes) {
             const note = new alpha.model.Note(); note.string = 7-raw.string;
             note.fret = raw.fret ?? 0; note.isDead = raw.dead;
+            if(raw.legato_slide) note.slideOutType = alpha.model.SlideOutType.Legato;
             if(raw.tie) {
                 const prior = previousNotes.get(raw.string);
                 if(!prior || prior.fret !== raw.fret || prior.bar !== raw.tie_source_bar)
@@ -76,6 +90,12 @@ for(let i=0;i<bars.length;i++) {
         const e=expected[j], a=received[j];
         const notes=a.notes.map(n=>[7-n.string,n.isDead?null:n.fret]).sort((a,b)=>a[0]-b[0]);
         const ties=a.notes.map(n=>[7-n.string,n.isTieDestination]).sort((a,b)=>a[0]-b[0]);
+        for(const raw of e.notes) {
+            const note=a.notes.find(n=>7-n.string===raw.string);
+            if(note.slideOutType !== (raw.legato_slide ? alpha.model.SlideOutType.Legato : alpha.model.SlideOutType.None) ||
+                (raw.legato_slide && note.slideTarget?.fret !== raw.slide_target_fret))
+                throw Error(`Roundtrip changed slide at bar ${i+1}, beat ${j+1}`);
+        }
         if(a.duration!==e.duration || a.dots!==e.dots || (a.graceType!==alpha.model.GraceType.None)!==e.grace ||
             (e.tuplet[0]!==1 && (a.tupletNumerator!==e.tuplet[0] || a.tupletDenominator!==e.tuplet[1])) ||
             JSON.stringify(notes)!==JSON.stringify(e.notes.map(n=>[n.string,n.fret]).sort((a,b)=>a[0]-b[0])) ||
