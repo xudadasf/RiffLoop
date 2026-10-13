@@ -54,6 +54,7 @@ for (const source of bars) {
         for(const raw of item.notes) {
             const note = new alpha.model.Note(); note.string = 7-raw.string;
             note.fret = raw.fret ?? 0; note.isDead = raw.dead;
+            note.isStaccato = !!raw.staccato;
             if(raw.legato_slide) note.slideOutType = alpha.model.SlideOutType.Legato;
             if(raw.tie) {
                 const prior = previousNotes.get(raw.string);
@@ -92,6 +93,8 @@ for(let i=0;i<bars.length;i++) {
         const ties=a.notes.map(n=>[7-n.string,n.isTieDestination]).sort((a,b)=>a[0]-b[0]);
         for(const raw of e.notes) {
             const note=a.notes.find(n=>7-n.string===raw.string);
+            if(note.isStaccato !== !!raw.staccato)
+                throw Error(`Roundtrip changed staccato at bar ${i+1}, beat ${j+1}`);
             if(note.slideOutType !== (raw.legato_slide ? alpha.model.SlideOutType.Legato : alpha.model.SlideOutType.None) ||
                 (raw.legato_slide && note.slideTarget?.fret !== raw.slide_target_fret))
                 throw Error(`Roundtrip changed slide at bar ${i+1}, beat ${j+1}`);

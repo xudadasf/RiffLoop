@@ -1,10 +1,10 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 跨行与跨页连奏滑音](VALIDATION-20261013-boundary-slides.md)，此前见 [和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 单音顿音与结束时间](VALIDATION-20261013-staccato.md)，此前见 [跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
-最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充单音、和弦及跨谱行连奏滑音通用规则后，全部所测播放时序通过增至 5/18，起音检查通过增至 10/18。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
+最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充连奏滑音及单音顿音通用规则后，全部所测播放时序通过增至 6/18，起音检查通过增至 10/18。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
 
 [2026-10-12 中途变速修复](VALIDATION-20261012-tempo.md) 已补回《变相怪杰》的 120→165→120，生成播放时长由 208 秒恢复为参考的 202 秒。18 份完整导出的速度时间线均通过。
 
@@ -43,6 +43,8 @@
 平移和弦滑音要求前后弦集合相同、每根弦品位移动量相同且非零，每根弦都有方向正确的独立斜线，和弦外侧还有共用弧线。支持上侧、下侧或双侧弧线，每侧只能有唯一对应；密集音符之间的短斜线还须完整位于两端数字之间。图形证据完整时不要求 `sl.` 文字；缺线、部分音不动、改变和弦形状、弧线位于和弦内部或跨休止时不推断整组滑音。同一谱行内只连接相邻节拍。
 
 跨行及跨页滑音另要求行尾斜线延伸到右边界，两端外侧弧线对应，且前行末拍和后行首拍弦集合相同、品位变化量一致。单音仍需行尾 `sl.` 文字；两端小节编号须连续且拍数检查通过。缺少边界证据、跨休止或部分弦滑动时不推断。
+
+单音顿音通过明确的 Bravura 上方/下方顿音字形与唯一节拍对应，GP 导出和回读保留逐音顿音属性，缩短声音而不改变原时值及起音位置。和弦级圆点无法唯一还原原 GP 的逐弦属性时记入 `staccato_marks`，不按整组推断；轮廓圆点暂不作为顿音。
 
 ## 当前边界
 
@@ -161,8 +163,16 @@ node experiments/pdf-tab-prototype/verify-playback.cjs output/pdf-tab-prototype/
 同一批候选可按滑音类型检查覆盖，并对照已保存的通过事件。出现识别错误，或历史通过事件丢失时返回失败：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-boundary-slides experiments/pdf-tab-prototype/validation-summary-20261013-boundary-slides.json
+node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-staccato experiments/pdf-tab-prototype/validation-summary-20261013-staccato.json
 ```
+
+顿音类型另用 `audit-staccato.cjs` 核对，同样支持历史已验证事件回归：
+
+```powershell
+node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-staccato experiments/pdf-tab-prototype/validation-summary-20261013-staccato.json
+```
+
+输出 `staccato-audit.json`，和弦属性歧义和无法验证的事件单列。
 
 输出 `slide-audit.json`；来源或目标小节无法完整对齐时单列为未验证，不混入通过项。缺失仍可能来自规则覆盖不足，不能一律解释为新的记谱类型。
 

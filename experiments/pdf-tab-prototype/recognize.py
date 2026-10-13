@@ -94,7 +94,7 @@ def text_spans(page):
 def recognize(pdf):
     document = fitz.open(pdf)
     result = {'input':str(Path(pdf).resolve()), 'format':'vector-pdf-experiment-v1',
-              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],
+              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],
               'warnings':['演奏技巧、延音、反复结构和速度变化尚未完整识别，所有导出均为实验稿。',
                           '初始 BPM 暂按四分音符计拍，须人工核对速度标记。']}
     previous_meter = [4, 4]
@@ -209,6 +209,7 @@ def recognize(pdf):
                 read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes)
                 validate_bar(bar)
                 previous_bar=bar
+            result['staccato_marks'].extend(read_staccatos(system,spans,staff['notation_bottom']))
             result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
             if result['systems']:
                 read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'])
@@ -218,6 +219,8 @@ def recognize(pdf):
     read_tempos(result,tempo_marks)
     if any(m['status']=='unsupported' for m in result['slide_marks']):
         result['warnings'].append('部分 sl. 滑音标记的连线或音符对应关系未确认，尚未还原；详见 slide_marks。')
+    if any(m['status']=='unsupported' for m in result['staccato_marks']):
+        result['warnings'].append('部分顿音标记无法确定对应音符，尚未还原；详见 staccato_marks。')
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
     numbers=[b['number'] for s in result['systems'] for b in s['bars']]
@@ -233,6 +236,35 @@ def recognize(pdf):
         result['warnings'].append('部分小节未识别到拍号，4/4 仅用于诊断，这些小节禁止导出。')
     document.close()
     return result
+
+
+def read_staccatos(system,spans,bottom):
+    """Explicit articulation glyphs identify single notes; chord scope is lost in PDF."""
+    standard=system['standard'];top=system['ys'][0]
+    upper=(standard['ys'][0]-35) if standard else top-30
+    lower=top-2 if standard else bottom
+    symbols=[s for s in spans if s['text'] in ('\ue4a2','\ue4a3') and 'bravura' in s['font'].lower()
+             and upper<s['origin'][1]<lower and system['left']<s['origin'][0]<system['right']
+             and (standard or s['text']=='\ue4a2' and s['origin'][1]<top
+                  or s['text']=='\ue4a3' and s['origin'][1]>system['ys'][-1])]
+    center=lambda s:(s['bbox'][0]+s['bbox'][2])/2
+    marks=[]
+    for symbol in symbols:
+        x=center(symbol);mark={'page':system['page'],'x':x,'y':symbol['origin'][1],
+                              'status':'unsupported','reason':'ambiguous-beat'}
+        matches=[(b,v) for b in system['bars'] for v in b['beats'] if abs(v['x']-x)<1.5]
+        if len(matches)==1:
+            bar,beat=matches[0];mark['bar']=bar['number']
+            if len(beat['notes'])>1:mark['reason']='chord-note-scope'
+            elif len(beat['notes'])!=1 or beat['grace'] or beat['notes'][0]['tie'] or beat['notes'][0]['dead']:
+                mark['reason']='unsupported-note'
+            elif sum(abs(center(s)-beat['x'])<1.5 for s in symbols)!=1:mark['reason']='duplicate-mark'
+            else:
+                beat['notes'][0]['staccato']=True
+                mark.update(status='recognized',string=beat['notes'][0]['string'])
+                mark.pop('reason')
+        marks.append(mark)
+    return marks
 
 
 def read_boundary_slides(previous,current,lines,previous_shapes,current_shapes,marks):
