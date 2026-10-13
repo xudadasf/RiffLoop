@@ -101,6 +101,7 @@ def recognize(pdf):
     meter_source = 'assumed-4/4'
     previous_number = 0
     previous_shapes = []
+    previous_lines = []
     tempo_marks=[]
     for pi, page in enumerate(document):
         lines, shapes = lines_and_shapes(page)
@@ -209,8 +210,11 @@ def recognize(pdf):
                 validate_bar(bar)
                 previous_bar=bar
             result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
+            if result['systems']:
+                read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'])
             result['systems'].append(system)
             previous_shapes = shapes
+            previous_lines = lines
     read_tempos(result,tempo_marks)
     if any(m['status']=='unsupported' for m in result['slide_marks']):
         result['warnings'].append('部分 sl. 滑音标记的连线或音符对应关系未确认，尚未还原；详见 slide_marks。')
@@ -229,6 +233,58 @@ def recognize(pdf):
         result['warnings'].append('部分小节未识别到拍号，4/4 仅用于诊断，这些小节禁止导出。')
     document.close()
     return result
+
+
+def read_boundary_slides(previous,current,lines,previous_shapes,current_shapes,marks):
+    """Match an outgoing slide and paired TAB slur continuations at a row break."""
+    if not previous['bars'] or not current['bars']:return
+    sb,tb=previous['bars'][-1],current['bars'][0]
+    if sb['number']+1!=tb['number'] or sb['issues'] or tb['issues']:return
+    if not sb['beats'] or not tb['beats']:return
+    sv,tv=sb['beats'][-1],tb['beats'][0]
+    if sv['grace'] or tv['grace']:return
+    source=sorted(sv['notes'],key=lambda n:n['string']);target=sorted(tv['notes'],key=lambda n:n['string'])
+    if not source or [n['string'] for n in source]!=[n['string'] for n in target]:return
+    if any(n['dead'] for n in source+target) or any(n['tie'] for n in target):return
+    shifts={tn['fret']-sn['fret'] for sn,tn in zip(source,target)}
+    if len(shifts)!=1 or 0 in shifts:return
+    gap=(previous['ys'][-1]-previous['ys'][0])/5
+    labels=[m for m in marks if m['page']==previous['page'] and m['status']=='unsupported'
+            and sv['x']-3<m['x']<previous['right'] and previous['ys'][0]-25<m['y']<previous['ys'][-1]+2]
+    if len(source)==1 and len(labels)!=1:return
+    for sn,tn in zip(source,target):
+        strokes=0
+        for x0,y0,x1,y1 in lines:
+            if x0>x1:x0,y0,x1,y1=x1,y1,x0,y0
+            if (x1-x0>gap*.3 and 0<x0-sn['bbox'][2]<4 and abs(x1-previous['right'])<gap*.5
+                    and abs(y0-sn['y'])<gap*.6 and abs(y1-sn['y'])<gap*.15
+                    and gap*.15<abs(y1-y0)<gap*.8 and (y0-y1)*(tn['fret']-sn['fret'])>0):strokes+=1
+        if strokes!=1:return
+
+    def boundary_sides(system,shapes,beat,notes,outgoing):
+        gap=(system['ys'][-1]-system['ys'][0])/5;sides=[]
+        for sh in shapes:
+            if sh['type']!='f' or len(sh['items'])!=2 or sh['rect'].height>=gap*2:continue
+            if not all(i[0]=='c' for i in sh['items']):continue
+            a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+            if outgoing:
+                if abs(a.x-beat['x'])>=1 or abs(z.x-system['right'])>=gap*.5:continue
+            elif abs(z.x-beat['x'])>=1 or not system['left']<a.x<z.x or not gap*.5<z.x-a.x<gap*2:continue
+            if abs(a.y-z.y)>=gap*.25:continue
+            if 0<notes[0]['y']-a.y<gap*.8:sides.append('above')
+            elif 0<a.y-notes[-1]['y']<gap*.8:sides.append('below')
+        return sides
+
+    outgoing=boundary_sides(previous,previous_shapes,sv,source,True)
+    incoming=boundary_sides(current,current_shapes,tv,target,False)
+    if not outgoing or sorted(outgoing)!=sorted(incoming) or len(outgoing)!=len(set(outgoing)):return
+    for sn,tn in zip(source,target):
+        sn.update(legato_slide=True,slide_target_bar=tb['number'],slide_target_fret=tn['fret'])
+        tn['slide_source_bar']=sb['number']
+    for m in labels:m.update(status='recognized',kind='system-boundary',bar=sb['number'],target_bar=tb['number'])
+    if not labels:
+        marks.append({'page':previous['page'],'x':sv['x'],'y':source[-1]['y'],
+                      'status':'recognized','kind':'system-boundary','bar':sb['number'],'target_bar':tb['number']})
 
 
 def slide_line_count(sn,tn,lines,gap,minimum_width=4):
