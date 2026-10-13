@@ -411,6 +411,30 @@ def read_chord_slides(system,beats,lines,arcs,gap):
     return marks
 
 
+def shared_legato_curve(a,z,sn,tn,beats,spans,lines,gap,top,curve_top):
+    """Every edge of a shared same-string slur must have its own H/P/sl. evidence."""
+    starts=[i for i,(b,v) in enumerate(beats) if abs(v['x']-a.x)<1]
+    ends=[i for i,(b,v) in enumerate(beats) if abs(v['x']-z.x)<1]
+    if len(starts)!=1 or len(ends)!=1 or ends[0]-starts[0]<2:return False
+    chain=beats[starts[0]:ends[0]+1]
+    if any(v['grace'] or len(v['notes'])!=1 for b,v in chain):return False
+    notes=[v['notes'][0] for b,v in chain]
+    if any(n['dead'] or n['string']!=sn['string'] for n in notes):return False
+    if not any(s is sn and t is tn for s,t in zip(notes,notes[1:])):return False
+    for (sb,sv),(tb,tv) in zip(chain,chain[1:]):
+        s,t=sv['notes'][0],tv['notes'][0]
+        if t['tie'] or tb['number'] not in (sb['number'],sb['number']+1):return False
+        labels=[m['text'].strip().lower() for m in spans if m['text'].strip().lower() in ('h','p','sl.')
+                and s['x']<(m['bbox'][0]+m['bbox'][2])/2<t['x']
+                and (top-25<m['origin'][1]<top+2 or abs(m['origin'][1]-curve_top)<gap*.5)]
+        if len(labels)!=1:return False
+        count=slide_line_count(s,t,lines,gap,minimum_width=gap*.15)
+        if labels[0]=='sl.':
+            if count!=1:return False
+        elif count or (t['fret']-s['fret'])*(1 if labels[0]=='h' else -1)<=0:return False
+    return True
+
+
 def read_slides(system,spans,lines,shapes):
     """Read single notes and parallel chords from independent slide evidence."""
     top,bottom=system['ys'][0],system['ys'][-1];gap=(bottom-top)/5
@@ -424,7 +448,7 @@ def read_slides(system,spans,lines,shapes):
         matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
         if any(m.get('kind')=='parallel-chord' and m['start_x']<x<m['end_x'] for m in marks):continue
         for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
-            if sv['grace'] or tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
+            if tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
             if tb['number'] not in (sb['number'],sb['number']+1):continue
             sn,tn=sv['notes'][0],tv['notes'][0]
             if sn['dead'] or tn['dead'] or tn['tie'] or sn['string']!=tn['string'] or sn['fret']==tn['fret']:continue
@@ -434,10 +458,13 @@ def read_slides(system,spans,lines,shapes):
                 a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
                 offset=sn['y']-a.y;target_offset=tn['y']-z.y
                 label_position=top-25<y<top+2 or abs(y-sh['rect'].y0)<gap*.5
-                if (abs(a.x-sn['x'])<1 and abs(z.x-tn['x'])<1 and label_position
+                endpoints=abs(a.x-sn['x'])<1 and abs(z.x-tn['x'])<1
+                if not endpoints and a.x<=sn['x']+1 and z.x>=tn['x']-1:
+                    endpoints=shared_legato_curve(a,z,sn,tn,beats,spans,lines,gap,top,sh['rect'].y0)
+                if (endpoints and label_position
                         and 0<abs(offset)<gap*.8 and 0<abs(target_offset)<gap*.8
                         and offset*target_offset>0 and abs(offset-target_offset)<gap*.25):curves.append(sh)
-            if len(curves)==1 and slide_line_count(sn,tn,lines,gap)==1:matches.append((sb,sn,tb,tn))
+            if len(curves)==1 and slide_line_count(sn,tn,lines,gap,minimum_width=gap*.15)==1:matches.append((sb,sn,tb,tn))
         mark={'page':system['page'],'x':x,'y':y,'status':'unsupported'}
         if len(matches)==1:
             sb,sn,tb,tn=matches[0]

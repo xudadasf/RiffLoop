@@ -1,10 +1,10 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)，此前见 [单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)，此前见 [掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
-最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充连奏滑音、单音顿音及掌根闷音通用规则后，全部所测播放时序通过增至 7/18，起音检查通过增至 10/18。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
+最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充连奏滑音、单音顿音及掌根闷音通用规则后，全部所测播放时序通过增至 8/18，起音检查通过增至 11/18。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
 
 [2026-10-12 中途变速修复](VALIDATION-20261012-tempo.md) 已补回《变相怪杰》的 120→165→120，生成播放时长由 208 秒恢复为参考的 202 秒。18 份完整导出的速度时间线均通过。
 
@@ -45,6 +45,8 @@
 跨行及跨页滑音另要求行尾斜线延伸到右边界，两端外侧弧线对应，且前行末拍和后行首拍弦集合相同、品位变化量一致。单音仍需行尾 `sl.` 文字；两端小节编号须连续且拍数检查通过。缺少边界证据、跨休止或部分弦滑动时不推断。
 
 单音顿音通过明确的 Bravura 上方/下方顿音字形与唯一节拍对应，GP 导出和回读保留逐音顿音属性，缩短声音而不改变原时值及起音位置。和弦级圆点无法唯一还原原 GP 的逐弦属性时记入 `staccato_marks`，不按整组推断；轮廓圆点暂不作为顿音。
+
+密集排版的单音滑音斜线按弦线间距检查最小宽度，并要求线条完整位于两端数字之间；仍需方向、弧线及 `sl.` 文字同时成立。同弦多个音共用连奏弧线时，每段都须有唯一的 H/P/sl. 标记及对应方向证据，不能跨过休止或不明过渡。支持明确的装饰音滑向普通音，装饰音拍前/拍上位置仍受下述边界限制。
 
 掌根闷音要求明确的 `P.M.` 文字；连续范围还要求相邻虚线、末端竖线及唯一对应的起止节拍。端点按品位数字实际右边缘匹配，范围可跨同一谱行中的小节；无标记时不跨行延续。仅恢复确定的单音属性，混合范围中的和弦归属留在 `palm_mute_marks`，不一律给整组加闷音。
 
@@ -165,13 +167,13 @@ node experiments/pdf-tab-prototype/verify-playback.cjs output/pdf-tab-prototype/
 同一批候选可按滑音类型检查覆盖，并对照已保存的通过事件。出现识别错误，或历史通过事件丢失时返回失败：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-palm-mute experiments/pdf-tab-prototype/validation-summary-20261013-palm-mute.json
+node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-compact-slides experiments/pdf-tab-prototype/validation-summary-20261013-compact-slides.json
 ```
 
 顿音类型另用 `audit-staccato.cjs` 核对，同样支持历史已验证事件回归：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-palm-mute experiments/pdf-tab-prototype/validation-summary-20261013-palm-mute.json
+node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-compact-slides experiments/pdf-tab-prototype/validation-summary-20261013-compact-slides.json
 ```
 
 输出 `staccato-audit.json`，和弦属性歧义和无法验证的事件单列。
@@ -179,7 +181,7 @@ node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/b
 掌根闷音类型使用相同的逐音核对及历史回归方式：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/benchmark-20261013-palm-mute experiments/pdf-tab-prototype/validation-summary-20261013-palm-mute.json
+node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/benchmark-20261013-compact-slides experiments/pdf-tab-prototype/validation-summary-20261013-compact-slides.json
 ```
 
 输出 `palm-mute-audit.json`；来源范围未确认或和弦逐弦归属不明时不算正确。
