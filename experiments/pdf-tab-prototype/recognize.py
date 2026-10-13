@@ -8,6 +8,8 @@ from pathlib import Path
 import fitz
 from symbols import outline_spans
 
+ORNAMENTS={'\ue567':'turn','\ue568':'inverted-turn','\ue56c':'upper-mordent','\ue56d':'lower-mordent'}
+
 
 def lines_and_shapes(page):
     lines, shapes = [], []
@@ -94,7 +96,7 @@ def text_spans(page):
 def recognize(pdf):
     document = fitz.open(pdf)
     result = {'input':str(Path(pdf).resolve()), 'format':'vector-pdf-experiment-v1',
-              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],'palm_mute_marks':[],
+              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],'palm_mute_marks':[],'ornament_marks':[],
               'warnings':['演奏技巧、延音、反复结构和速度变化尚未完整识别，所有导出均为实验稿。',
                           '初始 BPM 暂按四分音符计拍，须人工核对速度标记。']}
     previous_meter = [4, 4]
@@ -108,6 +110,9 @@ def recognize(pdf):
         spans = text_spans(page)
         if not any('bravura' in s['font'].lower() for s in spans):
             spans += outline_spans(shapes)
+        else:
+            # Some PDFs keep rests as font text but print ornaments as paths.
+            spans += [s for s in outline_spans(shapes) if s['text'] in ORNAMENTS]
         for span in spans:
             if not re.search(r'=\s*\d',span['text']):continue
             match=re.search(r'=\s*(\d{2,3})\s*$',span['text'])
@@ -211,6 +216,7 @@ def recognize(pdf):
                 previous_bar=bar
             result['staccato_marks'].extend(read_staccatos(system,spans,staff['notation_bottom']))
             result['palm_mute_marks'].extend(read_palm_mutes(system,spans,lines,shapes))
+            result['ornament_marks'].extend(read_ornaments(system,spans))
             result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
             if result['systems']:
                 read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'])
@@ -224,6 +230,8 @@ def recognize(pdf):
         result['warnings'].append('部分顿音标记无法确定对应音符，尚未还原；详见 staccato_marks。')
     if any(m['status']!='recognized' for m in result['palm_mute_marks']):
         result['warnings'].append('部分 P.M. 标记的范围或逐弦归属未确认，尚未完整还原；详见 palm_mute_marks。')
+    if any(m['status']!='recognized' for m in result['ornament_marks']):
+        result['warnings'].append('部分装饰音符号的音符归属未确认，尚未还原；详见 ornament_marks。')
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
     numbers=[b['number'] for s in result['systems'] for b in s['bars']]
@@ -287,6 +295,31 @@ def read_palm_mutes(system,spans,lines,shapes):
         if blocked:
             mark['blocked_beats']=blocked
             if not recognized:mark['reason']=blocked[0]['reason']
+    return marks
+
+
+def read_ornaments(system,spans):
+    """Read explicit turn/mordent glyphs over a unique, ordinary single note."""
+    top=(system['standard'] or system)['ys'][0]
+    symbols=[s for s in spans if s['text'] in ORNAMENTS and 'bravura' in s['font'].lower()
+             and top-25<s['origin'][1]<top-1 and system['left']<s['origin'][0]<system['right']]
+    center=lambda s:(s['bbox'][0]+s['bbox'][2])/2
+    marks=[]
+    for symbol in symbols:
+        x=center(symbol);name=ORNAMENTS[symbol['text']]
+        mark={'page':system['page'],'x':x,'y':symbol['origin'][1],'ornament':name,
+              'status':'unsupported','reason':'ambiguous-beat'}
+        matches=[(b,v) for b in system['bars'] for v in b['beats'] if abs(v['x']-x)<1.5]
+        if len(matches)==1:
+            bar,beat=matches[0];mark['bar']=bar['number']
+            if len(beat['notes'])>1:mark['reason']='chord-note-scope'
+            elif len(beat['notes'])!=1 or beat['grace'] or beat['notes'][0]['tie'] or beat['notes'][0]['dead']:
+                mark['reason']='unsupported-note'
+            elif sum(abs(center(s)-beat['x'])<1.5 for s in symbols)!=1:mark['reason']='duplicate-mark'
+            else:
+                beat['notes'][0]['ornament']=name
+                mark.update(status='recognized',string=beat['notes'][0]['string']);mark.pop('reason')
+        marks.append(mark)
     return marks
 
 
@@ -430,9 +463,48 @@ def shared_legato_curve(a,z,sn,tn,beats,spans,lines,gap,top,curve_top):
         if len(labels)!=1:return False
         count=slide_line_count(s,t,lines,gap,minimum_width=gap*.15)
         if labels[0]=='sl.':
-            if count!=1:return False
+            if not single_slide_evidence(s,t,lines,gap):return False
         elif count or (t['fret']-s['fret'])*(1 if labels[0]=='h' else -1)<=0:return False
     return True
+
+
+def single_slide_evidence(sn,tn,lines,gap):
+    """Called only with a confirmed sl. label and slur; narrow cutouts can hide the line."""
+    if slide_line_count(sn,tn,lines,gap,minimum_width=gap*.15)==1:return True
+    left,right=sn['bbox'][2],tn['bbox'][0]
+    if not 0<right-left<gap*.6:return False
+    # A visible conflicting diagonal is never treated as a missing line.
+    return not any(sn['x']<min(x0,x1)<max(x0,x1)<tn['x']
+                   and abs(y0-sn['y'])<gap and abs(y1-tn['y'])<gap
+                   and abs(y0-y1)>gap*.15 for x0,y0,x1,y1 in lines)
+
+
+def grouped_slide_pairs(label,beats,arcs,spans,lines,gap,top):
+    """One centered sl. label can describe a whole same-string slide chain."""
+    matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
+    for sh in arcs:
+        a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+        if abs(x-(a.x+z.x)/2)>gap*.5:continue
+        if not (top-25<y<top+2 or abs(y-sh['rect'].y0)<gap*.5):continue
+        starts=[i for i,(b,v) in enumerate(beats) if abs(v['x']-a.x)<1]
+        ends=[i for i,(b,v) in enumerate(beats) if abs(v['x']-z.x)<1]
+        if len(starts)!=1 or len(ends)!=1 or ends[0]-starts[0]<2:continue
+        chain=beats[starts[0]:ends[0]+1]
+        if any(v['grace'] or len(v['notes'])!=1 for b,v in chain):continue
+        notes=[v['notes'][0] for b,v in chain]
+        if any(n['dead'] or n['string']!=notes[0]['string'] for n in notes):continue
+        offset=notes[0]['y']-a.y;end_offset=notes[-1]['y']-z.y
+        if not (0<abs(offset)<gap*.8 and 0<abs(end_offset)<gap*.8
+                and offset*end_offset>0 and abs(offset-end_offset)<gap*.25):continue
+        labels=[m for m in spans if m['text'].strip().lower() in ('h','p','sl.')
+                and a.x<(m['bbox'][0]+m['bbox'][2])/2<z.x
+                and (top-25<m['origin'][1]<top+2 or abs(m['origin'][1]-sh['rect'].y0)<gap*.5)]
+        if len(labels)!=1 or labels[0] is not label:continue
+        pairs=[(sb,sv['notes'][0],tb,tv['notes'][0]) for (sb,sv),(tb,tv) in zip(chain,chain[1:])]
+        if any(tn['tie'] or sn['fret']==tn['fret'] or tb['number'] not in (sb['number'],sb['number']+1)
+               or not single_slide_evidence(sn,tn,lines,gap) for sb,sn,tb,tn in pairs):continue
+        matches.append(pairs)
+    return matches
 
 
 def read_slides(system,spans,lines,shapes):
@@ -447,6 +519,7 @@ def read_slides(system,spans,lines,shapes):
     for label in labels:
         matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
         if any(m.get('kind')=='parallel-chord' and m['start_x']<x<m['end_x'] for m in marks):continue
+        matches.extend(grouped_slide_pairs(label,beats,arcs,spans,lines,gap,top))
         for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
             if tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
             if tb['number'] not in (sb['number'],sb['number']+1):continue
@@ -464,13 +537,14 @@ def read_slides(system,spans,lines,shapes):
                 if (endpoints and label_position
                         and 0<abs(offset)<gap*.8 and 0<abs(target_offset)<gap*.8
                         and offset*target_offset>0 and abs(offset-target_offset)<gap*.25):curves.append(sh)
-            if len(curves)==1 and slide_line_count(sn,tn,lines,gap,minimum_width=gap*.15)==1:matches.append((sb,sn,tb,tn))
+            if len(curves)==1 and single_slide_evidence(sn,tn,lines,gap):matches.append([(sb,sn,tb,tn)])
         mark={'page':system['page'],'x':x,'y':y,'status':'unsupported'}
         if len(matches)==1:
-            sb,sn,tb,tn=matches[0]
-            sn.update(legato_slide=True,slide_target_bar=tb['number'],slide_target_fret=tn['fret'])
-            tn['slide_source_bar']=sb['number']
-            mark.update(status='recognized',bar=sb['number'],target_bar=tb['number'],string=sn['string'])
+            for sb,sn,tb,tn in matches[0]:
+                sn.update(legato_slide=True,slide_target_bar=tb['number'],slide_target_fret=tn['fret'])
+                tn['slide_source_bar']=sb['number']
+            mark.update(status='recognized',bar=matches[0][0][0]['number'],target_bar=tb['number'],string=sn['string'])
+            if len(matches[0])>1:mark.update(kind='grouped-single-notes',transitions=len(matches[0]))
         else:mark['reason']='requires-unique-adjacent-same-string-notes-line-and-arc'
         marks.append(mark)
     return marks

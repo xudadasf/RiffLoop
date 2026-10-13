@@ -1,6 +1,6 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)，此前见 [掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)，此前见 [密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、 [掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
@@ -49,6 +49,10 @@
 密集排版的单音滑音斜线按弦线间距检查最小宽度，并要求线条完整位于两端数字之间；仍需方向、弧线及 `sl.` 文字同时成立。同弦多个音共用连奏弧线时，每段都须有唯一的 H/P/sl. 标记及对应方向证据，不能跨过休止或不明过渡。支持明确的装饰音滑向普通音，装饰音拍前/拍上位置仍受下述边界限制。
 
 掌根闷音要求明确的 `P.M.` 文字；连续范围还要求相邻虚线、末端竖线及唯一对应的起止节拍。端点按品位数字实际右边缘匹配，范围可跨同一谱行中的小节；无标记时不跨行延续。仅恢复确定的单音属性，混合范围中的和弦归属留在 `palm_mute_marks`，不一律给整组加闷音。
+
+连续滑音也可共用一个位于整段弧线中心的 sl.，要求整段同弦、无歧义且每个过渡有证据。数字间距小于弦距的 0.6 倍时可接受没有斜线，但仍须显式文字和唯一弧线，且不可存在冲突斜线；宽间隔缺线不推断。
+
+支持明确的单音波音/回音符号，包括文字与轮廓混合的 PDF。以 Bravura 模板辨认四种符号，要求唯一对应普通单音，导出后回读类型并验证 MIDI 起音；真实素材目前仅验证了《默》的五个上波音。
 
 ## 当前边界
 
@@ -167,13 +171,13 @@ node experiments/pdf-tab-prototype/verify-playback.cjs output/pdf-tab-prototype/
 同一批候选可按滑音类型检查覆盖，并对照已保存的通过事件。出现识别错误，或历史通过事件丢失时返回失败：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-compact-slides experiments/pdf-tab-prototype/validation-summary-20261013-compact-slides.json
+node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
 ```
 
 顿音类型另用 `audit-staccato.cjs` 核对，同样支持历史已验证事件回归：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-compact-slides experiments/pdf-tab-prototype/validation-summary-20261013-compact-slides.json
+node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
 ```
 
 输出 `staccato-audit.json`，和弦属性歧义和无法验证的事件单列。
@@ -181,12 +185,18 @@ node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/b
 掌根闷音类型使用相同的逐音核对及历史回归方式：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/benchmark-20261013-compact-slides experiments/pdf-tab-prototype/validation-summary-20261013-compact-slides.json
+node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
 ```
 
 输出 `palm-mute-audit.json`；来源范围未确认或和弦逐弦归属不明时不算正确。
 
 输出 `slide-audit.json`；来源或目标小节无法完整对齐时单列为未验证，不混入通过项。缺失仍可能来自规则覆盖不足，不能一律解释为新的记谱类型。
+
+波音/回音另用类型审计，同时核对音符归属与具体类型：
+
+```powershell
+node experiments/pdf-tab-prototype/audit-ornaments.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
+```
 
 后续应继续处理跨行/跨页延音、演奏技巧、速度变化及多声部；保持独立实验，不能把核心谱面验证等同于全部演奏信息正确。
 
