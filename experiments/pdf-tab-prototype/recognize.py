@@ -94,7 +94,7 @@ def text_spans(page):
 def recognize(pdf):
     document = fitz.open(pdf)
     result = {'input':str(Path(pdf).resolve()), 'format':'vector-pdf-experiment-v1',
-              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],
+              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],'palm_mute_marks':[],
               'warnings':['演奏技巧、延音、反复结构和速度变化尚未完整识别，所有导出均为实验稿。',
                           '初始 BPM 暂按四分音符计拍，须人工核对速度标记。']}
     previous_meter = [4, 4]
@@ -210,6 +210,7 @@ def recognize(pdf):
                 validate_bar(bar)
                 previous_bar=bar
             result['staccato_marks'].extend(read_staccatos(system,spans,staff['notation_bottom']))
+            result['palm_mute_marks'].extend(read_palm_mutes(system,spans,lines,shapes))
             result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
             if result['systems']:
                 read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'])
@@ -221,6 +222,8 @@ def recognize(pdf):
         result['warnings'].append('部分 sl. 滑音标记的连线或音符对应关系未确认，尚未还原；详见 slide_marks。')
     if any(m['status']=='unsupported' for m in result['staccato_marks']):
         result['warnings'].append('部分顿音标记无法确定对应音符，尚未还原；详见 staccato_marks。')
+    if any(m['status']!='recognized' for m in result['palm_mute_marks']):
+        result['warnings'].append('部分 P.M. 标记的范围或逐弦归属未确认，尚未完整还原；详见 palm_mute_marks。')
     if not result['systems']:
         result['warnings'].append('未找到可提取的六线谱；当前不支持扫描图片或四弦贝斯谱。')
     numbers=[b['number'] for s in result['systems'] for b in s['bars']]
@@ -236,6 +239,55 @@ def recognize(pdf):
         result['warnings'].append('部分小节未识别到拍号，4/4 仅用于诊断，这些小节禁止导出。')
     document.close()
     return result
+
+
+def read_palm_mutes(system,spans,lines,shapes):
+    """Explicit P.M. labels and capped dashed ranges; never infer chord-note scope."""
+    top=system['ys'][0];gap=(system['ys'][-1]-top)/5
+    labels=[s for s in spans if s['text'].strip()=='P.M.' and top-35<s['origin'][1]<top-2
+            and system['left']<s['origin'][0]<system['right']]
+    beats=[(b,v) for b in system['bars'] for v in b['beats']];marks=[]
+    for label in labels:
+        x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
+        mark={'page':system['page'],'x':x,'y':y,'status':'unsupported','reason':'ambiguous-range'}
+        marks.append(mark)
+        starts=[i for i,(b,v) in enumerate(beats) if abs(v['x']-x)<1.5]
+        if len(starts)!=1:continue
+        start=starts[0];end=start
+        candidates=[]
+        for sh in shapes:
+            if sh['type']!='s' or len(sh['items'])!=1 or sh['items'][0][0]!='l':continue
+            a,z=sorted(sh['items'][0][1:],key=lambda p:p.x)
+            if (abs(a.y-z.y)<.1 and z.x-a.x>gap and 0<a.x-label['bbox'][2]<4
+                    and 0<y-a.y<gap):candidates.append((sh,a,z))
+        if candidates:
+            if len(candidates)!=1:continue
+            sh,a,z=candidates[0]
+            if not re.match(r'\[\s*\d',sh['dashes']):continue
+            caps=[(min(y0,y1),max(y0,y1)) for x0,y0,x1,y1 in lines
+                  if abs(x0-z.x)<.3 and abs(x1-z.x)<.3 and 0<abs(y1-y0)<gap
+                  and min(y0,y1)-.1<=z.y<=max(y0,y1)+.1]
+            if not caps or min(c[0] for c in caps)>z.y-gap*.15 or max(c[1] for c in caps)<z.y+gap*.15:continue
+            ends=[i for i,(b,v) in enumerate(beats)
+                  if v['x']-.5<z.x<max([v['x']]+[n['bbox'][2] for n in v['notes']])+1.5]
+            if len(ends)!=1 or ends[0]<=start:continue
+            end=ends[0]
+        selected=beats[start:end+1]
+        mark.update(bar=selected[0][0]['number'],end_bar=selected[-1][0]['number'],end_x=selected[-1][1]['x'])
+        blocked=[];recognized=0
+        for bar,beat in selected:
+            if not beat['notes']:continue
+            reason='chord-note-scope' if len(beat['notes'])>1 else 'unsupported-note'
+            if len(beat['notes'])!=1 or beat['grace'] or beat['notes'][0]['tie'] or beat['notes'][0]['dead']:
+                blocked.append({'bar':bar['number'],'x':beat['x'],'reason':reason});continue
+            beat['notes'][0]['palm_mute']=True;recognized+=1
+        if recognized:
+            mark.update(status='partial' if blocked else 'recognized',recognized_notes=recognized)
+            mark.pop('reason')
+        if blocked:
+            mark['blocked_beats']=blocked
+            if not recognized:mark['reason']=blocked[0]['reason']
+    return marks
 
 
 def read_staccatos(system,spans,bottom):
