@@ -231,17 +231,58 @@ def recognize(pdf):
     return result
 
 
+def slide_line_count(sn,tn,lines,gap,minimum_width=4):
+    count=0
+    for x0,y0,x1,y1 in lines:
+        if x0>x1:x0,y0,x1,y1=x1,y1,x0,y0
+        if minimum_width<4 and not sn['bbox'][2]-.3<x0<x1<tn['bbox'][0]+.3:continue
+        if (x1-x0>minimum_width and abs(x0-sn['bbox'][2])<4 and abs(x1-tn['bbox'][0])<4
+                and abs(y0-sn['y'])<gap*.6 and abs(y1-tn['y'])<gap*.6
+                and gap*.15<abs(y1-y0)<gap*.8 and (y0-y1)*(tn['fret']-sn['fret'])>0):count+=1
+    return count
+
+
+def read_chord_slides(system,beats,lines,arcs,gap):
+    """Parallel chords need per-string lines and unique upper/lower slurs."""
+    marks=[]
+    for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
+        if sv['grace'] or tv['grace'] or tb['number'] not in (sb['number'],sb['number']+1):continue
+        source=sorted(sv['notes'],key=lambda n:n['string']);target=sorted(tv['notes'],key=lambda n:n['string'])
+        if len(source)<2 or [n['string'] for n in source]!=[n['string'] for n in target]:continue
+        if any(n['dead'] for n in source+target) or any(n['tie'] for n in target):continue
+        pairs=list(zip(source,target));shifts={tn['fret']-sn['fret'] for sn,tn in pairs}
+        if len(shifts)!=1 or 0 in shifts:continue
+        if any(slide_line_count(sn,tn,lines,gap,minimum_width=gap*.3)!=1 for sn,tn in pairs):continue
+        curves=[];sides=[]
+        for sh in arcs:
+            a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+            if abs(a.x-sv['x'])>=1 or abs(z.x-tv['x'])>=1:continue
+            above=0<source[0]['y']-a.y<gap*.8 and 0<target[0]['y']-z.y<gap*.8
+            below=0<a.y-source[-1]['y']<gap*.8 and 0<z.y-target[-1]['y']<gap*.8
+            if (above or below) and abs(a.y-z.y)<gap*.25:
+                curves.append(sh);sides.append('above' if above else 'below')
+        if not curves or len(sides)!=len(set(sides)):continue
+        for sn,tn in pairs:
+            sn.update(legato_slide=True,slide_target_bar=tb['number'],slide_target_fret=tn['fret'])
+            tn['slide_source_bar']=sb['number']
+        marks.append({'page':system['page'],'x':(sv['x']+tv['x'])/2,'y':curves[0]['rect'].y0,
+                      'status':'recognized','kind':'parallel-chord','bar':sb['number'],'target_bar':tb['number'],
+                      'strings':[n['string'] for n in source],'start_x':sv['x'],'end_x':tv['x']})
+    return marks
+
+
 def read_slides(system,spans,lines,shapes):
-    """Require the label, slur and directional slide line between adjacent notes."""
+    """Read single notes and parallel chords from independent slide evidence."""
     top,bottom=system['ys'][0],system['ys'][-1];gap=(bottom-top)/5
     labels=[s for s in spans if s['text'].strip().lower()=='sl.'
             and system['left']<s['origin'][0]<system['right'] and top-25<s['origin'][1]<bottom+2]
     arcs=[sh for sh in shapes if sh['type']=='f' and len(sh['items'])==2
           and all(i[0]=='c' for i in sh['items']) and sh['rect'].height<gap*2]
     beats=[(b,v) for b in system['bars'] for v in b['beats']]
-    marks=[]
+    marks=read_chord_slides(system,beats,lines,arcs,gap)
     for label in labels:
         matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
+        if any(m.get('kind')=='parallel-chord' and m['start_x']<x<m['end_x'] for m in marks):continue
         for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
             if sv['grace'] or tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
             if tb['number'] not in (sb['number'],sb['number']+1):continue
@@ -256,13 +297,7 @@ def read_slides(system,spans,lines,shapes):
                 if (abs(a.x-sn['x'])<1 and abs(z.x-tn['x'])<1 and label_position
                         and 0<abs(offset)<gap*.8 and 0<abs(target_offset)<gap*.8
                         and offset*target_offset>0 and abs(offset-target_offset)<gap*.25):curves.append(sh)
-            strokes=[]
-            for x0,y0,x1,y1 in lines:
-                if x0>x1:x0,y0,x1,y1=x1,y1,x0,y0
-                if (x1-x0>4 and abs(x0-sn['bbox'][2])<4 and abs(x1-tn['bbox'][0])<4
-                        and abs(y0-sn['y'])<gap*.6 and abs(y1-tn['y'])<gap*.6
-                        and gap*.15<abs(y1-y0)<gap*.8 and (y0-y1)*(tn['fret']-sn['fret'])>0):strokes.append(1)
-            if len(curves)==1 and len(strokes)==1:matches.append((sb,sn,tb,tn))
+            if len(curves)==1 and slide_line_count(sn,tn,lines,gap)==1:matches.append((sb,sn,tb,tn))
         mark={'page':system['page'],'x':x,'y':y,'status':'unsupported'}
         if len(matches)==1:
             sb,sn,tb,tn=matches[0]
