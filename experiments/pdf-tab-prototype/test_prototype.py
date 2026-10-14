@@ -152,13 +152,13 @@ def outlined_music(page,symbols):
 
 class PrototypeTests(unittest.TestCase):
     def test_hidden_terminal_ties_require_consistent_printed_cutout_evidence(self):
-        for mode in ('valid','same_width','chord','untied_chord','mixed_width','wrong_width','wrong_size','one_anchor','wrong_font','inconsistent','offset','cross_string','missing_stem','visible_pitch','rest_between'):
+        for mode in ('valid','same_width','chord','untied_chord','mixed_width','narrow_anchors','wrong_size','one_anchor','wrong_font','inconsistent','offset','cross_string','missing_stem','visible_pitch','rest_between'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
                 pdf=Path(folder)/'printed-cutout.pdf';fixture(pdf,empty=True)
                 with fitz.open(pdf) as doc:
                     p=doc[0];p.insert_font(fontname='music',fontbuffer=font_buffer())
                     font='cour' if mode=='wrong_font' else 'helv'
-                    anchor='19' if mode=='same_width' else '7' if mode in ('wrong_width','mixed_width') else '12'
+                    anchor='19' if mode=='same_width' else '7' if mode in ('narrow_anchors','mixed_width') else '12'
                     size=8 if mode=='wrong_size' else 7
                     width=fitz.get_text_length('('+anchor+')',fontname=font,fontsize=size)
                     for x in (70,140,210,280):
@@ -195,7 +195,7 @@ class PrototypeTests(unittest.TestCase):
                     doc.saveIncr()
                 result=recognize(pdf);bar=result['systems'][1]['bars'][0]
                 hidden=[n for v in bar['beats'] for n in v['notes'] if n.get('inferred_from')]
-                if mode in ('valid','same_width','chord'):
+                if mode in ('valid','same_width','chord','narrow_anchors'):
                     self.assertEqual(len(hidden),3 if mode=='chord' else 2)
                     if mode=='chord':
                         self.assertEqual([len(v['notes']) for v in bar['beats']],[2,2,2,0])

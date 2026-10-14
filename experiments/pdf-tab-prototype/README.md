@@ -1,10 +1,10 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-13 连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)，此前见 [密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、 [掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-14 隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)，此前见 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
-最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充连奏滑音、单音顿音及掌根闷音通用规则后，全部所测播放时序通过增至 8/18，起音检查通过增至 11/18。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
+最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充通用规则并继续恢复隐藏延音后，完整核心通过并导出的分谱增至 21 份；全部所测播放时序通过 9/21，起音检查通过 12/21。原先通过项全部保留，分母增加来自新增可验证分谱。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
 
 [2026-10-12 中途变速修复](VALIDATION-20261012-tempo.md) 已补回《变相怪杰》的 120→165→120，生成播放时长由 208 秒恢复为参考的 202 秒。18 份完整导出的速度时间线均通过。
 
@@ -26,7 +26,7 @@
 
 如果中间连续多拍都隐藏品位数字，可沿弧线逐段检查后续符干，直到同弦同品的可见括号数字。扩展路径只跨过完全隐藏的节拍，每一步都必须有独立弧线、唯一符干、对称间距和连续小节；整条路径成立后才补音。缺少末端证据、弧线有歧义，或中间出现休止、可见音符、部分可见和弦时，不能用这条扩展路径越过。
 
-对末端直接接休止或新音的情况，另可从同页至少两处同字体、同字号、数字实际字形宽度一致的可见括号标记及实际入弧测量留白宽度；不要求品位数字相同，也不把相同位数视为等宽。同一和弦的多根弦只算一个排版位置。这些测量必须一致，且弧线归属唯一。只有隐藏位置与该宽度匹配、前后弧线同弦、目标符干唯一，并通过已有的连续小节、休止和可见音符检查时，才恢复延音。不同字体、证据不足或间距冲突时不采用这条路径；不读取参考 GP 推算间距。
+对末端直接接休止或新音的情况，另从同页至少两处同字体、同字号的可见括号与入弧测量留白：先扣除实际数字宽度的一半，核对括号及边距一致，再加上来源音实际数字宽度的一半；不按位数假设字形等宽。同一和弦的多根弦只算一个排版位置。只有隐藏位置与测量值匹配、前后弧线同弦、目标符干唯一，并通过连续小节、休止和可见音符检查时才恢复延音。恢复音保留独立测得的宽度，后续弧线可继续使用。字体、字号、留白不一致或样本不足时不采用，不读取参考 GP 推算间距。
 
 延音和弦只印出一个括号音符时，只有该音符已确认从来源和弦延续、遗漏弦还有独立弧线与实测留白证据，才能补回该弦；普通单音、不同品位或尚未确认延音的括号音符不能用作这个依据。
 
@@ -171,13 +171,13 @@ node experiments/pdf-tab-prototype/verify-playback.cjs output/pdf-tab-prototype/
 同一批候选可按滑音类型检查覆盖，并对照已保存的通过事件。出现识别错误，或历史通过事件丢失时返回失败：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
+node experiments/pdf-tab-prototype/audit-slides.cjs output/pdf-tab-prototype/benchmark-20261013-tie-padding experiments/pdf-tab-prototype/validation-summary-20261014-tie-padding.json
 ```
 
 顿音类型另用 `audit-staccato.cjs` 核对，同样支持历史已验证事件回归：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
+node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/benchmark-20261013-tie-padding experiments/pdf-tab-prototype/validation-summary-20261014-tie-padding.json
 ```
 
 输出 `staccato-audit.json`，和弦属性歧义和无法验证的事件单列。
@@ -185,7 +185,7 @@ node experiments/pdf-tab-prototype/audit-staccato.cjs output/pdf-tab-prototype/b
 掌根闷音类型使用相同的逐音核对及历史回归方式：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
+node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/benchmark-20261013-tie-padding experiments/pdf-tab-prototype/validation-summary-20261014-tie-padding.json
 ```
 
 输出 `palm-mute-audit.json`；来源范围未确认或和弦逐弦归属不明时不算正确。
@@ -195,7 +195,7 @@ node experiments/pdf-tab-prototype/audit-palm-mute.cjs output/pdf-tab-prototype/
 波音/回音另用类型审计，同时核对音符归属与具体类型：
 
 ```powershell
-node experiments/pdf-tab-prototype/audit-ornaments.cjs output/pdf-tab-prototype/benchmark-20261013-ornaments experiments/pdf-tab-prototype/validation-summary-20261013-ornaments.json
+node experiments/pdf-tab-prototype/audit-ornaments.cjs output/pdf-tab-prototype/benchmark-20261013-tie-padding experiments/pdf-tab-prototype/validation-summary-20261014-tie-padding.json
 ```
 
 后续应继续处理跨行/跨页延音、演奏技巧、速度变化及多声部；保持独立实验，不能把核心谱面验证等同于全部演奏信息正确。

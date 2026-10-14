@@ -659,20 +659,22 @@ def read_ties(system,spans,lines,shapes):
         fret_width=source.get('fret_width',source['bbox'][2]-source['bbox'][0])
         anchors={}
         for s in spans:
-            if (s.get('fret_width') is None or abs(s['fret_width']-fret_width)>.1
-                    or s['font']!=source['font'] or abs(s['size']-note['size'])>.1):continue
+            if (s.get('fret_width') is None or s['font']!=source['font']
+                    or abs(s['size']-note['size'])>.1):continue
             x0,y0,x1,y1=s['bbox'];ends=[]
             for arc in arcs:
                 a,z=sorted((arc[1],arc[4]),key=lambda p:p.x)
                 if (0<x0-z.x<2 and abs(z.y-(y0+y1)/2)<gap*.5
                         and abs(a.y-z.y)<gap*.25):ends.append((x0+x1)/2-z.x)
-            if len(ends)==1:anchors[tuple(s['bbox'])]=ends[0]
+            # Separate the measured parentheses/margin from the actual digit
+            # width, so narrow and wide frets share only the verified padding.
+            if len(ends)==1:anchors[tuple(s['bbox'])]=ends[0]-s['fret_width']/2
         widths=list(anchors.values())
         # Two strings in one printed chord are one layout sample, not two.
         independent=any(abs((a[0]+a[2]-b[0]-b[2])/2)>.3 or abs(a[1]-b[1])>gap*5
                         for a in anchors for b in anchors)
         if independent and max(widths)-min(widths)<.3:
-            width=sum(widths)/len(widths)
+            width=sum(widths)/len(widths)+fret_width/2
             if 7<=width<gap*1.5:return width
         return None
     for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
@@ -767,7 +769,10 @@ def read_ties(system,spans,lines,shapes):
                 'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
             tn.pop('tie_outgoing_x',None)
             if abs(x-end.x)>=7:tn['tie_outgoing_x']=paired_outgoing(x)
-            if matches_cutout(x):tn['tie_cutout_half_width']=cutout
+            # Keep an independently measured glyph width even if this incoming
+            # arc used a short offset; the following arc may use the full cutout.
+            inherited_cutout=printed_cutout(sn)
+            if inherited_cutout is not None:tn['tie_cutout_half_width']=inherited_cutout
             if tv: tv['notes'].append(tn)
             else:
                 tv={'x':x,'notes':[tn],'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
