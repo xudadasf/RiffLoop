@@ -803,8 +803,8 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
     if source['grace'] or target['grace'] or not source['notes'] or not target['notes']: return
     key=lambda n:(n['string'],n['fret'])
     if any(n['dead'] for n in source['notes']+target['notes']): return
-    if not all(n['parenthesized'] for n in target['notes']): return
-    if sorted(map(key,source['notes']))!=sorted(map(key,target['notes'])): return
+    same_chord=(all(n['parenthesized'] for n in target['notes'])
+                and sorted(map(key,source['notes']))==sorted(map(key,target['notes'])))
 
     def boundary_arcs(system,shapes,beat,outgoing):
         gap=(system['ys'][-1]-system['ys'][0])/5
@@ -827,7 +827,7 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
     # Standard notation does not identify TAB strings by Y. Only accept the
     # entire identical chord, with one distinct boundary arc per chord tone.
     standard_match=False
-    if previous['standard'] and current['standard']:
+    if same_chord and previous['standard'] and current['standard']:
         def standard_count(system,arcs):
             return len(clusters([p.y for p in arcs
                        if system['standard']['ys'][0]-35<p.y<system['ys'][0]-5],1))
@@ -837,7 +837,10 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
         return [p.y-note['y'] for p in arcs if abs(p.y-note['y'])<4.5
                 and sum(abs(p.y-n['y'])<4.5 for n in notes)==1]
     for note in target['notes']:
-        origin=next(n for n in source['notes'] if key(n)==key(note))
+        if not note['parenthesized']: continue
+        origins=[n for n in source['notes'] if key(n)==key(note)]
+        if len(origins)!=1: continue
+        origin=origins[0]
         # TAB curves must belong to the same string, at the same vertical
         # offset on each side. Do not attach a neighbouring string's curve.
         offsets_out=tab_offsets(outgoing,source['notes'],origin)
