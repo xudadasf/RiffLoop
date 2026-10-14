@@ -108,15 +108,20 @@ def recognize(pdf):
     for pi, page in enumerate(document):
         lines, shapes = lines_and_shapes(page)
         spans = text_spans(page)
+        outlined=outline_spans(shapes)
         if not any('bravura' in s['font'].lower() for s in spans):
-            spans += outline_spans(shapes)
+            spans += outlined
         else:
             # Some PDFs keep rests as font text but print ornaments as paths.
-            spans += [s for s in outline_spans(shapes) if s['text'] in ORNAMENTS]
+            spans += [s for s in outlined if s['text'] in ORNAMENTS]
+        # Tempo symbols can be paths even when the staff uses font text.
+        # Include outlined dots here to reject dotted units, without changing
+        # the staff's rhythm-dot reader on mixed text/path pages.
+        tempo_spans=spans+[s for s in outlined if s['text'] in ('\ue1d5','\ue1e7') and s not in spans]
         for span in spans:
             if not re.search(r'=\s*\d',span['text']):continue
             match=re.search(r'=\s*(\d{2,3})\s*$',span['text'])
-            units=[s for s in spans if 'bravura' in s['font'].lower()
+            units=[s for s in tempo_spans if 'bravura' in s['font'].lower()
                    and 0<=span['bbox'][0]-s['bbox'][2]<12 and abs(s['origin'][1]-span['origin'][1])<3]
             unit='quarter' if len(units)==1 and units[0]['text']=='\ue1d5' else 'unsupported' if units else None
             tempo_marks.append({'page':pi+1,'x':units[0]['origin'][0] if unit=='quarter' else span['bbox'][0],

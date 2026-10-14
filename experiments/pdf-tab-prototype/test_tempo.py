@@ -8,17 +8,21 @@ import unittest
 import fitz
 from recognize import recognize
 from symbols import font_buffer
+from test_prototype import outlined_music
 
 HERE=Path(__file__).parent
 
 
-def tempo_fixture(path,mode='valid'):
+def tempo_fixture(path,mode='valid',outline=False):
     with fitz.open() as doc:
         p=doc.new_page(width=400,height=340)
         p.insert_font(fontname='music',fontbuffer=font_buffer())
+        def unit(x,y,code):
+            if outline:outlined_music(p,[(code,x,y,9.8)])
+            else:p.insert_text((x,y),chr(code),fontname='music',fontsize=9.8)
         p.insert_text((30,30),'Standard tuning',fontname='Times-Roman',fontsize=9)
         p.insert_text((30,45),'= 90',fontname='Times-Roman',fontsize=9)
-        p.insert_text((20,45),'\ue1d5',fontname='music',fontsize=9.8)
+        unit(20,45,0xe1d5)
         for y in (110,118.5):p.insert_text((38,y),'\ue084',fontname='music',fontsize=17)
         for row in range(3):
             top=100+row*60
@@ -28,11 +32,11 @@ def tempo_fixture(path,mode='valid'):
                 p.insert_text((30,top-2),str(row+1),fontname='Times-Roman',fontsize=6)
                 x=140 if mode=='mid_bar' and row==1 else 70
                 if mode!='no_unit' or row!=1:
-                    p.insert_text((x,top-12),'\ue1d3' if mode=='other_unit' and row==1 else '\ue1d5',fontname='music',fontsize=9.8)
-                if mode=='dotted' and row==1:p.insert_text((x+6,top-12),'\ue1e7',fontname='music',fontsize=9.8)
+                    unit(x,top-12,0xe1d3 if mode=='other_unit' and row==1 else 0xe1d5)
+                if mode=='dotted' and row==1:unit(x+6,top-12,0xe1e7)
                 p.insert_text((x+10,top-12),' = '+str(120 if row==1 else 90),fontname='Times-Bold',fontsize=10)
                 if mode=='conflict' and row==1:
-                    p.insert_text((x,top-22),'\ue1d5',fontname='music',fontsize=9.8)
+                    unit(x,top-22,0xe1d5)
                     p.insert_text((x+10,top-22),' = 150',fontname='Times-Bold',fontsize=10)
             for x in (70,140,210,280):
                 p.insert_text((x-2,top+14.4),'7',fontname='helv',fontsize=7)
@@ -41,6 +45,32 @@ def tempo_fixture(path,mode='valid'):
 
 
 class TempoTests(unittest.TestCase):
+    def test_outlined_tempo_units_on_a_page_with_text_music(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);pdf=root/'outlined-tempo.pdf';tempo_fixture(pdf,outline=True)
+            data=recognize(pdf)
+            self.assertEqual(data['tempo_issues'],[])
+            self.assertEqual(data['tempo_events'],[{'bar':1,'bpm':90},{'bar':2,'bpm':120},{'bar':3,'bpm':90}])
+            raw=root/'recognized.json';raw.write_text(json.dumps(data),encoding='utf-8')
+            for selection,expected in [('all',[90,120,90]),('2-3',[120,90])]:
+                gp=root/f'{selection}.gp';reference=root/f'{selection}.json'
+                run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(raw),str(gp),selection],capture_output=True,text=True)
+                self.assertEqual(run.returncode,0,run.stderr)
+                subprocess.run(['node',str(HERE/'gp-reference.cjs'),str(gp),str(reference)],check=True,capture_output=True)
+                result=json.loads(reference.read_text(encoding='utf-8'))
+                self.assertEqual([e['bpm'] for e in result['tempo_events']],expected)
+                self.assertEqual(result['tempo'],expected[0])
+
+    def test_uncertain_outlined_tempos_remain_blocked(self):
+        for mode in ('other_unit','no_unit','mid_bar','conflict','dotted'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);pdf=root/'tempo.pdf';tempo_fixture(pdf,mode,outline=True)
+                data=recognize(pdf);self.assertTrue(data['tempo_issues'])
+                raw=root/'recognized.json';raw.write_text(json.dumps(data),encoding='utf-8')
+                run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(raw),str(root/'out.gp')],capture_output=True,text=True)
+                self.assertNotEqual(run.returncode,0)
+                self.assertFalse((root/'out.gp').exists())
+
     def test_explicit_bar_start_tempos_survive_export_and_excerpt(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);pdf=root/'tempo.pdf';tempo_fixture(pdf)

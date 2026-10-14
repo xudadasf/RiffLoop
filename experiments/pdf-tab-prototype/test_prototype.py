@@ -143,7 +143,7 @@ def outlined_music(page,symbols):
     for code,x,y,size in symbols:
         pen=SVGPathPen(glyphs);glyphs[font.getBestCmap()[code]].draw(pen)
         paths.append(f'<path transform="translate({x} {y}) scale({size/font["head"].unitsPerEm} {-size/font["head"].unitsPerEm})" d="{pen.getCommands()}"/>')
-    svg='<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250">'+''.join(paths)+'</svg>'
+    svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="{page.rect.width}" height="{page.rect.height}">'+''.join(paths)+'</svg>'
     with fitz.open(stream=svg.encode(),filetype='svg') as source:
         with fitz.open(stream=source.convert_to_pdf(),filetype='pdf') as vector:
             page.show_pdf_page(page.rect,vector,0)
