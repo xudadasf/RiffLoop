@@ -680,7 +680,7 @@ def read_ties(system,spans,lines,shapes):
                         for a in anchors for b in anchors)
         if independent and max(widths)-min(widths)<.3:
             width=sum(widths)/len(widths)+fret_width/2
-            if 7<=width<gap*1.5:return width
+            if gap*.5<width<gap*1.5:return width
         return None
     for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
         start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
@@ -709,6 +709,10 @@ def read_ties(system,spans,lines,shapes):
             if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
             # GP often suppresses a tied fret number but retains its rhythm stem.
+            def plain_other_string(beat):
+                return (beat and not beat['grace'] and len(beat['notes'])==1
+                        and not beat['notes'][0]['parenthesized'] and not beat['notes'][0]['dead']
+                        and beat['notes'][0]['string']!=sn['string'])
             def paired_outgoing(x,incoming=end):
                 # A wider invisible fret cutout needs symmetric incoming and
                 # outgoing curves. Follow a complete hidden chain to printed
@@ -736,6 +740,14 @@ def read_ties(system,spans,lines,shapes):
                     nx=following[0]
                     target=next((b for b in system['bars'] if b['left']<nx<b['right']),None)
                     if not target or target['number'] not in (here['number'],here['number']+1):continue
+                    # A two-sided hidden cutout can continue over new attacks
+                    # on another string only with independently measured padding
+                    # at both hidden destinations and no intervening beat.
+                    next_beat=next((v for v in target['beats'] if abs(v['x']-nx)<1.5),None)
+                    if (cutout is not None and abs(x-incoming.x-cutout)<.3 and abs(nx-z.x-cutout)<.3
+                            and plain_other_string(next_beat)
+                            and not any(x<w['x']<nx-1.5 for b in system['bars'] for w in b['beats'])):
+                        matches.append(a.x);continue
                     # This extension only crosses wholly hidden beats. A rest,
                     # printed attack or partial chord must not be skipped.
                     if any(x<w['x']<nx+1.5 for b in system['bars'] for w in b['beats']):continue
@@ -744,7 +756,7 @@ def read_ties(system,spans,lines,shapes):
             stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<max(7,gap*1.5)
                             and bottom+gap*.8<max(y,y1)<bottom+gap*5
                             and top-2<min(y,y1)<bottom+gap*3],.5)
-            cutout=printed_cutout(sn) if any(abs(x-end.x)>=7 for x in stems) else None
+            cutout=printed_cutout(sn)
             def matches_cutout(x):
                 return (cutout is not None and abs(x-end.x-cutout)<.3
                         and all(abs(p.y-sn['y'])<gap*.25 for p in (start,end)))
@@ -760,12 +772,17 @@ def read_ties(system,spans,lines,shapes):
             tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
             if sv['grace'] or tv and (tv['grace'] or not tv['notes']): continue
             # A short tie mark can end near the next unrelated single note.
-            # A single printed destination needs its own confirmed tie from
-            # the source chord, plus measured cutout evidence for the missing note.
+            # A single printed destination needs its own confirmed tie, or a
+            # paired hidden chain; both require independently measured padding.
             visible_target=[n for n in tv['notes'] if not n.get('inferred_from')] if tv else []
-            if len(visible_target)==1 and not (matches_cutout(x) and visible_target[0]['parenthesized']
+            if len(visible_target)==1:
+                confirmed_chord=(matches_cutout(x) and visible_target[0]['parenthesized']
                     and visible_target[0]['tie'] and any(n['string']==visible_target[0]['string']
-                    and n['fret']==visible_target[0]['fret'] for n in sv['notes'])):continue
+                    and n['fret']==visible_target[0]['fret'] for n in sv['notes']))
+                measured_chain=(matches_cutout(x) and plain_other_string(tv)
+                    and (paired_outgoing(x) is not None or sn.get('tie_outgoing_x') is not None
+                         and abs(sn['tie_outgoing_x']-start.x)<.6))
+                if not confirmed_chord and not measured_chain:continue
             # With visible notes on another string, a displaced arc may be a
             # cross-string slur. Require both endpoints on the source string.
             if visible_target and (abs(start.y-sn['y'])>gap*.25 or abs(end.y-sn['y'])>gap*.25): continue
@@ -773,7 +790,7 @@ def read_ties(system,spans,lines,shapes):
             tn={**sn,'x':x,'bbox':[x-1,sn['y']-2,x+1,sn['y']+2],
                 'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
             tn.pop('tie_outgoing_x',None)
-            if abs(x-end.x)>=7:tn['tie_outgoing_x']=paired_outgoing(x)
+            tn['tie_outgoing_x']=paired_outgoing(x)
             # Keep an independently measured glyph width even if this incoming
             # arc used a short offset; the following arc may use the full cutout.
             inherited_cutout=printed_cutout(sn)
