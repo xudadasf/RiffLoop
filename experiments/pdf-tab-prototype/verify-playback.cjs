@@ -2,8 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 const alpha = require('../../RiffLoop/Resources/GpWeb/alphaTab.min.js');
+const {createCompleteTremoloGenerator} = require('./experimental-midi.cjs');
 
-function timeline(score, trackIndex) {
+function timeline(score, trackIndex, completeTremolos) {
     const track = score.tracks[trackIndex];
     if (!track || track.staves.length !== 1 || track.staves[0].tuning.length !== 6)
         throw Error('Playback verification requires an explicit single-staff six-string track');
@@ -24,7 +25,9 @@ function timeline(score, trackIndex) {
             super.finishTrack(t, tick);
         }
     }
-    const generator = new alpha.midi.MidiFileGenerator(score, new alpha.Settings(), new Handler(file));
+    const generator = completeTremolos
+        ? createCompleteTremoloGenerator(score, new alpha.Settings(), new Handler(file))
+        : new alpha.midi.MidiFileGenerator(score, new alpha.Settings(), new Handler(file));
     generator.generate();
     notes.sort((a,b) => a[0]-b[0] || a[1]-b[1]);
     const tempo = [];
@@ -47,9 +50,9 @@ function timeline(score, trackIndex) {
     };
 }
 
-function comparePlayback(actual, reference, trackIndex) {
+function comparePlayback(actual, reference, trackIndex, completeTremolos = false) {
     if (actual.tracks.length !== 1) throw Error('Expected a single-track full-score export');
-    const a = timeline(actual, 0), b = timeline(reference, trackIndex);
+    const a = timeline(actual, 0, completeTremolos), b = timeline(reference, trackIndex, completeTremolos);
     const checks = {}, differences = {};
     for (const key of ['bar_sequence','tempo_timeline','note_attacks','note_releases','end_tick','ticks_per_quarter']) {
         checks[key] = JSON.stringify(a[key]) === JSON.stringify(b[key]);
@@ -69,23 +72,27 @@ function comparePlayback(actual, reference, trackIndex) {
         note_attacks:t.note_attacks.length,end_tick:t.end_tick,duration_seconds:t.duration_seconds,
         tempo_timeline:t.tempo_timeline});
     return {passed:Object.values(checks).every(Boolean),checks,differences,
+        engine:completeTremolos ? 'experiment-complete-tremolos' : 'app-unmodified',
         actual:summary(a),reference:summary(b),
         method:'Full-score MIDI generation with alphaTab; exact played bar order/ticks, tempo events, attack multiplicity and note start/end pairs',
         not_checked:['pitch','velocity','timbre','pitch-bend curves','audio rendering','device playback'],
-        caution:'Timing effects such as staccato, grace notes and repeats can cause differences even when core notation matches; this is not a listening test. Difference counts are sorted event positions, not independent musical errors'};
+        caution:'Timing effects such as staccato, grace notes and repeats can cause differences even when core notation matches; this is not a listening test. Difference counts are sorted event positions, not independent musical errors. '
+            +(completeTremolos ? 'Experimental tremolo correction only; the application library is unchanged.'
+                : 'The app engine can omit tremolo tails of 10 ticks or less in both files; equality does not establish complete repetitions.')};
 }
 
 if (require.main === module) {
-    const [exported, reference, index, output] = process.argv.slice(2);
-    if (!output || !/^\d+$/.test(index)) throw Error('Usage: node verify-playback.cjs exported.gp reference.gp track-index report.json');
+    const [exported, reference, index, output, mode] = process.argv.slice(2);
+    if (!output || !/^\d+$/.test(index) || mode && mode !== '--complete-tremolos')
+        throw Error('Usage: node verify-playback.cjs exported.gp reference.gp track-index report.json [--complete-tremolos]');
     if ([exported,reference].some(p => path.resolve(p).toLowerCase() === path.resolve(output).toLowerCase()))
         throw Error('Report must not overwrite an input score');
     if (fs.existsSync(output)) fs.unlinkSync(output);
     const load = p => alpha.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(fs.readFileSync(p)),new alpha.Settings());
-    const result = comparePlayback(load(exported),load(reference),Number(index));
+    const result = comparePlayback(load(exported),load(reference),Number(index),mode === '--complete-tremolos');
     result.files = {exported:path.basename(exported),reference:path.basename(reference)};
     fs.writeFileSync(output,JSON.stringify(result,null,2)+'\n');
-    console.log(JSON.stringify({passed:result.passed,checks:result.checks,actual:result.actual,reference:result.reference}));
+    console.log(JSON.stringify({passed:result.passed,engine:result.engine,checks:result.checks,actual:result.actual,reference:result.reference}));
     process.exitCode = result.passed ? 0 : 1;
 }
 

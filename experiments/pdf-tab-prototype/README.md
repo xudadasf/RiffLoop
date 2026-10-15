@@ -1,10 +1,10 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-15《七重人格》整曲与播放库限制](VALIDATION-20261015-upper-rhythm.md)，此前见 [五线谱与六线谱双重核对](VALIDATION-20261015-mirrored-tremolo.md)、 [重复拨弦与整曲时序](VALIDATION-20261015-tremolo.md)、 [部分隐藏延音链](VALIDATION-20261014-hidden-partial.md)、[轮廓速度符号](VALIDATION-20261014-outline-tempo.md)、 [部分和弦跨行延音](VALIDATION-20261014-partial-boundary.md)、 [隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)、 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-15 极短重复拨弦尾音修复实验](VALIDATION-20261015-midi-tail.md)，此前见 [《七重人格》整曲与播放库限制](VALIDATION-20261015-upper-rhythm.md)、 [五线谱与六线谱双重核对](VALIDATION-20261015-mirrored-tremolo.md)、 [重复拨弦与整曲时序](VALIDATION-20261015-tremolo.md)、 [部分隐藏延音链](VALIDATION-20261014-hidden-partial.md)、[轮廓速度符号](VALIDATION-20261014-outline-tempo.md)、 [部分和弦跨行延音](VALIDATION-20261014-partial-boundary.md)、 [隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)、 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
-最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补回《七重人格》的上方三连音、隐藏延音及短时值重复拨弦后，完整核心通过并导出的分谱增至 23 份；全部所测播放时序与参考一致为 11/23，起音检查通过 14/23。原先通过项全部保留。这些检查共用同一播放库，已发现其会省略极短重复拨弦的末端发声；GP 数据正确与播放库行为正确须分开判断。《默》等仍有其他演奏信息尚未还原。
+最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补回《七重人格》的上方三连音、隐藏延音及短时值重复拨弦后，完整核心通过并导出的分谱增至 23 份；全部所测播放时序与参考一致为 11/23，起音检查通过 14/23。原先通过项全部保留。这些检查共用同一播放库，已发现其会省略极短重复拨弦的末端发声；GP 数据正确与播放库行为正确须分开判断。独立实验适配器现已补回《七重人格》的 11 个遗漏尾音，起音由 499 次恢复为 510 次，总时长不变；95 项测试及 23 份双模式播放检查未发现回退。默认应用引擎仍保持原样。《默》等仍有其他演奏信息尚未还原。
 
 [2026-10-12 中途变速修复](VALIDATION-20261012-tempo.md) 已补回《变相怪杰》的 120→165→120，生成播放时长由 208 秒恢复为参考的 202 秒。18 份完整导出的速度时间线均通过。
 
@@ -177,6 +177,8 @@ node experiments/pdf-tab-prototype/verify-playback.cjs output/pdf-tab-prototype/
 ```
 
 该命令比较完整播放小节顺序、速度时间线、发声音符的起止时刻及同时起音数量；不用于截取片段，不替代音高检查或实际听音。发现差异时保存报告并返回非零状态。读取失败会使旧报告失效，避免误读上次结果。
+
+默认报告标记为 `app-unmodified`。在命令末尾加 `--complete-tremolos` 可单独验证补全极短重复拨弦尾音的实验引擎，报告标记为 `experiment-complete-tremolos`。此选项不修改应用或 GP，适配器仅作用于当前实验实例；依赖的库内部方法发生变化时会停止，须重新验证。两种模式的导出和参考都使用相同引擎，因此仍需独立的预期时刻测试，不能仅凭两份结果相等判断播放正确。
 
 同一批候选可按滑音类型检查覆盖，并对照已保存的通过事件。出现识别错误，或历史通过事件丢失时返回失败：
 
