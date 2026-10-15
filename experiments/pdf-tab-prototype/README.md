@@ -1,6 +1,6 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-15 重复拨弦与整曲时序](VALIDATION-20261015-tremolo.md)，此前见 [部分隐藏延音链](VALIDATION-20261014-hidden-partial.md)、[轮廓速度符号](VALIDATION-20261014-outline-tempo.md)、 [部分和弦跨行延音](VALIDATION-20261014-partial-boundary.md)、 [隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)、 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-15 五线谱与六线谱双重核对](VALIDATION-20261015-mirrored-tremolo.md)，此前见 [重复拨弦与整曲时序](VALIDATION-20261015-tremolo.md)、 [部分隐藏延音链](VALIDATION-20261014-hidden-partial.md)、[轮廓速度符号](VALIDATION-20261014-outline-tempo.md)、 [部分和弦跨行延音](VALIDATION-20261014-partial-boundary.md)、 [隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)、 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
@@ -58,7 +58,7 @@
 
 支持明确的单音波音/回音符号，包括文字与轮廓混合的 PDF。以 Bravura 模板辨认四种符号，要求唯一对应普通单音，导出后回读类型并验证 MIDI 起音；真实素材目前仅验证了《默》的五个上波音。
 
-支持文字或轮廓形式的三斜杠重复拨弦：要求唯一对应普通无附点四分单音，且符号穿过同列真实六线谱符干。导出保留重复拨弦属性，GP 回读核对类型，实际 MIDI 验证该拍产生八次三十二分音符起音。《残酷天使纲领》三处标记已与参考核对，并使整曲全部所测时序通过。没有六线谱符干的另一种排版、和弦、连音、其他时值及斜杠数量尚未支持。
+支持文字或轮廓形式的三斜杠重复拨弦：要求唯一对应普通无附点四分单音，且符号穿过同列真实六线谱符干。六线谱没有符干时，另要求上方五线谱有唯一实心音头、连接该音头的真实符干、穿过该符干的同类标记，三者与六线谱同时对应；仅有下方标记不推断。导出保留重复拨弦属性，GP 回读核对类型，实际 MIDI 验证该拍产生八次三十二分音符起音。《残酷天使纲领》三处标记已与参考核对，并使整曲全部所测时序通过；《七重人格》再验证 13 处，整曲仍因第 21 小节未通过而阻止导出。和弦、连音、其他时值及斜杠数量尚未支持。补充结果见 [五线谱与六线谱双重核对](VALIDATION-20261015-mirrored-tremolo.md)。
 
 ## 当前边界
 

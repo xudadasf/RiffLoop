@@ -40,6 +40,27 @@ def tremolo_fixture(path,outline=False,mode='normal',string=3):
 
 
 class TremoloTests(unittest.TestCase):
+    def test_stemless_tab_requires_matching_standard_staff_tremolo(self):
+        for outline in (False,True):
+            for mode in ('normal','no_mark','no_head','no_stem','wrong_column','duplicate','chord','detached_stem','two_strokes'):
+                with self.subTest(outline=outline,mode=mode),tempfile.TemporaryDirectory() as folder:
+                    pdf=Path(folder)/'mirrored.pdf';tremolo_fixture(pdf,outline,mode='no_stem')
+                    with fitz.open(pdf) as doc:
+                        p=doc[0];p.insert_font(fontname='music',fontbuffer=font_buffer())
+                        for i in range(5):p.draw_line((30,60+i*4.25),(350,60+i*4.25),width=.4)
+                        if mode!='no_head':p.insert_text((67.5,64.25),'\ue0a4',fontname='music',fontsize=17)
+                        if mode=='chord':p.insert_text((67.5,68.5),'\ue0a4',fontname='music',fontsize=17)
+                        if mode!='no_stem':p.draw_line((67.75,70 if mode=='detached_stem' else 64.8),(67.75,84.4),width=.4)
+                        if mode!='no_mark':
+                            x=90 if mode=='wrong_column' else 67.75
+                            code=0xe221 if mode=='two_strokes' else 0xe222
+                            for _ in range(2 if mode=='duplicate' else 1):
+                                if outline:outlined_music(p,[(code,x,76,17)])
+                                else:p.insert_text((x,76),chr(code),fontname='music',fontsize=17)
+                        doc.saveIncr()
+                    data=recognize(pdf);beat=data['systems'][0]['bars'][0]['beats'][0]
+                    self.assertEqual(beat.get('tremolo_strokes'),3 if mode=='normal' else None)
+
     def test_three_strokes_on_a_quarter_stem_from_text_and_paths(self):
         for outline in (False,True):
             for string in (1,3,6):

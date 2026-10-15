@@ -559,7 +559,7 @@ def read_slides(system,spans,lines,shapes):
 
 
 def read_tremolos(system,spans,lines):
-    """Three explicit strokes on a regular single-note quarter's TAB stem."""
+    """Three strokes on a quarter's TAB stem, or mirrored on its staff stem."""
     top,bottom=system['ys'][0],system['ys'][-1];gap=(bottom-top)/5
     marks=[];claims=[]
     for span in spans:
@@ -575,6 +575,22 @@ def read_tremolos(system,spans,lines):
                 if note['dead'] or note['tie'] or not gap*.5<y-note['y']<gap*3:continue
                 stems=[line for line in lines if abs(line[0]-line[2])<.2 and abs(line[0]-x)<1
                        and min(line[1],line[3])<y-gap*.5 and max(line[1],line[3])>y+gap*.8]
+                if not stems and system['standard']:
+                    upper=system['standard']['ys'][0]-30
+                    heads=[s for s in spans if upper<s['origin'][1]<top-4 and s['size']>=14
+                           and any(c in s['text'] for c in ('\ue0a2','\ue0a3','\ue0a4','\ue0a9'))
+                           and abs((s['bbox'][0]+s['bbox'][2])/2-x)<1.5]
+                    mirrored=[s for s in spans if s['text']=='\ue222' and upper<s['origin'][1]<top-4
+                              and abs(s['origin'][0]-x)<4.5]
+                    if len(heads)==1 and heads[0]['text']=='\ue0a4' and len(mirrored)==1:
+                        head=heads[0];mx,my=mirrored[0]['origin']
+                        # Require a real stem attached to the unique notehead,
+                        # crossing the matching mark; TAB position alone is insufficient.
+                        stems=[l for l in lines if abs(l[0]-l[2])<.2 and abs(l[0]-mx)<1
+                               and min(abs(l[0]-head['bbox'][0]),abs(l[0]-head['bbox'][2]))<1
+                               and abs(l[1]-l[3])>9 and upper-25<min(l[1],l[3])<my-gap*.5
+                               and my+gap*.8<max(l[1],l[3])<top-4
+                               and min(abs(l[1]-head['origin'][1]),abs(l[3]-head['origin'][1]))<1.5]
                 if len(stems)==1:candidates.append((bar,i,beat))
         if len(candidates)==1:claims.append((mark,*candidates[0]))
     counts=collections.Counter(id(beat) for mark,bar,i,beat in claims)
