@@ -448,7 +448,7 @@ assert.doesNotMatch(
     );
     assert.match(
         source,
-        /const seekBoth = \(tick, options = \{\}\) => \{[\s\S]*?if \(options\.reveal === false\) return;[\s\S]*?api\.scrollToCursor\(\)/,
+        /const seekBoth = \(tick, options = \{\}\) => \{[\s\S]*?if \(options\.reveal === false \|\| options\.user\) return;[\s\S]*?scoreFollow\.move\(/,
         "ordinary seeks may reveal the cursor, but loop wraps must be able to preserve the viewport"
     );
     assert.match(
@@ -705,7 +705,7 @@ assert.doesNotMatch(
 
 {
     const startMarker = "    const loopScrollPlan = (rangeTop, rangeBottom, viewportHeight) => {";
-    const endMarker = "\n    const applyRangeScrollPolicy";
+    const endMarker = "\n    const scoreFollow";
     const start = source.indexOf(startMarker);
     const end = source.indexOf(endMarker, start);
     assert.notEqual(start, -1, "adaptive loop scrolling policy is missing");

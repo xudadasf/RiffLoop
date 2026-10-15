@@ -39,6 +39,9 @@ final class ModePracticeSettingsTests: XCTestCase {
         var first = GpPracticeProfile()
         first.masterVolume = 3.5
         first.playbackSpeed = 0.8
+        first.standaloneBpm = 87
+        first.standaloneBeatsPerMeasure = 7
+        first.standaloneVolume = 0.6
         first.countInAccents = [.strong, .subAccent, .normal, .muted]
         first.lastPositionTick = 4321
         first.displayedTrack = 2
@@ -47,6 +50,9 @@ final class ModePracticeSettingsTests: XCTestCase {
         try store.save(first, kind: .guitarPro, fileName: "first.gp")
         var second = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "second.gp"))
         XCTAssertEqual(second.masterVolume, 3.5)
+        XCTAssertEqual(second.standaloneBpm, 87)
+        XCTAssertEqual(second.standaloneBeatsPerMeasure, 7)
+        XCTAssertEqual(second.standaloneVolume, 0.6)
         XCTAssertEqual(second.countInAccents, first.countInAccents)
         XCTAssertEqual(second.lastPositionTick, 0)
         XCTAssertEqual(second.displayedTrack, 0)

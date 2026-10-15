@@ -55,7 +55,7 @@
             playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
             soundFont: null,
             scrollElement: "#viewport",
-            scrollMode: alphaTab.ScrollMode.Smooth,
+            scrollMode: alphaTab.ScrollMode.Off,
             scrollOffsetY: scoreFollowOffset(viewportElement.clientHeight || window.innerHeight),
             enableCursor: true,
             enableAnimatedBeatCursor: true,
@@ -750,78 +750,47 @@
         }
         return { mode: "smooth", targetTop: null };
     };
-    const applyRangeScrollPolicy = (firstBar, lastBar) => {
-        const lookup = api.renderer?.boundsLookup;
-        const firstBounds = lookup?.findMasterBarByIndex(Number(firstBar))?.realBounds;
-        const lastBounds = lookup?.findMasterBarByIndex(Number(lastBar))?.realBounds;
-        if (!firstBounds || !lastBounds) return;
-        const plan = loopScrollPlan(
-            firstBounds.y,
-            lastBounds.y + lastBounds.h,
-            viewportElement.clientHeight
-        );
-        // Own scrolling throughout a range: a delayed native smooth scroll must not
-        // drag A offscreen after the B-to-A jump.
-        const scrollMode = alphaTab.ScrollMode.Off;
-        if (api.settings.player.scrollMode !== scrollMode) {
-            api.settings.player.scrollMode = scrollMode;
-            api.settings.player.scrollSpeed = 450;
-            api.settings.player.nativeBrowserSmoothScroll = false;
-            if (plan.mode === "smooth") {
-                api.settings.player.scrollOffsetY = scoreFollowOffset(
-                    viewportElement.clientHeight || window.innerHeight
-                );
+    const scoreFollow = RiffLoopFollow.createScoreFollow({
+        viewport: viewportElement,
+        isPlaying: () => transport.isPlayingIntent()
+    });
+    const boundsForTick = tick => {
+        for (const bar of api.score?.masterBars || []) {
+            const range = api.tickCache?.getMasterBar(bar);
+            if (range && tick >= range.start && tick < range.end) {
+                return api.renderer?.boundsLookup?.findMasterBarByIndex(bar.index)?.realBounds;
             }
-            api.updateSettings();
         }
-        if (plan.targetTop !== null && Math.abs(viewportElement.scrollTop - plan.targetTop) > 2) {
-            viewportElement.scrollTo({ top: plan.targetTop, behavior: "auto" });
-        }
+        return null;
     };
-    const visibleBarScrollTop = (top, bottom, scrollTop, height) => {
-        const margin = 24;
-        if (bottom - top > height - margin * 2) return Math.max(0, top - margin);
-        if (top < scrollTop + margin) return Math.max(0, top - margin);
-        if (bottom > scrollTop + height - margin) return Math.max(0, bottom - height + margin);
-        return scrollTop;
-    };
-    const revealLoopTick = (tick) => {
-        if (!rangeLoopingEnabled || !committedRange) return;
+    const loopTargetTop = () => {
+        if (!rangeLoopingEnabled || !committedRange) return null;
         const lookup = api.renderer?.boundsLookup;
         const first = lookup?.findMasterBarByIndex(committedRange.firstBar)?.realBounds;
         const last = lookup?.findMasterBarByIndex(committedRange.lastBar)?.realBounds;
-        if (!first || !last) return;
-        const plan = loopScrollPlan(first.y, last.y + last.h, viewportElement.clientHeight);
-        if (plan.mode === "locked") { applyRangeScrollPolicy(committedRange.firstBar, committedRange.lastBar); return; }
-        for (let index = committedRange.firstBar; index <= committedRange.lastBar; index++) {
-            const bar = api.score?.masterBars?.[index];
-            const range = bar && api.tickCache?.getMasterBar(bar);
-            if (!range || tick < range.start || tick >= range.end) continue;
-            const bounds = lookup.findMasterBarByIndex(index)?.realBounds;
-            if (!bounds) break;
-            const top = visibleBarScrollTop(bounds.y, bounds.y + bounds.h, viewportElement.scrollTop, viewportElement.clientHeight);
-            if (Math.abs(viewportElement.scrollTop - top) > 1) viewportElement.scrollTo({ top, behavior: "auto" });
-            break;
-        }
+        return first && last
+            ? loopScrollPlan(first.y, last.y + last.h, viewportElement.clientHeight).targetTop
+            : null;
     };
-    const restoreScoreScrollPolicy = () => {
-        if (api.settings.player.scrollMode === alphaTab.ScrollMode.Smooth) return;
-        api.settings.player.scrollMode = alphaTab.ScrollMode.Smooth;
-        api.settings.player.scrollOffsetY = scoreFollowOffset(viewportElement.clientHeight || window.innerHeight);
-        api.updateSettings();
+    const applyRangeScrollPolicy = () => {
+        const top = loopTargetTop();
+        if (top !== null) scoreFollow.move(top);
     };
+    const revealLoopTick = tick => {
+        scoreFollow.follow(boundsForTick(tick), loopTargetTop());
+    };
+    const restoreScoreScrollPolicy = () => scoreFollow.reset();
     const seekBoth = (tick, options = {}) => {
         const position = Number(tick);
+        // Set the visual policy before alphaTab emits seek/position callbacks.
+        if (options.user) scoreFollow.select(boundsForTick(position));
         api.tickPosition = position;
         synthApi.tickPosition = position;
         refreshPendingRangeHighlight();
-        if (options.reveal === false) return;
-        if (rangeLoopingEnabled && committedRange) revealLoopTick(position);
-        window.setTimeout(() => {
-            if (rangeLoopingEnabled && committedRange) revealLoopTick(position);
-            else if (api.isReadyForPlayback) api.scrollToCursor();
-            refreshPendingRangeHighlight();
-        }, 50);
+        if (options.reveal === false || options.user) return;
+        const bounds = boundsForTick(position);
+        if (bounds) scoreFollow.move(loopTargetTop() ?? Math.max(0,
+            bounds.y + bounds.h / 2 - viewportElement.clientHeight / 2));
     };
     const stopTick = () => rangeLoopingEnabled && committedRange ? committedRange.startTick : 0;
     let rangeCompletionAwaitingReset = false;
@@ -944,6 +913,7 @@
         const transitioning = loopTransitioning || countIn.active;
         rangeCountInRestarter.cancel();
         if (transitioning) { transport.pause(true); return; }
+        if (!transport.isPlayingIntent()) scoreFollow.reset();
         transport.toggle();
     };
 
@@ -1331,6 +1301,7 @@
                     }
                 }
                 if (pointer.mode === "scroll") {
+                    deps.onBrowse?.();
                     viewport.scrollBy(pointer.previousX - event.clientX, pointer.previousY - event.clientY);
                     pointer.previousX = event.clientX;
                     pointer.previousY = event.clientY;
@@ -1382,8 +1353,16 @@
         hitScorePosition,
         post,
         scheduleLongPress: (callback) => setTimeout(callback, LONG_PRESS_MILLISECONDS),
-        cancelLongPress: clearTimeout
+        cancelLongPress: clearTimeout,
+        onBrowse: () => scoreFollow.browse()
     });
+
+    viewportElement.addEventListener("pointerdown", () => scoreFollow.interact(), true);
+    viewportElement.addEventListener("pointerup", () => scoreFollow.release(), true);
+    viewportElement.addEventListener("pointercancel", () => scoreFollow.release(), true);
+    viewportElement.addEventListener("wheel", () => {
+        scoreFollow.browse(); scoreFollow.release();
+    }, { passive: true });
 
     scoreElement.addEventListener("pointerdown", (event) => pointerSelection.pointerDown(event), true);
     scoreElement.addEventListener("pointermove", (event) => pointerSelection.pointerMove(event), true);
@@ -1442,7 +1421,7 @@
         playPause() { configureAudioOutput(); playPauseBoth(); },
         pause() { rangeCountInRestarter.cancel(); transport.pause(true); },
         stop() { rangeCountInRestarter.cancel(); transport.stop(); seekBoth(stopTick()); },
-        seekTick(tick) { seekBoth(tick); },
+        seekTick(tick, user = false) { seekBoth(tick, { user }); },
         setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
         setMasterVolume(volume) {
             synthOutput.setMasterVolume(volume);

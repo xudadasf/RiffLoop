@@ -5,6 +5,40 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testMetronomeResumesAfterPermittedInterruptionButNotAfterManualPause() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            FilePracticeSettingsStore().remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.bpm = 120
+        model.toggleMetronomePlayback()
+        try await waitForTransport { model.isMetronomePlaying }
+        let center = NotificationCenter.default
+        func send(_ type: AVAudioSession.InterruptionType) {
+            center.post(name: AVAudioSession.interruptionNotification, object: nil, userInfo: [
+                AVAudioSessionInterruptionTypeKey: type.rawValue,
+                AVAudioSessionInterruptionOptionKey: AVAudioSession.InterruptionOptions.shouldResume.rawValue
+            ])
+        }
+        send(.began)
+        try await waitForTransport { !model.isPlaying }
+        send(.ended)
+        try await waitForTransport { model.isMetronomePlaying }
+        XCTAssertFalse(model.isAudioPlaying)
+        send(.began)
+        try await waitForTransport { !model.isPlaying }
+        model.pause()
+        send(.ended)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertFalse(model.currentBeatCue.contains("小节"))
+        XCTAssertTrue(model.currentBeatCue.contains("拍"))
+    }
+
     func testTooShortDraftKeepsOriginalAndCancelStopsSilentClock() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let store = FilePracticeSettingsStore()

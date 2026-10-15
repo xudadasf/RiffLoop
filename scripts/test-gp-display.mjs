@@ -1,3 +1,4 @@
+import './test-gp-follow.mjs';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -81,7 +82,7 @@ assert.match(
 assert.match(html, /\.at-highlight\s*,\s*\.at-highlight\s+\*/, "played notation needs a visible highlight rule");
 assert.match(html, /fill\s*:\s*#006edc/i, "played notation must visibly differ from unplayed notation");
 
-assert.match(script, /scrollMode\s*:\s*alphaTab\.ScrollMode\.Smooth/, "score following must use smooth scrolling");
+assert.match(script, /scrollMode\s*:\s*alphaTab\.ScrollMode\.Off/, "the smooth follow controller must own scrolling without competing alphaTab jumps");
 assert.match(script, /enableAnimatedBeatCursor\s*:\s*true/, "the beat cursor must animate between beats");
 assert.match(script, /enableElementHighlighting\s*:\s*true/, "played notation highlighting must be enabled");
 assert.match(

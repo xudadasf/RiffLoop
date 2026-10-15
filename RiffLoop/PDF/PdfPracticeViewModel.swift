@@ -71,7 +71,7 @@ final class PdfPracticeViewModel: ObservableObject {
     private var boundaryObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var failureObserver: NSObjectProtocol?
-    private var interruptionObserver: NSObjectProtocol?
+    private let interruptionRecovery = AudioInterruptionRecovery()
     private var metronomeOnlyTimer: Timer?
     private var countInStopTask: Task<Void, Never>?
     private var viewportSaveTask: Task<Void, Never>?
@@ -89,7 +89,7 @@ final class PdfPracticeViewModel: ObservableObject {
     var audioTimelinePosition: Double { min(max(currentTime, 0), max(duration, 0)) }
     var currentBeatCue: String {
         let beat = max(0, Int(floor((currentTime - (beatOffset ?? 0) - synchronizationOffset) * bpm / 60)))
-        return "第 \(beat / max(1, beatsPerMeasure) + 1) 小节 · 第 \(beat % max(1, beatsPerMeasure) + 1) 拍"
+        return "第 \(beat % max(1, beatsPerMeasure) + 1) 拍"
     }
     var hasUsableReadingTrack: Bool { !isRecordingReadingTrack && isUsablePdfReadingTrack(readingPoints) }
     var isFollowingTransportActive: Bool { isAutoFollowing && isPlaying }
@@ -105,17 +105,20 @@ final class PdfPracticeViewModel: ObservableObject {
                 self.timeChanged(self.player.currentTime().seconds)
             }
         }
-        interruptionObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard
-                let rawValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-                AVAudioSession.InterruptionType(rawValue: rawValue) == .began
-            else { return }
-            Task { @MainActor [weak self] in self?.pause() }
+        interruptionRecovery.onBegan = { [weak self] in
+            guard let self, self.isPlaying else { return nil }
+            let audio = self.isAudioPlaying, metronome = self.isMetronomePlaying
+            let following = self.isAutoFollowing
+            ReproductionStore.shared.record("incident", "pdf.audio_interrupted", ["reason": "session_interruption"])
+            self.pause()
+            return { [weak self] in
+                guard let self else { return }
+                self.isAutoFollowing = following && self.hasUsableReadingTrack
+                self.startPlayback(audio: audio, metronome: metronome)
+            }
         }
+        interruptionRecovery.onDisconnect = { [weak self] in self?.pause() }
+
     }
 
     deinit {
@@ -123,9 +126,6 @@ final class PdfPracticeViewModel: ObservableObject {
             if let periodicObserver { player.removeTimeObserver(periodicObserver) }
             if let boundaryObserver { player.removeTimeObserver(boundaryObserver) }
             removeItemObservers()
-            if let interruptionObserver {
-                NotificationCenter.default.removeObserver(interruptionObserver)
-            }
             metronomeOnlyTimer?.invalidate()
             countInStopTask?.cancel()
             viewportSaveTask?.cancel()
@@ -266,6 +266,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func togglePlayback() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.togglePlayback", details: [:])
         defer {
@@ -276,6 +277,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func toggleReadingFollowPlayback() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleReadingFollowPlayback", details: [:])
         defer {
@@ -325,6 +327,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func toggleAudioPlayback() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleAudioPlayback", details: [:])
         defer {
@@ -339,6 +342,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func toggleMetronomePlayback() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.toggleMetronomePlayback", details: [:])
         defer {
@@ -372,6 +376,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func play(includeCountIn: Bool = false) {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.play", details: ["includeCountIn": String(describing: includeCountIn)])
         defer {
@@ -393,6 +398,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pause", details: [:])
         defer {
@@ -421,6 +427,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pauseAudio() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pauseAudio", details: [:])
         defer {
@@ -443,6 +450,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func pauseMetronome() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.pauseMetronome", details: [:])
         defer {
@@ -497,6 +505,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     func seek(to seconds: TimeInterval) {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("pdf.seek", details: ["seconds": String(describing: seconds)])
         defer {

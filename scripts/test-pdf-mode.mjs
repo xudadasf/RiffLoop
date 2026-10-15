@@ -54,7 +54,7 @@ assert.match(
 );
 assert.match(
     pdfViewModel,
-    /AVAudioSession\.interruptionNotification[\s\S]*?InterruptionType\(rawValue: rawValue\) == \.began[\s\S]*?self\?\.pause\(\)/,
+    /interruptionRecovery\.onBegan[\s\S]*?self\.pause\(\)[\s\S]*?self\.startPlayback\(audio: audio, metronome: metronome\)/,
     "an audio interruption must converge PDF backing and metronome state"
 );
 assert.match(

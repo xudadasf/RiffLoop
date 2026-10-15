@@ -1,3 +1,4 @@
+import './test-gp-follow.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const read = name => readFileSync(new URL(`../RiffLoop/Resources/GpWeb/${name}`, import.meta.url), 'utf8');
@@ -69,11 +70,6 @@ function extract(name, next) {
     assert.ok(start >= 0 && end > start);
     return new Function(`${source.slice(start, end)}; return ${name};`)();
 }
-const visible = extract('visibleBarScrollTop', 'revealLoopTick');
-assert.equal(visible(700, 900, 0, 600), 324, 'B row bottom must fit above the controls');
-assert.equal(visible(100, 250, 324, 600), 76, 'B to A must reveal the whole A row immediately');
-assert.equal(visible(100, 250, 76, 600), 76, 'Fully visible rows must not jitter');
-assert.equal(visible(100, 900, 500, 600), 76, 'Oversized rows align their beginning');
 let output = 0;
 const synth = extract('createSynthOutputController', 'synthOutput')({
     changeTrackVolume: (_, value) => { output = value; }, changeTrackMute() {}

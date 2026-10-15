@@ -9,11 +9,11 @@ func gpCustomBaseBpmRange(originalBpm: Double) -> ClosedRange<Double> {
     let original = originalBpm.isFinite && originalBpm > 0 ? originalBpm : 120
     let lower = max(
         gpMinimumCustomBpm,
-        ceil(original * gpMinimumEffectivePlaybackSpeed / 0.5)
+        ceil(original * gpMinimumEffectivePlaybackSpeed)
     )
     let upper = min(
         gpMaximumCustomBpm,
-        floor(original * gpMaximumEffectivePlaybackSpeed / 1.5)
+        floor(original * gpMaximumEffectivePlaybackSpeed)
     )
     guard lower <= upper else {
         let fallback = min(max(original, gpMinimumCustomBpm), gpMaximumCustomBpm)
@@ -48,4 +48,13 @@ func gpScaledCurrentBpm(
         baseBpm: baseBpm,
         practiceMultiplier: practiceMultiplier
     )
+}
+
+func gpPracticeSpeedRange(originalBpm: Double, baseBpm: Double) -> ClosedRange<Double> {
+    let original = originalBpm.isFinite && originalBpm > 0 ? originalBpm : 120
+    let base = baseBpm.isFinite && baseBpm > 0 ? baseBpm : original
+    let ratio = base / original
+    let lower = max(0.25, gpMinimumEffectivePlaybackSpeed / ratio)
+    let upper = max(lower, min(2, gpMaximumEffectivePlaybackSpeed / ratio))
+    return lower ... upper
 }

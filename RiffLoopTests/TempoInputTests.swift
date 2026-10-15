@@ -19,6 +19,16 @@ final class TempoInputTests: XCTestCase {
         XCTAssertEqual(draft.value, 30)
     }
 
+    func testScoreSpecificTempoLimitsAreValidatedBeforeApplying() {
+        var draft = TempoDraft(value: 120, range: 38...300)
+        draft.clear()
+        draft.digit(3); draft.digit(0)
+        XCTAssertNil(draft.value)
+        draft.clear()
+        draft.digit(3); draft.digit(8)
+        XCTAssertEqual(draft.value, 38)
+    }
+
     func testPasteRejectsMalformedNumbersWithoutChangingTempo() {
         var draft = TempoDraft(value: 120)
         for invalid in ["", "1e2", "12.5", "-60", "NaN", "∞", "120bpm", "29", "301", "999999999999999999999", "١٢٠"] {

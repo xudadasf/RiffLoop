@@ -35,6 +35,7 @@ struct GpPracticeView: View {
     @StateObject private var viewModel = GpWebViewModel()
     @State private var isLibraryPresented = false
     @State private var didOpenInitialURL = false
+    @State private var practiceStartedAt = Date()
     @State private var activePanel: GpControlPanel?
     @State private var currentFileName: String?
     @State private var scoreReadTask: Task<Void, Never>?
@@ -46,8 +47,8 @@ struct GpPracticeView: View {
         self.initialURL = initialURL
     }
 
-    private let speeds = [0.5, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
-    private let quickSpeeds = [0.5, 0.75, 0.9, 1.0, 1.25]
+    private let speeds = [0.25, 0.5, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
+    private let quickSpeeds = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
 
     var body: some View {
         GpWebView(viewModel: viewModel)
@@ -99,6 +100,7 @@ struct GpPracticeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    PracticeSessionTimer(startedAt: practiceStartedAt)
                     HStack(spacing: 2) {
                         Button { viewModel.setScoreZoom(viewModel.scoreZoom - 0.1) } label: {
                             Image(systemName: "minus.magnifyingglass")
@@ -135,7 +137,7 @@ struct GpPracticeView: View {
                 Text(viewModel.errorMessage ?? "")
             }
             .onChange(of: scenePhase) { _, phase in
-                viewModel.setSceneActive(phase == .active)
+                if phase != .inactive { viewModel.setSceneActive(phase == .active) }
             }
             .onAppear {
                 guard !didOpenInitialURL else { return }
@@ -189,6 +191,9 @@ struct GpPracticeView: View {
     private var playbackState: (text: String, color: Color) {
         if viewModel.loopPreview != nil {
             return ("正在选择循环范围", .blue)
+        }
+        if viewModel.isStandaloneMetronomePlaying {
+            return ("独立节拍器 · \(Int(viewModel.standaloneBpm)) BPM", .green)
         }
         if viewModel.isPlaying {
             let loopSuffix = viewModel.rangeLoopingEnabled && viewModel.loopRange != nil
@@ -274,13 +279,17 @@ struct GpPracticeView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(viewModel.playbackSpeed == value ? .accentColor : .secondary)
-                        .disabled(!viewModel.playerReady)
+                        .disabled(!viewModel.playerReady || !viewModel.practiceSpeedRange.contains(value))
                     }
                 }
             }
             .controlSize(.small)
 
-            Text(tempoSummary)
+            Button { activePanel = .loop } label: {
+                Text(tempoSummary).underline()
+            }
+                .buttonStyle(.plain)
+                .accessibilityLabel("调整练习 BPM")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -381,23 +390,20 @@ struct GpPracticeView: View {
 
             Section("速度") {
                 Text("原谱 BPM：\(Int(viewModel.originalBaseBpm.rounded()))")
-                Stepper(
-                    value: Binding(
-                        get: { viewModel.baseBpm },
-                        set: { viewModel.setBaseBpm($0) }
-                    ),
-                    in: viewModel.customBpmRange,
-                    step: 1
-                ) {
-                    Text("基准 BPM：\(Int(viewModel.baseBpm.rounded()))")
-                }
-                .disabled(!viewModel.playerReady || viewModel.customBpmRange.lowerBound == viewModel.customBpmRange.upperBound)
+                Text("练习起始速度")
+                TempoInputControl(bpm: Binding(
+                    get: { viewModel.practiceStartBpm },
+                    set: { viewModel.setPracticeStartBpm($0) }
+                ), range: Int(viewModel.customBpmRange.lowerBound)...Int(viewModel.customBpmRange.upperBound), onChange: {})
+                .disabled(!viewModel.playerReady)
+                Text("当前实际速度：\(viewModel.currentBpm, specifier: "%.1f") BPM")
+                    .font(.subheadline.monospacedDigit())
 
                 Picker("播放速度", selection: Binding(
                     get: { viewModel.playbackSpeed },
                     set: { viewModel.setPlaybackSpeed($0) }
                 )) {
-                    ForEach(speeds, id: \.self) { Text(speedLabel($0)).tag($0) }
+                    ForEach(Array(Set(speeds.filter { viewModel.practiceSpeedRange.contains($0) } + [viewModel.playbackSpeed])).sorted(), id: \.self) { Text(speedLabel($0)).tag($0) }
                 }
 
                 Button("恢复导入 BPM", action: viewModel.resetBaseBpm)
@@ -408,7 +414,7 @@ struct GpPracticeView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Text("1.00× 以当前基准 BPM 为准；变速谱按原 tempo map 等比例缩放。")
+                Text("输入 BPM 后按该起始速度播放，倍速回到 1×。谱中原有的速度变化按比例保留；音符、节拍和伴奏同步变速。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -439,7 +445,7 @@ struct GpPracticeView: View {
                         get: { viewModel.speedLadderTarget },
                         set: { viewModel.setSpeedLadderTarget($0) }
                     )) {
-                        ForEach(speeds.filter { $0 >= viewModel.playbackSpeed }, id: \.self) {
+                        ForEach(Array(Set(speeds.filter { $0 >= viewModel.playbackSpeed && viewModel.practiceSpeedRange.contains($0) } + [viewModel.speedLadderTarget])).sorted(), id: \.self) {
                             Text("\(Int(($0 * 100).rounded()))%").tag($0)
                         }
                     }
@@ -465,6 +471,23 @@ struct GpPracticeView: View {
 
     private var metronomePanel: some View {
         Form {
+            Section("独立练习") {
+                Button(viewModel.isStandaloneMetronomePlaying ? "暂停独立节拍器" : "启动独立节拍器",
+                    action: viewModel.toggleStandaloneMetronome)
+                    .disabled(!viewModel.playerReady)
+                TempoInputControl(bpm: Binding(
+                    get: { viewModel.standaloneBpm }, set: { viewModel.setStandaloneBpm($0) }
+                ), onChange: {})
+                Stepper("每小节 \(viewModel.standaloneBeatsPerMeasure) 拍", value: Binding(
+                    get: { viewModel.standaloneBeatsPerMeasure }, set: { viewModel.setStandaloneBeats($0) }
+                ), in: 1...16)
+                Slider(value: Binding(
+                    get: { viewModel.standaloneVolume }, set: { viewModel.setStandaloneVolume($0) }
+                ), in: 0...2)
+                LabeledContent("独立节拍音量", value: percent(viewModel.standaloneVolume))
+                Text("谱面保持静止，可自由翻阅。点击底部播放会关闭独立节拍器，恢复正常跟谱播放。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("节拍器") {
                 Toggle("开启节拍器", isOn: Binding(
                     get: { viewModel.metronomeEnabled },

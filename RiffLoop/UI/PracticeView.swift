@@ -35,6 +35,7 @@ struct PracticeView: View {
     @State private var scrubTime: TimeInterval = 0
     @State private var isScrubbing = false
     @State private var didOpenInitialURL = false
+    @State private var practiceStartedAt = Date()
     @State private var groupingInput = "4"
     @State private var activePanel: VideoControlPanel?
     @State private var currentFileName: String?
@@ -91,6 +92,7 @@ struct PracticeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    PracticeSessionTimer(startedAt: practiceStartedAt)
                     Button { ReproductionStore.shared.record("action", "video.tap_files", ["target": "isLibraryPresented"]); isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
                     }
@@ -126,7 +128,7 @@ struct PracticeView: View {
                 groupingInput = grouping.map(String.init).joined(separator: "+")
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { viewModel.pause() }
+                if phase == .background { viewModel.pause() }
             }
             .onAppear {
                 guard !didOpenInitialURL else { return }

@@ -61,7 +61,7 @@ assert.match(
 );
 assert.match(
     gpView,
-    /Picker\("目标速度"[\s\S]*?ForEach\(speeds\.filter \{ \$0 >= viewModel\.playbackSpeed \}/,
+    /Picker\("目标速度"[\s\S]*?ForEach\(Array\(Set\(speeds\.filter \{ \$0 >= viewModel\.playbackSpeed && viewModel\.practiceSpeedRange\.contains\(\$0\) \}/,
     "GP ladder target choices must not include speeds below the current manual speed"
 );
 assert.ok(
@@ -119,7 +119,7 @@ assert.match(
 );
 assert.match(
     gpViewModel,
-    /func setSpeedLadderTarget\(_ target: Double\) \{[\s\S]*?min\(max\(target, playbackSpeed\), 1\.5\)/,
+    /func setSpeedLadderTarget\(_ target: Double\) \{[\s\S]*?min\(max\(target, playbackSpeed\), practiceSpeedRange\.upperBound\)/,
     "the GP speed ladder target must never be lower than the current manual speed"
 );
 assert.match(
@@ -163,8 +163,8 @@ assert.match(
     );
 }
 
-assert.match(gpView, /基准 BPM：[\s\S]*?恢复导入 BPM/);
-assert.match(gpView, /1\.00× 以当前基准 BPM 为准/);
+assert.match(gpView, /练习起始速度[\s\S]*?TempoInputControl[\s\S]*?setPracticeStartBpm[\s\S]*?恢复导入 BPM/);
+assert.match(gpView, /输入 BPM 后按该起始速度播放，倍速回到 1×/);
 assert.match(
     gpView,
     /format: "基准 %\.0f BPM · 当前 %\.0f BPM · %\.2f×",[\s\S]*?viewModel\.currentBpm/,

@@ -210,6 +210,33 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
                 XCTAssertFalse(model.isPlaying)
             }
         }
+        model.pause()
+        model.clearLoop()
+        model.setCountInEnabled(false)
+        model.setPracticeStartBpm(53)
+        model.seek(to: 0)
+        try await Task.sleep(for: .milliseconds(300))
+        model.setStandaloneBpm(87)
+        model.toggleStandaloneMetronome()
+        XCTAssertTrue(model.isStandaloneMetronomePlaying)
+        let stationaryTick = model.position.currentTick
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(model.position.currentTick, stationaryTick, "Standalone beats must not advance the score")
+        XCTAssertFalse(model.isPlaying)
+        model.togglePlayback()
+        XCTAssertFalse(model.isStandaloneMetronomePlaying)
+        try await waitUntil("Normal playback must resume exclusively after standalone practice") {
+            model.isPlaying && model.position.currentTick > stationaryTick + 100
+        }
+        model.receive(.barHit(GpBarHit(index: 2, startTick: 7680, endTick: 11520, seekTick: 8640)))
+        try await waitUntil("A tap during playback must seek and continue") {
+            model.isPlaying && model.position.currentTick >= 8640
+        }
+        XCTAssertEqual(model.currentBpm, 53, accuracy: 0.01)
+        model.pause()
+        model.resetBaseBpm()
+        model.setPlaybackSpeed(0.9)
+        model.setCountInEnabled(true)
         // The 60 BPM count-in exceeds the 3.5 s stall threshold. A paused seek
         // must receive a fresh playback grace period after the count-in ends.
         model.clearLoop()

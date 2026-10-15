@@ -1,6 +1,9 @@
 import Foundation
 
 struct GpPracticeProfile: Codable, Equatable, Sendable {
+    var standaloneBpm: Double?
+    var standaloneBeatsPerMeasure: Int?
+    var standaloneVolume: Double?
     var scoreZoom = 1.0
     var playbackSpeed = 1.0
     var baseBpm: Double?
@@ -33,6 +36,9 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     var highestPracticeSpeed = 1.0
 
     init(
+        standaloneBpm: Double? = nil,
+        standaloneBeatsPerMeasure: Int? = nil,
+        standaloneVolume: Double? = nil,
         scoreZoom: Double = 1.0,
         playbackSpeed: Double = 1.0,
         baseBpm: Double? = nil,
@@ -64,6 +70,9 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         totalCompletedLoops: Int = 0,
         highestPracticeSpeed: Double = 1.0
     ) {
+        self.standaloneBpm = standaloneBpm
+        self.standaloneBeatsPerMeasure = standaloneBeatsPerMeasure
+        self.standaloneVolume = standaloneVolume
         self.scoreZoom = scoreZoom
         self.playbackSpeed = playbackSpeed
         self.baseBpm = baseBpm
@@ -98,6 +107,9 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        standaloneBpm = try values.decodeIfPresent(Double.self, forKey: .standaloneBpm)
+        standaloneBeatsPerMeasure = try values.decodeIfPresent(Int.self, forKey: .standaloneBeatsPerMeasure)
+        standaloneVolume = try values.decodeIfPresent(Double.self, forKey: .standaloneVolume)
         scoreZoom = try values.decodeIfPresent(Double.self, forKey: .scoreZoom) ?? 1
         playbackSpeed = try values.decodeIfPresent(Double.self, forKey: .playbackSpeed) ?? 1
         baseBpm = try values.decodeIfPresent(Double.self, forKey: .baseBpm)

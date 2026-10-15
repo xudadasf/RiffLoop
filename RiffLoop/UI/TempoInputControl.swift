@@ -3,16 +3,19 @@ import SwiftUI
 /// Editing is a draft: only a complete, in-range integer reaches the audio engine.
 struct TempoDraft: Equatable {
     var text: String
+    let range: ClosedRange<Int>
     var replacesOnNextDigit = true
     var pasteRejected = false
 
-    init(value: Double) {
-        text = String(Int(value.isFinite ? min(max(value.rounded(), 30), 300) : 120))
+    init(value: Double, range: ClosedRange<Int> = 30...300) {
+        self.range = range
+        text = String(Int(min(max(value.isFinite ? value.rounded() : 120,
+            Double(range.lowerBound)), Double(range.upperBound))))
     }
 
     var value: Int? {
         guard !text.isEmpty, text.utf8.allSatisfy({ (48...57).contains($0) }),
-              let number = Int(text), (30...300).contains(number) else { return nil }
+              let number = Int(text), range.contains(number) else { return nil }
         return number
     }
 
@@ -40,7 +43,7 @@ struct TempoDraft: Equatable {
         let candidate = string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !candidate.isEmpty, candidate.count <= 3,
               candidate.utf8.allSatisfy({ (48...57).contains($0) }),
-              let number = Int(candidate), (30...300).contains(number) else {
+              let number = Int(candidate), range.contains(number) else {
             pasteRejected = true
             return
         }
@@ -52,6 +55,7 @@ struct TempoDraft: Equatable {
 
 struct TempoInputControl: View {
     @Binding var bpm: Double
+    var range: ClosedRange<Int> = 30...300
     var onChange: () -> Void
     @State private var isEditing = false
 
@@ -59,16 +63,16 @@ struct TempoInputControl: View {
         HStack(spacing: 8) {
             Text("BPM")
             Button { isEditing = true } label: {
-                Text(TempoDraft(value: bpm).text)
+                Text(String(Int(bpm.isFinite ? bpm.rounded() : 120)))
                     .font(.body.monospacedDigit().weight(.semibold))
                     .frame(minWidth: 64, minHeight: 44)
                     .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("输入节拍速度")
-            .accessibilityValue("\(TempoDraft(value: bpm).text) BPM")
+            .accessibilityValue("\(String(Int(bpm.isFinite ? bpm.rounded() : 120))) BPM")
             .popover(isPresented: $isEditing) {
-                TempoKeypad(value: bpm) { number in
+                TempoKeypad(value: bpm, range: range) { number in
                     bpm = Double(number)
                     onChange()
                     isEditing = false
@@ -78,7 +82,7 @@ struct TempoInputControl: View {
             Stepper("调整 BPM", value: Binding(
                 get: { bpm },
                 set: { bpm = $0; onChange() }
-            ), in: 30...300, step: 1)
+            ), in: Double(range.lowerBound)...Double(range.upperBound), step: 1)
             .labelsHidden()
         }
     }
@@ -90,8 +94,8 @@ struct TempoKeypad: View {
     let apply: (Int) -> Void
     let cancel: () -> Void
 
-    init(value: Double, apply: @escaping (Int) -> Void, cancel: @escaping () -> Void) {
-        _draft = State(initialValue: TempoDraft(value: value))
+    init(value: Double, range: ClosedRange<Int> = 30...300, apply: @escaping (Int) -> Void, cancel: @escaping () -> Void) {
+        _draft = State(initialValue: TempoDraft(value: value, range: range))
         self.apply = apply
         self.cancel = cancel
     }
@@ -107,7 +111,7 @@ struct TempoKeypad: View {
                 .font(.system(size: 36, weight: .semibold, design: .rounded).monospacedDigit())
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .accessibilityLabel("待输入速度")
-            Text(draft.pasteRejected || draft.value == nil ? "请输入 30–300 的整数" : "30–300 BPM · 输入后点应用")
+            Text(draft.pasteRejected || draft.value == nil ? "请输入 \(draft.range.lowerBound)–\(draft.range.upperBound) 的整数" : "\(draft.range.lowerBound)–\(draft.range.upperBound) BPM · 输入后点应用")
                 .font(.caption)
                 .foregroundStyle(draft.pasteRejected || draft.value == nil ? Color.orange : .secondary)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {

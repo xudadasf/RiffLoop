@@ -39,6 +39,7 @@ final class PracticeViewModel: ObservableObject {
     @Published private(set) var highestPlaybackRate: Float = 1
     @Published private(set) var currentBeatIndex = 0
 
+    private let interruptionRecovery = AudioInterruptionRecovery()
     private let metronome = MetronomeEngine()
     private let audioGain = PlayerAudioGain()
     private let settingsStore = FilePracticeSettingsStore()
@@ -62,6 +63,16 @@ final class PracticeViewModel: ObservableObject {
         player.automaticallyWaitsToMinimizeStalling = false
         audioGain.setVolume(mediaVolume, player: player)
         installPeriodicTimeObserver()
+        interruptionRecovery.onBegan = { [weak self] in
+            guard let self, self.isPlaying else { return nil }
+            ReproductionStore.shared.record("incident", "video.audio_interrupted", ["reason": "session_interruption"])
+            self.pause()
+            return { [weak self] in
+                guard let self, self.hasMedia else { return }
+                self.preparePlaybackAndStart(at: self.currentTime)
+            }
+        }
+        interruptionRecovery.onDisconnect = { [weak self] in self?.pause() }
     }
 
     deinit {
@@ -143,6 +154,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func togglePlayback() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("video.togglePlayback", details: [:])
         defer {
@@ -159,6 +171,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func pause() {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("video.pause", details: [:])
         defer {
@@ -185,6 +198,7 @@ final class PracticeViewModel: ObservableObject {
     }
 
     func seek(to seconds: TimeInterval) {
+        interruptionRecovery.cancel()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("video.seek", details: ["seconds": String(describing: seconds)])
         defer {

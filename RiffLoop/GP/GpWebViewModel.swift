@@ -1,6 +1,6 @@
 import Combine
 import Foundation
-import AVFAudio
+import AVFoundation
 import UIKit
 import WebKit
 
@@ -17,6 +17,11 @@ final class GpWebViewModel: ObservableObject {
         endTick: 0
     )
     @Published private(set) var isPlaying = false
+    @Published private(set) var isStandaloneMetronomePlaying = false
+    @Published private(set) var standaloneBpm = 120.0
+    @Published private(set) var standaloneBeatsPerMeasure = 4
+    @Published private(set) var standaloneVolume = 1.0
+    private let standaloneMetronome = MetronomeEngine()
     @Published private(set) var selectedBar: GpBarHit?
     @Published private(set) var loopRange: GpLoopBarRange?
     @Published private(set) var loopPreview: GpLoopBarRange?
@@ -71,6 +76,21 @@ final class GpWebViewModel: ObservableObject {
         gpCustomBaseBpmRange(originalBpm: originalBaseBpm)
     }
 
+    var practiceSpeedRange: ClosedRange<Double> {
+        gpPracticeSpeedRange(originalBpm: originalBaseBpm, baseBpm: baseBpm)
+    }
+
+    var practiceStartBpm: Double { baseBpm * playbackSpeed }
+
+    func setPracticeStartBpm(_ bpm: Double) {
+        guard bpm.isFinite else { return }
+        playbackSpeed = 1
+        setBaseBpm(bpm)
+        if speedLadderEnabled { speedLadderBaseSpeed = 1 }
+        speedLadderTarget = min(practiceSpeedRange.upperBound, max(speedLadderTarget, 1))
+        saveProfile()
+    }
+
     var currentBpm: Double {
         gpScaledCurrentBpm(
             originalTempo: position.originalTempo ?? originalBaseBpm,
@@ -106,6 +126,7 @@ final class GpWebViewModel: ObservableObject {
     private var nativeBackingAnchorMilliseconds = 0.0
     private var nativeBackingSyncPoints: [GpBackingSyncPoint] = []
     private var speedLadderBaseSpeed: Double?
+    private let interruptionRecovery = AudioInterruptionRecovery()
     private var audioObservers = Set<AnyCancellable>()
     private var recoveryAttempts = 0
     private var recoveryTask: Task<Void, Never>?
@@ -114,18 +135,19 @@ final class GpWebViewModel: ObservableObject {
 
     init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
         self.settingsStore = settingsStore
-        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] note in
-                let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue ?? 0
-                self?.handleAudioRouteChange(reason: reason)
-            }.store(in: &audioObservers)
-        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] note in
-                let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue
-                if type == AVAudioSession.InterruptionType.began.rawValue { self?.interruptPlayback(reason: "session_interruption") }
-            }.store(in: &audioObservers)
+        interruptionRecovery.onBegan = { [weak self] in
+            guard let self, self.isPlaying || self.isStandaloneMetronomePlaying else { return nil }
+            let standalone = self.isStandaloneMetronomePlaying
+            ReproductionStore.shared.record("incident", "gp.audio_interrupted", ["reason": "session_interruption"])
+            self.pause()
+            return { [weak self] in
+                guard let self, self.sceneActive, self.playerReady else { return }
+                if standalone { self.startStandaloneMetronome() } else { self.togglePlayback() }
+            }
+        }
+        interruptionRecovery.onDisconnect = { [weak self] in
+            self?.handleAudioRouteChange(reason: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue)
+        }
         NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.recoverWebContent() }
@@ -134,17 +156,20 @@ final class GpWebViewModel: ObservableObject {
 
     func handleAudioRouteChange(reason: UInt) {
         if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {
+            interruptionRecovery.cancel()
             interruptPlayback(reason: "output_disconnected")
         }
     }
 
     private func interruptPlayback(reason: String) {
-        guard isPlaying else { return }
+        guard isPlaying || isStandaloneMetronomePlaying else { return }
         ReproductionStore.shared.record("incident", "gp.audio_interrupted", ["reason": reason])
         pause()
     }
 
     func recoverWebContent() {
+        interruptionRecovery.cancel()
+        stopStandaloneMetronome()
         recoveryTask?.cancel()
         recoveryTask = nil
         updatePracticeClock(isPlaying: false)
@@ -183,6 +208,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        interruptionRecovery.cancel()
+        stopStandaloneMetronome()
         recoveryTask?.cancel()
         recoveryTask = nil
         recoveryAttempts = 0
@@ -252,12 +279,15 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func togglePlayback() {
+        interruptionRecovery.cancel()
+        stopStandaloneMetronome()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.togglePlayback", details: [:])
         defer {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
+        guard playerReady else { return }
         if !isPlaying {
             do {
                 let session = AVAudioSession.sharedInstance()
@@ -270,6 +300,69 @@ final class GpWebViewModel: ObservableObject {
             }
         }
         call("playPause")
+    }
+
+    func toggleStandaloneMetronome() {
+        interruptionRecovery.cancel()
+        if isStandaloneMetronomePlaying { stopStandaloneMetronome(); return }
+        guard playerReady else { return }
+        pause()
+        startStandaloneMetronome()
+    }
+
+    private func startStandaloneMetronome() {
+        do {
+            let subdivision: Subdivision = switch metronomeSubdivisionFactor {
+            case 2: .eighth
+            case 4: .sixteenth
+            case 8: .thirtySecond
+            default: .quarter
+            }
+            let accents = (0..<standaloneBeatsPerMeasure).map { index in
+                index < beatAccents.count ? BeatAccent(rawValue: beatAccents[index].rawValue) ?? .normal
+                    : (index == 0 ? .strong : .normal)
+            }
+            try standaloneMetronome.synchronize(
+                timeline: BeatTimeline(bpm: standaloneBpm, beatOffset: 0, subdivision: subdivision,
+                    quarterNotesPerMeasure: standaloneBeatsPerMeasure, beatAccents: accents),
+                anchor: TransportAnchor(mediaTime: 0,
+                    hostTime: CMClockGetTime(CMClockGetHostTimeClock()).seconds + 0.1, mediaRate: 1),
+                volume: Float(standaloneVolume))
+            isStandaloneMetronomePlaying = true
+            updatePracticeClock(isPlaying: true)
+        } catch {
+            standaloneMetronome.stop()
+            updatePracticeClock(isPlaying: false)
+            isStandaloneMetronomePlaying = false
+            errorMessage = "独立节拍器启动失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func stopStandaloneMetronome() {
+        guard isStandaloneMetronomePlaying else { return }
+        standaloneMetronome.stop()
+        isStandaloneMetronomePlaying = false
+        updatePracticeClock(isPlaying: false)
+    }
+
+    func setStandaloneBpm(_ value: Double) {
+        guard value.isFinite else { return }
+        standaloneBpm = min(300, max(30, value.rounded()))
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
+        saveProfile()
+    }
+
+    func setStandaloneBeats(_ value: Int) {
+        standaloneBeatsPerMeasure = min(16, max(1, value))
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
+        saveProfile()
+    }
+
+    func setStandaloneVolume(_ value: Double) {
+        guard value.isFinite else { return }
+        standaloneVolume = min(2, max(0, value))
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
+        saveProfile()
     }
 
     func leaveMode() {
@@ -286,6 +379,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func pause() {
+        interruptionRecovery.cancel()
+        stopStandaloneMetronome()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.pause", details: [:])
         defer {
@@ -301,6 +396,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func stop() {
+        interruptionRecovery.cancel()
+        stopStandaloneMetronome()
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.stop", details: [:])
         defer {
@@ -313,14 +410,15 @@ final class GpWebViewModel: ObservableObject {
         call("stop")
     }
 
-    func seek(to tick: Double) {
+    func seek(to tick: Double, userInitiated: Bool = false) {
+        if userInitiated { interruptionRecovery.cancel() }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.seek", details: ["tick": String(describing: tick)])
         defer {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        call("seekTick", arguments: [tick])
+        call("seekTick", arguments: [tick, userInitiated])
     }
 
     func setPlaybackSpeed(_ speed: Double) {
@@ -330,7 +428,8 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        playbackSpeed = min(max(speed, 0.5), 1.5)
+        guard speed.isFinite else { return }
+        playbackSpeed = min(max(speed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
         if speedLadderEnabled {
             speedLadderBaseSpeed = playbackSpeed
         }
@@ -360,7 +459,13 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
+        guard bpm.isFinite else { return }
         baseBpm = min(max(bpm.rounded(), customBpmRange.lowerBound), customBpmRange.upperBound)
+        playbackSpeed = min(max(playbackSpeed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
+        if let speedLadderBaseSpeed {
+            self.speedLadderBaseSpeed = min(max(speedLadderBaseSpeed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
+        }
+        speedLadderTarget = min(max(speedLadderTarget, playbackSpeed), practiceSpeedRange.upperBound)
         completedLoops = 0
         applyEffectivePlaybackSpeed()
         saveProfile()
@@ -548,6 +653,7 @@ final class GpWebViewModel: ObservableObject {
         metronomeSubdivisionFactor = factor
         playerReady = false
         call("setMetronomeSubdivision", arguments: [factor])
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
 
@@ -561,6 +667,7 @@ final class GpWebViewModel: ObservableObject {
         guard beatAccents.indices.contains(index) else { return }
         beatAccents[index] = beatAccents[index].next
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue), true])
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
 
@@ -640,7 +747,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        speedLadderTarget = min(max(target, playbackSpeed), 1.5)
+        speedLadderTarget = min(max(target, playbackSpeed), practiceSpeedRange.upperBound)
         completedLoops = 0
         saveProfile()
     }
@@ -689,6 +796,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSceneActive(_ isActive: Bool) {
+        if !isActive { interruptionRecovery.cancel(); stopStandaloneMetronome() }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSceneActive", details: ["isActive": String(describing: isActive)])
         defer {
@@ -777,6 +885,10 @@ final class GpWebViewModel: ObservableObject {
                 saveProfile()
             }
         case let .playerStateChanged(state):
+            if isStandaloneMetronomePlaying {
+                if state.state == 1 { call("pause") }
+                return
+            }
             isPlaying = state.state == 1 || state.transitioning == true
             if state.state == 1 {
                 if !nativeBackingPlaybackRequested {
@@ -980,7 +1092,12 @@ final class GpWebViewModel: ObservableObject {
             break
         case let .seek(bar):
             selectedBar = bar
-            seek(to: bar.seekTick ?? bar.startTick)
+            let tick = bar.seekTick ?? bar.startTick
+            if rangeLoopingEnabled, let range = loopRange,
+               !(range.startTick ..< range.endTick).contains(tick) {
+                setRangeLoopingEnabled(false)
+            }
+            seek(to: tick, userInitiated: true)
         case let .selectStart(range):
             pause()
             restoreSpeedBeforeLadder()
@@ -1032,12 +1149,16 @@ final class GpWebViewModel: ObservableObject {
         soloTrack = pendingProfile.soloTrack.flatMap { validTrackIndices.contains($0) ? $0 : nil }
         trackVolumes = pendingProfile.trackVolumes.filter { validTrackIndices.contains($0.key) }
         scoreZoom = pendingProfile.scoreZoom.isFinite ? min(max(pendingProfile.scoreZoom, 0.8), 1.5) : 1
-        playbackSpeed = min(max(pendingProfile.playbackSpeed, 0.5), 1.5)
+        playbackSpeed = pendingProfile.playbackSpeed.isFinite ? pendingProfile.playbackSpeed : 1
         let bpmRange = gpCustomBaseBpmRange(originalBpm: metadata.initialBpm ?? 120)
         baseBpm = min(
             max(pendingProfile.baseBpm ?? metadata.initialBpm ?? 120, bpmRange.lowerBound),
             bpmRange.upperBound
         )
+        playbackSpeed = min(max(playbackSpeed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
+        standaloneBpm = min(300, max(30, pendingProfile.standaloneBpm ?? baseBpm))
+        standaloneBeatsPerMeasure = min(16, max(1, pendingProfile.standaloneBeatsPerMeasure ?? metadata.beatsPerMeasure ?? 4))
+        standaloneVolume = min(2, max(0, pendingProfile.standaloneVolume ?? 1))
         masterVolume = min(max(pendingProfile.masterVolume, 0), 16)
         backingVolume = min(max(pendingProfile.backingVolume, 0), 4)
         synthEnabled = pendingProfile.synthEnabled
@@ -1057,7 +1178,7 @@ final class GpWebViewModel: ObservableObject {
         wholeSongLoopingEnabled = pendingProfile.wholeSongLoopingEnabled
         loopCountInEnabled = pendingProfile.loopCountInEnabled
         speedLadderEnabled = pendingProfile.speedLadderEnabled
-        speedLadderTarget = min(max(pendingProfile.speedLadderTarget, playbackSpeed), 1.5)
+        speedLadderTarget = min(max(pendingProfile.speedLadderTarget, playbackSpeed), practiceSpeedRange.upperBound)
         loopsPerSpeedStep = min(max(pendingProfile.loopsPerSpeedStep, 1), 10)
         speedLadderStep = min(max(pendingProfile.speedLadderStep, 0.01), 0.25)
         totalPracticeMilliseconds = max(0, pendingProfile.totalPracticeMilliseconds)
@@ -1129,7 +1250,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func restoreSpeedBeforeLadder() {
-        let restoredSpeed = speedLadderBaseSpeed ?? playbackSpeed
+        let restoredSpeed = min(max(speedLadderBaseSpeed ?? playbackSpeed,
+            practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
         speedLadderEnabled = false
         speedLadderBaseSpeed = nil
         guard restoredSpeed != playbackSpeed else { return }
@@ -1180,6 +1302,9 @@ final class GpWebViewModel: ObservableObject {
         guard let currentFileName, didApplyPendingProfile else { return }
         try? settingsStore.save(
             GpPracticeProfile(
+                standaloneBpm: standaloneBpm,
+                standaloneBeatsPerMeasure: standaloneBeatsPerMeasure,
+                standaloneVolume: standaloneVolume,
                 scoreZoom: scoreZoom,
                 playbackSpeed: playbackSpeed,
                 baseBpm: baseBpm,

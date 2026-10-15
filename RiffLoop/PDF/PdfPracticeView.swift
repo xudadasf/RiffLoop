@@ -33,6 +33,7 @@ struct PdfPracticeView: View {
     @State private var pdfLibraryPresented = false
     @State private var audioLibraryPresented = false
     @State private var didOpenInitialURL = false
+    @State private var practiceStartedAt = Date()
     @State private var groupingInput = "4"
     @State private var activePanel: PdfControlPanel?
     @State private var confirmTrackDeletion = false
@@ -99,6 +100,7 @@ struct PdfPracticeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                    PracticeSessionTimer(startedAt: practiceStartedAt)
                 Button { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "pdfLibraryPresented"]); pdfLibraryPresented = true } label: {
                     Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
                 }
@@ -139,7 +141,7 @@ struct PdfPracticeView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { viewModel.pause() }
+            if phase == .background { viewModel.pause() }
         }
         .onDisappear(perform: viewModel.leaveMode)
             .keepPracticeScreenAwake(hasFile: viewModel.document != nil)
