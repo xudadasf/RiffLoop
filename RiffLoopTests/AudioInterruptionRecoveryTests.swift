@@ -4,6 +4,22 @@ import XCTest
 
 @MainActor
 final class AudioInterruptionRecoveryTests: XCTestCase {
+    func testNewInterruptionInvalidatesPreviousPermissionToResume() {
+        let recovery = AudioInterruptionRecovery()
+        var starts = 0
+        recovery.onBegan = { { starts += 1 } }
+        let began = AVAudioSession.InterruptionType.began.rawValue
+        let ended = AVAudioSession.InterruptionType.ended.rawValue
+        let allowed = AVAudioSession.InterruptionOptions.shouldResume.rawValue
+        recovery.handle(type: began, options: 0, outputs: ["Spark USB"], active: true)
+        recovery.handle(type: ended, options: allowed, outputs: ["Spark USB"], active: false)
+        recovery.handle(type: began, options: 0, outputs: ["Spark USB"], active: false)
+        recovery.becameActive(outputs: ["Spark USB"])
+        XCTAssertEqual(starts, 0, "The new interruption has not ended yet")
+        recovery.handle(type: ended, options: allowed, outputs: ["Spark USB"], active: true)
+        XCTAssertEqual(starts, 1)
+    }
+
     func testPermittedEndWhileInactiveWaitsForActivationAndCanBeCancelled() {
         let recovery = AudioInterruptionRecovery()
         var starts = 0
@@ -49,6 +65,8 @@ final class AudioInterruptionRecoveryTests: XCTestCase {
             recovery.handle(type: began, options: 0, outputs: ["Spark USB"], active: true)
             if reason == "user" { recovery.cancel() }
             if reason == "disconnect" { recovery.disconnect() }
+            // Background is a cancellation, unlike a transient inactive state.
+            if reason == "background" { recovery.cancel() }
             recovery.handle(type: ended, options: reason == "notAllowed" ? 0 : allowed,
                 outputs: reason == "differentOutput" ? ["Speaker"] : ["Spark USB"],
                 active: reason != "background")

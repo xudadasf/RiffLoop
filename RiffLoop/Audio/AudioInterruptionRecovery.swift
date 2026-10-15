@@ -59,6 +59,8 @@ final class AudioInterruptionRecovery {
 
     func handle(type: UInt, options: UInt, outputs: [String], active: Bool) {
         if type == AVAudioSession.InterruptionType.began.rawValue {
+            // A second interruption needs its own ended/shouldResume permission.
+            waitingForActivation = false
             guard resume == nil else { return }
             let action = onBegan?()
             interruptedOutputs = outputs
