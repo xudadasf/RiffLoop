@@ -39,10 +39,62 @@ def tremolo_fixture(path,outline=False,mode='normal',string=3):
         doc.saveIncr()
 
 
+def short_tremolo_fixture(path,tuplet=False):
+    fixture(path,empty=True)
+    with fitz.open(path) as doc:
+        p=doc[0];p.insert_font(fontname='music',fontbuffer=font_buffer())
+        short=[70,82,94] if tuplet else [70+i*10 for i in range(8)]
+        sixteenths=[118,136,154] if tuplet else []
+        for x in short+sixteenths+[200,250,300]:
+            p.insert_text((x-1.95,114.4),'7',fontname='helv',fontsize=7)
+            p.draw_line((x,117),(x,155),width=.4)
+        for group,levels in ((short,3),(sixteenths,2)):
+            if group:
+                for j in range(levels):p.draw_rect(fitz.Rect(group[0],148+j*3,group[-1]+.2,149.5+j*3),color=None,fill=(0,0,0))
+        if tuplet:p.insert_text((79.75,171),'3',fontname='tiit',fontsize=9)
+        p.insert_text((70,121.5),'\ue222',fontname='music',fontsize=17)
+        doc.saveIncr()
+
+
 class TremoloTests(unittest.TestCase):
+    def test_short_tremolo_preserves_duration_tuplet_and_gp_marks(self):
+        for tuplet in (False,True):
+            with self.subTest(tuplet=tuplet),tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);pdf=root/'short.pdf';short_tremolo_fixture(pdf,tuplet)
+                data=recognize(pdf);bar=data['systems'][0]['bars'][0];first=bar['beats'][0]
+                self.assertEqual(bar['issues'],[])
+                self.assertEqual(first['duration'],32)
+                self.assertEqual(first['tuplet'],[3,2] if tuplet else [1,1])
+                self.assertEqual(first.get('tremolo_strokes'),3)
+                raw=root/'recognized.json';raw.write_text(json.dumps(data),encoding='utf-8');gp=root/'out.gp'
+                run=subprocess.run(['node',str(HERE/'gp-export.cjs'),str(raw),str(gp)],capture_output=True,text=True)
+                self.assertEqual(run.returncode,0,run.stderr)
+                script=r'''
+const fs=require('fs'),a=require('./RiffLoop/Resources/GpWeb/alphaTab.min.js');
+const s=a.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(fs.readFileSync(process.argv[1])),new a.Settings()),notes=[];
+const b=s.tracks[0].staves[0].bars[0].voices[0].beats[0];
+class Handler extends a.midi.AlphaSynthMidiFileHandler {
+ addNote(t,tick,duration,key,velocity,channel){notes.push([tick,duration]);super.addNote(t,tick,duration,key,velocity,channel);}
+}
+new a.midi.MidiFileGenerator(s,new a.Settings(),new Handler(new a.midi.MidiFile())).generate();
+console.log(JSON.stringify({duration:b.duration,tuplet:[b.tupletNumerator,b.tupletDenominator],marks:b.tremoloPicking?.marks,notes}));
+'''
+                run=subprocess.run(['node','-e',script,str(gp)],cwd=HERE.parent.parent,capture_output=True,text=True)
+                self.assertEqual(run.returncode,0,run.stderr);result=json.loads(run.stdout)
+                self.assertEqual(result['duration'],32);self.assertEqual(result['marks'],3)
+                if tuplet:
+                    self.assertEqual(result['tuplet'],[3,2])
+                    # alphaTab's existing >10-tick loop omits the final 10-tick
+                    # repetition. Preserve correct GP data; record the playback limit.
+                    self.assertEqual(result['notes'][:7],[[i*10,10] for i in range(7)])
+                    self.assertEqual(result['notes'][7],[80,80])
+                else:
+                    self.assertEqual(result['notes'][:8],[[i*15,15] for i in range(8)])
+                    self.assertEqual(result['notes'][8],[120,120])
+
     def test_stemless_tab_requires_matching_standard_staff_tremolo(self):
         for outline in (False,True):
-            for mode in ('normal','no_mark','no_head','no_stem','wrong_column','duplicate','chord','detached_stem','two_strokes'):
+            for mode in ('normal','adjacent_mark','no_mark','no_head','no_stem','wrong_column','duplicate','chord','detached_stem','two_strokes'):
                 with self.subTest(outline=outline,mode=mode),tempfile.TemporaryDirectory() as folder:
                     pdf=Path(folder)/'mirrored.pdf';tremolo_fixture(pdf,outline,mode='no_stem')
                     with fitz.open(pdf) as doc:
@@ -51,6 +103,10 @@ class TremoloTests(unittest.TestCase):
                         if mode!='no_head':p.insert_text((67.5,64.25),'\ue0a4',fontname='music',fontsize=17)
                         if mode=='chord':p.insert_text((67.5,68.5),'\ue0a4',fontname='music',fontsize=17)
                         if mode!='no_stem':p.draw_line((67.75,70 if mode=='detached_stem' else 64.8),(67.75,84.4),width=.4)
+                        if mode=='adjacent_mark':
+                            p.insert_text((74.1,62.125),'\ue0a4',fontname='music',fontsize=17)
+                            p.draw_line((74.35,62.675),(74.35,84.4),width=.4)
+                            p.insert_text((74.35,76),'\ue222',fontname='music',fontsize=17)
                         if mode!='no_mark':
                             x=90 if mode=='wrong_column' else 67.75
                             code=0xe221 if mode=='two_strokes' else 0xe222
@@ -59,7 +115,7 @@ class TremoloTests(unittest.TestCase):
                                 else:p.insert_text((x,76),chr(code),fontname='music',fontsize=17)
                         doc.saveIncr()
                     data=recognize(pdf);beat=data['systems'][0]['bars'][0]['beats'][0]
-                    self.assertEqual(beat.get('tremolo_strokes'),3 if mode=='normal' else None)
+                    self.assertEqual(beat.get('tremolo_strokes'),3 if mode in ('normal','adjacent_mark') else None)
 
     def test_three_strokes_on_a_quarter_stem_from_text_and_paths(self):
         for outline in (False,True):

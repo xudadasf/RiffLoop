@@ -215,7 +215,7 @@ def recognize(pdf):
                 for beat in bar['beats']:
                     beat['notes'].sort(key=lambda n:n['string'])
                     beat['tuplet']=[1,1]
-                read_tuplets(bar,staff,standard,spans)
+                read_tuplets(bar,staff,standard,spans,lines)
                 read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes)
                 validate_bar(bar)
                 previous_bar=bar
@@ -559,17 +559,17 @@ def read_slides(system,spans,lines,shapes):
 
 
 def read_tremolos(system,spans,lines):
-    """Three strokes on a quarter's TAB stem, or mirrored on its staff stem."""
+    """Three strokes on a supported TAB stem, or mirrored on its staff stem."""
     top,bottom=system['ys'][0],system['ys'][-1];gap=(bottom-top)/5
     marks=[];claims=[]
     for span in spans:
         x,y=span['origin']
         if span['text']!='\ue222' or not system['left']<x<system['right'] or not top<y<bottom+gap*4:continue
-        mark={'page':system['page'],'x':x,'y':y,'status':'unsupported','reason':'requires-unique-quarter-note-and-stem'}
+        mark={'page':system['page'],'x':x,'y':y,'status':'unsupported','reason':'requires-supported-single-note-and-stem'}
         marks.append(mark);candidates=[]
         for bar in system['bars']:
             for i,beat in enumerate(bar['beats']):
-                if (beat['duration']!=4 or beat['dots'] or beat['tuplet']!=[1,1] or beat['grace']
+                if ((beat['duration'],tuple(beat['tuplet'])) not in ((4,(1,1)),(32,(1,1)),(32,(3,2))) or beat['dots'] or beat['grace']
                         or len(beat['notes'])!=1 or abs(beat['x']-x)>=1):continue
                 note=beat['notes'][0]
                 if note['dead'] or note['tie'] or not gap*.5<y-note['y']<gap*3:continue
@@ -582,15 +582,16 @@ def read_tremolos(system,spans,lines):
                            and abs((s['bbox'][0]+s['bbox'][2])/2-x)<1.5]
                     mirrored=[s for s in spans if s['text']=='\ue222' and upper<s['origin'][1]<top-4
                               and abs(s['origin'][0]-x)<4.5]
-                    if len(heads)==1 and heads[0]['text']=='\ue0a4' and len(mirrored)==1:
-                        head=heads[0];mx,my=mirrored[0]['origin']
+                    if len(heads)==1 and heads[0]['text']=='\ue0a4':
+                        head=heads[0]
                         # Require a real stem attached to the unique notehead,
                         # crossing the matching mark; TAB position alone is insufficient.
-                        stems=[l for l in lines if abs(l[0]-l[2])<.2 and abs(l[0]-mx)<1
-                               and min(abs(l[0]-head['bbox'][0]),abs(l[0]-head['bbox'][2]))<1
+                        stems=[l for mx,my in (m['origin'] for m in mirrored) for l in lines
+                               if abs(l[0]-l[2])<.2 and abs(l[0]-mx)<1
                                and abs(l[1]-l[3])>9 and upper-25<min(l[1],l[3])<my-gap*.5
                                and my+gap*.8<max(l[1],l[3])<top-4
-                               and min(abs(l[1]-head['origin'][1]),abs(l[3]-head['origin'][1]))<1.5]
+                               and ((abs(min(l[1],l[3])-head['origin'][1])<1.5 and abs(l[0]-head['bbox'][0])<1)
+                                    or (abs(max(l[1],l[3])-head['origin'][1])<1.5 and abs(l[0]-head['bbox'][2])<1))]
                 if len(stems)==1:candidates.append((bar,i,beat))
         if len(candidates)==1:claims.append((mark,*candidates[0]))
     counts=collections.Counter(id(beat) for mark,bar,i,beat in claims)
@@ -673,13 +674,18 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
         if any(abs(center(h)-source['x'])>=4.5 for h in before): continue
         pairs=list(zip(sorted(before,key=lambda s:s['origin'][1]),sorted(after,key=lambda s:s['origin'][1])))
         if any(abs(a['origin'][1]-z['origin'][1])>.25 for a,z in pairs): continue
-        # Every tone needs its own horizontal arc, terminating at the two
-        # notehead edges. One chord-level slur cannot imply several tied notes.
+        # Every tone needs its own arc at the head edges. A single hidden tone
+        # may instead have a short arc aligned below both head centers.
+        # One chord-level slur cannot imply several tied notes.
         connections=[]
         for a,z in pairs:
-            matches=[i for i,(p,q) in enumerate(arcs) if abs(p.x-a['bbox'][2])<2
-                     and abs(q.x-z['bbox'][0])<2 and abs(p.y-q.y)<.5
-                     and abs(p.y-a['origin'][1])<1.5 and abs(q.y-z['origin'][1])<1.5]
+            space=standard['ys'][1]-standard['ys'][0]
+            matches=[i for i,(p,q) in enumerate(arcs) if abs(p.y-q.y)<.5 and (
+                     (abs(p.x-a['bbox'][2])<2 and abs(q.x-z['bbox'][0])<2
+                      and abs(p.y-a['origin'][1])<1.5 and abs(q.y-z['origin'][1])<1.5)
+                     or (len(pairs)==1 and abs(p.x-center(a))<space*.25 and abs(q.x-center(z))<space*.25
+                         and space*.4<p.y-a['origin'][1]<space*.8
+                         and space*.4<q.y-z['origin'][1]<space*.8))]
             connections.append(matches)
         if any(len(m)!=1 for m in connections): continue
         if len({m[0] for m in connections})!=len(pairs): continue
@@ -1029,7 +1035,7 @@ def beam_cross_section(shape,x):
     return None
 
 
-def read_tuplets(bar,staff,standard,spans):
+def read_tuplets(bar,staff,standard,spans,lines):
     top,bottom=staff['ys'][0],staff['ys'][-1]
     low=standard['ys'][-1] if standard else bottom
     high=top-4 if standard else bottom+55
@@ -1045,6 +1051,29 @@ def read_tuplets(bar,staff,standard,spans):
         if len(ids)==count and not used.intersection(ids):
             for i in ids: bar['beats'][i]['tuplet']=[count,ratios[count]]
             used.update(ids)
+    if not standard:return
+    # Upper triplet digits must have their own two-sided bracket. Fingerings
+    # and nearby text must not turn the nearest notes into a tuplet.
+    space=standard['ys'][1]-standard['ys'][0]
+    upper=[s for s in spans if s['text']=='3' and 7<=s['size']<=10 and 'times' in s['font'].lower()
+           and standard['ys'][0]-30<s['origin'][1]<standard['ys'][0]
+           and bar['left']<s['origin'][0]<bar['right']]
+    for label in upper:
+        x0,_,x1,_=label['bbox'];y=label['origin'][1]
+        horizontal=[(min(a,c),max(a,c),(b+d)/2) for a,b,c,d in lines
+                    if abs(b-d)<.2 and abs(a-c)>space*.5 and y-space<(b+d)/2<y]
+        left=[l for l in horizontal if 0<x0-l[1]<space]
+        right=[l for l in horizontal if 0<l[0]-x1<space]
+        if len(left)!=1 or len(right)!=1 or abs(left[0][2]-right[0][2])>.2:continue
+        start,end=left[0][0],right[0][1];by=left[0][2]
+        if not bar['left']<start<end<bar['right']:continue
+        if any(sum(abs(a-c)<.2 and abs(a-x)<.2 and abs(min(b,d)-by)<.2
+                   and space*.3<abs(b-d)<space*.8 for a,b,c,d in lines)!=1 for x in (start,end)):continue
+        ids=[i for i,b in enumerate(bar['beats']) if start-.5<b['x']<end+.5]
+        if len(ids)!=3 or used.intersection(ids):continue
+        if any(bar['beats'][i]['grace'] or bar['beats'][i]['duration'] is None for i in ids):continue
+        for i in ids:bar['beats'][i]['tuplet']=[3,2]
+        used.update(ids)
 
 
 def add_rests(bar,staff,standard,spans,lines,shapes):

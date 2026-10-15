@@ -53,8 +53,10 @@ for (const source of bars) {
         [beat.tupletNumerator,beat.tupletDenominator] = item.tuplet;
         if(item.grace) beat.graceType = alpha.model.GraceType.BeforeBeat;
         if(item.tremolo_strokes !== undefined) {
-            if(item.tremolo_strokes!==3 || item.duration!==4 || item.dots || item.grace ||
-                item.tuplet[0]!==1 || item.tuplet[1]!==1 || item.notes.length!==1 || item.notes[0].tie || item.notes[0].dead)
+            const plain=item.tuplet[0]===1 && item.tuplet[1]===1;
+            const supported=item.duration===4 && plain || item.duration===32 && (plain || item.tuplet[0]===3 && item.tuplet[1]===2);
+            if(item.tremolo_strokes!==3 || !supported || item.dots || item.grace ||
+                item.notes.length!==1 || item.notes[0].tie || item.notes[0].dead)
                 throw Error('Unsupported tremolo in recognition data');
             beat.tremoloPicking = new alpha.model.TremoloPickingEffect();
             beat.tremoloPicking.marks = item.tremolo_strokes;

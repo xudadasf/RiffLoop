@@ -40,7 +40,8 @@ if(require.main===module) {
     const summary={candidate_count:cases.length,counts:Object.fromEntries(categories.map(k=>[k,cases.reduce((n,c)=>n+(c[k]?.length||0),0)])),
         cases_with_verified_rule:cases.filter(c=>c.verified?.length).length,
         limitations:['Repeated regression corpus, not blind testing','Only core-exact bars can verify beat-level tremolos',
-            'Only three strokes on undotted regular single-note quarters are currently recognized','Tremolo timing uses alphaTab playback semantics; audible playback is not verified'],cases,regressions:[]};
+            'Only three strokes on undotted single-note quarters or 32nds (plain or 3:2) are currently recognized',
+            'Tremolo timing uses alphaTab playback semantics; its >10-tick cutoff can omit very short final repetitions; audible playback is not verified'],cases,regressions:[]};
     if(baselineFile){const baseline=read(baselineFile);summary.regressions=findRegressions(summary,baseline.tremolo_audit||baseline);}
     fs.writeFileSync(path.join(folder,'tremolo-audit.json'),JSON.stringify(summary,null,2));
     console.log(JSON.stringify({counts:summary.counts,cases_with_verified_rule:summary.cases_with_verified_rule,regressions:summary.regressions.length}));
