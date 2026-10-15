@@ -52,6 +52,13 @@ for (const source of bars) {
         beat.duration = item.duration; beat.dots = item.dots;
         [beat.tupletNumerator,beat.tupletDenominator] = item.tuplet;
         if(item.grace) beat.graceType = alpha.model.GraceType.BeforeBeat;
+        if(item.tremolo_strokes !== undefined) {
+            if(item.tremolo_strokes!==3 || item.duration!==4 || item.dots || item.grace ||
+                item.tuplet[0]!==1 || item.tuplet[1]!==1 || item.notes.length!==1 || item.notes[0].tie || item.notes[0].dead)
+                throw Error('Unsupported tremolo in recognition data');
+            beat.tremoloPicking = new alpha.model.TremoloPickingEffect();
+            beat.tremoloPicking.marks = item.tremolo_strokes;
+        }
         const currentNotes = new Map();
         for(const raw of item.notes) {
             const note = new alpha.model.Note(); note.string = 7-raw.string;
@@ -96,6 +103,8 @@ for(let i=0;i<bars.length;i++) {
     if(received.length !== expected.length) throw Error('Export roundtrip changed beat count');
     for(let j=0;j<expected.length;j++) {
         const e=expected[j], a=received[j];
+        if((a.tremoloPicking?.marks ?? 0)!==(e.tremolo_strokes ?? 0) || (a.tremoloPicking?.style ?? 0)!==0)
+            throw Error(`Roundtrip changed tremolo at bar ${i+1}, beat ${j+1}`);
         const notes=a.notes.map(n=>[7-n.string,n.isDead?null:n.fret]).sort((a,b)=>a[0]-b[0]);
         const ties=a.notes.map(n=>[7-n.string,n.isTieDestination]).sort((a,b)=>a[0]-b[0]);
         for(const raw of e.notes) {

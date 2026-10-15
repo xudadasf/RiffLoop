@@ -1,10 +1,10 @@
 # PDF 六线谱 → GP 独立实验
 
-这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-14 部分隐藏延音链](VALIDATION-20261014-hidden-partial.md)，此前见 [轮廓速度符号](VALIDATION-20261014-outline-tempo.md)、 [部分和弦跨行延音](VALIDATION-20261014-partial-boundary.md)、 [隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)、 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
+这是可运行的电脑端实验工具，尚未接入 RiffLoop，也未更改 Android 或 iOS。当前结论：**已有完整分谱通过音符、休止、延音及节奏等核心项目的对比；完整演奏技巧和通用整曲转换仍未解决。** 最新结果见 [2026-10-15 重复拨弦与整曲时序](VALIDATION-20261015-tremolo.md)，此前见 [部分隐藏延音链](VALIDATION-20261014-hidden-partial.md)、[轮廓速度符号](VALIDATION-20261014-outline-tempo.md)、 [部分和弦跨行延音](VALIDATION-20261014-partial-boundary.md)、 [隐藏延音与留白测量](VALIDATION-20261014-tie-padding.md)、 [连续滑音与轮廓装饰音](VALIDATION-20261013-ornaments.md)、[密集滑音与共享连奏弧线](VALIDATION-20261013-compact-slides.md)、[掌根闷音与连续范围](VALIDATION-20261013-palm-mute.md)、[单音顿音](VALIDATION-20261013-staccato.md)、[跨行与跨页滑音](VALIDATION-20261013-boundary-slides.md)、[和弦连奏滑音](VALIDATION-20261013-chord-slides.md)、[单音滑音与按类型回归](VALIDATION-20261012-slides.md)、[中途变速修复](VALIDATION-20261012-tempo.md) 和 [按字形宽度恢复延音与《默》整曲验证](VALIDATION-20261011-font-width.md)。
 
 当前优先级：用户主要需要可靠的练习节奏，因此优先检查起音位置、时值、休止、延音和拍号，并继续核对速度；演奏技巧标记暂列后。节奏检查通过不代替音符检查，也不降低现有整份导出条件。
 
-最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充通用规则并继续恢复隐藏延音后，完整核心通过并导出的分谱增至 22 份；全部所测播放时序通过 9/22，起音检查通过 12/22。原先通过项全部保留，分母增加来自新增可验证分谱。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
+最初的 [播放时序验证及未完成事项](VALIDATION-20261011-playback.md) 使用实际 MIDI 生成器检查播放行为，当时 18 份核心通过分谱中仅《醉拳》通过全部所测播放时序项目。补充通用规则并继续恢复隐藏延音后，完整核心通过并导出的分谱增至 22 份；补回重复拨弦后，全部所测播放时序通过 10/22，起音检查通过 13/22。原先通过项全部保留。《默》等仍有其他演奏信息尚未还原，核心通过不能视作播放完全还原。
 
 [2026-10-12 中途变速修复](VALIDATION-20261012-tempo.md) 已补回《变相怪杰》的 120→165→120，生成播放时长由 208 秒恢复为参考的 202 秒。18 份完整导出的速度时间线均通过。
 
@@ -57,6 +57,8 @@
 连续滑音也可共用一个位于整段弧线中心的 sl.，要求整段同弦、无歧义且每个过渡有证据。数字间距小于弦距的 0.6 倍时可接受没有斜线，但仍须显式文字和唯一弧线，且不可存在冲突斜线；宽间隔缺线不推断。
 
 支持明确的单音波音/回音符号，包括文字与轮廓混合的 PDF。以 Bravura 模板辨认四种符号，要求唯一对应普通单音，导出后回读类型并验证 MIDI 起音；真实素材目前仅验证了《默》的五个上波音。
+
+支持文字或轮廓形式的三斜杠重复拨弦：要求唯一对应普通无附点四分单音，且符号穿过同列真实六线谱符干。导出保留重复拨弦属性，GP 回读核对类型，实际 MIDI 验证该拍产生八次三十二分音符起音。《残酷天使纲领》三处标记已与参考核对，并使整曲全部所测时序通过。没有六线谱符干的另一种排版、和弦、连音、其他时值及斜杠数量尚未支持。
 
 ## 当前边界
 
@@ -203,6 +205,14 @@ node experiments/pdf-tab-prototype/audit-ornaments.cjs output/pdf-tab-prototype/
 ```
 
 后续应继续处理跨行/跨页延音、演奏技巧、速度变化及多声部；保持独立实验，不能把核心谱面验证等同于全部演奏信息正确。
+
+重复拨弦另按节拍、斜杠数量及演奏类型审计，仅在核心完全对齐的小节计入已验证：
+
+```powershell
+node experiments/pdf-tab-prototype/audit-tremolos.cjs output/pdf-tab-prototype/benchmark-20261014-tremolo experiments/pdf-tab-prototype/validation-summary-20261015-tremolo.json
+```
+
+此审计只处理可评估候选；多分谱、参考文件读取失败等候选中的预测另列在验证摘要的 `unverified_tremolos_outside_evaluated_cases`，不能计入正确数。
 
 ## 参考 API
 

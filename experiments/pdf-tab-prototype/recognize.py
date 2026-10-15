@@ -96,7 +96,7 @@ def text_spans(page):
 def recognize(pdf):
     document = fitz.open(pdf)
     result = {'input':str(Path(pdf).resolve()), 'format':'vector-pdf-experiment-v1',
-              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],'palm_mute_marks':[],'ornament_marks':[],
+              'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],'palm_mute_marks':[],'ornament_marks':[],'tremolo_marks':[],
               'warnings':['演奏技巧、延音、反复结构和速度变化尚未完整识别，所有导出均为实验稿。',
                           '初始 BPM 暂按四分音符计拍，须人工核对速度标记。']}
     previous_meter = [4, 4]
@@ -113,7 +113,7 @@ def recognize(pdf):
             spans += outlined
         else:
             # Some PDFs keep rests as font text but print ornaments as paths.
-            spans += [s for s in outlined if s['text'] in ORNAMENTS]
+            spans += [s for s in outlined if s['text'] in ORNAMENTS or s['text']=='\ue222']
         # Tempo symbols can be paths even when the staff uses font text.
         # Include outlined dots here to reject dotted units, without changing
         # the staff's rhythm-dot reader on mixed text/path pages.
@@ -222,6 +222,7 @@ def recognize(pdf):
             result['staccato_marks'].extend(read_staccatos(system,spans,staff['notation_bottom']))
             result['palm_mute_marks'].extend(read_palm_mutes(system,spans,lines,shapes))
             result['ornament_marks'].extend(read_ornaments(system,spans))
+            result['tremolo_marks'].extend(read_tremolos(system,spans,lines))
             result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
             if result['systems']:
                 read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'])
@@ -229,6 +230,8 @@ def recognize(pdf):
             previous_shapes = shapes
             previous_lines = lines
     read_tempos(result,tempo_marks)
+    if any(m['status']=='unsupported' for m in result['tremolo_marks']):
+        result['warnings'].append('部分重复拨弦标记的节拍或符干未确认，尚未还原；详见 tremolo_marks。')
     if any(m['status']=='unsupported' for m in result['slide_marks']):
         result['warnings'].append('部分 sl. 滑音标记的连线或音符对应关系未确认，尚未还原；详见 slide_marks。')
     if any(m['status']=='unsupported' for m in result['staccato_marks']):
@@ -552,6 +555,35 @@ def read_slides(system,spans,lines,shapes):
             if len(matches[0])>1:mark.update(kind='grouped-single-notes',transitions=len(matches[0]))
         else:mark['reason']='requires-unique-adjacent-same-string-notes-line-and-arc'
         marks.append(mark)
+    return marks
+
+
+def read_tremolos(system,spans,lines):
+    """Three explicit strokes on a regular single-note quarter's TAB stem."""
+    top,bottom=system['ys'][0],system['ys'][-1];gap=(bottom-top)/5
+    marks=[];claims=[]
+    for span in spans:
+        x,y=span['origin']
+        if span['text']!='\ue222' or not system['left']<x<system['right'] or not top<y<bottom+gap*4:continue
+        mark={'page':system['page'],'x':x,'y':y,'status':'unsupported','reason':'requires-unique-quarter-note-and-stem'}
+        marks.append(mark);candidates=[]
+        for bar in system['bars']:
+            for i,beat in enumerate(bar['beats']):
+                if (beat['duration']!=4 or beat['dots'] or beat['tuplet']!=[1,1] or beat['grace']
+                        or len(beat['notes'])!=1 or abs(beat['x']-x)>=1):continue
+                note=beat['notes'][0]
+                if note['dead'] or note['tie'] or not gap*.5<y-note['y']<gap*3:continue
+                stems=[line for line in lines if abs(line[0]-line[2])<.2 and abs(line[0]-x)<1
+                       and min(line[1],line[3])<y-gap*.5 and max(line[1],line[3])>y+gap*.8]
+                if len(stems)==1:candidates.append((bar,i,beat))
+        if len(candidates)==1:claims.append((mark,*candidates[0]))
+    counts=collections.Counter(id(beat) for mark,bar,i,beat in claims)
+    for mark,bar,i,beat in claims:
+        if counts[id(beat)]!=1:
+            mark['reason']='duplicate-mark';continue
+        beat['tremolo_strokes']=3
+        mark.update(status='recognized',bar=bar['number'],beat=i,strokes=3)
+        mark.pop('reason')
     return marks
 
 
