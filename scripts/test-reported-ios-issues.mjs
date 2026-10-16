@@ -189,7 +189,7 @@ for (const file of ["UI/PracticeView.swift", "PDF/PdfPracticeView.swift", "GP/Gp
 }
 assert.match(homeView, /继续今天的练习[\s\S]*?continuePracticeCard/);
 assert.match(homeView, /开始新的练习[\s\S]*?modeButton\(for: \.video\)[\s\S]*?modeButton\(for: \.guitarPro\)[\s\S]*?modeButton\(for: \.pdf\)/);
-assert.match(homeView, /calendarDays\(weeks: 4\)[\s\S]*?最近一个月/);
+assert.match(read("RiffLoop/UI/PracticeHistoryCard.swift"), /calendarDays\(weeks: 4\)[\s\S]*?最近一个月/);
 assert.match(
     homeView,
     /welcomeHeader[\s\S]*?signingStatusCard[\s\S]*?continuePracticeCard/,

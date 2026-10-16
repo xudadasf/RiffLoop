@@ -47,6 +47,10 @@ final class PracticeSessionTimerTests: XCTestCase {
         XCTAssertEqual(PracticeDurationText.compact(3599), "59m")
         XCTAssertEqual(PracticeDurationText.compact(3600), "1h 0m")
         XCTAssertEqual(PracticeDurationText.compact(7625), "2h 7m")
+        XCTAssertEqual(PracticeDurationText.hoursMinutes(7625), "2h 7m")
+        XCTAssertEqual(PracticeDurationText.hoursMinutes(59), "0h 0m")
+        XCTAssertEqual(PracticeDurationText.hoursMinutes(900), "0h 15m")
+        XCTAssertEqual(PracticeDurationText.hoursMinutes(-2), "0h 0m")
         XCTAssertEqual(PracticeDurationText.detailed(7625), "2h 7m 5s")
         XCTAssertEqual(PracticeDurationText.detailed(45), "0h 0m 45s")
     }

@@ -13,6 +13,21 @@ final class PracticeExperienceTests: XCTestCase {
         try await capture(AnyView(HomeView()), name: "Home-compact-practice-calendar", expectAwake: false)
     }
 
+    func testSelectedDayDurationBubbleRendersInsideFixedHeader() async throws {
+        let suite = "HistoryBubble.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let history = PracticeHistoryStore(defaults: defaults)
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        let noon = Calendar.current.startOfDay(for: yesterday).addingTimeInterval(12 * 3600)
+        history.record(seconds: 7625, endingAt: noon)
+        let selected = try XCTUnwrap(history.calendarDays(weeks: 4).first {
+            Calendar.current.isDate($0.date, inSameDayAs: noon)
+        })
+        try await capture(AnyView(PracticeHistoryCard(history: history, selectedDay: .constant(selected))
+            .frame(width: 340)), name: "Home-selected-day-inline-duration-bubble", expectAwake: false)
+    }
+
     func testTempoKeypadRendersWithoutSystemKeyboard() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)

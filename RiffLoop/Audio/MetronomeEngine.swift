@@ -233,7 +233,7 @@ final class MetronomeEngine {
         )
     }
 
-    private static func makeClick(
+    static func makeClick(
         frequency: Double,
         amplitude: Float,
         decay: Double,
@@ -253,7 +253,7 @@ final class MetronomeEngine {
             let sample = amplitude * envelope * Float(sin(2 * .pi * frequency * seconds))
 
             for channel in 0..<Int(format.channelCount) {
-                channels[channel][frame] = boostedAudioSample(sample, gain: boost)
+                channels[channel][frame] = limitedMetronomeSample(sample, gain: boost)
             }
         }
 
@@ -264,4 +264,15 @@ final class MetronomeEngine {
 /// Native independent clicks support the same 0–600% range as score clicks.
 func metronomeClickBoost(volume: Float) -> Float {
     volume.isFinite ? min(6, max(1, volume)) : 1
+}
+
+/// Match the score player's soft knee. Gain is not loudness or amplifier power;
+/// peaks approach 0.98 instead of being abruptly cut off at full scale.
+func limitedMetronomeSample(_ sample: Float, gain: Float) -> Float {
+    guard sample.isFinite, gain.isFinite else { return 0 }
+    let value = Double(sample) * Double(max(0, gain))
+    let magnitude = abs(value)
+    guard magnitude > 0.75 else { return Float(value) }
+    let limited = Float(0.75 + 0.23 * tanh((magnitude - 0.75) / 0.23))
+    return value < 0 ? -limited : limited
 }

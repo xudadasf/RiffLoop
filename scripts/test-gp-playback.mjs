@@ -51,6 +51,22 @@ const source = readFileSync(
     assert.ok(pulses[4].frequency > pulses[1].frequency * 1.2);
     assert.equal(pulses[6].rms, 0, 'Muted main beat must stay silent');
     assert.ok(pulses.every(pulse => pulse.peak * 2 < 1), '200% metronome must retain peak headroom');
+    const limiterScope = {};
+    new Function('window', readFileSync(new URL('../RiffLoop/Resources/GpWeb/riffloop-audio.js', import.meta.url), 'utf8'))(limiterScope);
+    const audit = [1, 2, 4, 6].map(gain => {
+        options.metronomeVolume = api.metronomeVolume * gain;
+        const render = alphaTab.synth.AlphaSynth.prototype.exportAudio.call(null, options, midi, [], new Map());
+        const raw = render.render(100).samples;
+        const limited = Array.from(raw, limiterScope.RiffLoopAudio.limit);
+        return { percent: gain * 100,
+            rms: Math.sqrt(limited.reduce((sum, sample) => sum + sample * sample, 0) / limited.length),
+            peak: limited.reduce((peak, sample) => Math.max(peak, Math.abs(sample)), 0) };
+    });
+    for (let index = 0; index < audit.length; index++) {
+        assert.ok(audit[index].peak <= 0.980001, 'Score click output must retain its soft-limited ceiling');
+        if (index) assert.ok(audit[index].rms > audit[index - 1].rms, 'Actual score click energy must increase through 600%');
+    }
+    console.log('GP metronome gain audit:', JSON.stringify(audit));
     console.log('GP shipped-synth metronome energy, pitch separation and headroom passed');
 }
 

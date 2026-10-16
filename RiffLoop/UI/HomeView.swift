@@ -185,58 +185,7 @@ struct HomeView: View {
     }
 
     private var practiceSummaryCard: some View {
-        let days = practiceHistory.calendarDays(weeks: 4)
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("练习概览")
-                    .font(.headline)
-                Spacer()
-                Text("最近一个月")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 24) {
-                practiceMetric("今天", seconds: practiceHistory.seconds(on: Date()))
-                practiceMetric("本周", seconds: practiceHistory.secondsThisWeek())
-                practiceMetric("累计", seconds: practiceHistory.totalSeconds)
-            }
-
-            LazyVGrid(columns: columns, spacing: 5) {
-                ForEach(days) { day in
-                    Button { selectedPracticeDay = day } label: {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(practiceColor(for: day))
-                            .frame(height: 22)
-                            .overlay {
-                                if Calendar.current.isDateInToday(day.date) {
-                                    RoundedRectangle(cornerRadius: 4).stroke(.orange, lineWidth: 1.5)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(day.isFuture)
-                    .accessibilityIdentifier("practice.day.\(day.id)")
-                    .accessibilityLabel(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN"))))
-                    .accessibilityValue(PracticeDurationText.detailed(day.seconds))
-                }
-            }
-        }
-        .padding(18)
-        .cardSurface()
-        .popover(item: $selectedPracticeDay) { day in
-            VStack(alignment: .leading, spacing: 10) {
-                Text(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN"))))
-                    .font(.headline)
-                Text(PracticeDurationText.detailed(practiceHistory.seconds(on: day.date)))
-                    .font(.title2.monospacedDigit())
-                    .accessibilityIdentifier("practice.day.duration")
-            }
-            .padding(20)
-            .presentationCompactAdaptation(.popover)
-        }
+        PracticeHistoryCard(history: practiceHistory, selectedDay: $selectedPracticeDay)
     }
 
     private var recentProjectsSection: some View {
@@ -371,26 +320,6 @@ struct HomeView: View {
             (recentSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
              displayName(for: project).localizedStandardContains(recentSearch.trimmingCharacters(in: .whitespacesAndNewlines)))
         }
-    }
-
-    private func practiceMetric(_ title: String, seconds: TimeInterval) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(formatPracticeDuration(seconds))
-                .font(.headline.monospacedDigit())
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func practiceColor(for day: PracticeDay) -> Color {
-        guard !day.isFuture else { return Color(.quaternarySystemFill) }
-        let minutes = day.seconds / 60
-        if minutes == 0 { return Color(.quaternarySystemFill) }
-        if minutes < 5 { return Color.orange.opacity(0.3) }
-        if minutes < 15 { return Color.orange.opacity(0.5) }
-        if minutes < 30 { return Color.orange.opacity(0.7) }
-        return .orange
     }
 
     private func formatPracticeDuration(_ seconds: TimeInterval) -> String {
