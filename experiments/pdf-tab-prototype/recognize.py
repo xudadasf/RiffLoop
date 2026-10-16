@@ -488,11 +488,10 @@ def single_slide_evidence(sn,tn,lines,gap):
 
 
 def grouped_slide_pairs(label,beats,arcs,spans,lines,gap,top):
-    """One centered sl. label can describe a whole same-string slide chain."""
+    """A centered sl. covers a contiguous group; other edges need unique H/P evidence."""
     matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
     for sh in arcs:
         a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
-        if abs(x-(a.x+z.x)/2)>gap*.5:continue
         if not (top-25<y<top+2 or abs(y-sh['rect'].y0)<gap*.5):continue
         starts=[i for i,(b,v) in enumerate(beats) if abs(v['x']-a.x)<1]
         ends=[i for i,(b,v) in enumerate(beats) if abs(v['x']-z.x)<1]
@@ -507,11 +506,28 @@ def grouped_slide_pairs(label,beats,arcs,spans,lines,gap,top):
         labels=[m for m in spans if m['text'].strip().lower() in ('h','p','sl.')
                 and a.x<(m['bbox'][0]+m['bbox'][2])/2<z.x
                 and (top-25<m['origin'][1]<top+2 or abs(m['origin'][1]-sh['rect'].y0)<gap*.5)]
-        if len(labels)!=1 or labels[0] is not label:continue
+        slide_labels=[m for m in labels if m['text'].strip().lower()=='sl.']
+        if len(slide_labels)!=1 or slide_labels[0] is not label:continue
         pairs=[(sb,sv['notes'][0],tb,tv['notes'][0]) for (sb,sv),(tb,tv) in zip(chain,chain[1:])]
         if any(tn['tie'] or sn['fret']==tn['fret'] or tb['number'] not in (sb['number'],sb['number']+1)
-               or not single_slide_evidence(sn,tn,lines,gap) for sb,sn,tb,tn in pairs):continue
-        matches.append(pairs)
+               for sb,sn,tb,tn in pairs):continue
+        explained=set();valid=True
+        for mark in labels:
+            if mark is label:continue
+            mx=(mark['bbox'][0]+mark['bbox'][2])/2
+            edges=[i for i,(_,sn,_,tn) in enumerate(pairs) if sn['x']<mx<tn['x']]
+            if len(edges)!=1 or edges[0] in explained:valid=False;break
+            i=edges[0];_,sn,_,tn=pairs[i]
+            direction=1 if mark['text'].strip().lower()=='h' else -1
+            if (tn['fret']-sn['fret'])*direction<=0 or slide_line_count(sn,tn,lines,gap,minimum_width=gap*.15):
+                valid=False;break
+            explained.add(i)
+        remaining=[i for i in range(len(pairs)) if i not in explained]
+        if not valid or len(remaining)<2 or remaining!=list(range(remaining[0],remaining[-1]+1)):continue
+        group=[pairs[i] for i in remaining]
+        if abs(x-(group[0][1]['x']+group[-1][3]['x'])/2)>gap*.5:continue
+        if any(not single_slide_evidence(sn,tn,lines,gap) for _,sn,_,tn in group):continue
+        matches.append(group)
     return matches
 
 
