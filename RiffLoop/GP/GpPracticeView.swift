@@ -105,8 +105,12 @@ struct GpPracticeView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     PracticeSessionTimer(clock: practiceClock)
                     Button { activePanel = activePanel == .standalone ? nil : .standalone } label: {
-                        Label(viewModel.isStandaloneMetronomePlaying ? "\(Int(viewModel.standaloneBpm)) BPM" : "独立节拍", systemImage: "metronome")
-                            .labelStyle(.titleAndIcon)
+                        HStack(spacing: 4) {
+                            Image(systemName: "metronome")
+                            Text(viewModel.isStandaloneMetronomePlaying ? "\(Int(viewModel.standaloneBpm)) BPM" : "独立节拍")
+                        }
+                        .font(.subheadline)
+                        .fixedSize()
                     }
                     .tint(viewModel.isStandaloneMetronomePlaying ? .green : .accentColor)
                     .accessibilityIdentifier("gp.standalone.settings")
@@ -315,7 +319,7 @@ struct GpPracticeView: View {
             activePanel = activePanel == panel ? nil : panel
         } label: {
             VStack(alignment: .leading, spacing: 5) {
-                Label(panel.title, systemImage: panel.systemImage)
+                Label(panel == .metronome ? "跟谱" : panel.title, systemImage: panel.systemImage)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(activePanel == panel ? Color.accentColor : .primary)
                 Text(summary)
