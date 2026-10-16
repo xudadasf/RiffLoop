@@ -7,8 +7,8 @@ final class AudioGainTests: XCTestCase {
         XCTAssertEqual(metronomeClickBoost(volume: 6), 6)
         XCTAssertEqual(metronomeClickBoost(volume: 10), 6)
         XCTAssertEqual(metronomeClickBoost(volume: 0.4), 1)
-        XCTAssertEqual(boostedAudioSample(0.1, gain: metronomeClickBoost(volume: 6)), 0.6, accuracy: 0.001)
-        XCTAssertEqual(boostedAudioSample(0.8, gain: metronomeClickBoost(volume: 6)), 1)
+        XCTAssertEqual(limitedMetronomeSample(0.1, gain: metronomeClickBoost(volume: 6)), 0.6, accuracy: 0.001)
+        XCTAssertLessThan(limitedMetronomeSample(0.8, gain: metronomeClickBoost(volume: 6)), 1)
     }
     func testNativeClickBuffersGainEnergyWithoutHardClipping() throws {
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
