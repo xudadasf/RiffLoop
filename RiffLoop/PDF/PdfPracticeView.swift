@@ -33,7 +33,7 @@ struct PdfPracticeView: View {
     @State private var pdfLibraryPresented = false
     @State private var audioLibraryPresented = false
     @State private var didOpenInitialURL = false
-    @State private var practiceStartedAt = Date()
+    @StateObject private var practiceClock = PracticeSessionClock()
     @State private var groupingInput = "4"
     @State private var activePanel: PdfControlPanel?
     @State private var confirmTrackDeletion = false
@@ -96,11 +96,12 @@ struct PdfPracticeView: View {
         .animation(.snappy, value: activePanel)
             .modifier(ReproductionScreenModifier(mode: "pdf", panel: activePanel?.rawValue ?? "none",
                 libraries: ["pdfLibraryPresented": pdfLibraryPresented, "audioLibraryPresented": audioLibraryPresented], snapshot: viewModel.reproductionSnapshot))
-        .navigationTitle(pdfTitle)
+        .modifier(PracticeSessionLifecycle(clock: practiceClock))
+            .navigationTitle(pdfTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                    PracticeSessionTimer(startedAt: practiceStartedAt)
+                    PracticeSessionTimer(clock: practiceClock)
                 Button { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "pdfLibraryPresented"]); pdfLibraryPresented = true } label: {
                     Label(viewModel.document == nil ? "选择 PDF" : "更换 PDF", systemImage: "folder")
                 }

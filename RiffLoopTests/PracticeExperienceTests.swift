@@ -4,6 +4,15 @@ import XCTest
 
 @MainActor
 final class PracticeExperienceTests: XCTestCase {
+    func testCompactIndependentControlsAndHomeSummaryRender() async throws {
+        let model = GpWebViewModel()
+        model.setStandaloneVolume(6)
+        try await capture(AnyView(GpStandaloneMetronomeControls(viewModel: model)
+            .frame(width: 340, height: 340).background(Color(.systemGroupedBackground))),
+            name: "GP-compact-independent-metronome-600", expectAwake: false)
+        try await capture(AnyView(HomeView()), name: "Home-compact-practice-calendar", expectAwake: false)
+    }
+
     func testTempoKeypadRendersWithoutSystemKeyboard() async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
@@ -56,7 +65,7 @@ final class PracticeExperienceTests: XCTestCase {
         try await capture(AnyView(GpPracticeView(initialURL: gp)), name: "GP-paused-controls", delay: 4)
     }
 
-    private func capture(_ page: AnyView, name: String, delay: Double = 1) async throws {
+    private func capture(_ page: AnyView, name: String, delay: Double = 1, expectAwake: Bool = true) async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: AnyView(NavigationStack { page }
@@ -75,7 +84,7 @@ final class PracticeExperienceTests: XCTestCase {
             window.rootViewController = nil
         }
         try await Task.sleep(for: .seconds(delay))
-        XCTAssertTrue(UIApplication.shared.isIdleTimerDisabled, "\(name) must stay awake even while paused")
+        XCTAssertEqual(UIApplication.shared.isIdleTimerDisabled, expectAwake, "\(name) screen-awake policy")
         let image = UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
             controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
         }

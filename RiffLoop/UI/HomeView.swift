@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var importError: String?
     @State private var recentSearch = ""
     @State private var recentKind: PracticeKind?
+    @State private var selectedPracticeDay: PracticeDay?
 
     var body: some View {
         NavigationStack(path: $externalDocuments) {
@@ -205,29 +206,37 @@ struct HomeView: View {
 
             LazyVGrid(columns: columns, spacing: 5) {
                 ForEach(days) { day in
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(practiceColor(for: day))
-                        .frame(height: 12)
-                        .overlay {
-                            if Calendar.current.isDateInToday(day.date) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(.orange, lineWidth: 1.5)
+                    Button { selectedPracticeDay = day } label: {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(practiceColor(for: day))
+                            .frame(height: 22)
+                            .overlay {
+                                if Calendar.current.isDateInToday(day.date) {
+                                    RoundedRectangle(cornerRadius: 4).stroke(.orange, lineWidth: 1.5)
+                                }
                             }
-                        }
-                        .accessibilityLabel(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN"))))
-                        .accessibilityValue(formatPracticeDuration(day.seconds))
-                        .help("\(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN")))) · \(formatPracticeDuration(day.seconds))")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(day.isFuture)
+                    .accessibilityIdentifier("practice.day.\(day.id)")
+                    .accessibilityLabel(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN"))))
+                    .accessibilityValue(PracticeDurationText.detailed(day.seconds))
                 }
             }
-            HStack {
-                Text("最近 4 周 · 每格一天")
-                Spacer()
-                Text("浅 → 深：练习增加")
-            }
-            .font(.caption2).foregroundStyle(.secondary)
         }
         .padding(18)
         .cardSurface()
+        .popover(item: $selectedPracticeDay) { day in
+            VStack(alignment: .leading, spacing: 10) {
+                Text(day.date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "zh_CN"))))
+                    .font(.headline)
+                Text(PracticeDurationText.detailed(practiceHistory.seconds(on: day.date)))
+                    .font(.title2.monospacedDigit())
+                    .accessibilityIdentifier("practice.day.duration")
+            }
+            .padding(20)
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     private var recentProjectsSection: some View {
@@ -385,11 +394,7 @@ struct HomeView: View {
     }
 
     private func formatPracticeDuration(_ seconds: TimeInterval) -> String {
-        let totalMinutes = Int(max(0, seconds) / 60)
-        if totalMinutes < 60 { return "\(totalMinutes) 分钟" }
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        return minutes == 0 ? "\(hours) 小时" : "\(hours)小时 \(minutes)分"
+        PracticeDurationText.compact(seconds)
     }
 
     private var greeting: String {

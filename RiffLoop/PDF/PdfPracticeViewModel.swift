@@ -1270,7 +1270,6 @@ final class PdfPracticeViewModel: ObservableObject {
         guard isPlaying, let lastPracticeSampleDate else { return }
         let elapsed = max(0, Date().timeIntervalSince(lastPracticeSampleDate))
         accumulatedPracticeTime += elapsed
-        PracticeHistoryStore.shared.record(seconds: elapsed)
     }
 
     private func apply(_ profile: PdfPracticeProfile) {

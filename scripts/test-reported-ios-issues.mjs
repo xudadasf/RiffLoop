@@ -182,7 +182,10 @@ assert.doesNotMatch(
 );
 
 for (const source of [mediaViewModel, pdfViewModel, gpViewModel]) {
-    assert.match(source, /PracticeHistoryStore\.shared\.record\(/, "every practice mode must update daily history");
+    assert.doesNotMatch(source, /PracticeHistoryStore\.shared\.record\(/, "transport clocks must not double-count foreground history");
+}
+for (const file of ["UI/PracticeView.swift", "PDF/PdfPracticeView.swift", "GP/GpPracticeView.swift"]) {
+    assert.match(read(`RiffLoop/${file}`), /PracticeSessionLifecycle\(clock: practiceClock\)/, "every mode records foreground practice time");
 }
 assert.match(homeView, /继续今天的练习[\s\S]*?continuePracticeCard/);
 assert.match(homeView, /开始新的练习[\s\S]*?modeButton\(for: \.video\)[\s\S]*?modeButton\(for: \.guitarPro\)[\s\S]*?modeButton\(for: \.pdf\)/);

@@ -35,7 +35,7 @@ struct PracticeView: View {
     @State private var scrubTime: TimeInterval = 0
     @State private var isScrubbing = false
     @State private var didOpenInitialURL = false
-    @State private var practiceStartedAt = Date()
+    @StateObject private var practiceClock = PracticeSessionClock()
     @State private var groupingInput = "4"
     @State private var activePanel: VideoControlPanel?
     @State private var currentFileName: String?
@@ -88,11 +88,12 @@ struct PracticeView: View {
             .modifier(ReproductionScreenModifier(mode: "video", panel: activePanel?.rawValue ?? "none",
                 libraries: ["isLibraryPresented": isLibraryPresented], snapshot: viewModel.reproductionSnapshot))
             .background(Color.black.ignoresSafeArea())
+            .modifier(PracticeSessionLifecycle(clock: practiceClock))
             .navigationTitle(videoTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    PracticeSessionTimer(startedAt: practiceStartedAt)
+                    PracticeSessionTimer(clock: practiceClock)
                     Button { ReproductionStore.shared.record("action", "video.tap_files", ["target": "isLibraryPresented"]); isLibraryPresented = true } label: {
                         Label("选择文件", systemImage: "folder")
                     }

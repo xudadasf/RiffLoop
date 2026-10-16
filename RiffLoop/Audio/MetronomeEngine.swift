@@ -96,7 +96,7 @@ final class MetronomeEngine {
             self.anchor = anchor
             self.rhythmMode = rhythmMode
             playerNode.volume = min(max(volume, 0), 1)
-            clickBoost = min(2, max(1, volume))
+            clickBoost = metronomeClickBoost(volume: volume)
             rebuildClickBuffers(
                 duration: min(0.035, max(0.004, timeline.eventInterval / anchor.mediaRate / 2))
             )
@@ -259,4 +259,9 @@ final class MetronomeEngine {
 
         return buffer
     }
+}
+
+/// Native independent clicks support the same 0–600% range as score clicks.
+func metronomeClickBoost(volume: Float) -> Float {
+    volume.isFinite ? min(6, max(1, volume)) : 1
 }

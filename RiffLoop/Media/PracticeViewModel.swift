@@ -929,7 +929,6 @@ final class PracticeViewModel: ObservableObject {
         if let lastPracticeSampleDate {
             let elapsed = min(max(now.timeIntervalSince(lastPracticeSampleDate), 0), 0.5)
             accumulatedPracticeTime += elapsed
-            PracticeHistoryStore.shared.record(seconds: elapsed, endingAt: now)
         }
         self.lastPracticeSampleDate = now
     }

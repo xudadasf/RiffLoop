@@ -83,7 +83,7 @@ struct FilePracticeSettingsStore {
         case .guitarPro:
             common.formUnion(["scoreZoom", "playbackSpeed", "masterVolume", "backingVolume", "synthEnabled", "backingEnabled",
                 "countInEnabled", "countInVolume", "countInAccents", "metronomeSubdivisionFactor",
-                "standaloneBpm", "standaloneBeatsPerMeasure", "standaloneVolume"])
+                "standaloneBpm", "standaloneBeatsPerMeasure", "standaloneVolume", "standaloneSubdivisionFactor", "standaloneBeatAccents"])
         case .video, .pdf:
             common.formUnion(["bpm", "beatsPerMeasure", "beatUnit", "beatGrouping", "subdivision", "rhythmMode", "playbackRate",
                 "mediaVolume", "audioVolume", "snapLoopPointsToBeat"])

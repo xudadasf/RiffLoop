@@ -4,6 +4,50 @@ import XCTest
 
 final class ModePracticeSettingsTests: XCTestCase {
     @MainActor
+    func testIndependentMetronomeDoesNotBorrowScoreSettingsAndPersistsAcrossFiles() throws {
+        let suite = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FilePracticeSettingsStore(defaults: defaults)
+        var old = GpPracticeProfile()
+        old.baseBpm = 180
+        old.metronomeSubdivisionFactor = 8
+        old.beatAccents = [.muted, .strong, .muted]
+        old.metronomeVolume = 2
+        try store.save(old, kind: .guitarPro, fileName: "first.gp")
+        let model = GpWebViewModel(settingsStore: store)
+        let metadata = GpScoreMetadata(title: "Settings", artist: "", bars: 1,
+                                      hasBackingTrack: false, tracks: [], initialBpm: 180)
+        model.loadScore(data: Data(), fileName: "first.gp")
+        model.receive(.scoreLoaded(metadata))
+        XCTAssertEqual(model.standaloneBpm, 120)
+        XCTAssertEqual(model.standaloneSubdivisionFactor, 1)
+        XCTAssertEqual(model.standaloneBeatAccents, [.strong, .normal, .normal, .normal])
+        let scoreAccents = model.beatAccents
+        model.setStandaloneBpm(87)
+        model.setStandaloneBeats(7)
+        model.setStandaloneSubdivision(2)
+        model.cycleStandaloneAccent(at: 0)
+        model.setStandaloneVolume(6)
+        XCTAssertEqual(model.metronomeSubdivisionFactor, 8)
+        XCTAssertEqual(model.metronomeVolume, 2)
+        XCTAssertEqual(model.beatAccents, scoreAccents)
+        model.setMetronomeSubdivisionFactor(4)
+        model.cycleBeatAccent(at: 0)
+        XCTAssertEqual(model.standaloneSubdivisionFactor, 2)
+        XCTAssertEqual(model.standaloneBeatAccents[0], .subAccent)
+        model.loadScore(data: Data(), fileName: "second.gp")
+        model.receive(.scoreLoaded(metadata))
+        XCTAssertEqual(model.standaloneBpm, 87)
+        XCTAssertEqual(model.standaloneBeatsPerMeasure, 7)
+        XCTAssertEqual(model.standaloneVolume, 6)
+        XCTAssertEqual(model.standaloneSubdivisionFactor, 2)
+        XCTAssertEqual(model.standaloneBeatAccents.count, 7)
+        XCTAssertEqual(model.standaloneBeatAccents[0], .subAccent)
+        model.leaveMode()
+    }
+
+    @MainActor
     func testRestoredCountInUsesCurrentModeVolumeInsteadOfLegacyIndependentVolume() throws {
         let suite = UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!

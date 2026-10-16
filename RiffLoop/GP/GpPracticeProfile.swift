@@ -4,6 +4,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     var standaloneBpm: Double?
     var standaloneBeatsPerMeasure: Int?
     var standaloneVolume: Double?
+    var standaloneSubdivisionFactor: Int?
+    var standaloneBeatAccents: [GpBeatAccent]?
     var scoreZoom = 1.0
     var playbackSpeed = 1.0
     var baseBpm: Double?
@@ -39,6 +41,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         standaloneBpm: Double? = nil,
         standaloneBeatsPerMeasure: Int? = nil,
         standaloneVolume: Double? = nil,
+        standaloneSubdivisionFactor: Int? = nil,
+        standaloneBeatAccents: [GpBeatAccent]? = nil,
         scoreZoom: Double = 1.0,
         playbackSpeed: Double = 1.0,
         baseBpm: Double? = nil,
@@ -73,6 +77,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         self.standaloneBpm = standaloneBpm
         self.standaloneBeatsPerMeasure = standaloneBeatsPerMeasure
         self.standaloneVolume = standaloneVolume
+        self.standaloneSubdivisionFactor = standaloneSubdivisionFactor
+        self.standaloneBeatAccents = standaloneBeatAccents
         self.scoreZoom = scoreZoom
         self.playbackSpeed = playbackSpeed
         self.baseBpm = baseBpm
@@ -110,6 +116,8 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         standaloneBpm = try values.decodeIfPresent(Double.self, forKey: .standaloneBpm)
         standaloneBeatsPerMeasure = try values.decodeIfPresent(Int.self, forKey: .standaloneBeatsPerMeasure)
         standaloneVolume = try values.decodeIfPresent(Double.self, forKey: .standaloneVolume)
+        standaloneSubdivisionFactor = try values.decodeIfPresent(Int.self, forKey: .standaloneSubdivisionFactor)
+        standaloneBeatAccents = try values.decodeIfPresent([GpBeatAccent].self, forKey: .standaloneBeatAccents)
         scoreZoom = try values.decodeIfPresent(Double.self, forKey: .scoreZoom) ?? 1
         playbackSpeed = try values.decodeIfPresent(Double.self, forKey: .playbackSpeed) ?? 1
         baseBpm = try values.decodeIfPresent(Double.self, forKey: .baseBpm)

@@ -21,6 +21,8 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var standaloneBpm = 120.0
     @Published private(set) var standaloneBeatsPerMeasure = 4
     @Published private(set) var standaloneVolume = 1.0
+    @Published private(set) var standaloneSubdivisionFactor = 1
+    @Published private(set) var standaloneBeatAccents: [GpBeatAccent] = [.strong, .normal, .normal, .normal]
     private let standaloneMetronome = MetronomeEngine()
     @Published private(set) var selectedBar: GpBarHit?
     @Published private(set) var loopRange: GpLoopBarRange?
@@ -312,14 +314,14 @@ final class GpWebViewModel: ObservableObject {
 
     private func startStandaloneMetronome() {
         do {
-            let subdivision: Subdivision = switch metronomeSubdivisionFactor {
+            let subdivision: Subdivision = switch standaloneSubdivisionFactor {
             case 2: .eighth
             case 4: .sixteenth
             case 8: .thirtySecond
             default: .quarter
             }
             let accents = (0..<standaloneBeatsPerMeasure).map { index in
-                index < beatAccents.count ? BeatAccent(rawValue: beatAccents[index].rawValue) ?? .normal
+                index < standaloneBeatAccents.count ? BeatAccent(rawValue: standaloneBeatAccents[index].rawValue) ?? .normal
                     : (index == 0 ? .strong : .normal)
             }
             try standaloneMetronome.synchronize(
@@ -354,13 +356,30 @@ final class GpWebViewModel: ObservableObject {
 
     func setStandaloneBeats(_ value: Int) {
         standaloneBeatsPerMeasure = min(16, max(1, value))
+        standaloneBeatAccents = (0..<standaloneBeatsPerMeasure).map { index in
+            standaloneBeatAccents.indices.contains(index) ? standaloneBeatAccents[index] : (index == 0 ? .strong : .normal)
+        }
         if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
 
     func setStandaloneVolume(_ value: Double) {
         guard value.isFinite else { return }
-        standaloneVolume = min(2, max(0, value))
+        standaloneVolume = min(6, max(0, value))
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
+        saveProfile()
+    }
+
+    func setStandaloneSubdivision(_ factor: Int) {
+        guard [1, 2, 4, 8].contains(factor) else { return }
+        standaloneSubdivisionFactor = factor
+        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
+        saveProfile()
+    }
+
+    func cycleStandaloneAccent(at index: Int) {
+        guard standaloneBeatAccents.indices.contains(index) else { return }
+        standaloneBeatAccents[index] = standaloneBeatAccents[index].next
         if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
@@ -653,7 +672,6 @@ final class GpWebViewModel: ObservableObject {
         metronomeSubdivisionFactor = factor
         playerReady = false
         call("setMetronomeSubdivision", arguments: [factor])
-        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
 
@@ -667,7 +685,6 @@ final class GpWebViewModel: ObservableObject {
         guard beatAccents.indices.contains(index) else { return }
         beatAccents[index] = beatAccents[index].next
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue), true])
-        if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
 
@@ -1156,9 +1173,15 @@ final class GpWebViewModel: ObservableObject {
             bpmRange.upperBound
         )
         playbackSpeed = min(max(playbackSpeed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
-        standaloneBpm = min(300, max(30, pendingProfile.standaloneBpm ?? baseBpm))
-        standaloneBeatsPerMeasure = min(16, max(1, pendingProfile.standaloneBeatsPerMeasure ?? metadata.beatsPerMeasure ?? 4))
-        standaloneVolume = min(2, max(0, pendingProfile.standaloneVolume ?? 1))
+        standaloneBpm = min(300, max(30, pendingProfile.standaloneBpm ?? 120))
+        standaloneBeatsPerMeasure = min(16, max(1, pendingProfile.standaloneBeatsPerMeasure ?? 4))
+        standaloneVolume = min(6, max(0, pendingProfile.standaloneVolume ?? 1))
+        standaloneSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.standaloneSubdivisionFactor ?? 1)
+            ? (pendingProfile.standaloneSubdivisionFactor ?? 1) : 1
+        let savedStandaloneAccents = pendingProfile.standaloneBeatAccents ?? []
+        standaloneBeatAccents = (0..<standaloneBeatsPerMeasure).map { index in
+            savedStandaloneAccents.indices.contains(index) ? savedStandaloneAccents[index] : (index == 0 ? .strong : .normal)
+        }
         masterVolume = min(max(pendingProfile.masterVolume, 0), 16)
         backingVolume = min(max(pendingProfile.backingVolume, 0), 4)
         synthEnabled = pendingProfile.synthEnabled
@@ -1292,7 +1315,6 @@ final class GpWebViewModel: ObservableObject {
         self.playbackStartedAt = nil
         sessionPracticeMilliseconds += elapsed
         totalPracticeMilliseconds += elapsed
-        PracticeHistoryStore.shared.record(seconds: Double(elapsed) / 1_000)
         saveProfile()
     }
 
@@ -1305,6 +1327,8 @@ final class GpWebViewModel: ObservableObject {
                 standaloneBpm: standaloneBpm,
                 standaloneBeatsPerMeasure: standaloneBeatsPerMeasure,
                 standaloneVolume: standaloneVolume,
+                standaloneSubdivisionFactor: standaloneSubdivisionFactor,
+                standaloneBeatAccents: standaloneBeatAccents,
                 scoreZoom: scoreZoom,
                 playbackSpeed: playbackSpeed,
                 baseBpm: baseBpm,

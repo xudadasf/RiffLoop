@@ -4,6 +4,7 @@ import SwiftUI
 private enum GpControlPanel: String, Identifiable {
     case loop
     case metronome
+    case standalone
     case sound
     case tracks
 
@@ -12,7 +13,8 @@ private enum GpControlPanel: String, Identifiable {
     var title: String {
         switch self {
         case .loop: "循环"
-        case .metronome: "节拍器"
+        case .metronome: "谱面节拍"
+        case .standalone: "独立节拍器"
         case .sound: "声音"
         case .tracks: "轨道"
         }
@@ -21,7 +23,7 @@ private enum GpControlPanel: String, Identifiable {
     var systemImage: String {
         switch self {
         case .loop: "repeat"
-        case .metronome: "metronome"
+        case .metronome, .standalone: "metronome"
         case .sound: "speaker.wave.2.fill"
         case .tracks: "slider.horizontal.3"
         }
@@ -35,7 +37,7 @@ struct GpPracticeView: View {
     @StateObject private var viewModel = GpWebViewModel()
     @State private var isLibraryPresented = false
     @State private var didOpenInitialURL = false
-    @State private var practiceStartedAt = Date()
+    @StateObject private var practiceClock = PracticeSessionClock()
     @State private var activePanel: GpControlPanel?
     @State private var currentFileName: String?
     @State private var scoreReadTask: Task<Void, Never>?
@@ -83,7 +85,7 @@ struct GpPracticeView: View {
             .overlay(alignment: .bottomTrailing) {
                 if let panel = activePanel {
                     panelContent(panel)
-                        .frame(width: 420, height: 540)
+                        .frame(width: panel == .standalone ? 340 : 420, height: panel == .standalone ? 400 : 540)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
                         .padding(16)
@@ -96,11 +98,19 @@ struct GpPracticeView: View {
             .animation(.snappy, value: activePanel)
             .modifier(ReproductionScreenModifier(mode: "gp", panel: activePanel?.rawValue ?? "none",
                 libraries: ["isLibraryPresented": isLibraryPresented], snapshot: viewModel.reproductionSnapshot))
+            .modifier(PracticeSessionLifecycle(clock: practiceClock))
             .navigationTitle(gpTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    PracticeSessionTimer(startedAt: practiceStartedAt)
+                    PracticeSessionTimer(clock: practiceClock)
+                    Button { activePanel = activePanel == .standalone ? nil : .standalone } label: {
+                        Label(viewModel.isStandaloneMetronomePlaying ? "\(Int(viewModel.standaloneBpm)) BPM" : "独立节拍", systemImage: "metronome")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .tint(viewModel.isStandaloneMetronomePlaying ? .green : .accentColor)
+                    .accessibilityIdentifier("gp.standalone.settings")
+                    .accessibilityLabel("独立节拍器设置")
                     HStack(spacing: 2) {
                         Button { viewModel.setScoreZoom(viewModel.scoreZoom - 0.1) } label: {
                             Image(systemName: "minus.magnifyingglass")
@@ -349,6 +359,8 @@ struct GpPracticeView: View {
                 loopPanel
             case .metronome:
                 metronomePanel
+            case .standalone:
+                GpStandaloneMetronomeControls(viewModel: viewModel)
             case .sound:
                 soundPanel
             case .tracks:
@@ -471,24 +483,7 @@ struct GpPracticeView: View {
 
     private var metronomePanel: some View {
         Form {
-            Section("独立练习") {
-                Button(viewModel.isStandaloneMetronomePlaying ? "暂停独立节拍器" : "启动独立节拍器",
-                    action: viewModel.toggleStandaloneMetronome)
-                    .disabled(!viewModel.playerReady)
-                TempoInputControl(bpm: Binding(
-                    get: { viewModel.standaloneBpm }, set: { viewModel.setStandaloneBpm($0) }
-                ), onChange: {})
-                Stepper("每小节 \(viewModel.standaloneBeatsPerMeasure) 拍", value: Binding(
-                    get: { viewModel.standaloneBeatsPerMeasure }, set: { viewModel.setStandaloneBeats($0) }
-                ), in: 1...16)
-                Slider(value: Binding(
-                    get: { viewModel.standaloneVolume }, set: { viewModel.setStandaloneVolume($0) }
-                ), in: 0...2)
-                LabeledContent("独立节拍音量", value: percent(viewModel.standaloneVolume))
-                Text("谱面保持静止，可自由翻阅。点击底部播放会关闭独立节拍器，恢复正常跟谱播放。")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("节拍器") {
+            Section("谱面节拍器") {
                 Toggle("开启节拍器", isOn: Binding(
                     get: { viewModel.metronomeEnabled },
                     set: { viewModel.setMetronomeEnabled($0) }
@@ -730,8 +725,8 @@ struct GpPracticeView: View {
     }
 
     private var practiceSummary: String {
-        "本次 \(formatDuration(viewModel.sessionPracticeMilliseconds)) · "
-            + "累计 \(formatDuration(viewModel.totalPracticeMilliseconds)) · "
+        "本次播放 \(formatDuration(viewModel.sessionPracticeMilliseconds)) · "
+            + "累计播放 \(formatDuration(viewModel.totalPracticeMilliseconds)) · "
             + "累计循环 \(viewModel.totalCompletedLoops) 轮 · "
             + "最高 \(Int((viewModel.highestPracticeSpeed * 100).rounded()))%"
     }
