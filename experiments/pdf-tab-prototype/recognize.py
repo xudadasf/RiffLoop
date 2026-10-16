@@ -93,8 +93,45 @@ def text_spans(page):
     return spans
 
 
+def font_resources(page):
+    """Names alone cannot identify a font shared by two PDF pages."""
+    resources=collections.defaultdict(set)
+    for xref,extension,kind,name,*rest in page.get_fonts():
+        resources[re.sub(r'^[A-Z]{6}\+','',name)].add(xref)
+    return {name:next(iter(ids)) for name,ids in resources.items() if len(ids)==1 and 0 not in ids}
+
+
+def document_tie_padding(document):
+    """Measure printed TAB parentheses, retaining font identity and staff scale."""
+    samples=[]
+    for pi,page in enumerate(document):
+        spans=[s for s in text_spans(page) if s.get('fret_width') is not None]
+        if not spans:continue
+        fonts=font_resources(page);lines,shapes=lines_and_shapes(page)
+        staffs=[s for s in staves(lines,page.rect.width) if s['count']==6]
+        for span in spans:
+            font=fonts.get(span['font'])
+            if font is None:continue
+            x0,y0,x1,y1=span['bbox'];x=(x0+x1)/2;y=(y0+y1)/2
+            matches=[s for s in staffs if s['left']<x<s['right']
+                     and min(abs(yy-y) for yy in s['ys'])<(s['ys'][-1]-s['ys'][0])/5*.36]
+            if len(matches)!=1:continue
+            gap=(matches[0]['ys'][-1]-matches[0]['ys'][0])/5;ends=[]
+            for sh in shapes:
+                if sh['type']!='f' or len(sh['items'])!=2 or not all(i[0]=='c' for i in sh['items']):continue
+                if sh['rect'].width<=4 or sh['rect'].height>=gap*2:continue
+                a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+                if 0<x0-z.x<2 and abs(z.y-y)<gap*.5 and abs(a.y-z.y)<gap*.25:
+                    ends.append(x-z.x-span['fret_width']/2)
+            if len(ends)==1:
+                samples.append({'font':font,'size':span['size'],'gap':gap,'page':pi+1,
+                                'x':x,'y':y,'padding':ends[0]})
+    return samples
+
+
 def recognize(pdf):
     document = fitz.open(pdf)
+    padding_samples=document_tie_padding(document)
     result = {'input':str(Path(pdf).resolve()), 'format':'vector-pdf-experiment-v1',
               'tempo':None,'tuning':None,'pages':len(document),'systems':[],'slide_marks':[],'staccato_marks':[],'palm_mute_marks':[],'ornament_marks':[],'tremolo_marks':[],
               'warnings':['演奏技巧、延音、反复结构和速度变化尚未完整识别，所有导出均为实验稿。',
@@ -206,7 +243,7 @@ def recognize(pdf):
                 bar['beats'].sort(key=lambda b:b['x'])
                 system['bars'].append(bar)
             read_hidden_standard_ties(system,spans,lines,shapes)
-            read_ties(system,spans,lines,shapes)
+            read_ties(system,spans,lines,shapes,padding_samples,font_resources(page))
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
             previous_bar=result['systems'][-1]['bars'][-1] if result['systems'] else None
@@ -718,7 +755,7 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
         tb['issues']=[issue for issue in tb['issues'] if issue!='空小节或休止符尚未识别']
 
 
-def read_ties(system,spans,lines,shapes):
+def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
     """Use an actual connecting curve and equal pitch; never parentheses alone."""
     top,bottom=system['ys'][0],system['ys'][-1]; gap=(bottom-top)/5
     staff={'ys':system['ys']}; standard=system['standard']
@@ -750,6 +787,18 @@ def read_ties(system,spans,lines,shapes):
                         for a in anchors for b in anchors)
         if independent and max(widths)-min(widths)<.3:
             width=sum(widths)/len(widths)+fret_width/2
+            if gap*.5<width<gap*1.5:return width
+        # Preserve local behavior; only use other pages when their actual font
+        # resource, size, staff spacing and all observed margins agree.
+        font=(fonts or {}).get(source['font'])
+        pooled=[s for s in padding_samples if font is not None and s['font']==font
+                and abs(s['size']-note['size'])<.1 and abs(s['gap']-gap)<.1]
+        if not any(s['page']!=system['page'] for s in pooled):return None
+        independent=any(a['page']!=b['page'] or abs(a['x']-b['x'])>.3 or abs(a['y']-b['y'])>gap*5
+                        for a in pooled for b in pooled)
+        measured=[s['padding'] for s in pooled]
+        if independent and max(measured+widths)-min(measured+widths)<.3:
+            width=sum(measured)/len(measured)+fret_width/2
             if gap*.5<width<gap*1.5:return width
         return None
     for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
