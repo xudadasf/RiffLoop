@@ -1,0 +1,98 @@
+{
+  "commit": "24b1b313cf838dac35f9b87fd4cd7c72ee9a8c7b",
+  "ci_run": 38844209779,
+  "sample_rate": 48000,
+  "click_seconds": 0.035,
+  "measurements": [
+    {
+      "voice": "strong",
+      "volume": 1.0,
+      "peak": 0.9035728,
+      "rms": 0.3127443415625813
+    },
+    {
+      "voice": "strong",
+      "volume": 1.5,
+      "peak": 0.9784361,
+      "rms": 0.4422301032467205
+    },
+    {
+      "voice": "strong",
+      "volume": 2.0,
+      "peak": 0.97997314,
+      "rms": 0.5308515163590326
+    },
+    {
+      "voice": "strong",
+      "volume": 4.0,
+      "peak": 0.98,
+      "rms": 0.716441326731549
+    },
+    {
+      "voice": "strong",
+      "volume": 6.0,
+      "peak": 0.98,
+      "rms": 0.8046939554862016
+    },
+    {
+      "voice": "subAccent",
+      "volume": 1.0,
+      "peak": 0.6498598,
+      "rms": 0.19106960777381746
+    },
+    {
+      "voice": "subAccent",
+      "volume": 1.5,
+      "peak": 0.92294043,
+      "rms": 0.285720768456594
+    },
+    {
+      "voice": "subAccent",
+      "volume": 2.0,
+      "peak": 0.97617066,
+      "rms": 0.36688134269736167
+    },
+    {
+      "voice": "subAccent",
+      "volume": 4.0,
+      "peak": 0.97999996,
+      "rms": 0.5499369225014364
+    },
+    {
+      "voice": "subAccent",
+      "volume": 6.0,
+      "peak": 0.98,
+      "rms": 0.6432286954051818
+    },
+    {
+      "voice": "normal",
+      "volume": 1.0,
+      "peak": 0.4295021,
+      "rms": 0.11471080056902991
+    },
+    {
+      "voice": "normal",
+      "volume": 1.5,
+      "peak": 0.64425313,
+      "rms": 0.17206620102030895
+    },
+    {
+      "voice": "normal",
+      "volume": 2.0,
+      "peak": 0.8515152,
+      "rms": 0.22935565861406662
+    },
+    {
+      "voice": "normal",
+      "volume": 4.0,
+      "peak": 0.9798984,
+      "rms": 0.4022157717650339
+    },
+    {
+      "voice": "normal",
+      "volume": 6.0,
+      "peak": 0.97999996,
+      "rms": 0.4957413287131365
+    }
+  ]
+}

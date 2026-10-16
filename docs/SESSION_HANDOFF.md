@@ -1,3 +1,16 @@
+# 最新接手状态：2026-10-16 11:25，0.25.67（111）
+
+已原账号覆盖安装到 iPad。用户确认 iPad 通过 USB 连接 Spark MINI，授权在合理范围内保留较大音量调节范围。本轮保留 0–600%，把原生独立节拍器硬削波改为与 GP 一致的柔和限幅；实际 PCM 测量确认高档增益有效、峰值受控，但不保证外接设备绝不过载。没有自动调大用户音量，也没有执行真机最大音量播放。
+首页日期详情改为卡片右上角固定小气泡，只显示 `nh ym`，不显示日期/秒数，不弹系统窗口，选中格子描边。
+
+工作树 `C:/Users/sadada/.codex/worktrees/riffloop-practice-controls-20261015`，分支 `codex/ipad-practice-controls-20261015`。
+最终产品提交 `24b1b313cf838dac35f9b87fd4cd7c72ee9a8c7b`；CI 38844209779 的 174 项测试、5 套 Node 回归通过，IPA 38844240021 校验通过。设备版本/原 Bundle ID/签名、自动续签与启动首页核对通过；14 个 Documents 文件（169,785,536 字节）哈希保持一致。
+最终续签包在本工作树及旧 playback 工作树的 `output/release-0.25.67-build111-24b1b31`。用户要求后台命令，不抢电脑焦点；沿用已有 Explorer 的 Document.Application 启动签名器。可用后台 WindowPattern.Close 正常关闭已完成安装器，保留续签 daemon。
+见 [完整记录与音量测量](reviews/2026-10-16-spark-gain-and-history.md)、[发布说明](releases/0.25.67.md)。未做 Spark MINI 实际声压/安全音量认证或完整真机触控验收。
+
+---
+以下为历史状态，以上述版本为准。
+
 # 最新接手状态：2026-10-16
 
 0.25.66（110）已于 2026-10-16 10:46 原账号覆盖安装到 iPad。实际工作树为
