@@ -711,7 +711,7 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
     arcs=[sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
           for sh in shapes if sh['type']=='f' and len(sh['items'])==2
           and all(i[0]=='c' for i in sh['items']) and sh['rect'].width>4
-          and sh['rect'].height<12 and upper<sh['rect'].y0<top-5]
+          and sh['rect'].height<12 and upper<sh['rect'].y0 and sh['rect'].y1<top]
     for before,after in zip(columns,columns[1:]):
         x=sum(map(center,after))/len(after)
         beats=[(b,v) for b in system['bars'] for v in b['beats']]
@@ -727,8 +727,8 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
         if any(abs(center(h)-source['x'])>=4.5 for h in before): continue
         pairs=list(zip(sorted(before,key=lambda s:s['origin'][1]),sorted(after,key=lambda s:s['origin'][1])))
         if any(abs(a['origin'][1]-z['origin'][1])>.25 for a,z in pairs): continue
-        # Every tone needs its own arc at the head edges. A single hidden tone
-        # may instead have a short arc aligned below both head centers.
+        # Every tone needs its own arc, at the head edges or aligned above/below
+        # both head centers in compact notation. No arc may serve two tones.
         # One chord-level slur cannot imply several tied notes.
         connections=[]
         for a,z in pairs:
@@ -736,9 +736,9 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
             matches=[i for i,(p,q) in enumerate(arcs) if abs(p.y-q.y)<.5 and (
                      (abs(p.x-a['bbox'][2])<2 and abs(q.x-z['bbox'][0])<2
                       and abs(p.y-a['origin'][1])<1.5 and abs(q.y-z['origin'][1])<1.5)
-                     or (len(pairs)==1 and abs(p.x-center(a))<space*.25 and abs(q.x-center(z))<space*.25
-                         and space*.4<p.y-a['origin'][1]<space*.8
-                         and space*.4<q.y-z['origin'][1]<space*.8))]
+                     or (abs(p.x-center(a))<space*.25 and abs(q.x-center(z))<space*.25
+                         and space*.4<abs(p.y-a['origin'][1])<space*.8
+                         and space*.4<abs(q.y-z['origin'][1])<space*.8))]
             connections.append(matches)
         if any(len(m)!=1 for m in connections): continue
         if len({m[0] for m in connections})!=len(pairs): continue

@@ -108,7 +108,7 @@ def wide_tie_fixture(path,mode='chain'):
         doc.saveIncr()
 
 
-def hidden_staff_chord_fixture(path,mode='single'):
+def hidden_staff_chord_fixture(path,mode='single',head_offset=0,arc_depth=3):
     fixture(path,empty=True)
     with fitz.open(path) as doc:
         page=doc[0];page.insert_font(fontname='music',fontbuffer=font_buffer())
@@ -116,20 +116,21 @@ def hidden_staff_chord_fixture(path,mode='single'):
         for i,x in enumerate((70,140,210,280)):
             hidden=i==1 or mode=='chain' and i==2
             for tone,y in enumerate((50,58.5)):
-                hy=y+(2.125 if mode=='shifted_head' and i==1 and tone==0 else 0)
+                hy=y+head_offset+(2.125 if mode=='shifted_head' and i==1 and tone==0 else 0)
                 page.insert_text((x-2.5,hy),'\ue0a4',fontname='music',fontsize=17)
                 if not hidden or mode=='visible_target':
                     token='X' if mode=='dead_source' and i==0 else str(tone+5)
                     width=fitz.get_text_length(token,fontname='helv',fontsize=7)
                     page.insert_text((x-width/2,102.4+tone*6),token,fontname='helv',fontsize=7)
-            if not (mode=='missing_stem' and i==1):page.draw_line((x+2.2,40),(x+2.2,58),width=.5)
+            if not (mode=='missing_stem' and i==1):page.draw_line((x+2.2,40+head_offset),(x+2.2,58+head_offset),width=.5)
         if mode=='rest_between':page.insert_text((105,112),'\ue4e5',fontname='music',fontsize=17)
         for source,target in ([(70,140),(140,210)] if mode=='chain' else [(70,140)]):
             for tone,y in enumerate((50.8,59.3)):
                 if mode=='no_arcs' or mode=='partial_arcs' and tone==1:continue
+                y+=head_offset
                 sh=page.new_shape();a=source+3;z=target-3
-                sh.draw_bezier((a,y),(a+5,y+3),(z-5,y+3),(z,y))
-                sh.draw_bezier((z,y),(z-5,y+2),(a+5,y+2),(a,y))
+                sh.draw_bezier((a,y),(a+5,y+arc_depth),(z-5,y+arc_depth),(z,y))
+                sh.draw_bezier((z,y),(z-5,y+arc_depth-1),(a+5,y+arc_depth-1),(a,y))
                 sh.finish(color=None,fill=(0,0,0));sh.commit()
         doc.saveIncr()
 
