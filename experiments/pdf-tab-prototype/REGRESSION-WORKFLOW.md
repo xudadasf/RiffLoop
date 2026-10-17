@@ -4,11 +4,11 @@
 
 ## 每轮怎么做
 
-1. 查看上一轮 `report.md` 和 `summary.json` 的跨曲问题队列。优先查与节奏有关、影响分谱较多的类别；配对存疑的材料保留，但单独分组。
-2. 从同类问题中选有明确谱面证据的案例，确认原因，建立会失败的最小测试。分类名称只是现象，不能自动当作根因。
-3. 修改通用规则，不改参考答案、不按拍数强行补音，也不降低通过门槛。
+1. 查看上一轮 `report.md` 的跨曲节奏排查清单和 `summary.json` 中的 `diagnostics.rhythm_inventory`，按受影响分谱数及节奏影响选一组；不能以某首曲目接近整曲通过作为选题依据。配对存疑材料继续单独保留。
+2. 批量核查所选分组的全部分谱，记录各条目的谱面证据、拒绝位置和原因。观察到同类差异不等于同一根因；不同原因应拆成子组，不能强行共用规则。
+3. 明确本轮共享规则、预期受益范围和仍不支持的子组，为已确认原因建立会失败的测试及混淆反例，然后修改通用规则。不改参考答案、不按拍数强行补音，也不降低通过门槛。
 4. 运行 `regression.py`：自动测试 → 全部 PDF 重新识别 → 逐小节核心/节奏检查 → 五类技巧检查 → 所有完整核心通过的分谱实际导出/回读 → 两种引擎的完整播放检查。
-5. 查看历史通过项是否退步，以及问题清单中的新增、已解决、仍存在项。出现退步时先修复本轮规则；没有退步时保存代码和报告，再选择下一类问题。
+5. 按类别比较本轮实际受益分谱、未解决条目及原因，同时检查历史通过项、问题清单新增和已解决项。出现退步时先修复本轮规则；没有退步时保存代码和报告，再选择下一组。单曲通过不能替代这一轮的批量验收。
 
 验收硬门槛：任何此前通过的小节、技巧事件或播放检查变为失败，本轮就不能作为成功优化保存或更新基线。新增通过项不能抵消旧项退步；应先修正或撤回导致退步的改动，再重跑全量验证。
 
@@ -19,7 +19,7 @@
 从仓库根目录执行。`--out` 每次必须是一个全新的目录，失败目录也不覆盖；输出必须位于原始素材目录之外。
 
 ```powershell
-python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素材' --baseline experiments/pdf-tab-prototype/validation-summary-20261016-staff-ties.json --pairing-baseline output/pdf-tab-prototype/recovered-pairing-20261015 --out output/pdf-tab-prototype/regression-next-round
+python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素材' --baseline experiments/pdf-tab-prototype/validation-summary-20261017-whole-context.json --pairing-baseline output/pdf-tab-prototype/recovered-pairing-20261015 --out output/pdf-tab-prototype/regression-next-round
 ```
 
 后续将 `--baseline` 改为上一轮的 `summary.json`，`--out` 改成另一新目录；继续使用相同的配对基线。素材路径和候选集合必须一致；从脚本生成的第一轮开始，还会固定 PDF/GP 内容哈希。素材改变时应另建明确的评估基线，不能把曲库变化混成规则改进。
@@ -32,6 +32,8 @@ python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素�
 - `exports/case-*/`：完整 GP、导出回读结果、原应用与独立实验引擎的播放差异及日志。
 - `summary.json`：可作为下一轮基线；保存预测/来源哈希、历史通过项退步、问题队列及新增/已解决记录。
 - `report.md`：按跨曲影响排序的概览。
+
+`diagnostics.rhythm_inventory` 会继续把节奏差异拆成可观察的形态，例如延续拍数量不足、已确认延音但时值未知、相同拍数而时值顺序不同、起音/延续/休止状态不同。每个失败小节只进入一个观察分组，保存全部小节编号；分组不改变原有通过判定或问题编号，也不声称已经证明根因。
 
 门槛按具体小节、技巧事件和播放检查保留。即使总通过数相同，过去通过的小节变成失败也会被发现。原有失败继续留在队列中，不因其已知而消失。新曲目导出失败也会记录；若丢失过去成功导出的分谱，则明确报退步。
 

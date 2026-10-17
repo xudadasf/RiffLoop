@@ -210,6 +210,13 @@ def write_round_report(result,out):
     lines.extend(['','详细小节、音符、播放差异示例及新增/已解决记录见 [summary.json](summary.json)。',
                   '下一轮优先调查影响多首且与练习节奏有关的类别，确认谱面证据后修改通用规则，再运行完整回归。不要通过降低判定门槛消除问题记录。'])
     (out/'report.md').write_text('\n\n'.join(lines[:5])+'\n\n'+'\n'.join(lines[5:])+'\n',encoding='utf-8')
+    inventory=['\n## 跨曲节奏排查清单',
+               '先按下表选一组问题，对该组全部分谱取证，再修改共享规则。这里记录可观察差异，不能直接当作根因；旧问题队列及其编号保持不变。',
+               '| 观察到的共同现象 | 配对分组 | 分谱数 | 小节数 |',
+               '| --- | --- | ---: | ---: |']
+    for group in result['diagnostics'].get('rhythm_inventory',[]):
+        inventory.append(f"| {group['label']} | {group['pairing']} | {group['case_count']} | {group['bar_count']} |")
+    with (out/'report.md').open('a',encoding='utf-8') as stream:stream.write('\n\n'.join(inventory[:2])+'\n\n'+'\n'.join(inventory[2:])+'\n')
 
 
 if __name__=='__main__':

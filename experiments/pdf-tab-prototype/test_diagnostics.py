@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from diagnostics import diagnose,failure_reason,write_report
+from diagnostics import diagnose,failure_reason,write_report,rhythm_family,rhythm_inventory
 
 
 def bar():
@@ -15,6 +15,27 @@ def bar():
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_rhythm_families_separate_unknown_holds_missing_holds_and_timing(self):
+        reference=bar();reference['beats'][0]['notes'][0]['tie']=True
+        actual=copy.deepcopy(reference);actual['beats'][0]['duration']=None
+        self.assertEqual(rhythm_family(actual,reference,'unknown_duration'),'unknown_held_duration')
+        actual['beats'][0]['notes'][0]['tie']=False
+        self.assertEqual(rhythm_family(actual,reference,'unknown_duration'),'unknown_duration')
+        reference['beats'].insert(0,copy.deepcopy(bar()['beats'][0]))
+        self.assertEqual(rhythm_family(bar(),reference,'timing_attack_rest'),'missing_hold_events')
+        reference=bar();actual=bar();actual['beats'][0]['duration']=2
+        self.assertEqual(rhythm_family(actual,reference,'timing_attack_rest'),'duration_sequence')
+        actual=bar();actual['beats'][0]['notes'][0]['tie']=True
+        self.assertEqual(rhythm_family(actual,reference,'timing_attack_rest'),'attack_hold_rest_flags')
+
+    def test_inventory_counts_each_failed_bar_once_and_preserves_pairing_groups(self):
+        cases=[{'case':f'case-{i}','group':'consistent' if i<2 else 'uncertain',
+                'rhythm_observations':[{'bar':n,'family':'missing_hold_events'} for n in (1,2)]} for i in range(3)]
+        inventory=rhythm_inventory(cases)
+        self.assertEqual([(g['pairing'],g['case_count'],g['bar_count']) for g in inventory],
+                         [('consistent',2,4),('uncertain',1,2)])
+        self.assertEqual(sum(g['bar_count'] for g in inventory),6)
+
     def test_uncertain_pair_and_read_failure_remain_visible(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);rows=[]

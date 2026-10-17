@@ -150,7 +150,7 @@ def recognize(pdf):
             spans += outlined
         else:
             # Some PDFs keep rests as font text but print ornaments as paths.
-            spans += [s for s in outlined if s['text'] in ORNAMENTS or s['text']=='\ue222']
+            spans += [s for s in outlined if s['text'] in ORNAMENTS or s['text'] in ('\ue222','\ue06d')]
         # Tempo symbols can be paths even when the staff uses font text.
         # Include outlined dots here to reject dotted units, without changing
         # the staff's rhythm-dot reader on mixed text/path pages.
@@ -1201,8 +1201,36 @@ def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes):
                 if abs(a.y-note['y'])<gap*.25 and abs(z.y-note['y'])<gap*.25:matches.append(i)
         if len(matches)!=1 or matches[0] in incoming:return
         incoming.add(matches[0])
+    # Remove only identified non-rhythmic ink; every other mark still blocks inference.
+    outgoing=set()
+    for note in notes:
+        matches=[]
+        for i,sh in enumerate(shapes):
+            if sh['type']!='f' or len(sh['items'])!=2 or not all(it[0]=='c' for it in sh['items']):continue
+            a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+            if not (0<a.x-note['bbox'][2]<2 and a.x<z.x and sh['rect'].height<gap*2
+                    and abs(a.y-note['y'])<gap*.25 and abs(z.y-note['y'])<gap*.25):continue
+            boundary=abs(z.x-bar['right'])<1.5 and abs(bar['right']-staff['right'])<1
+            targets=[s for s in spans if s['text']=='('+str(note['fret'])+')'
+                     and s['bbox'][0]>bar['right'] and 0<s['bbox'][0]-z.x<2
+                     and abs((s['bbox'][1]+s['bbox'][3])/2-note['y'])<gap*.25]
+            if boundary or len(targets)==1:matches.append(i)
+        if len(matches)==1:outgoing.update(matches)
+    wedges=[];bottom=staff['ys'][-1]
+    for i,sh in enumerate(shapes):
+        if sh['type']!='s' or len(sh['items'])!=1 or sh['items'][0][0]!='l' or sh.get('width',1)>=.8:continue
+        a,z=sorted(sh['items'][0][1:],key=lambda p:p.x)
+        if (staff['left']<a.x<z.x<staff['right'] and z.x-a.x>gap*3
+                and bottom+gap*.4<min(a.y,z.y)<max(a.y,z.y)<bottom+gap*2.5):wedges.append((i,a,z))
+    partners={i:[] for i,a,z in wedges}
+    for i,a,z in wedges:
+        for j,b,w in wedges:
+            if i==j or abs(a.x-b.x)>.2 or abs(z.x-w.x)>.2:continue
+            if (abs(a.y-b.y)<.2 and gap*.8<abs(z.y-w.y)<gap*2 and abs((z.y+w.y)/2-a.y)<.2
+                    or abs(z.y-w.y)<.2 and gap*.8<abs(a.y-b.y)<gap*2 and abs((a.y+b.y)/2-z.y)<.2):partners[i].append(j)
+    hairpins={i for i,others in partners.items() if len(others)==1 and len(partners[others[0]])==1}
     remaining_spans=[s for s in spans if not any(list(s['bbox'])==n['bbox'] for n in notes)]
-    remaining_shapes=[sh for i,sh in enumerate(shapes) if i not in incoming]
+    remaining_shapes=[sh for i,sh in enumerate(shapes) if i not in incoming|outgoing|hairpins]
     if not visually_empty(bar,staff,None,remaining_spans,remaining_shapes,bottom=staff['notation_bottom']):return
     beat['duration']=1
     beat['evidence']='stemless-whole-tab-continuation'

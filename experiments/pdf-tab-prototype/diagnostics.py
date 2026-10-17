@@ -21,6 +21,44 @@ REASONS={
 GROUPS={'consistent':'配对有一致性支持','uncertain':'配对证据不足'}
 RHYTHM_REASONS={k:REASONS[k] for k in ('pass','missing_bar','multiple_voices','meter','unknown_duration','validation')}
 RHYTHM_REASONS.update({'pass':'节奏序列检查通过','timing_attack_rest':'时值、起音、延续或休止差异'})
+RHYTHM_FAMILIES={
+    'unknown_held_duration':'单个已确认延续拍的时值未知',
+    'unknown_duration':'其他时值未知',
+    'missing_hold_events':'节拍数量和纯延续拍数量同时不足',
+    'missing_note_events':'整小节未读到节拍，参考含音符',
+    'missing_rest_events':'整小节未读到节拍，参考为休止',
+    'event_count':'其他节拍数量差异',
+    'duration_sequence':'节拍数量相同但时值顺序不同',
+    'attack_hold_rest_flags':'时值相同但起音、延续或休止状态不同',
+}
+
+
+def rhythm_family(bar,reference,reason):
+    """Observed failure shape, not a diagnosis and never recognition input."""
+    if reason=='unknown_duration':
+        beats=bar['beats'] if bar else []
+        return ('unknown_held_duration' if len(beats)==1 and beats[0]['notes']
+                and all(n.get('tie') for n in beats[0]['notes']) else 'unknown_duration')
+    if reason!='timing_attack_rest':return reason
+    actual,expected=core_events(bar),core_events(reference)
+    if not actual:return 'missing_note_events' if any(ns for t,g,ns in expected) else 'missing_rest_events'
+    holds=lambda events:sum(bool(ns) and all(tie for s,f,d,tie in ns) for t,g,ns in events)
+    if len(actual)!=len(expected):
+        return ('missing_hold_events' if len(actual)<len(expected)
+                and holds(expected)-holds(actual)==len(expected)-len(actual) else 'event_count')
+    if [(t,g) for t,g,ns in actual]!=[(t,g) for t,g,ns in expected]:return 'duration_sequence'
+    return 'attack_hold_rest_flags'
+
+
+def rhythm_inventory(cases):
+    grouped=collections.defaultdict(list)
+    for case in cases:
+        for item in case['rhythm_observations']:
+            grouped[case['group'],item['family']].append({'case':case['case'],'bar':item['bar']})
+    return sorted([{'pairing':group,'family':family,'label':RHYTHM_FAMILIES.get(family,RHYTHM_REASONS.get(family,family)),
+                    'case_count':len({e['case'] for e in items}),'bar_count':len(items),'items':items}
+                   for (group,family),items in grouped.items()],
+                  key=lambda g:(g['pairing']!='consistent',-g['case_count'],-g['bar_count'],g['family']))
 
 
 def failure_reason(bar,reference):
@@ -69,12 +107,14 @@ def diagnose(folder,pairing_baseline=None):
         if len({b['number'] for b in bars})!=len(bars):raise ValueError('Repeated PDF bar numbers: '+row['case'])
         by_number={b['number']:b for b in bars}
         counts=dict.fromkeys(REASONS,0);differences=[]
-        rhythm_counts=dict.fromkeys(RHYTHM_REASONS,0);rhythm_differences=[]
+        rhythm_counts=dict.fromkeys(RHYTHM_REASONS,0);rhythm_differences=[];rhythm_observations=[]
         for rb in tracks[0]['bars']:
             bar=by_number.get(rb['number']);reason=failure_reason(bar,rb);counts[reason]+=1
             if reason!='pass':differences.append({'bar':rb['number'],'reason':reason})
             rhythm=rhythm_reason(bar,rb);rhythm_counts[rhythm]+=1
-            if rhythm!='pass':rhythm_differences.append({'bar':rb['number'],'reason':rhythm})
+            if rhythm!='pass':
+                rhythm_differences.append({'bar':rb['number'],'reason':rhythm})
+                rhythm_observations.append({'bar':rb['number'],'family':rhythm_family(bar,rb,rhythm)})
         if counts['pass']!=row['metrics']['core_exact_bars']:
             raise ValueError('Classification disagrees with frozen evaluation: '+row['case'])
         basis=pairing[row['case']]
@@ -88,10 +128,11 @@ def diagnose(folder,pairing_baseline=None):
         cases.append({'case':row['case'],'pdf':Path(row['pdf']).name,'group':group,
                       'current_pairing_status':row.get('pairing_checks',{}).get('status','uncertain'),
                       'bars':len(tracks[0]['bars']),'counts':counts,'differences':differences,
-                      'rhythm_counts':rhythm_counts,'rhythm_differences':rhythm_differences})
+                      'rhythm_counts':rhythm_counts,'rhythm_differences':rhythm_differences,
+                      'rhythm_observations':rhythm_observations})
     return {'candidate_count':len(rows),'pairing_basis':pairing_baseline.name if pairing_baseline else 'current-results',
             'statuses':dict(collections.Counter(r['status'] for r in rows)),
-            'groups':groups,'cases':cases,
+            'groups':groups,'cases':cases,'rhythm_inventory':rhythm_inventory(cases),
             'method':'One first differing layer per reference bar: missing, voices, meter, unknown duration, notes, rhythm/rests, ties, validation. Counts are not independent root causes.',
             'rhythm_method':'Exact voice-0 beat durations, grace flags and attack/hold/rest presence with confirmed meter and validation. Ignores pitch and chord size; does not establish tempo, repeats, grace placement or audible timing.',
             'pairing_caution':'Consistency is an automatic check, not proof of matching editions. Keep both groups; do not use the supported subset as overall success.'}
