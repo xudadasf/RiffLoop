@@ -755,6 +755,11 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
         tb['issues']=[issue for issue in tb['issues'] if issue!='空小节或休止符尚未识别']
 
 
+def annotated_tie_start(note,point,gap):
+    edge=note.get('tie_annotation_right')
+    return edge is not None and abs(edge-point.x)<.6 and abs(note['y']-point.y)<gap*.25
+
+
 def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
     """Use an actual connecting curve and equal pitch; never parentheses alone."""
     top,bottom=system['ys'][0],system['ys'][-1]; gap=(bottom-top)/5
@@ -764,6 +769,18 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
           and sh['rect'].height<gap*2]
     def notes():
         return [(b,v,n) for b in system['bars'] for v in b['beats'] for n in v['notes']]
+    # GP places the start of a harmonic's TAB tie after its small <...>
+    # annotation. Record only a unique adjacent text edge; this does not infer
+    # a harmonic's sounding pitch or turn the annotation into another note.
+    for b,v,n in notes():
+        if n['dead'] or n['parenthesized'] or v['grace']:continue
+        origin=next((s for s in spans if list(s['bbox'])==n['bbox']),None)
+        if not origin:continue
+        labels=[s for s in spans if re.fullmatch(r'<\d{1,2}>',s['text'])
+                and s['font']==origin['font'] and n['size']*.5<s['size']<n['size']*.82
+                and 0<s['bbox'][0]-n['bbox'][2]<gap*.4
+                and abs((s['bbox'][1]+s['bbox'][3])/2-n['y'])<gap*.3]
+        if len(labels)==1:n['tie_annotation_right']=labels[0]['bbox'][2]
     def printed_cutout(note):
         if note.get('tie_cutout_half_width') is not None:return note['tie_cutout_half_width']
         source=next((s for s in spans if list(s['bbox'])==note['bbox']),None)
@@ -811,6 +828,8 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                  or n.get('tie_cutout_half_width') is not None
                     and abs(n['x']+n['tie_cutout_half_width']-start.x)<.3 and abs(n['y']-start.y)<gap*.25)
                  and abs(n['y']-start.y)<gap*.8 and n['x']<end.x-3 and not n['dead']]
+        annotated=[(b,v,n) for b,v,n in notes() if annotated_tie_start(n,start,gap)]
+        if len(annotated)==1:sources=annotated
         if not sources: continue
         sb,sv,sn=min(sources,key=lambda t:abs(t[2]['x']-start.x)+abs(t[2]['y']-start.y))
         # An existing different fret is a slur/hammer-on, not a tie.
@@ -827,6 +846,9 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             if sv['grace'] or tv['grace'] or tb['number'] not in (sb['number'],sb['number']+1): continue
             if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
+            # This attachment is proven only for a printed same-pitch target.
+            # Do not use it to invent a hidden harmonic destination.
+            if annotated_tie_start(sn,start,gap):continue
             # GP often suppresses a tied fret number but retains its rhythm stem.
             def plain_other_string(beat):
                 return (beat and not beat['grace'] and len(beat['notes'])==1
@@ -943,19 +965,33 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
     source,target=source_bar['beats'][-1],target_bar['beats'][0]
     if source['grace'] or target['grace'] or not source['notes'] or not target['notes']: return
     key=lambda n:(n['string'],n['fret'])
-    if any(n['dead'] for n in source['notes']+target['notes']): return
-    same_chord=(all(n['parenthesized'] for n in target['notes'])
+    same_chord=(not any(n['dead'] for n in source['notes']+target['notes'])
+                and all(n['parenthesized'] for n in target['notes'])
                 and sorted(map(key,source['notes']))==sorted(map(key,target['notes'])))
 
     def boundary_arcs(system,shapes,beat,outgoing):
         gap=(system['ys'][-1]-system['ys'][0])/5
+        # A double bar has an inner printed boundary before the staff ends.
+        # Require that actual full-height line instead of widening tolerance.
+        inner=[]
+        if outgoing:
+            for shape in shapes:
+                for item in shape['items']:
+                    if item[0]=='l':x,y,x1,y1=(*item[1],*item[2])
+                    elif item[0]=='re' and item[1].width<1.5:
+                        r=item[1];x=x1=(r.x0+r.x1)/2;y,y1=r.y0,r.y1
+                    else:continue
+                    if (abs(x-x1)<.2 and min(y,y1)<system['ys'][0]+.8
+                            and max(y,y1)>system['ys'][-1]-.8
+                            and 0<system['right']-x<gap):inner.append(x)
         arcs=[]
         for sh in shapes:
             if sh['type']!='f' or len(sh['items'])!=2 or sh['rect'].width<=4: continue
             if sh['rect'].height>=gap*2 or not all(i[0]=='c' for i in sh['items']): continue
             a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
             if outgoing:
-                if abs(z.x-system['right'])>2 or abs(a.x-beat['x'])>12: continue
+                if abs(z.x-system['right'])>2 and not any(abs(z.x-x)<1 for x in inner):continue
+                if abs(a.x-beat['x'])>12 and not any(annotated_tie_start(n,a,gap) for n in beat['notes']):continue
                 point=a
             else:
                 if not system['left']<a.x<system['left']+32 or abs(z.x-beat['x'])>12: continue
@@ -978,8 +1014,8 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
         return [p.y-note['y'] for p in arcs if abs(p.y-note['y'])<4.5
                 and sum(abs(p.y-n['y'])<4.5 for n in notes)==1]
     for note in target['notes']:
-        if not note['parenthesized']: continue
-        origins=[n for n in source['notes'] if key(n)==key(note)]
+        if not note['parenthesized'] or note['dead']: continue
+        origins=[n for n in source['notes'] if not n['dead'] and key(n)==key(note)]
         if len(origins)!=1: continue
         origin=origins[0]
         # TAB curves must belong to the same string, at the same vertical
