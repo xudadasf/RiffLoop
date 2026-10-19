@@ -242,7 +242,7 @@ def recognize(pdf):
                 add_rests(bar,staff,standard,spans,lines,shapes)
                 bar['beats'].sort(key=lambda b:b['x'])
                 system['bars'].append(bar)
-            read_hidden_standard_ties(system,spans,lines,shapes)
+            read_hidden_standard_ties(system,spans,lines,shapes,result['tuning'])
             read_ties(system,spans,lines,shapes,padding_samples,font_resources(page))
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
@@ -699,8 +699,8 @@ def validate_bar(bar):
     bar['issues']=list(dict.fromkeys(bar['issues']))
 
 
-def read_hidden_standard_ties(system,spans,lines,shapes):
-    """Recover a suppressed TAB chord only from a complete matching staff chord."""
+def read_hidden_standard_ties(system,spans,lines,shapes,tuning=None):
+    """Recover suppressed TAB tones from individually matched staff ties."""
     standard=system['standard']
     if not standard: return
     top=system['ys'][0]; upper=standard['ys'][0]-35
@@ -723,9 +723,25 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
         if not tb or tb['number'] not in (sb['number'],sb['number']+1): continue
         if source['grace'] or source['duration'] is None or not source['notes']: continue
         if any(n['dead'] for n in source['notes']): continue
-        if len(before)!=len(after) or len(after)!=len(source['notes']): continue
+        if len(before)!=len(source['notes']) or len(after)>len(before): continue
         if any(abs(center(h)-source['x'])>=4.5 for h in before): continue
-        pairs=list(zip(sorted(before,key=lambda s:s['origin'][1]),sorted(after,key=lambda s:s['origin'][1])))
+        ordered=sorted(before,key=lambda s:s['origin'][1]);retained=source['notes']
+        if len(after)<len(before):
+            # Map a subset only when every source head is present and known
+            # tuning gives a unique pitch order. String order alone is unsafe:
+            # a high fret on a lower string can sound above an open upper one.
+            if not tuning or len(tuning)!=6:continue
+            pitch=lambda n:tuning[n['string']-1]+n['fret']
+            if len(set(map(pitch,retained)))!=len(retained):continue
+            if any(abs(a['origin'][1]-z['origin'][1])<.25 for a,z in zip(ordered,ordered[1:])):continue
+            ranked=sorted(retained,key=pitch,reverse=True)
+            matches=[[i for i,a in enumerate(ordered) if abs(a['origin'][1]-z['origin'][1])<.25]
+                     for z in after]
+            if any(len(m)!=1 for m in matches) or len({m[0] for m in matches})!=len(after):continue
+            pairs=[(ordered[m[0]],z) for m,z in zip(matches,after)]
+            retained=[ranked[m[0]] for m in matches]
+        else:
+            pairs=list(zip(ordered,sorted(after,key=lambda s:s['origin'][1])))
         if any(abs(a['origin'][1]-z['origin'][1])>.25 for a,z in pairs): continue
         # Every tone needs its own arc, at the head edges or aligned above/below
         # both head centers in compact notation. No arc may serve two tones.
@@ -747,7 +763,7 @@ def read_hidden_standard_ties(system,spans,lines,shapes):
                    for x0,y0,x1,y1 in lines): continue
         notes=[{**n,'x':x,'bbox':[x-1,n['y']-2,x+1,n['y']+2],'parenthesized':False,
                 'tie':True,'tie_source_bar':sb['number'],'inferred_from':'standard-heads-and-tie-curves'}
-               for n in source['notes']]
+               for n in retained]
         beat={'x':x,'notes':notes,'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
         read_rhythm(beat,system,standard,spans,lines,shapes,tb['left'],tb['right'])
         if beat['duration'] is None: continue
@@ -894,14 +910,34 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                     if any(x<w['x']<nx+1.5 for b in system['bars'] for w in b['beats']):continue
                     if paired_outgoing(nx,z) is not None:matches.append(a.x)
                 return matches[0] if len(matches)==1 else None
-            stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(x-end.x)<max(7,gap*1.5)
+            stems=clusters([x for x,y,x1,y1 in lines if abs(x-x1)<.2 and abs(y1-y)>gap*.5
+                            and abs(x-end.x)<max(7,gap*1.5)
                             and bottom+gap*.8<max(y,y1)<bottom+gap*5
                             and top-2<min(y,y1)<bottom+gap*3],.5)
             cutout=printed_cutout(sn)
             def matches_cutout(x):
                 return (cutout is not None and abs(x-end.x-cutout)<.3
                         and all(abs(p.y-sn['y'])<gap*.25 for p in (start,end)))
-            stems=[x for x in stems if abs(x-end.x)<7 or paired_outgoing(x) is not None or matches_cutout(x)]
+            def beamed_hidden(x):
+                # A wholly hidden destination can retain a short TAB stem
+                # joined directly to the source by a complete filled beam.
+                # This supplies independent evidence when no printed fret
+                # parentheses exist to calibrate the omitted glyph width.
+                if not 0<x-end.x<gap*1.5 or any(abs(p.y-sn['y'])>gap*.25 for p in (start,end)):return False
+                if any(abs(v['x']-x)<1.5 for b in system['bars'] for v in b['beats']):return False
+                short=[(min(y,y1),max(y,y1)) for sx,y,sx1,y1 in lines if abs(sx-sx1)<.2 and abs(sx-x)<.5
+                       and abs(y-y1)>gap and bottom+gap*.5<min(y,y1)<bottom+gap*1.5]
+                if len(short)!=1:return False
+                beams=[]
+                for sh in shapes:
+                    if abs(sh['rect'].x0-sv['x'])>.5 or abs(sh['rect'].x1-x)>.5:continue
+                    a=beam_cross_section(sh,sv['x']);z=beam_cross_section(sh,x)
+                    if a is None or z is None or not bottom+gap*.8<a<bottom+gap*5:continue
+                    if not short[0][0]<z<short[0][1]:continue
+                    if any(abs(sx-sx1)<.2 and abs(sx-sv['x'])<.5 and min(y,y1)<sn['y']+gap
+                           and min(y,y1)<a<max(y,y1) for sx,y,sx1,y1 in lines):beams.append(sh)
+                return len(beams)==1
+            stems=[x for x in stems if abs(x-end.x)<7 or paired_outgoing(x) is not None or matches_cutout(x) or beamed_hidden(x)]
             if len(stems)!=1: continue
             x=stems[0]
             # Visible notes on other strings may share this stem; only ink on
