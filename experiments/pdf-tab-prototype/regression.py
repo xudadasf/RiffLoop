@@ -13,7 +13,8 @@ from diagnostics import diagnose,write_report
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parent.parent
 AUDITS={'slide':('slides','slide'),'staccato':('staccato','staccato'),
-        'palm_mute':('palm-mute','palm-mute'),'ornament':('ornaments','ornament'),'tremolo':('tremolos','tremolo')}
+        'palm_mute':('palm-mute','palm-mute'),'ornament':('ornaments','ornament'),'tremolo':('tremolos','tremolo'),
+        'harmonic':('harmonics','harmonic')}
 
 
 def read(path):return json.loads(path.read_text(encoding='utf-8'))
@@ -36,7 +37,7 @@ def problem_queue(summary):
         for field,layer,priority in [('rhythm_differences','rhythm',0),('differences','core',2)]:
             for event in case[field]:add(layer+'/'+event['reason'],case['case'],priority,event)
     for key in AUDITS:
-        for case in summary[key+'_audit']['cases']:
+        for case in summary.get(key+'_audit',{'cases':[]})['cases']:
             for event in case.get('not_recognized',[]):
                 add(key+'/'+event.get('pattern','missing'),case['case'],1,event)
     for case in summary['full_score_exports']:

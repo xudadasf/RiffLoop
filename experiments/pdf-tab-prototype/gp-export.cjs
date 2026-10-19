@@ -65,6 +65,13 @@ for (const source of bars) {
         for(const raw of item.notes) {
             const note = new alpha.model.Note(); note.string = 7-raw.string;
             note.fret = raw.fret ?? 0; note.isDead = raw.dead;
+            if(raw.harmonic !== undefined) {
+                if(raw.harmonic !== 'natural' || raw.dead || !Number.isInteger(raw.fret))
+                    throw Error('Unsupported harmonic in recognition data');
+                note.harmonicType = alpha.model.HarmonicType.Natural;
+                note.harmonicValue = raw.fret;
+                if(note.harmonicPitch <= 0) throw Error('Unsupported natural harmonic position');
+            }
             note.isStaccato = !!raw.staccato;
             note.isPalmMute = !!raw.palm_mute;
             if(raw.ornament !== undefined) {
@@ -74,11 +81,11 @@ for (const source of bars) {
             if(raw.legato_slide) note.slideOutType = alpha.model.SlideOutType.Legato;
             if(raw.tie) {
                 const prior = previousNotes.get(raw.string);
-                if(!prior || prior.fret !== raw.fret || prior.bar !== raw.tie_source_bar)
+                if(!prior || prior.fret !== raw.fret || prior.harmonic !== raw.harmonic || prior.bar !== raw.tie_source_bar)
                     throw Error('Tie origin is missing from this export selection');
                 note.isTieDestination = true;
             }
-            currentNotes.set(raw.string,{fret:raw.fret,bar:source.number});
+            currentNotes.set(raw.string,{fret:raw.fret,harmonic:raw.harmonic,bar:source.number});
             beat.addNote(note);
         }
         if(!item.grace) previousNotes = currentNotes;
@@ -111,6 +118,9 @@ for(let i=0;i<bars.length;i++) {
         const ties=a.notes.map(n=>[7-n.string,n.isTieDestination]).sort((a,b)=>a[0]-b[0]);
         for(const raw of e.notes) {
             const note=a.notes.find(n=>7-n.string===raw.string);
+            if(note.harmonicType !== (raw.harmonic === 'natural' ? alpha.model.HarmonicType.Natural : alpha.model.HarmonicType.None) ||
+                note.harmonicValue !== (raw.harmonic === 'natural' ? raw.fret : 0))
+                throw Error(`Roundtrip changed harmonic at bar ${i+1}, beat ${j+1}`);
             if(note.isStaccato !== !!raw.staccato)
                 throw Error(`Roundtrip changed staccato at bar ${i+1}, beat ${j+1}`);
             if(note.isPalmMute !== !!raw.palm_mute)

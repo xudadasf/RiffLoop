@@ -190,7 +190,8 @@ def recognize(pdf):
             notes=[]
             for span in spans:
                 token=span['text'].strip()
-                if not re.fullmatch(r'\(?\d{1,2}\)?|[xX]',token):
+                harmonic=re.fullmatch(r'<\d{1,2}>|\(<\d{1,2}>\)',token)
+                if not harmonic and not re.fullmatch(r'\(?\d{1,2}\)?|[xX]',token):
                     continue
                 if not any(font in span['font'].lower() for font in ('arial','helvetica')):
                     continue
@@ -199,12 +200,17 @@ def recognize(pdf):
                 if abs(ys[si]-y)>gap*.36 or not staff['left']+5<x<staff['right']+1:
                     continue
                 notes.append({'x':x,'y':ys[si],'string':si+1,
-                              'fret':None if token.upper()=='X' else int(token.strip('()')),
+                              'fret':None if token.upper()=='X' else int(token.strip('()<>')),
                               'dead':token.upper()=='X','parenthesized':token.startswith('('),
                               'tie':False,
-                              'size':span['size'],'bbox':list(span['bbox'])})
-            normal_size = collections.Counter(round(n['size'],1) for n in notes).most_common(1)
+                              'size':span['size'],'bbox':list(span['bbox']),
+                              **({'harmonic':'natural'} if harmonic else {})})
+            # Small <...> labels beside ordinary frets are artificial-harmonic
+            # annotations, not independent natural-harmonic notes or grace notes.
+            ordinary=[n for n in notes if not n.get('harmonic')]
+            normal_size = collections.Counter(round(n['size'],1) for n in (ordinary or notes)).most_common(1)
             normal_size = normal_size[0][0] if normal_size else 7
+            notes=[n for n in notes if not n.get('harmonic') or n['size']>=normal_size*.82]
             number_y=(standard['ys'][0] if standard else ys[0])-2
             numbers=[(s['bbox'][0],int(s['text'])) for s in spans
                      if s['text'].isdigit() and 'times' in s['font'].lower()
@@ -734,6 +740,7 @@ def read_hidden_standard_ties(system,spans,lines,shapes,tuning=None):
             pitch=lambda n:tuning[n['string']-1]+n['fret']
             if len(set(map(pitch,retained)))!=len(retained):continue
             if any(abs(a['origin'][1]-z['origin'][1])<.25 for a,z in zip(ordered,ordered[1:])):continue
+            if any(n.get('harmonic') for n in retained):continue  # Diamond-head mapping is not implemented.
             ranked=sorted(retained,key=pitch,reverse=True)
             matches=[[i for i,a in enumerate(ordered) if abs(a['origin'][1]-z['origin'][1])<.25]
                      for z in after]
@@ -838,7 +845,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
         start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
         if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
         sources=[(b,v,n) for b,v,n in notes() if (abs(n['x']-start.x)<7
-                 or n['parenthesized'] and abs(n['bbox'][2]-start.x)<2
+                 or (n['parenthesized'] or n.get('harmonic')=='natural') and abs(n['bbox'][2]-start.x)<2
                  or n.get('tie_outgoing_x') is not None and abs(n['tie_outgoing_x']-start.x)<.6
                     and abs(n['y']-start.y)<gap*.25
                  or n.get('tie_cutout_half_width') is not None
@@ -854,7 +861,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                  and n['string']==sn['string'] and n['x']>sn['x']+3]
         if targets:
             tb,tv,tn=min(targets,key=lambda t:abs(t[2]['x']-end.x))
-            if tn['fret']!=sn['fret']: continue
+            if tn['fret']!=sn['fret'] or tn.get('harmonic')!=sn.get('harmonic'): continue
             if not tn['parenthesized'] and not tn.get('inferred_from'): continue
             # Parenthesized two-digit frets are wider than the old centre
             # tolerance. Use their printed edge, but require adjacent beats:
@@ -883,7 +890,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                     if not a.x>x or abs(a.x-x-(x-incoming.x))>=.6:continue
                     if any(abs(p.y-sn['y'])>gap*.25 for p in (a,z)):continue
                     if any(n['parenthesized'] and not n['dead'] and not v['grace']
-                           and n['string']==sn['string'] and n['fret']==sn['fret']
+                           and n['string']==sn['string'] and n['fret']==sn['fret'] and n.get('harmonic')==sn.get('harmonic')
                            and b['number'] in (here['number'],here['number']+1)
                            and abs(n['bbox'][0]-z.x)<2 and n['x']>a.x+3
                            and not any(x<w['x']<v['x'] for bar in system['bars'] for w in bar['beats'])
@@ -984,7 +991,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
     previous={}
     for b,v,n in notes():
         prior=previous.get(n['string'])
-        if n['parenthesized'] and prior and n['fret']==prior[2]['fret']:
+        if n['parenthesized'] and prior and n['fret']==prior[2]['fret'] and n.get('harmonic')==prior[2].get('harmonic'):
             for arc in arcs:
                 a,z=sorted((arc[1],arc[4]),key=lambda p:p.x)
                 if abs(a.x-prior[2]['x'])<12 and abs(z.x-n['x'])<12 and standard['ys'][0]-35<a.y<top-5:
@@ -1000,7 +1007,7 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
     if not source_bar['beats'] or not target_bar['beats']: return
     source,target=source_bar['beats'][-1],target_bar['beats'][0]
     if source['grace'] or target['grace'] or not source['notes'] or not target['notes']: return
-    key=lambda n:(n['string'],n['fret'])
+    key=lambda n:(n['string'],n['fret'],n.get('harmonic',''))
     same_chord=(not any(n['dead'] for n in source['notes']+target['notes'])
                 and all(n['parenthesized'] for n in target['notes'])
                 and sorted(map(key,source['notes']))==sorted(map(key,target['notes'])))
@@ -1113,7 +1120,9 @@ def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
     rings=[sh for sh in shapes if sh['type']=='s' and len(sh['items'])==4
            and all(i[0]=='c' for i in sh['items'])
            and abs((sh['rect'].x0+sh['rect'].x1)/2-x)<1
-           and 5<sh['rect'].width<16
+           and (5<sh['rect'].width<16 or
+                all(n.get('harmonic')=='natural' and sh['rect'].x0<n['bbox'][0]<n['bbox'][2]<sh['rect'].x1
+                    and .5<sh['rect'].width-(n['bbox'][2]-n['bbox'][0])<gap for n in beat['notes']))
            and all(sh['rect'].y0<n['y']<sh['rect'].y1 for n in beat['notes'])]
     if rings: beat['duration']=2 if stems else 1
     # When present, use the standard staff's noteheads to disambiguate whole/half.
@@ -1283,7 +1292,8 @@ def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes):
             if not (0<a.x-note['bbox'][2]<2 and a.x<z.x and sh['rect'].height<gap*2
                     and abs(a.y-note['y'])<gap*.25 and abs(z.y-note['y'])<gap*.25):continue
             boundary=abs(z.x-bar['right'])<1.5 and abs(bar['right']-staff['right'])<1
-            targets=[s for s in spans if s['text']=='('+str(note['fret'])+')'
+            label=('<'+str(note['fret'])+'>') if note.get('harmonic')=='natural' else str(note['fret'])
+            targets=[s for s in spans if s['text']=='('+label+')'
                      and s['bbox'][0]>bar['right'] and 0<s['bbox'][0]-z.x<2
                      and abs((s['bbox'][1]+s['bbox'][3])/2-note['y'])<gap*.25]
             if boundary or len(targets)==1:matches.append(i)

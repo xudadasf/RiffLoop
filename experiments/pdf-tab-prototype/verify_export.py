@@ -8,6 +8,12 @@ from pathlib import Path
 from evaluate import core_events
 
 
+def natural_harmonics(bar):
+    return [(i,n['string'],n['fret'],n['harmonicValue'])
+            for i,b in enumerate(v for v in bar['beats'] if v.get('voice',0)==0)
+            for n in b['notes'] if n.get('harmonic')==1]
+
+
 def tempo_sequence(score,first,last):
     active=score['tempo'];linear=False;changes=[]
     for event in sorted(score.get('tempo_events',[]),key=lambda e:(e['bar'],e['position'])):
@@ -58,12 +64,14 @@ def main():
             differences.append(f"bar {b['number']}: multiple voices unsupported")
         if core_events(a)!=core_events(b) or a['meter']!=b['meter']:
             differences.append(f"bar {b['number']}: notes, rhythm, rests, ties or meter differ")
+        if natural_harmonics(a)!=natural_harmonics(b):
+            differences.append(f"bar {b['number']}: natural harmonic type or position differs")
     result={'reference':args.reference.name,'track':args.track,'source_bars':args.bars,
             'reference_track_index':expected['track'],'reference_staff_index':expected['staff'],
             'bars':len(chosen),'notes':sum(len(v['notes']) for b in chosen for v in b['beats'] if v['voice']==0),
             'passed':not differences,'differences':differences,
-            'checked':['string/fret/dead/tie','rational duration/dots/tuplet/grace flag','voice-0 beat sequence including full-bar silence','meter','tuning','initial tempo','tempo changes'],
-            'not_checked':['techniques','repeat structures','audible playback']}
+            'checked':['string/fret/dead/tie','natural harmonic type/position','rational duration/dots/tuplet/grace flag','voice-0 beat sequence including full-bar silence','meter','tuning','initial tempo','tempo changes'],
+            'not_checked':['other techniques','repeat structures','audible playback']}
     args.out.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(result,ensure_ascii=False))
     return 0 if result['passed'] else 1

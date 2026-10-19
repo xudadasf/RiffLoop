@@ -23,6 +23,12 @@ def snapshot():
 
 
 class RegressionTests(unittest.TestCase):
+    def test_older_baselines_can_add_the_harmonic_audit_without_losing_guards(self):
+        old=snapshot();old.pop('harmonic_audit');new=snapshot()
+        self.assertEqual(problem_queue(old),problem_queue(new));self.assertEqual(find_regressions(old,new),[])
+        new['harmonic_audit']['regressions']=[{'case':'case-000','event':{'bar':1,'harmonic':'natural'}}]
+        self.assertTrue(any(f['layer']=='harmonic' for f in find_regressions(old,new)))
+
     def test_unchanged_failures_are_not_regressions_but_swapped_passes_are(self):
         old=snapshot();self.assertEqual(find_regressions(old,old),[])
         new=copy.deepcopy(old)
