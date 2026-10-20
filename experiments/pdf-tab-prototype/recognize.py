@@ -263,7 +263,11 @@ def recognize(pdf):
                 read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes)
                 validate_bar(bar)
                 previous_bar=bar
-            result['staccato_marks'].extend(read_staccatos(system,spans,staff['notation_bottom']))
+            outline_upper=ys[0]-30
+            if gi:
+                prev=groups[gi-1]['ys']
+                outline_upper=max(outline_upper,prev[-1]+5*(prev[1]-prev[0]))
+            result['staccato_marks'].extend(read_staccatos(system,spans,staff['notation_bottom'],outlined,shapes,outline_upper))
             result['palm_mute_marks'].extend(read_palm_mutes(system,spans,lines,shapes))
             result['ornament_marks'].extend(read_ornaments(system,spans))
             result['tremolo_marks'].extend(read_tremolos(system,spans,lines))
@@ -375,8 +379,8 @@ def read_ornaments(system,spans):
     return marks
 
 
-def read_staccatos(system,spans,bottom):
-    """Explicit articulation glyphs identify single notes; chord scope is lost in PDF."""
+def read_staccatos(system,spans,bottom,outlined=(),shapes=(),outline_upper=None):
+    """Resolve explicit glyphs and isolated outline dots above TAB single notes."""
     standard=system['standard'];top=system['ys'][0]
     upper=(standard['ys'][0]-35) if standard else top-30
     lower=top-2 if standard else bottom
@@ -384,6 +388,19 @@ def read_staccatos(system,spans,bottom):
              and upper<s['origin'][1]<lower and system['left']<s['origin'][0]<system['right']
              and (standard or s['text']=='\ue4a2' and s['origin'][1]<top
                   or s['text']=='\ue4a3' and s['origin'][1]>system['ys'][-1])]
+    if not standard:
+        gap=(system['ys'][-1]-top)/5
+        for s in outlined:
+            if s['text']!='\ue1e7' or s.get('source')!='font-outline':continue
+            if not max(upper,outline_upper if outline_upper is not None else upper)<s['origin'][1]<top-2:continue
+            if not system['left']<s['origin'][0]<system['right']:continue
+            box=fitz.Rect(s['bbox'])
+            if not all(gap*.12<v<gap*.35 for v in (box.width,box.height)):continue
+            # Punctuation and dots next to other outlines cannot establish articulation.
+            nearby=fitz.Rect(box.x0-gap,box.y0-.2,box.x1+gap,box.y1+.2)
+            if any('bravura' not in t['font'].lower() and nearby.intersects(fitz.Rect(t['bbox'])) for t in spans):continue
+            if any(sh['type']=='f' and sh['rect']!=box and nearby.intersects(sh['rect']) for sh in shapes):continue
+            symbols.append(s)
     center=lambda s:(s['bbox'][0]+s['bbox'][2])/2
     marks=[]
     for symbol in symbols:

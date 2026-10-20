@@ -40,7 +40,7 @@ if(require.main===module) {
     const summary={candidate_count:cases.length,counts:Object.fromEntries(categories.map(k=>[k,cases.reduce((n,c)=>n+(c[k]?.length||0),0)])),
         cases_with_verified_rule:cases.filter(c=>c.verified?.length).length,
         limitations:['Repeated regression corpus, not blind testing','Only core-exact bars can verify note-level articulation',
-            'A chord-level printed dot does not identify which GP notes were marked','Outline dots are not distinguished from augmentation dots'],cases,
+            'A chord-level printed dot does not identify which GP notes were marked','Outline dots require isolated placement above TAB and a unique ordinary single note; other placements remain unsupported'],cases,
         regressions:[]};
     if(baselineFile){const baseline=read(baselineFile);summary.regressions=findRegressions(summary,baseline.staccato_audit||baseline);}
     fs.writeFileSync(path.join(folder,'staccato-audit.json'),JSON.stringify(summary,null,2));
