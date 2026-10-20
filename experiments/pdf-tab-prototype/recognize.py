@@ -252,6 +252,7 @@ def recognize(pdf):
             read_ties(system,spans,lines,shapes,padding_samples,font_resources(page))
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
+            read_mixed_half_chords(system,lines,shapes)
             previous_bar=result['systems'][-1]['bars'][-1] if result['systems'] else None
             for bar in system['bars']:
                 # New hidden tie destinations must participate in tuplet grouping.
@@ -1070,6 +1071,35 @@ def read_boundary_ties(previous,current,previous_shapes,current_shapes):
             note['tie']=True
             note['tie_source_bar']=source_bar['number']
             note['tie_evidence']='paired-system-boundary-curves'
+
+
+def read_mixed_half_chords(system,lines,shapes):
+    """A circled attack and confirmed holds can share one detached half stem."""
+    if system['standard']:return
+    bottom=system['ys'][-1];gap=(bottom-system['ys'][0])/5
+    for bar in system['bars']:
+        for beat in bar['beats']:
+            if beat['grace'] or beat['duration']!=4:continue
+            held=[n for n in beat['notes'] if n['parenthesized'] and n['tie'] and not n['dead']]
+            fresh=[n for n in beat['notes'] if not n['parenthesized'] and not n['tie'] and not n['dead']
+                   and not n.get('harmonic') and not n.get('inferred_from')]
+            if not held or not fresh or len(held)+len(fresh)!=len(beat['notes']):continue
+            x=beat['x']
+            stems=[(min(y,z),max(y,z)) for sx,y,ex,z in lines if abs(sx-ex)<.2 and abs(sx-x)<1.5
+                   and bottom<min(y,z)<max(y,z)<bottom+gap*5]
+            if len(stems)!=1:continue
+            a,z=stems[0]
+            if not (1.3<(a-bottom)/gap<1.7 and 2.3<(z-bottom)/gap<2.7 and .8<(z-a)/gap<1.2):continue
+            rings=[s for s in shapes if s['type']=='s' and len(s['items'])==4 and all(i[0]=='c' for i in s['items'])
+                   and all(abs(a[4]-b[1])<.1 for a,b in zip(s['items'],s['items'][1:]+s['items'][:1]))
+                   and abs((s['rect'].x0+s['rect'].x1)/2-x)<1 and 5<s['rect'].width<16
+                   and s['rect'].height<max(n['y'] for n in fresh)-min(n['y'] for n in fresh)+gap*2
+                   and all(s['rect'].x0<n['bbox'][0]<n['bbox'][2]<s['rect'].x1
+                           and s['rect'].y0<n['y']<s['rect'].y1 for n in fresh)
+                   and not any(s['rect'].y0<n['y']<s['rect'].y1 for n in held)]
+            if len(rings)==1:
+                beat['duration']=2
+                beat['evidence']='mixed-tab-half-chord'
 
 
 def read_rhythm(beat,staff,standard,spans,lines,shapes,left,right):
