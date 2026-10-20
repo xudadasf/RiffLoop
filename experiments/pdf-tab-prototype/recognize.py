@@ -983,8 +983,8 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
             if sv['grace'] or tv and (tv['grace'] or not tv['notes']): continue
             # A short tie mark can end near the next unrelated single note.
-            # A single printed destination needs its own confirmed tie, or a
-            # paired hidden chain; both require independently measured padding.
+            # A single printed destination needs independent evidence for the
+            # omitted continuation, not just a curve ending near its stem.
             visible_target=[n for n in tv['notes'] if not n.get('inferred_from')] if tv else []
             if len(visible_target)==1:
                 confirmed_chord=(matches_cutout(x) and visible_target[0]['parenthesized']
@@ -993,7 +993,16 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                 measured_chain=(matches_cutout(x) and plain_other_string(tv)
                     and (paired_outgoing(x) is not None or sn.get('tie_outgoing_x') is not None
                          and abs(sn['tie_outgoing_x']-start.x)<.6))
-                if not confirmed_chord and not measured_chain:continue
+                held_terminal=(matches_cutout(x) and plain_other_string(tv) and len(sv['notes'])==1
+                    and sn['parenthesized'] and sn['tie'] and not sn.get('inferred_from')
+                    and not sn.get('harmonic') and not visible_target[0].get('harmonic')
+                    and abs(start.x-sn['x']-cutout)<.3
+                    and sum(abs(min(a[1].x,a[4].x)-start.x)<.3 and abs(max(a[1].x,a[4].x)-end.x)<.3
+                            and abs(a[1].y-start.y)<.3 and abs(a[4].y-end.y)<.3 for a in arcs)==1
+                    and not any(s['text'].strip().lower().rstrip('.') in ('h','p','sl')
+                                and sn['x']<(s['bbox'][0]+s['bbox'][2])/2<x
+                                and abs(s['origin'][1]-sn['y'])<gap*2 for s in spans))
+                if not confirmed_chord and not measured_chain and not held_terminal:continue
             # With visible notes on another string, a displaced arc may be a
             # cross-string slur. Require both endpoints on the source string.
             if visible_target and (abs(start.y-sn['y'])>gap*.25 or abs(end.y-sn['y'])>gap*.25): continue
