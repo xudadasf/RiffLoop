@@ -171,6 +171,15 @@ def recognize(pdf):
             if tempo:
                 result['tempo'] = int(tempo[1])
         groups = staves(lines, page.rect.width)
+        if groups:
+            last=groups[-1];space=last['ys'][1]-last['ys'][0]
+            # A page fraction is layout text only when its value and placement agree.
+            footers=[s for s in spans if s['text'].strip()==f'{pi+1}/{len(document)}'
+                     and 'bravura' not in s['font'].lower() and s['size']<=9
+                     and s['origin'][1]>page.rect.y1-page.rect.height*.05
+                     and s['bbox'][1]>last['ys'][-1]+space
+                     and abs(s['bbox'][2]-last['right'])<space*.5]
+            if len(footers)==1:footers[0]['page_footer']=True
         for gi, staff in enumerate(groups):
             if staff['count'] != 6:
                 continue
@@ -1375,7 +1384,7 @@ def visually_empty(bar,staff,standard,spans,shapes,bottom=None):
     def staff_segment(rect):
         return rect.height<.8 and (rect.width>20 or rect.width>1
                                   and any(abs((rect.y0+rect.y1)/2-y)<.15 for y in rows))
-    ignored=[s for s in spans if any(c in s['text'] for c in ('\ue050','\ue06d','\ue08a','\ue08b'))
+    ignored=[s for s in spans if s.get('page_footer') or any(c in s['text'] for c in ('\ue050','\ue06d','\ue08a','\ue08b'))
              or all('\ue080'<=c<='\ue089' for c in s['text'])]
     for s in spans:
         x,y=s['origin']
