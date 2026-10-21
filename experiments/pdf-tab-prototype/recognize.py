@@ -141,6 +141,7 @@ def recognize(pdf):
     previous_number = 0
     previous_shapes = []
     previous_lines = []
+    previous_spans = []
     tempo_marks=[]
     for pi, page in enumerate(document):
         lines, shapes = lines_and_shapes(page)
@@ -282,10 +283,11 @@ def recognize(pdf):
             result['tremolo_marks'].extend(read_tremolos(system,spans,lines))
             result['slide_marks'].extend(read_slides(system,spans,lines,shapes))
             if result['systems']:
-                read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'])
+                read_boundary_slides(result['systems'][-1],system,previous_lines,previous_shapes,shapes,result['slide_marks'],previous_spans)
             result['systems'].append(system)
             previous_shapes = shapes
             previous_lines = lines
+            previous_spans = spans
     read_tempos(result,tempo_marks)
     if any(m['status']=='unsupported' for m in result['tremolo_marks']):
         result['warnings'].append('部分重复拨弦标记的节拍或符干未确认，尚未还原；详见 tremolo_marks。')
@@ -430,7 +432,7 @@ def read_staccatos(system,spans,bottom,outlined=(),shapes=(),outline_upper=None)
     return marks
 
 
-def read_boundary_slides(previous,current,lines,previous_shapes,current_shapes,marks):
+def read_boundary_slides(previous,current,lines,previous_shapes,current_shapes,marks,spans):
     """Match an outgoing slide and paired TAB slur continuations at a row break."""
     if not previous['bars'] or not current['bars']:return
     sb,tb=previous['bars'][-1],current['bars'][0]
@@ -480,6 +482,30 @@ def read_boundary_slides(previous,current,lines,previous_shapes,current_shapes,m
     if not labels:
         marks.append({'page':previous['page'],'x':sv['x'],'y':source[-1]['y'],
                       'status':'recognized','kind':'system-boundary','bar':sb['number'],'target_bar':tb['number']})
+    # A label centered over the whole outgoing group can also cover its
+    # immediately preceding, independently drawn same-string transition.
+    if len(source)!=1 or len(labels)!=1 or len(sb['beats'])<2:return
+    pv=sb['beats'][-2]
+    if pv['grace'] or len(pv['notes'])!=1:return
+    pn=pv['notes'][0];sn=source[0];mark=labels[0]
+    if pn['dead'] or sn['tie'] or pn['string']!=sn['string'] or pn['fret']==sn['fret']:return
+    if abs(mark['x']-(pn['x']+previous['right'])/2)>gap*.5:return
+    text_marks=[s for s in spans if s['text'].strip().lower() in ('h','p','sl.')
+                and pn['x']<(s['bbox'][0]+s['bbox'][2])/2<previous['right']
+                and previous['ys'][0]-25<s['origin'][1]<previous['ys'][-1]+2]
+    if len(text_marks)!=1 or text_marks[0]['text'].strip().lower()!='sl.':return
+    curves=[]
+    for sh in previous_shapes:
+        if sh['type']!='f' or len(sh['items'])!=2 or not all(i[0]=='c' for i in sh['items']):continue
+        if sh['rect'].height>=gap*2:continue
+        a,z=sorted((sh['items'][0][1],sh['items'][0][4]),key=lambda p:p.x)
+        offset=pn['y']-a.y;end_offset=sn['y']-z.y
+        if (abs(a.x-pn['x'])<1 and abs(z.x-sn['x'])<1 and 0<abs(offset)<gap*.8
+                and 0<abs(end_offset)<gap*.8 and offset*end_offset>0 and abs(offset-end_offset)<gap*.25):curves.append(sh)
+    if len(curves)!=1 or not single_slide_evidence(pn,sn,lines,gap):return
+    pn.update(legato_slide=True,slide_target_bar=sb['number'],slide_target_fret=sn['fret'])
+    sn['slide_source_bar']=sb['number']
+    mark.update(kind='grouped-system-boundary',transitions=2);mark.pop('reason',None)
 
 
 def slide_line_count(sn,tn,lines,gap,minimum_width=4):
