@@ -259,6 +259,7 @@ def recognize(pdf):
                 bar['beats'].sort(key=lambda b:b['x'])
                 system['bars'].append(bar)
             read_hidden_standard_ties(system,spans,lines,shapes,result['tuning'])
+            read_bend_continuations(system,spans,lines,shapes)
             read_ties(system,spans,lines,shapes,padding_samples,font_resources(page))
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
@@ -829,6 +830,81 @@ def read_hidden_standard_ties(system,spans,lines,shapes,tuning=None):
         if beat['duration'] is None: continue
         tb['beats'].append(beat);tb['beats'].sort(key=lambda v:v['x'])
         tb['issues']=[issue for issue in tb['issues'] if issue!='空小节或休止符尚未识别']
+
+
+def read_bend_continuations(system,spans,lines,shapes):
+    """Recover single-note hold timing, not the bend's sounding pitch curve."""
+    standard=system['standard']
+    if not standard:return
+    space=standard['ys'][1]-standard['ys'][0];top=system['ys'][0];upper=standard['ys'][0]-35
+    center=lambda h:(h['bbox'][0]+h['bbox'][2])/2
+    heads=[h for h in spans if h['text'] in ('\ue0a2','\ue0a3','\ue0a4') and h['size']>=14
+           and upper<h['origin'][1]<top-5 and system['left']<center(h)<system['right']]
+    parentheses=[];bends=[]
+    for sh in shapes:
+        items=sh['items']
+        if sh['type']=='f' and len(items)==2 and all(i[0]=='c' for i in items):
+            _,a,b,c,z=items[0];_,aa,bb,cc,zz=items[1]
+            if (abs(a.x-z.x)<.1 and abs(a.x-aa.x)<.1 and abs(a.x-zz.x)<.1
+                    and abs(a.y-zz.y)<.1 and abs(z.y-aa.y)<.1 and space*.9<z.y-a.y<space*1.1
+                    and abs(b.x-c.x)<.1 and space*.7<abs(b.x-a.x)<space*.9
+                    and (b.x-a.x)*(bb.x-aa.x)>0):
+                parentheses.append((a.x,(a.y+z.y)/2,-1 if b.x<a.x else 1))
+        if sh['type']=='s':
+            for first,second in zip(items,items[1:]):
+                if first[0]!='l' or second[0]!='l':continue
+                _,a,peak=first;_,join,z=second
+                if (abs(peak.x-join.x)<.1 and abs(peak.y-join.y)<.1 and a.x<peak.x<z.x
+                        and space*1.5<a.y-peak.y<space*2.5 and space<z.y-peak.y<space*2):
+                    bends.append((a,z))
+    for head in sorted(heads,key=center):
+        x=center(head);y=head['origin'][1]
+        left=[p for p in parentheses if p[2]==-1 and -.1<head['bbox'][0]-p[0]<space*2 and abs(p[1]-y)<space*.15]
+        right=[p for p in parentheses if p[2]==1 and -.1<p[0]-head['bbox'][2]<space*.5 and abs(p[1]-y)<space*.15]
+        if len(left)!=1 or len(right)!=1:continue
+        if sum(left[0][0]<center(h)<right[0][0] and abs(h['origin'][1]-y)<space for h in heads)!=1:continue
+        beats=[(b,v) for b in system['bars'] for v in b['beats']]
+        prior=[(b,v) for b,v in beats if v['x']<x-4.5]
+        if not prior:continue
+        sb,sv=max(prior,key=lambda pair:pair[1]['x'])
+        if sv['grace'] or sv['duration'] is None or len(sv['notes'])!=1:continue
+        sn=sv['notes'][0]
+        if sn['dead'] or sn.get('harmonic'):continue
+        before=[h for h in heads if abs(center(h)-sv['x'])<4.5]
+        if len(before)!=1:continue
+        origin=before[0];ox=center(origin);oy=origin['origin'][1]
+        if not space*.4<oy-y<space*.6:continue
+        if any(ox+4.5<center(h)<x-4.5 for h in heads):continue
+        links=[(a,z) for a,z in bends if 0<a.x-ox<space*.4 and 0<x-z.x<space*.4
+               and space*.5<oy-a.y<space*.9 and space*.5<y-z.y<space*.9]
+        if len(links)!=1:continue
+        if any(s['text'].strip().lower() in ('h','p','sl.') and ox<center(s)<x
+               and upper<s['origin'][1]<system['ys'][-1]+2 for s in spans):continue
+        tb=next((b for b in system['bars'] if b['left']<x<b['right']),None)
+        if not tb or tb['number'] not in (sb['number'],sb['number']+1):continue
+        targets=[v for b,v in beats if abs(v['x']-x)<4.5]
+        if len(targets)>1:continue
+        evidence='standard-bend-and-parenthesized-head'
+        if targets:
+            tv=targets[0]
+            if tv['grace'] or len(tv['notes'])!=1:continue
+            tn=tv['notes'][0]
+            if (not tn['parenthesized'] or tn['dead'] or tn.get('harmonic')
+                    or (tn['string'],tn['fret'])!=(sn['string'],sn['fret'])):continue
+        else:
+            # A small cue head has no independent beat. Hidden full-size
+            # destinations require their own unique, attached rhythm stem.
+            stems=[(a,b,c,d) for a,b,c,d in lines if abs(a-c)<.2 and head['bbox'][0]-1<a<head['bbox'][2]+1
+                   and abs(d-b)>9 and upper-15<min(b,d)<max(b,d)<top-4
+                   and min(b,d)-1<y<max(b,d)+1]
+            if len(stems)!=1 or head['text']=='\ue0a2':continue
+            tn={**sn,'x':x,'bbox':[x-1,sn['y']-2,x+1,sn['y']+2],
+                'parenthesized':False,'inferred_from':evidence}
+            tv={'x':x,'notes':[tn],'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
+            read_rhythm(tv,system,standard,spans,lines,shapes,tb['left'],tb['right'])
+            if tv['duration'] is None:continue
+            tb['beats'].append(tv);tb['beats'].sort(key=lambda v:v['x'])
+        tn.update(tie=True,tie_source_bar=sb['number'],tie_evidence=evidence)
 
 
 def annotated_tie_start(note,point,gap):
