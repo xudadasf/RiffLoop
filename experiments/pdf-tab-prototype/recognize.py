@@ -833,23 +833,25 @@ def read_hidden_standard_ties(system,spans,lines,shapes,tuning=None):
 
 
 def read_bend_continuations(system,spans,lines,shapes):
-    """Recover single-note hold timing, not the bend's sounding pitch curve."""
+    """Recover proven bend holds, not the bend's sounding pitch curve."""
     standard=system['standard']
     if not standard:return
     space=standard['ys'][1]-standard['ys'][0];top=system['ys'][0];upper=standard['ys'][0]-35
     center=lambda h:(h['bbox'][0]+h['bbox'][2])/2
     heads=[h for h in spans if h['text'] in ('\ue0a2','\ue0a3','\ue0a4') and h['size']>=14
            and upper<h['origin'][1]<top-5 and system['left']<center(h)<system['right']]
-    parentheses=[];bends=[]
+    parentheses=[];bends=[];arcs=[]
     for sh in shapes:
         items=sh['items']
         if sh['type']=='f' and len(items)==2 and all(i[0]=='c' for i in items):
             _,a,b,c,z=items[0];_,aa,bb,cc,zz=items[1]
+            if sh['rect'].width>4 and sh['rect'].height<space*2:arcs.append(sorted((a,z),key=lambda p:p.x))
             if (abs(a.x-z.x)<.1 and abs(a.x-aa.x)<.1 and abs(a.x-zz.x)<.1
                     and abs(a.y-zz.y)<.1 and abs(z.y-aa.y)<.1 and space*.9<z.y-a.y<space*1.1
                     and abs(b.x-c.x)<.1 and space*.7<abs(b.x-a.x)<space*.9
                     and (b.x-a.x)*(bb.x-aa.x)>0):
-                parentheses.append((a.x,(a.y+z.y)/2,-1 if b.x<a.x else 1))
+                # Equal endpoint/control X values put this cubic's outer edge at t=.5.
+                parentheses.append((a.x,(a.y+z.y)/2,-1 if b.x<a.x else 1,a.x+.75*(b.x-a.x)))
         if sh['type']=='s':
             for first,second in zip(items,items[1:]):
                 if first[0]!='l' or second[0]!='l':continue
@@ -862,7 +864,54 @@ def read_bend_continuations(system,spans,lines,shapes):
         left=[p for p in parentheses if p[2]==-1 and -.1<head['bbox'][0]-p[0]<space*2 and abs(p[1]-y)<space*.15]
         right=[p for p in parentheses if p[2]==1 and -.1<p[0]-head['bbox'][2]<space*.5 and abs(p[1]-y)<space*.15]
         if len(left)!=1 or len(right)!=1:continue
-        if sum(left[0][0]<center(h)<right[0][0] and abs(h['origin'][1]-y)<space for h in heads)!=1:continue
+        group=[h for h in heads if left[0][0]<center(h)<right[0][0] and abs(h['origin'][1]-y)<space]
+        if len(group)==2:
+            # Bent unisons print two offset heads on one stem. Each source
+            # tone still needs independent evidence: one bend and one tie.
+            x=sum(map(center,group))/2
+            if any(h['text']!='\ue0a4' or abs(h['origin'][1]-y)>.25 for h in group):continue
+            if not space*.9<abs(center(group[0])-center(group[1]))<space*1.2:continue
+            beats=[(b,v) for b in system['bars'] for v in b['beats']]
+            if any(abs(v['x']-x)<4.5 for b,v in beats):continue
+            prior=[(b,v) for b,v in beats if v['x']<x-4.5]
+            if not prior:continue
+            sb,sv=max(prior,key=lambda pair:pair[1]['x'])
+            if sv['grace'] or sv['duration'] is None or len(sv['notes'])!=2:continue
+            if any(n['dead'] or n['tie'] or n.get('harmonic') for n in sv['notes']):continue
+            before=sorted((h for h in heads if abs(center(h)-sv['x'])<4.5),key=lambda h:h['origin'][1])
+            if len(before)!=2 or any(h['text']!='\ue0a4' for h in before):continue
+            high,low=before
+            if abs(high['origin'][1]-y)>.25 or not space*.4<low['origin'][1]-y<space*.6:continue
+            if any(max(map(center,before))+1<center(h)<min(map(center,group))-1 for h in heads):continue
+            if any(s['text'].strip().lower() in ('h','p','sl.') and sv['x']<center(s)<x
+                   and upper<s['origin'][1]<system['ys'][-1]+2 for s in spans):continue
+            def common_stems(hs):
+                return [(a,b,c,d) for a,b,c,d in lines if abs(a-c)<.2 and abs(d-b)>9
+                        and max(h['bbox'][0] for h in hs)-.5<a<min(h['bbox'][2] for h in hs)+.5
+                        and upper-15<min(b,d)<max(b,d)<top-4
+                        and min(b,d)-1<min(h['origin'][1] for h in hs)
+                        and max(h['origin'][1] for h in hs)<max(b,d)+1]
+            if len(common_stems(before))!=1 or len(common_stems(group))!=1:continue
+            links=[(a,z,h) for a,z in bends for h in group
+                   if 0<a.x-center(low)<space*.4 and 0<center(h)-z.x<space*.4
+                   and space*.5<low['origin'][1]-a.y<space*.9 and space*.5<y-z.y<space*.9]
+            if len(links)!=1:continue
+            held=next(h for h in group if h is not links[0][2])
+            ties=[(a,z) for a,z in arcs if 0<a.x-high['bbox'][2]<space*.3
+                  and abs(a.y-z.y)<.25 and 0<y-a.y<space*.35
+                  and (abs(z.x-held['bbox'][0])<.7
+                       or held is min(group,key=center) and abs(z.x-left[0][3])<.3)]
+            if len(ties)!=1:continue
+            tb=next((b for b in system['bars'] if b['left']<x<b['right']),None)
+            if not tb or tb['number'] not in (sb['number'],sb['number']+1):continue
+            notes=[{**n,'x':x,'bbox':[x-1,n['y']-2,x+1,n['y']+2],'parenthesized':False,
+                    'tie':True,'tie_source_bar':sb['number'],'inferred_from':'bent-unison-heads-with-independent-tie'}
+                   for n in sv['notes']]
+            beat={'x':x,'notes':notes,'grace':False,'duration':None,'dots':0,'tuplet':[1,1]}
+            read_rhythm(beat,system,standard,spans,lines,shapes,tb['left'],tb['right'])
+            if beat['duration'] is not None:tb['beats'].append(beat);tb['beats'].sort(key=lambda v:v['x'])
+            continue
+        if len(group)!=1:continue
         beats=[(b,v) for b in system['bars'] for v in b['beats']]
         prior=[(b,v) for b,v in beats if v['x']<x-4.5]
         if not prior:continue
