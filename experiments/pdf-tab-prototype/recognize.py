@@ -1047,9 +1047,13 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             if sv['grace'] or tv['grace'] or tb['number'] not in (sb['number'],sb['number']+1): continue
             if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
-            # This attachment is proven only for a printed same-pitch target.
-            # Do not use it to invent a hidden harmonic destination.
-            if annotated_tie_start(sn,start,gap):continue
+            annotated_source=annotated_tie_start(sn,start,gap)
+            if annotated_source:
+                # A hidden annotated hold needs independent rhythm/layout evidence.
+                # The annotation identifies an edge, not a sounding harmonic pitch.
+                if len(sources)!=1 or len(sv['notes'])!=1 or sv['grace'] or sv['duration'] is None:continue
+                if any(abs(p.y-sn['y'])>gap*.25 for p in (start,end)):continue
+                if sum(abs(min(a[1].x,a[4].x)-start.x)<.6 and abs(a[1].y-start.y)<.3 for a in arcs)!=1:continue
             # GP often suppresses a tied fret number but retains its rhythm stem.
             def plain_other_string(beat):
                 return (beat and not beat['grace'] and len(beat['notes'])==1
@@ -1133,6 +1137,14 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             if not tb or x<=sn['x']+3 or tb['number'] not in (sb['number'],sb['number']+1): continue
             tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
             if sv['grace'] or tv and (tv['grace'] or not tv['notes']): continue
+            annotated_partial=annotated_source and matches_cutout(x) and plain_other_string(tv)
+            if annotated_source:
+                short=[l for l in lines if abs(l[0]-l[2])<.2 and abs(l[0]-x)<.5
+                       and abs(l[1]-l[3])>gap and bottom+gap*.5<min(l[1],l[3])<bottom+gap*1.5
+                       and max(l[1],l[3])<bottom+gap*5]
+                if not annotated_partial and (tv or len(short)!=1 or not 0<x-end.x<gap):continue
+                if any(s['text'].strip().lower().rstrip('.') in ('h','p','sl') and sv['x']<(s['bbox'][0]+s['bbox'][2])/2<x
+                       and abs(s['origin'][1]-sn['y'])<gap*2 for s in spans):continue
             # A short tie mark can end near the next unrelated single note.
             # A single printed destination needs independent evidence for the
             # omitted continuation, not just a curve ending near its stem.
@@ -1153,13 +1165,16 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                     and not any(s['text'].strip().lower().rstrip('.') in ('h','p','sl')
                                 and sn['x']<(s['bbox'][0]+s['bbox'][2])/2<x
                                 and abs(s['origin'][1]-sn['y'])<gap*2 for s in spans))
-                if not confirmed_chord and not measured_chain and not held_terminal:continue
+                if not confirmed_chord and not measured_chain and not held_terminal and not annotated_partial:continue
             # With visible notes on another string, a displaced arc may be a
             # cross-string slur. Require both endpoints on the source string.
             if visible_target and (abs(start.y-sn['y'])>gap*.25 or abs(end.y-sn['y'])>gap*.25): continue
             if any(sv['x']<v['x']<x-1.5 for b in system['bars'] for v in b['beats']): continue
             tn={**sn,'x':x,'bbox':[x-1,sn['y']-2,x+1,sn['y']+2],
                 'parenthesized':False,'inferred_from':'tie-curve-and-stem'}
+            if annotated_source:
+                tn.pop('tie_annotation_right',None)
+                tn['inferred_from']='annotation-curve-and-measured-cutout' if annotated_partial else 'annotation-curve-and-short-stem'
             tn.pop('tie_outgoing_x',None)
             tn['tie_outgoing_x']=paired_outgoing(x)
             # Keep an independently measured glyph width even if this incoming

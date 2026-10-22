@@ -19,7 +19,7 @@
 从仓库根目录执行。`--out` 每次必须是一个全新的目录，失败目录也不覆盖；输出必须位于原始素材目录之外。
 
 ```powershell
-python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素材' --baseline experiments/pdf-tab-prototype/validation-summary-20261021-bent-unison.json --pairing-baseline output/pdf-tab-prototype/recovered-pairing-20261015 --out output/pdf-tab-prototype/regression-next-round
+python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素材' --baseline experiments/pdf-tab-prototype/validation-summary-20261022-annotated-holds.json --pairing-baseline output/pdf-tab-prototype/recovered-pairing-20261015 --out output/pdf-tab-prototype/regression-next-round
 ```
 
 后续将 `--baseline` 改为上一轮的 `summary.json`，`--out` 改成另一新目录；继续使用相同的配对基线。素材路径和候选集合必须一致；从脚本生成的第一轮开始，还会固定 PDF/GP 内容哈希。素材改变时应另建明确的评估基线，不能把曲库变化混成规则改进。
