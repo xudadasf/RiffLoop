@@ -982,6 +982,17 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                 and 0<s['bbox'][0]-n['bbox'][2]<gap*.4
                 and abs((s['bbox'][1]+s['bbox'][3])/2-n['y'])<gap*.3]
         if len(labels)==1:n['tie_annotation_right']=labels[0]['bbox'][2]
+    # A close hidden fret can put the annotation edge beyond its incoming
+    # cutout. Orient short curves by that unique edge, not by X or PDF order.
+    short_arcs={}
+    for sh in shapes:
+        if (sh['type']!='f' or len(sh['items'])!=2 or not all(i[0]=='c' for i in sh['items'])
+                or not 0<sh['rect'].width<=4 or sh['rect'].height>=gap*2):continue
+        arc=sh['items'][0];a,z=arc[1],arc[4]
+        matches=[(start,end) for start,end in ((a,z),(z,a))
+                 for b,v,n in notes() if annotated_tie_start(n,start,gap)]
+        if len(matches)==1:
+            short_arcs[id(arc)]=matches[0];arcs.append(arc)
     def printed_cutout(note):
         if note.get('tie_cutout_half_width') is not None:return note['tie_cutout_half_width']
         source=next((s for s in spans if list(s['bbox'])==note['bbox']),None)
@@ -1024,7 +1035,8 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
     # a printed companion whose wider fret puts its arc later in X order.
     # Only the second pass may create notes, preserving hidden-chain order.
     for arc,existing_only in ((a,p) for p in (True,False) for a in ordered):
-        start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
+        short_arc=id(arc) in short_arcs
+        start,end=short_arcs.get(id(arc),sorted((arc[1],arc[4]),key=lambda p:p.x))
         if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
         sources=[(b,v,n) for b,v,n in notes() if (abs(n['x']-start.x)<7
                  or (n['parenthesized'] or n.get('harmonic')=='natural') and abs(n['bbox'][2]-start.x)<2
@@ -1042,6 +1054,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                  or n['parenthesized'] and abs(n['bbox'][0]-end.x)<2)
                  and n['string']==sn['string'] and n['x']>sn['x']+3]
         if targets:
+            if short_arc:continue  # Short marks require an independently hidden chain.
             tb,tv,tn=min(targets,key=lambda t:abs(t[2]['x']-end.x))
             if tn['fret']!=sn['fret'] or tn.get('harmonic')!=sn.get('harmonic'): continue
             if not tn['parenthesized'] and not tn.get('inferred_from'): continue
@@ -1058,7 +1071,9 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
                 # The annotation identifies an edge, not a sounding harmonic pitch.
                 if len(sources)!=1 or len(sv['notes'])!=1 or sv['grace'] or sv['duration'] is None:continue
                 if any(abs(p.y-sn['y'])>gap*.25 for p in (start,end)):continue
-                if sum(abs(min(a[1].x,a[4].x)-start.x)<.6 and abs(a[1].y-start.y)<.3 for a in arcs)!=1:continue
+                if short_arc:
+                    if sum(any(abs(p.x-start.x)<.6 and abs(p.y-start.y)<.3 for p in (a[1],a[4])) for a in arcs)!=1:continue
+                elif sum(abs(min(a[1].x,a[4].x)-start.x)<.6 and abs(a[1].y-start.y)<.3 for a in arcs)!=1:continue
             # GP often suppresses a tied fret number but retains its rhythm stem.
             def plain_other_string(beat):
                 return (beat and not beat['grace'] and len(beat['notes'])==1
@@ -1134,6 +1149,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             stems=[x for x in stems if abs(x-end.x)<7 or paired_outgoing(x) is not None or matches_cutout(x) or beamed_hidden(x)]
             if len(stems)!=1: continue
             x=stems[0]
+            if short_arc and paired_outgoing(x) is None:continue
             # Visible notes on other strings may share this stem; only ink on
             # the source string rules out its suppressed continuation.
             if any(n['string']==sn['string'] and not n.get('inferred_from') and n['bbox'][0]-1<x<n['bbox'][2]+1
