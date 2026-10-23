@@ -3,6 +3,7 @@ const fs = require('fs');
 const alpha = require('../../RiffLoop/Resources/GpWeb/alphaTab.min.js');
 const [input, output, selection = 'all'] = process.argv.slice(2);
 const data = JSON.parse(fs.readFileSync(input,'utf8'));
+const slideOuts={up:alpha.model.SlideOutType.OutUp,down:alpha.model.SlideOutType.OutDown};
 const ornaments={'turn':alpha.model.NoteOrnament.Turn,'inverted-turn':alpha.model.NoteOrnament.InvertedTurn,
     'upper-mordent':alpha.model.NoteOrnament.UpperMordent,'lower-mordent':alpha.model.NoteOrnament.LowerMordent};
 const requested = selection === 'all' ? null : new Set(selection.split(',').flatMap(part => {
@@ -79,6 +80,11 @@ for (const source of bars) {
                 note.ornament = ornaments[raw.ornament];
             }
             if(raw.legato_slide) note.slideOutType = alpha.model.SlideOutType.Legato;
+            if(raw.slide_out !== undefined) {
+                if(!slideOuts[raw.slide_out] || raw.legato_slide || raw.dead || item.grace)
+                    throw Error('Unsupported terminal slide in recognition data');
+                note.slideOutType = slideOuts[raw.slide_out];
+            }
             if(raw.tie) {
                 const prior = previousNotes.get(raw.string);
                 if(!prior || prior.fret !== raw.fret || prior.harmonic !== raw.harmonic || prior.bar !== raw.tie_source_bar)
@@ -127,7 +133,7 @@ for(let i=0;i<bars.length;i++) {
                 throw Error(`Roundtrip changed palm mute at bar ${i+1}, beat ${j+1}`);
             if(note.ornament !== (raw.ornament === undefined ? alpha.model.NoteOrnament.None : ornaments[raw.ornament]))
                 throw Error(`Roundtrip changed ornament at bar ${i+1}, beat ${j+1}`);
-            if(note.slideOutType !== (raw.legato_slide ? alpha.model.SlideOutType.Legato : alpha.model.SlideOutType.None) ||
+            if(note.slideOutType !== (raw.legato_slide ? alpha.model.SlideOutType.Legato : slideOuts[raw.slide_out] ?? alpha.model.SlideOutType.None) ||
                 (raw.legato_slide && note.slideTarget?.fret !== raw.slide_target_fret))
                 throw Error(`Roundtrip changed slide at bar ${i+1}, beat ${j+1}`);
         }

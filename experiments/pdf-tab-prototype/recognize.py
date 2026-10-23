@@ -264,6 +264,7 @@ def recognize(pdf):
             if result['systems']:
                 read_boundary_ties(result['systems'][-1],system,previous_shapes,shapes)
             read_mixed_half_chords(system,lines,shapes)
+            slide_out_shapes=read_slide_outs(system,shapes)
             previous_bar=result['systems'][-1]['bars'][-1] if result['systems'] else None
             for bar in system['bars']:
                 # New hidden tie destinations must participate in tuplet grouping.
@@ -271,7 +272,7 @@ def recognize(pdf):
                     beat['notes'].sort(key=lambda n:n['string'])
                     beat['tuplet']=[1,1]
                 read_tuplets(bar,staff,standard,spans,lines)
-                read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes)
+                read_stemless_whole_tie(bar,previous_bar,staff,standard,spans,shapes,slide_out_shapes)
                 validate_bar(bar)
                 previous_bar=bar
             outline_upper=ys[0]-30
@@ -1515,7 +1516,34 @@ def add_rests(bar,staff,standard,spans,lines,shapes):
         bar['issues'].append('空小节或休止符尚未识别')
 
 
-def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes):
+def read_slide_outs(system,shapes):
+    """Identify isolated terminal diagonals; a line reaching a fret is not a slide out."""
+    gap=(system['ys'][-1]-system['ys'][0])/5
+    notes=[(b,v,n) for b in system['bars'] for v in b['beats'] for n in v['notes']]
+    claims=[]
+    for bar,beat,note in notes:
+        if beat['grace'] or note['dead'] or note.get('inferred_from') or note.get('legato_slide'):continue
+        matches=[]
+        for i,sh in enumerate(shapes):
+            if (sh['type']!='s' or len(sh['items'])!=1 or sh['items'][0][0]!='l'
+                    or not gap*.05<sh.get('width',0)<gap*.15):continue
+            a,z=sorted(sh['items'][0][1:],key=lambda p:p.x);dx=z.x-a.x;dy=z.y-a.y
+            if not (gap*.55<dx<gap*.8 and abs(abs(dy)-dx)<.2
+                    and abs((a.y+z.y)/2-note['y'])<gap*.2
+                    and 0<a.x-note['bbox'][2]<gap*.5 and z.x<bar['right']-1):continue
+            # Close notes can make an ordinary connecting slide equally short.
+            if any(n['x']>note['x'] and -1<n['bbox'][0]-z.x<gap*.5
+                   and abs(n['y']-note['y'])<gap*.3 for b,v,n in notes):continue
+            matches.append((i,'down' if dy>0 else 'up'))
+        if len(matches)==1:claims.append((note,*matches[0]))
+    accepted=set()
+    for note,i,direction in claims:
+        if sum(j==i for n,j,d in claims)!=1:continue
+        note['slide_out']=direction;accepted.add(i)
+    return accepted
+
+
+def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes,slide_out_shapes=()):
     """Read GP's stemless parenthesized whole-note continuation, not a beat deficit."""
     if standard or not previous or previous['issues'] or previous['number']+1!=bar['number']:return
     if bar['meter_source']!='pdf' or len(bar['beats'])!=1 or not previous['beats']:return
@@ -1570,7 +1598,7 @@ def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes):
                     or abs(z.y-w.y)<.2 and gap*.8<abs(a.y-b.y)<gap*2 and abs((a.y+b.y)/2-z.y)<.2):partners[i].append(j)
     hairpins={i for i,others in partners.items() if len(others)==1 and len(partners[others[0]])==1}
     remaining_spans=[s for s in spans if not any(list(s['bbox'])==n['bbox'] for n in notes)]
-    remaining_shapes=[sh for i,sh in enumerate(shapes) if i not in incoming|outgoing|hairpins]
+    remaining_shapes=[sh for i,sh in enumerate(shapes) if i not in incoming|outgoing|hairpins|set(slide_out_shapes)]
     if not visually_empty(bar,staff,None,remaining_spans,remaining_shapes,bottom=staff['notation_bottom']):return
     beat['duration']=1
     beat['evidence']='stemless-whole-tab-continuation'

@@ -14,7 +14,7 @@ HERE=Path(__file__).resolve().parent
 ROOT=HERE.parent.parent
 AUDITS={'slide':('slides','slide'),'staccato':('staccato','staccato'),
         'palm_mute':('palm-mute','palm-mute'),'ornament':('ornaments','ornament'),'tremolo':('tremolos','tremolo'),
-        'harmonic':('harmonics','harmonic')}
+        'harmonic':('harmonics','harmonic'),'slide_out':('slide-outs','slide-out')}
 
 
 def read(path):return json.loads(path.read_text(encoding='utf-8'))
