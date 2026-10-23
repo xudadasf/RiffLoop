@@ -12,6 +12,8 @@
 
 验收硬门槛：任何此前通过的小节、技巧事件或播放检查变为失败，本轮就不能作为成功优化保存或更新基线。新增通过项不能抵消旧项退步；应先修正或撤回导致退步的改动，再重跑全量验证。
 
+还须逐字段比较全部 `recognized.json`，包括重复编号、多分谱等无法进入参考 GP 对比的材料：旧的明确时值不能退回未知，旧的小节校验通过项不能新增错误，同拍同弦不能增加重复音符。脚本的参考通过项门槛不覆盖这些未评估小节，不能仅凭退出码 0 更新基线；应保存这部分预测差异和检查结果。
+
 脚本自动执行和记录第 4、5 步的检查；谱面取证、根因判断和规则编写由开发代理继续完成。脚本本身不会自动重写识别规则，不需要调用外部模型。
 
 ## 运行
@@ -19,7 +21,7 @@
 从仓库根目录执行。`--out` 每次必须是一个全新的目录，失败目录也不覆盖；输出必须位于原始素材目录之外。
 
 ```powershell
-python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素材' --baseline experiments/pdf-tab-prototype/validation-summary-20261022-annotated-holds.json --pairing-baseline output/pdf-tab-prototype/recovered-pairing-20261015 --out output/pdf-tab-prototype/regression-next-round
+python experiments/pdf-tab-prototype/regression.py 'C:/Users/sadada/Desktop/素材' --baseline experiments/pdf-tab-prototype/validation-summary-20261022-tie-dependencies.json --pairing-baseline output/pdf-tab-prototype/recovered-pairing-20261015 --out output/pdf-tab-prototype/regression-next-round
 ```
 
 后续将 `--baseline` 改为上一轮的 `summary.json`，`--out` 改成另一新目录；继续使用相同的配对基线。素材路径和候选集合必须一致；从脚本生成的第一轮开始，还会固定 PDF/GP 内容哈希。素材改变时应另建明确的评估基线，不能把曲库变化混成规则改进。

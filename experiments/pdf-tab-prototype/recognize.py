@@ -1019,7 +1019,11 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             width=sum(measured)/len(measured)+fret_width/2
             if gap*.5<width<gap*1.5:return width
         return None
-    for arc in sorted(arcs,key=lambda a:min(a[1].x,a[4].x)):
+    ordered=sorted(arcs,key=lambda a:min(a[1].x,a[4].x))
+    # Confirm existing destinations first: hidden chord tones may depend on
+    # a printed companion whose wider fret puts its arc later in X order.
+    # Only the second pass may create notes, preserving hidden-chain order.
+    for arc,existing_only in ((a,p) for p in (True,False) for a in ordered):
         start,end=sorted((arc[1],arc[4]),key=lambda p:p.x)
         if not top-5<start.y<bottom+7 or not top-5<end.y<bottom+7: continue
         sources=[(b,v,n) for b,v,n in notes() if (abs(n['x']-start.x)<7
@@ -1047,6 +1051,7 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             if sv['grace'] or tv['grace'] or tb['number'] not in (sb['number'],sb['number']+1): continue
             if any(sv['x']<v['x']<tv['x'] for b in system['bars'] for v in b['beats']): continue
         else:
+            if existing_only:continue
             annotated_source=annotated_tie_start(sn,start,gap)
             if annotated_source:
                 # A hidden annotated hold needs independent rhythm/layout evidence.
@@ -1137,6 +1142,9 @@ def read_ties(system,spans,lines,shapes,padding_samples=(),fonts=None):
             if not tb or x<=sn['x']+3 or tb['number'] not in (sb['number'],sb['number']+1): continue
             tv=next((v for v in tb['beats'] if abs(v['x']-x)<1.5),None)
             if sv['grace'] or tv and (tv['grace'] or not tv['notes']): continue
+            # A recovered wide-fret target may lie outside the old centre
+            # tolerance. Never append another note on its occupied string.
+            if tv and any(n['string']==sn['string'] for n in tv['notes']):continue
             annotated_partial=annotated_source and matches_cutout(x) and plain_other_string(tv)
             if annotated_source:
                 short=[l for l in lines if abs(l[0]-l[2])<.2 and abs(l[0]-x)<.5
@@ -1530,11 +1538,14 @@ def read_stemless_whole_tie(bar,previous,staff,standard,spans,shapes):
             if boundary or len(targets)==1:matches.append(i)
         if len(matches)==1:outgoing.update(matches)
     wedges=[];bottom=staff['ys'][-1]
+    # Preserve near-staff hairpins when the next system is close; extend the
+    # search for lower marks only as far as this system's notation area.
+    wedge_bottom=max(bottom+gap*2.5,staff['notation_bottom'])
     for i,sh in enumerate(shapes):
         if sh['type']!='s' or len(sh['items'])!=1 or sh['items'][0][0]!='l' or sh.get('width',1)>=.8:continue
         a,z=sorted(sh['items'][0][1:],key=lambda p:p.x)
         if (staff['left']<a.x<z.x<staff['right'] and z.x-a.x>gap*3
-                and bottom+gap*.4<min(a.y,z.y)<max(a.y,z.y)<bottom+gap*2.5):wedges.append((i,a,z))
+                and bottom+gap*.4<min(a.y,z.y)<max(a.y,z.y)<wedge_bottom):wedges.append((i,a,z))
     partners={i:[] for i,a,z in wedges}
     for i,a,z in wedges:
         for j,b,w in wedges:

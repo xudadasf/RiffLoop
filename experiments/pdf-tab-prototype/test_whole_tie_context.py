@@ -10,7 +10,7 @@ from symbols import font_buffer
 from test_prototype import HERE
 
 
-def whole_context_fixture(path,mode='combined'):
+def whole_context_fixture(path,mode='combined',hairpin_depth=9):
     chain=mode in ('combined','outgoing','different_target','displaced_arc','duplicate_arc')
     right=550 if chain else 370
     with fitz.open() as doc:
@@ -42,9 +42,9 @@ def whole_context_fixture(path,mode='combined'):
                 with fitz.open(stream=page.get_svg_image(text_as_path=True).encode(),filetype='svg') as svg:
                     with fitz.open(stream=svg.convert_to_pdf(),filetype='pdf') as vector:
                         p.show_pdf_page(p.rect,vector,0)
-        if mode in ('combined','hairpin','crescendo','one_arm','duplicate','parallel','uneven','inside_staff','unknown_mark'):
+        if mode in ('combined','hairpin','crescendo','one_arm','duplicate','parallel','uneven','inside_staff','unknown_mark','close_staff'):
             bottom=112 if mode=='inside_staff' else 130
-            a,z=230,right-3;mid=bottom+9
+            a,z=230,right-3;mid=bottom+hairpin_depth
             lines=[((a,mid-4.25),(z,mid)),((a,mid+4.25),(z,mid))]
             if mode=='crescendo':lines=[((a,mid),(z,mid-4.25)),((a,mid),(z,mid+4.25))]
             if mode=='one_arm':lines=lines[:1]
@@ -53,10 +53,33 @@ def whole_context_fixture(path,mode='combined'):
             if mode=='uneven':lines[1]=((a,mid+4.25),(z,mid+2))
             for a,z in lines:p.draw_line(a,z,width=.4)
         if mode=='unknown_mark':p.draw_circle((300,150),1,color=None,fill=(0,0,0))
+        if mode=='close_staff':
+            for y in range(150,181,6):p.draw_line((30,y),(right,y),width=.4)
+            for x in (30,right):p.draw_line((x,150),(x,180),width=.5)
         doc.save(path)
 
 
 class WholeTieContextTests(unittest.TestCase):
+    def test_close_next_staff_preserves_previously_supported_nearby_hairpin(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pdf=Path(folder)/'close.pdf';whole_context_fixture(pdf,'close_staff')
+            bar=recognize(pdf)['systems'][0]['bars'][1]
+            self.assertFalse(bar['issues']);self.assertEqual(bar['beats'][0]['duration'],1)
+
+    def test_low_hairpins_within_this_system_do_not_hide_a_whole_hold(self):
+        for mode in ('hairpin','crescendo'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'low.pdf';whole_context_fixture(pdf,mode,hairpin_depth=24)
+                bar=recognize(pdf)['systems'][0]['bars'][1]
+                self.assertFalse(bar['issues']);self.assertEqual(bar['beats'][0]['duration'],1)
+
+    def test_low_hairpins_still_need_complete_unambiguous_geometry(self):
+        for mode in ('one_arm','duplicate','parallel','uneven','unknown_mark','hairpin'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
+                pdf=Path(folder)/'low.pdf';whole_context_fixture(pdf,mode,hairpin_depth=29 if mode=='hairpin' else 24)
+                bar=recognize(pdf)['systems'][0]['bars'][1]
+                self.assertIsNone(bar['beats'][0]['duration']);self.assertTrue(bar['issues'])
+
     def test_known_clef_outgoing_tie_and_hairpins_preserve_whole_continuations(self):
         for mode in ('clef','outgoing','hairpin','crescendo','boundary','combined'):
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as folder:
