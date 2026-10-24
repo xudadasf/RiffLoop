@@ -7,8 +7,8 @@ function auditSlides(pred,track,exactBars) {
     for(const bar of track.staves[0].bars) for(const beat of bar.voices[0].beats) for(const note of beat.notes) {
         if(note.slideOutType!==alpha.model.SlideOutType.Legato || !note.slideTarget)continue;
         const target=note.slideTarget;
-        expected.push({bar:bar.index+1,beat:beat.index,string:7-note.string,fret:note.fret,
-            target_bar:target.beat.voice.bar.index+1,target_fret:target.fret});
+        expected.push({bar:bar.index+1,beat:beat.index,string:7-note.string,fret:note.isDead?null:note.fret,
+            target_bar:target.beat.voice.bar.index+1,target_fret:target.isDead?null:target.fret});
     }
     for(const system of pred.systems) for(const bar of system.bars) bar.beats.forEach((beat,i)=>{
         for(const note of beat.notes) if(note.legato_slide) actual.push({bar:bar.number,beat:i,

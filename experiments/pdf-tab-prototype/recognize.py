@@ -517,7 +517,8 @@ def slide_line_count(sn,tn,lines,gap,minimum_width=4):
         if minimum_width<4 and not sn['bbox'][2]-.3<x0<x1<tn['bbox'][0]+.3:continue
         if (x1-x0>minimum_width and abs(x0-sn['bbox'][2])<4 and abs(x1-tn['bbox'][0])<4
                 and abs(y0-sn['y'])<gap*.6 and abs(y1-tn['y'])<gap*.6
-                and gap*.15<abs(y1-y0)<gap*.8 and (y0-y1)*(tn['fret']-sn['fret'])>0):count+=1
+                and gap*.15<abs(y1-y0)<gap*.8
+                and (sn['dead'] or (y0-y1)*(tn['fret']-sn['fret'])>0)):count+=1
     return count
 
 
@@ -577,6 +578,8 @@ def shared_legato_curve(a,z,sn,tn,beats,spans,lines,gap,top,curve_top):
 def single_slide_evidence(sn,tn,lines,gap):
     """Called only with a confirmed sl. label and slur; narrow cutouts can hide the line."""
     if slide_line_count(sn,tn,lines,gap,minimum_width=gap*.15)==1:return True
+    # X has no source pitch: require a visible connector, never a hidden-line guess.
+    if sn['dead']:return False
     left,right=sn['bbox'][2],tn['bbox'][0]
     if not 0<right-left<gap*.6:return False
     # A visible conflicting diagonal is never treated as a missing line.
@@ -646,7 +649,8 @@ def read_slides(system,spans,lines,shapes):
             if tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
             if tb['number'] not in (sb['number'],sb['number']+1):continue
             sn,tn=sv['notes'][0],tv['notes'][0]
-            if sn['dead'] or tn['dead'] or tn['tie'] or sn['string']!=tn['string'] or sn['fret']==tn['fret']:continue
+            if tn['dead'] or tn['tie'] or sn['string']!=tn['string'] or sn['fret']==tn['fret']:continue
+            if sn['dead'] and sv['grace']:continue
             if not sn['x']<x<tn['x']:continue
             curves=[]
             for sh in arcs:
