@@ -518,20 +518,25 @@ def slide_line_count(sn,tn,lines,gap,minimum_width=4):
         if (x1-x0>minimum_width and abs(x0-sn['bbox'][2])<4 and abs(x1-tn['bbox'][0])<4
                 and abs(y0-sn['y'])<gap*.6 and abs(y1-tn['y'])<gap*.6
                 and gap*.15<abs(y1-y0)<gap*.8
-                and (sn['dead'] or (y0-y1)*(tn['fret']-sn['fret'])>0)):count+=1
+                and (sn['dead'] or tn['dead'] or (y0-y1)*(tn['fret']-sn['fret'])>0)):count+=1
     return count
 
 
-def read_chord_slides(system,beats,lines,arcs,gap):
+def read_chord_slides(system,beats,lines,arcs,gap,labels=()):
     """Parallel chords need per-string lines and unique upper/lower slurs."""
     marks=[]
     for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
         if sv['grace'] or tv['grace'] or tb['number'] not in (sb['number'],sb['number']+1):continue
         source=sorted(sv['notes'],key=lambda n:n['string']);target=sorted(tv['notes'],key=lambda n:n['string'])
         if len(source)<2 or [n['string'] for n in source]!=[n['string'] for n in target]:continue
-        if any(n['dead'] for n in source+target) or any(n['tie'] for n in target):continue
-        pairs=list(zip(source,target));shifts={tn['fret']-sn['fret'] for sn,tn in pairs}
-        if len(shifts)!=1 or 0 in shifts:continue
+        if any(n['dead'] for n in source) or any(n['tie'] for n in target):continue
+        pairs=list(zip(source,target))
+        if any(n['dead'] for n in target):
+            if not all(n['dead'] for n in target):continue
+            if sum(sv['x']<(l['bbox'][0]+l['bbox'][2])/2<tv['x'] for l in labels)!=1:continue
+        else:
+            shifts={tn['fret']-sn['fret'] for sn,tn in pairs}
+            if len(shifts)!=1 or 0 in shifts:continue
         if any(slide_line_count(sn,tn,lines,gap,minimum_width=gap*.3)!=1 for sn,tn in pairs):continue
         curves=[];sides=[]
         for sh in arcs:
@@ -640,17 +645,21 @@ def read_slides(system,spans,lines,shapes):
     arcs=[sh for sh in shapes if sh['type']=='f' and len(sh['items'])==2
           and all(i[0]=='c' for i in sh['items']) and sh['rect'].height<gap*2]
     beats=[(b,v) for b in system['bars'] for v in b['beats']]
-    marks=read_chord_slides(system,beats,lines,arcs,gap)
+    marks=read_chord_slides(system,beats,lines,arcs,gap,labels)
     for label in labels:
         matches=[];x=(label['bbox'][0]+label['bbox'][2])/2;y=label['origin'][1]
         if any(m.get('kind')=='parallel-chord' and m['start_x']<x<m['end_x'] for m in marks):continue
         matches.extend(grouped_slide_pairs(label,beats,arcs,spans,lines,gap,top))
         for (sb,sv),(tb,tv) in zip(beats,beats[1:]):
-            if tv['grace'] or len(sv['notes'])!=1 or len(tv['notes'])!=1:continue
+            if tv['grace'] or len(tv['notes'])!=1:continue
             if tb['number'] not in (sb['number'],sb['number']+1):continue
-            sn,tn=sv['notes'][0],tv['notes'][0]
+            tn=tv['notes'][0];sources=[n for n in sv['notes'] if n['string']==tn['string']]
+            if len(sources)!=1:continue
+            sn=sources[0]
             if tn['dead'] or tn['tie'] or sn['string']!=tn['string'] or sn['fret']==tn['fret']:continue
             if sn['dead'] and sv['grace']:continue
+            if len(sv['notes'])>1 and (sv['grace'] or sn['dead']
+                    or slide_line_count(sn,tn,lines,gap,minimum_width=gap*.15)!=1):continue
             if not sn['x']<x<tn['x']:continue
             curves=[]
             for sh in arcs:

@@ -134,7 +134,7 @@ for(let i=0;i<bars.length;i++) {
             if(note.ornament !== (raw.ornament === undefined ? alpha.model.NoteOrnament.None : ornaments[raw.ornament]))
                 throw Error(`Roundtrip changed ornament at bar ${i+1}, beat ${j+1}`);
             if(note.slideOutType !== (raw.legato_slide ? alpha.model.SlideOutType.Legato : slideOuts[raw.slide_out] ?? alpha.model.SlideOutType.None) ||
-                (raw.legato_slide && note.slideTarget?.fret !== raw.slide_target_fret))
+                (raw.legato_slide && (note.slideTarget?.isDead ? null : note.slideTarget?.fret) !== raw.slide_target_fret))
                 throw Error(`Roundtrip changed slide at bar ${i+1}, beat ${j+1}`);
         }
         if(a.duration!==e.duration || a.dots!==e.dots || (a.graceType!==alpha.model.GraceType.None)!==e.grace ||
