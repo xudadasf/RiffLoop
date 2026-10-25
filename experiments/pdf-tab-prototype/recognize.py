@@ -1446,7 +1446,10 @@ def read_tuplets(bar,staff,standard,spans,lines):
     low=standard['ys'][-1] if standard else bottom
     high=top-4 if standard else bottom+55
     ratios={3:2,5:4,6:4,7:4}
+    # A fret's text baseline can sit below the sixth string; its glyph is already owned.
+    note_boxes={tuple(n['bbox']) for beat in bar['beats'] for n in beat['notes']}
     labels=[s for s in spans if s['text'] in ('3','5','6','7') and 7<=s['size']<=10
+            and tuple(s['bbox']) not in note_boxes
             and 'arial' not in s['font'].lower() and low<s['origin'][1]<high
             and bar['left']<s['origin'][0]<bar['right']]
     used=set()
