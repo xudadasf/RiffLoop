@@ -28,7 +28,11 @@ def main():
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--timeout-seconds', type=int, default=300,
+                        help='Per-clip time limit, including loading; CPU offload needs longer')
     args = parser.parse_args()
+    if args.timeout_seconds <= 0:
+        parser.error('--timeout-seconds must be positive')
     if args.output.exists():
         raise FileExistsError('Preserve frozen predictions; use a new output')
     clips = json.loads(args.manifest.read_text(encoding='utf-8'))
@@ -39,12 +43,13 @@ def main():
         if sha256(args.model_dir/item['name']) != item['sha256']:
             raise ValueError('Model hash mismatch')
     model = next(item['name'] for item in source['files'] if not item['name'].startswith('mmproj'))
+    projector = next(item['name'] for item in source['files'] if item['name'].startswith('mmproj'))
     template_path = args.model_dir/'chat_template.jinja'
     template_source = json.loads((args.model_dir/'template-source.json').read_text())
     if sha256(template_path) != template_source['sha256']:
         raise ValueError('Template hash mismatch')
     template = '{% set enable_thinking = false %}\n'+template_path.read_text(encoding='utf-8')
-    common = [str(args.runtime), '-m', str(args.model_dir/model), '--mmproj', str(args.model_dir/'mmproj-F16.gguf'),
+    common = [str(args.runtime), '-m', str(args.model_dir/model), '--mmproj', str(args.model_dir/projector),
               '-c', '8192', '-fit', 'on', '-fitt', '1536', '-fa', 'on', '-b', '256', '-ub', '128', '-t', '4',
               '--image-min-tokens', '1024', '--image-max-tokens', '2048', '--jinja', '--chat-template', template,
               '--temp', '0.7', '--top-p', '0.8', '--top-k', '20', '--min-p', '0', '--presence-penalty', '1.5',
@@ -53,6 +58,7 @@ def main():
     raw_dir.mkdir(parents=True, exist_ok=False)
     result = {'format': 'vlm-compact-rhythm-v1', 'transport': 'offline-cli', 'model': model,
               'source': source, 'template_source': template_source, 'runtime_sha256': sha256(args.runtime),
+              'timeout_seconds': args.timeout_seconds,
               'manifest_sha256': sha256(args.manifest), 'prompt': PROMPT,
               'timing_scope': 'cold process including model loading', 'predictions': []}
     for index, clip in enumerate(clips):
@@ -60,7 +66,8 @@ def main():
         started = time.perf_counter()
         with out_path.open('w', encoding='utf-8') as out, err_path.open('w', encoding='utf-8') as err:
             try:
-                run = subprocess.run(common+['--image', clip['image'], '-p', PROMPT], stdout=out, stderr=err, timeout=300)
+                run = subprocess.run(common+['--image', clip['image'], '-p', PROMPT], stdout=out, stderr=err,
+                                     timeout=args.timeout_seconds)
                 returncode = run.returncode
             except subprocess.TimeoutExpired:
                 returncode = -1

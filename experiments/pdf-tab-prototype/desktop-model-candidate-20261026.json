@@ -1,0 +1,29 @@
+{
+  "status": "prepared-not-evaluated",
+  "model": {
+    "repo": "ggml-org/Qwen3.8-27B-GGUF",
+    "revision": "a316ea527fde32c12487be7574e2db5ac2ad2a7e",
+    "files": [
+      {
+        "name": "Qwen3.8-27B-Q4_K_M.gguf",
+        "bytes": 18973870528,
+        "sha256": "c600de0300ae8a0eb3a6c0b8b5561b8b96f16bd2c863c2a66c42de29d391a747",
+        "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/Qwen3.8-27B-Q4_K_M.gguf"
+      },
+      {
+        "name": "mmproj-Qwen3.8-27B-BF16.gguf",
+        "bytes": 931145888,
+        "sha256": "de2a49866988ea272c43dc2a43ee2662c25725a717ca5b9059ea420a97f53fe8",
+        "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/mmproj-Qwen3.8-27B-BF16.gguf"
+      }
+    ]
+  },
+  "template": {
+    "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/chat_template.jinja",
+    "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+    "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+  },
+  "directory": "D:\\RiffLoop-model-tests\\pdf-tab-prototype\\local-model-20261026\\qwen38-27b-q4",
+  "evaluation": "Same frozen images and strict rhythm criteria; GP references evaluation-only",
+  "resource_gate": "Recheck available RAM before loading; no user processes stopped"
+}
