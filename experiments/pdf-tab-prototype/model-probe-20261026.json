@@ -1,0 +1,1767 @@
+{
+  "date": "2026-10-26",
+  "baseline_commit": "88acc6e5f04536d96875a3df4deaa65bad2b1c9c",
+  "status": "no-candidate-accepted",
+  "scope": "fixed exploratory crops, strict primary-voice beat sequence; not whole-score playback accuracy",
+  "reports": {
+    "comparison": {
+      "predictions_sha256": "0fd4c0fc500f402fa42bae443cae2db1653c76baec9e3361817b00240e5f8a1e",
+      "scope": "exploratory fixed crops; primary-voice durations/rests/grace/tie counts; not playback accuracy",
+      "totals": {
+        "clips": 24,
+        "bars": 77,
+        "structural_or_bar_count_failures": 12,
+        "baseline_timing_pass": 75,
+        "model_timing_pass": 27,
+        "model_core_pass": 22,
+        "model_new_timing_pass": 0,
+        "model_lost_timing_pass": 48
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [
+            1,
+            2
+          ],
+          "model_core_pass": [
+            1,
+            2
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-002-system-011",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            34,
+            35,
+            36
+          ],
+          "model_timing_pass": [
+            35
+          ],
+          "model_core_pass": [
+            35
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-004-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Incomplete or structurally invalid prediction"
+        },
+        {
+          "id": "case-004-system-016",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Duplicate string"
+        },
+        {
+          "id": "case-009-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-009-system-014",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Incomplete or structurally invalid prediction"
+        },
+        {
+          "id": "case-011-system-000",
+          "pairing": "consistent",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "model_timing_pass": [
+            3,
+            4
+          ],
+          "model_core_pass": [
+            3,
+            4
+          ],
+          "error": null,
+          "model_bars": 4
+        },
+        {
+          "id": "case-011-system-012",
+          "pairing": "consistent",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_core_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "error": null,
+          "model_bars": 4
+        },
+        {
+          "id": "case-019-system-000",
+          "pairing": "consistent",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "model_timing_pass": [
+            1,
+            2,
+            4
+          ],
+          "model_core_pass": [
+            1,
+            2,
+            4
+          ],
+          "error": null,
+          "model_bars": 5
+        },
+        {
+          "id": "case-019-system-011",
+          "pairing": "consistent",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            50,
+            51,
+            52,
+            53,
+            54
+          ],
+          "model_timing_pass": [
+            51,
+            54
+          ],
+          "model_core_pass": [
+            51
+          ],
+          "error": null,
+          "model_bars": 5
+        },
+        {
+          "id": "case-026-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-026-system-006",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            19,
+            20,
+            21
+          ],
+          "model_timing_pass": [
+            19,
+            21
+          ],
+          "model_core_pass": [
+            19,
+            21
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-038-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-038-system-024",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            73,
+            74,
+            75
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Duplicate string"
+        },
+        {
+          "id": "case-045-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-045-system-014",
+          "pairing": "consistent",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "model_timing_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "model_core_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "error": null,
+          "model_bars": 4
+        },
+        {
+          "id": "case-063-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-063-system-014",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [
+            44
+          ],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-071-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Invalid note or rest mixed with note"
+        },
+        {
+          "id": "case-071-system-010",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_core_pass": [
+            32,
+            33
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-077-system-000",
+          "pairing": "consistent",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            1,
+            2
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 3
+        },
+        {
+          "id": "case-077-system-009",
+          "pairing": "consistent",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            17,
+            18
+          ],
+          "model_timing_pass": [
+            17,
+            18
+          ],
+          "model_core_pass": [
+            18
+          ],
+          "error": null,
+          "model_bars": 2
+        },
+        {
+          "id": "case-081-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 2
+        },
+        {
+          "id": "case-081-system-015",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            46,
+            47,
+            48
+          ],
+          "model_timing_pass": [
+            46
+          ],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        }
+      ]
+    },
+    "comparison-constrained": {
+      "predictions_sha256": "f2b5fb9532aa867b72b5c0b18dcef692ff716b9cec6302e088558e61c5892f4e",
+      "scope": "exploratory fixed crops; primary-voice durations/rests/grace/tie counts; not playback accuracy",
+      "totals": {
+        "clips": 24,
+        "bars": 77,
+        "structural_or_bar_count_failures": 8,
+        "baseline_timing_pass": 75,
+        "model_timing_pass": 28,
+        "model_core_pass": 22,
+        "model_new_timing_pass": 0,
+        "model_lost_timing_pass": 47
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [
+            1,
+            2
+          ],
+          "model_core_pass": [
+            1,
+            2
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-002-system-011",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            34,
+            35,
+            36
+          ],
+          "model_timing_pass": [
+            35
+          ],
+          "model_core_pass": [
+            35
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-004-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-004-system-016",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-009-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-009-system-014",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-011-system-000",
+          "pairing": "consistent",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "model_timing_pass": [
+            3,
+            4
+          ],
+          "model_core_pass": [
+            3,
+            4
+          ],
+          "error": null,
+          "model_bars": 4
+        },
+        {
+          "id": "case-011-system-012",
+          "pairing": "consistent",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_core_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "error": null,
+          "model_bars": 4
+        },
+        {
+          "id": "case-019-system-000",
+          "pairing": "consistent",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "model_timing_pass": [
+            1,
+            2,
+            4
+          ],
+          "model_core_pass": [
+            1,
+            2,
+            4
+          ],
+          "error": null,
+          "model_bars": 5
+        },
+        {
+          "id": "case-019-system-011",
+          "pairing": "consistent",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            50,
+            51,
+            52,
+            53,
+            54
+          ],
+          "model_timing_pass": [
+            51,
+            54
+          ],
+          "model_core_pass": [
+            51
+          ],
+          "error": null,
+          "model_bars": 5
+        },
+        {
+          "id": "case-026-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-026-system-006",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            19,
+            20,
+            21
+          ],
+          "model_timing_pass": [
+            19,
+            21
+          ],
+          "model_core_pass": [
+            19,
+            21
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-038-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-038-system-024",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            73,
+            74,
+            75
+          ],
+          "model_timing_pass": [
+            73
+          ],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-045-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-045-system-014",
+          "pairing": "consistent",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "model_timing_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "model_core_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "error": null,
+          "model_bars": 4
+        },
+        {
+          "id": "case-063-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-063-system-014",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [
+            44
+          ],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-071-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 4
+        },
+        {
+          "id": "case-071-system-010",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_core_pass": [
+            32,
+            33
+          ],
+          "error": null,
+          "model_bars": 3
+        },
+        {
+          "id": "case-077-system-000",
+          "pairing": "consistent",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            1,
+            2
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 3
+        },
+        {
+          "id": "case-077-system-009",
+          "pairing": "consistent",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            17,
+            18
+          ],
+          "model_timing_pass": [
+            17,
+            18
+          ],
+          "model_core_pass": [
+            18
+          ],
+          "error": null,
+          "model_bars": 2
+        },
+        {
+          "id": "case-081-system-000",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "model_core_pass": [],
+          "error": "Bar count mismatch",
+          "model_bars": 2
+        },
+        {
+          "id": "case-081-system-015",
+          "pairing": "consistent",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            46,
+            47,
+            48
+          ],
+          "model_timing_pass": [
+            46
+          ],
+          "model_core_pass": [],
+          "error": null,
+          "model_bars": 3
+        }
+      ]
+    },
+    "vlm-highres-comparison": {
+      "predictions_sha256": "9bbf5b08fcf2af95fcca5a0600896b0030ae8a0b812fd5f6d0ee6a6544cec8e7",
+      "totals": {
+        "clips": 4,
+        "bars": 13,
+        "invalid_or_uncertain_clips": 1,
+        "baseline_timing_pass": 11,
+        "model_timing_pass": 0
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-011-system-012",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-026-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-071-system-010",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid bar"
+        }
+      ]
+    },
+    "vlm-thinking-comparison": {
+      "predictions_sha256": "229fa02fbe1a89062f42bd496fb73d0816e7382898ef7a81db13f20669b7e054",
+      "totals": {
+        "clips": 4,
+        "bars": 13,
+        "invalid_or_uncertain_clips": 3,
+        "baseline_timing_pass": 11,
+        "model_timing_pass": 0
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-011-system-012",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-026-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid bar"
+        },
+        {
+          "id": "case-071-system-010",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid bar"
+        }
+      ]
+    },
+    "vlm-full-comparison": {
+      "predictions_sha256": "c44b1aca13d582d324fd88b1adaf4dc49e9a8d1c3d8b3890f982182b1ff6c88c",
+      "totals": {
+        "clips": 24,
+        "bars": 77,
+        "invalid_or_uncertain_clips": 16,
+        "baseline_timing_pass": 75,
+        "model_timing_pass": 0
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-002-system-011",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            34,
+            35,
+            36
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid rhythm values"
+        },
+        {
+          "id": "case-004-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-004-system-016",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-009-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-009-system-014",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-011-system-000",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-011-system-012",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-019-system-000",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-019-system-011",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            50,
+            51,
+            52,
+            53,
+            54
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-026-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-026-system-006",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            19,
+            20,
+            21
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid rhythm values"
+        },
+        {
+          "id": "case-038-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-038-system-024",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            73,
+            74,
+            75
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-045-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-045-system-014",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-063-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-063-system-014",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid rhythm values"
+        },
+        {
+          "id": "case-071-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-071-system-010",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid bar"
+        },
+        {
+          "id": "case-077-system-000",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            1,
+            2
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-077-system-009",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            17,
+            18
+          ],
+          "model_timing_pass": [],
+          "error": "Model reported uncertainty"
+        },
+        {
+          "id": "case-081-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-081-system-015",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            46,
+            47,
+            48
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        }
+      ]
+    },
+    "vlm9-pilot-comparison": {
+      "predictions_sha256": "353f161331e06046056798a5a045c2d5e440ccda1ca4468aa1ebaf045fa2c301",
+      "totals": {
+        "clips": 4,
+        "bars": 13,
+        "invalid_or_uncertain_clips": 3,
+        "baseline_timing_pass": 11,
+        "model_timing_pass": 0
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Unreadable or malformed beat"
+        },
+        {
+          "id": "case-011-system-012",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-026-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-071-system-010",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [],
+          "error": null
+        }
+      ]
+    },
+    "vlm9-full-cli-comparison": {
+      "predictions_sha256": "6ddeaf91df2f6cea5e7fc06648f62d1369b9a99e8a5d66bc53de1ba731c26f07",
+      "totals": {
+        "clips": 24,
+        "bars": 77,
+        "invalid_or_uncertain_clips": 12,
+        "baseline_timing_pass": 75,
+        "model_timing_pass": 2
+      },
+      "clips": [
+        {
+          "id": "case-002-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [
+            1
+          ],
+          "error": null
+        },
+        {
+          "id": "case-002-system-011",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            34,
+            35,
+            36
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-004-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-004-system-016",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51
+          ],
+          "model_timing_pass": [],
+          "error": "Invalid bar"
+        },
+        {
+          "id": "case-009-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "id": "case-009-system-014",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 4688 (char 4687)"
+        },
+        {
+          "id": "case-011-system-000",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-011-system-012",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            49,
+            50,
+            51,
+            52
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-019-system-000",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 4688 (char 4687)"
+        },
+        {
+          "id": "case-019-system-011",
+          "expected_bars": 5,
+          "baseline_timing_pass": [
+            50,
+            51,
+            52,
+            53,
+            54
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 230 column 13 (char 5298)"
+        },
+        {
+          "id": "case-026-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "id": "case-026-system-006",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            19,
+            20,
+            21
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-038-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-038-system-024",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            73,
+            74,
+            75
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-045-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "id": "case-045-system-014",
+          "expected_bars": 4,
+          "baseline_timing_pass": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-063-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-063-system-014",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            43,
+            44,
+            45
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        },
+        {
+          "id": "case-071-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [
+            3
+          ],
+          "error": null
+        },
+        {
+          "id": "case-071-system-010",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            31,
+            32,
+            33
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-077-system-000",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            1,
+            2
+          ],
+          "model_timing_pass": [],
+          "error": null
+        },
+        {
+          "id": "case-077-system-009",
+          "expected_bars": 2,
+          "baseline_timing_pass": [
+            17,
+            18
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "id": "case-081-system-000",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            1,
+            2,
+            3
+          ],
+          "model_timing_pass": [],
+          "error": "Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "id": "case-081-system-015",
+          "expected_bars": 3,
+          "baseline_timing_pass": [
+            46,
+            47,
+            48
+          ],
+          "model_timing_pass": [],
+          "error": "Bar count mismatch"
+        }
+      ]
+    }
+  },
+  "runs": {
+    "predictions": {
+      "sha256": "0fd4c0fc500f402fa42bae443cae2db1653c76baec9e3361817b00240e5f8a1e",
+      "samples": 24,
+      "total_seconds": 65.797,
+      "median_seconds": 2.716,
+      "min_seconds": 0.799,
+      "max_seconds": 4.487
+    },
+    "predictions-constrained": {
+      "sha256": "f2b5fb9532aa867b72b5c0b18dcef692ff716b9cec6302e088558e61c5892f4e",
+      "samples": 24,
+      "total_seconds": 69.664,
+      "median_seconds": 2.86,
+      "min_seconds": 0.788,
+      "max_seconds": 5.399
+    },
+    "official-prediction": {
+      "sha256": "833fd2bdd0093296bdad737ae1f8b771ada5253b775c8ee2093dad5ea41f6802",
+      "samples": 1,
+      "total_seconds": 2.552,
+      "median_seconds": 2.552,
+      "min_seconds": 2.552,
+      "max_seconds": 2.552
+    },
+    "official-uncached": {
+      "sha256": "379855c0f1eb85c08bcda1d27cd473634d74291b81fe90b3af2d1d920b348c9d",
+      "samples": 1,
+      "total_seconds": 33.021,
+      "median_seconds": 33.021,
+      "min_seconds": 33.021,
+      "max_seconds": 33.021
+    },
+    "vlm-pilot": {
+      "sha256": "916d6e7f874a876eff833ab875c354b3f50a31e08dc0a80695fa771ff00f71f4",
+      "samples": 4,
+      "total_seconds": 176.29,
+      "median_seconds": 30.182,
+      "min_seconds": 10.411,
+      "max_seconds": 105.515
+    },
+    "vlm-highres": {
+      "sha256": "9bbf5b08fcf2af95fcca5a0600896b0030ae8a0b812fd5f6d0ee6a6544cec8e7",
+      "samples": 5,
+      "total_seconds": 42.854,
+      "median_seconds": 7.6,
+      "min_seconds": 5.645,
+      "max_seconds": 14.72
+    },
+    "vlm-thinking": {
+      "sha256": "229fa02fbe1a89062f42bd496fb73d0816e7382898ef7a81db13f20669b7e054",
+      "samples": 5,
+      "total_seconds": 261.834,
+      "median_seconds": 52.05,
+      "min_seconds": 48.787,
+      "max_seconds": 56.981
+    },
+    "vlm-full": {
+      "sha256": "c44b1aca13d582d324fd88b1adaf4dc49e9a8d1c3d8b3890f982182b1ff6c88c",
+      "samples": 24,
+      "total_seconds": 174.661,
+      "median_seconds": 7.233,
+      "min_seconds": 1.824,
+      "max_seconds": 16.226
+    },
+    "vlm9-pilot": {
+      "sha256": "353f161331e06046056798a5a045c2d5e440ccda1ca4468aa1ebaf045fa2c301",
+      "samples": 5,
+      "total_seconds": 94.945,
+      "median_seconds": 21.489,
+      "min_seconds": 11.617,
+      "max_seconds": 25.585
+    },
+    "vlm9-full-cli": {
+      "sha256": "6ddeaf91df2f6cea5e7fc06648f62d1369b9a99e8a5d66bc53de1ba731c26f07",
+      "samples": 24,
+      "total_seconds": 750.026,
+      "median_seconds": 15.989,
+      "min_seconds": 7.952,
+      "max_seconds": 109.316
+    }
+  },
+  "sources": {
+    "tab": {
+      "github_revision": "3cd36084fda5433bb26cb3a3281f25e9e3ee0476",
+      "model_revision": "cf0aa64313e981e3c4337e322df6540958a55e1d",
+      "downloaded_files_sha256": {
+        "guitar_omr_infer.py": "f3fb679bbef3a634a02566b7cc7b36746237f7eca71a4f78c6c91c935b234aed",
+        "guitar_omr_train.py": "2c268da08bc3c65d448b1ed584967390679de656ea055709eae1a4adf3059e18",
+        "guitar_omr_eval.py": "da2bf2e41aa76ecb345f12cc3fc745263eddcee7d78337467fa2800b2b0e7d24",
+        "guitar_omr_dataset_smoke.py": "856f269bd545430046339b31a46ce0dc41fb0a8b1624e2287c91d9a76155efeb",
+        "config.json": "e01b646883b09556ac2a0b485ad951b4cbcfec5264347e6074ab5c0731459e36",
+        "vocab.json": "1ef093ed50e391f02cfa95d4da98600749c6822b839ad1cc586af46922cfb1e3",
+        "README.md": "294b3c464b8c48305eb0842b4ddfd173573070844ea22ee773120e6830194112"
+      },
+      "checkpoint_sha256": "833a45752eb99cf525ec2744c20d93175540b487f162caa38e554fc3c7fb0f7e",
+      "checkpoint_bytes": 194331017,
+      "space_revision": "db9d40b3c5a686f875cbc0e4e48af63f4ac75187",
+      "official_example_sha256": "ff439c2c52402ca5f1e0390e718f450bdab0959b4df8ac3d50894cb11fdefda6"
+    },
+    "qwen4": {
+      "repo": "unsloth/Qwen3.5-4B-GGUF",
+      "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+      "runtime": "ggml-org/llama.cpp b11889 CUDA 12.4",
+      "files": [
+        {
+          "name": "Qwen3.5-4B-Q8_0.gguf",
+          "bytes": 4482403488,
+          "sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+          "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q8_0.gguf"
+        },
+        {
+          "name": "mmproj-F16.gguf",
+          "bytes": 672423616,
+          "sha256": "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
+          "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/mmproj-F16.gguf"
+        },
+        {
+          "name": "cudart-llama-bin-win-cuda-12.4-x64.zip",
+          "bytes": 391443627,
+          "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11889/cudart-llama-bin-win-cuda-12.4-x64.zip"
+        },
+        {
+          "name": "llama-b11889-bin-win-cuda-12.4-x64.zip",
+          "bytes": 279414515,
+          "sha256": "ce07031c3e4ab2a98d8b6addf1937b9f60d743208a569d3aad116cd25d6a41bd",
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11889/llama-b11889-bin-win-cuda-12.4-x64.zip"
+        }
+      ]
+    },
+    "qwen9": {
+      "repo": "unsloth/Qwen3.5-9B-GGUF",
+      "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+      "files": [
+        {
+          "name": "Qwen3.5-9B-Q4_K_M.gguf",
+          "bytes": 5680522464,
+          "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf"
+        },
+        {
+          "name": "mmproj-F16.gguf",
+          "bytes": 918166080,
+          "sha256": "f70dc3509053962b0d0d3ee8a7eacebf5d60aa560cad78254ae8698516ae029f",
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/mmproj-F16.gguf"
+        }
+      ]
+    },
+    "template9": {
+      "url": "https://huggingface.co/Qwen/Qwen3.5-9B/resolve/c202236235762e1c871ad0ccb60c8ee5ba337b9a/chat_template.jinja",
+      "sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+    }
+  },
+  "scripts_sha256": {
+    "local_model_probe.py": "3eb515c26b9e823dcb14e6b37e3abae5a28fa0dd3a7255c9fe8f5824330bdb30",
+    "prepare_model_probe.py": "e9d34c57d9441da77f74d67b6b6dca69764568f919ee2571f49f71801ad84de5",
+    "evaluate_model_probe.py": "609ad932c5c6ebf83cb6e79a0aa7573315ee4326cc87c28a2066e2b2372054e9",
+    "fetch_model_probe.py": "d153fd3709cb037f5c81bc5bf853dc5feba9cc826e968971486a4f2327a50b1b",
+    "local_vlm_probe.py": "79885a57813ae6d561dd818b1830010651817ddc143289eff44a322132382bdf",
+    "local_vlm_cli_probe.py": "1450e8ae1f408032c10f390243e084def5100d0e65d2fcee17075ced8806839e",
+    "evaluate_vlm_probe.py": "f86f2b427a3450f98dd52f326fddd1b4f39130cdd033bcaaa5481522b409eb58",
+    "test_model_probe.py": "00b9bd92df7c698589a1782037f067e8dd5833639b42e752bdc0a2c5997b70b7"
+  },
+  "geometry_sha256": "7b01171eb2f3c367656d16139dffe1c043c1747e9e74e879a7c1c85ee4c7c3fa",
+  "manifest_sha256": "6ba09859f3994d7413c843d3e113785681b416a7dd8d857327fbfe7412b2d507",
+  "data_root": "D:\\RiffLoop-model-tests\\pdf-tab-prototype\\local-model-20261026",
+  "migration": {
+    "verified_files": 20521,
+    "bytes": 18216197149.0,
+    "c_backup_removed_by_user_and_checked": true
+  },
+  "full_82_regression_rerun": false,
+  "production_recognizer_exporter_baseline_unchanged": true,
+  "tests": {
+    "run": 196,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 185.064,
+    "log_sha256": "4d95562887363af6346c2bf0b1683f84a8b2739360b9bf35e0347384b13d68ce"
+  },
+  "deployment_priority": "desktop-first; accuracy first; iPad on-device inference not required"
+}

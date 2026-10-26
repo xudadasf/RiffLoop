@@ -1,0 +1,17 @@
+{
+  "github_revision": "3cd36084fda5433bb26cb3a3281f25e9e3ee0476",
+  "model_revision": "cf0aa64313e981e3c4337e322df6540958a55e1d",
+  "downloaded_files_sha256": {
+    "guitar_omr_infer.py": "f3fb679bbef3a634a02566b7cc7b36746237f7eca71a4f78c6c91c935b234aed",
+    "guitar_omr_train.py": "2c268da08bc3c65d448b1ed584967390679de656ea055709eae1a4adf3059e18",
+    "guitar_omr_eval.py": "da2bf2e41aa76ecb345f12cc3fc745263eddcee7d78337467fa2800b2b0e7d24",
+    "guitar_omr_dataset_smoke.py": "856f269bd545430046339b31a46ce0dc41fb0a8b1624e2287c91d9a76155efeb",
+    "config.json": "e01b646883b09556ac2a0b485ad951b4cbcfec5264347e6074ab5c0731459e36",
+    "vocab.json": "1ef093ed50e391f02cfa95d4da98600749c6822b839ad1cc586af46922cfb1e3",
+    "README.md": "294b3c464b8c48305eb0842b4ddfd173573070844ea22ee773120e6830194112"
+  },
+  "checkpoint_sha256": "833a45752eb99cf525ec2744c20d93175540b487f162caa38e554fc3c7fb0f7e",
+  "checkpoint_bytes": 194331017,
+  "space_revision": "db9d40b3c5a686f875cbc0e4e48af63f4ac75187",
+  "official_example_sha256": "ff439c2c52402ca5f1e0390e718f450bdab0959b4df8ac3d50894cb11fdefda6"
+}
