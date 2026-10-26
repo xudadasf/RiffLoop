@@ -9,6 +9,28 @@ import json
 
 
 class ModelProbeTests(unittest.TestCase):
+    def test_named_fields_preserve_all_rhythm_semantics(self):
+        beat = {'value': 'eighth', 'dots': 1, 'tuplet': [3, 2],
+                'rest': False, 'ties': 2, 'grace': True}
+        prediction = {'response': {'choices': [{'finish_reason': 'stop', 'message': {
+            'content': json.dumps({'bars': [[beat]], 'uncertain': []})}}]}}
+        self.assertEqual(compact_bars(prediction, 'named'), [[[8, 1, 3, 2, 0, 2, 1]]])
+        with self.assertRaises(ValueError):
+            compact_bars(prediction)
+
+    def test_named_fields_cannot_silently_default_or_coerce_errors(self):
+        beat = {'value': 'quarter', 'dots': 0, 'tuplet': [1, 1],
+                'rest': False, 'ties': 0, 'grace': False}
+        missing = dict(beat)
+        del missing['rest']
+        for invalid in (missing, dict(beat, value='unknown'), dict(beat, rest='false'),
+                        dict(beat, grace=0), dict(beat, tuplet=[3]),
+                        dict(beat, rest=True, ties=1), dict(beat, extra='ignored')):
+            prediction = {'response': {'choices': [{'finish_reason': 'stop', 'message': {
+                'content': json.dumps({'bars': [[invalid]], 'uncertain': []})}}]}}
+            with self.subTest(beat=invalid), self.assertRaises(ValueError):
+                compact_bars(prediction, 'named')
+
     def test_cli_token_limit_is_not_reported_as_finished(self):
         prompt = 'prompt eval time = 400 ms / 1024 tokens\n'
         self.assertTrue(generation_finished(0, prompt+'eval time = 300 ms / 99 runs', 4096))

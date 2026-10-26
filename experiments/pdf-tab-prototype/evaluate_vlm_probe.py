@@ -9,7 +9,9 @@ from evaluate_model_probe import timing
 from local_model_probe import sha256
 
 
-def compact_bars(prediction):
+def compact_bars(prediction, representation='compact'):
+    if representation not in ('compact', 'named'):
+        raise ValueError('Unknown response representation')
     choice = prediction['response']['choices'][0]
     if choice['finish_reason'] != 'stop':
         raise ValueError('Output truncated')
@@ -26,7 +28,19 @@ def compact_bars(prediction):
     for bar in bars:
         if not isinstance(bar, list) or not bar:
             raise ValueError('Invalid bar')
-        for beat in bar:
+        for index, beat in enumerate(bar):
+            if representation == 'named':
+                values = {'whole': 1, 'half': 2, 'quarter': 4, 'eighth': 8,
+                          'sixteenth': 16, 'thirty-second': 32, 'sixty-fourth': 64}
+                if (not isinstance(beat, dict) or
+                        set(beat) != {'value', 'dots', 'tuplet', 'rest', 'ties', 'grace'} or
+                        not isinstance(beat['value'], str) or beat['value'] not in values or
+                        not isinstance(beat['tuplet'], list) or len(beat['tuplet']) != 2 or
+                        type(beat['rest']) is not bool or type(beat['grace']) is not bool):
+                    raise ValueError('Invalid named rhythm fields')
+                beat = [values[beat['value']], beat['dots'], *beat['tuplet'],
+                        int(beat['rest']), beat['ties'], int(beat['grace'])]
+                bar[index] = beat
             if not isinstance(beat, list) or len(beat) != 7 or any(type(x) is not int for x in beat):
                 raise ValueError('Unreadable or malformed beat')
             d, dots, n, den, rest, ties, grace = beat
@@ -56,6 +70,7 @@ def main():
     parser.add_argument('--geometry', type=Path, required=True)
     parser.add_argument('--baseline', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--representation', choices=('compact', 'named'), default='compact')
     args = parser.parse_args()
     data = json.loads(args.predictions.read_text(encoding='utf-8'))
     manifest = json.loads(args.manifest.read_text(encoding='utf-8'))
@@ -83,7 +98,7 @@ def main():
         row = {'id': prediction['id'], 'expected_bars': len(system['bars']),
                'baseline_timing_pass': [], 'model_timing_pass': [], 'error': None}
         try:
-            bars = compact_bars(prediction)
+            bars = compact_bars(prediction, args.representation)
             if len(bars) != len(system['bars']):
                 raise ValueError('Bar count mismatch')
         except (ValueError, KeyError, TypeError) as error:
@@ -101,7 +116,8 @@ def main():
               'invalid_or_uncertain_clips': sum(r['error'] is not None for r in rows),
               'baseline_timing_pass': sum(len(r['baseline_timing_pass']) for r in rows),
               'model_timing_pass': sum(len(r['model_timing_pass']) for r in rows)}
-    report = {'predictions_sha256': sha256(args.predictions), 'totals': totals, 'clips': rows}
+    report = {'predictions_sha256': sha256(args.predictions), 'representation': args.representation,
+              'totals': totals, 'clips': rows}
     args.output.write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     print(json.dumps(totals))
 

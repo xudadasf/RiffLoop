@@ -30,9 +30,14 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--timeout-seconds', type=int, default=300,
                         help='Per-clip time limit, including loading; CPU offload needs longer')
+    parser.add_argument('--temperature', type=float, default=0.7)
+    parser.add_argument('--prompt-file', type=Path)
     args = parser.parse_args()
     if args.timeout_seconds <= 0:
         parser.error('--timeout-seconds must be positive')
+    if not 0 <= args.temperature <= 2:
+        parser.error('--temperature must be between 0 and 2')
+    prompt = args.prompt_file.read_text(encoding='utf-8') if args.prompt_file else PROMPT
     if args.output.exists():
         raise FileExistsError('Preserve frozen predictions; use a new output')
     clips = json.loads(args.manifest.read_text(encoding='utf-8'))
@@ -52,21 +57,22 @@ def main():
     common = [str(args.runtime), '-m', str(args.model_dir/model), '--mmproj', str(args.model_dir/projector),
               '-c', '8192', '-fit', 'on', '-fitt', '1536', '-fa', 'on', '-b', '256', '-ub', '128', '-t', '4',
               '--image-min-tokens', '1024', '--image-max-tokens', '2048', '--jinja', '--chat-template', template,
-              '--temp', '0.7', '--top-p', '0.8', '--top-k', '20', '--min-p', '0', '--presence-penalty', '1.5',
+              '--temp', str(args.temperature), '--top-p', '0.8', '--top-k', '20', '--min-p', '0', '--presence-penalty', '1.5',
               '--seed', '42', '-n', '4096', '-lv', '4']
     raw_dir = args.output.with_suffix('')
     raw_dir.mkdir(parents=True, exist_ok=False)
     result = {'format': 'vlm-compact-rhythm-v1', 'transport': 'offline-cli', 'model': model,
               'source': source, 'template_source': template_source, 'runtime_sha256': sha256(args.runtime),
               'timeout_seconds': args.timeout_seconds,
-              'manifest_sha256': sha256(args.manifest), 'prompt': PROMPT,
+              'temperature': args.temperature,
+              'manifest_sha256': sha256(args.manifest), 'prompt': prompt,
               'timing_scope': 'cold process including model loading', 'predictions': []}
     for index, clip in enumerate(clips):
         out_path, err_path = raw_dir/f'{index:03d}.out.txt', raw_dir/f'{index:03d}.err.txt'
         started = time.perf_counter()
         with out_path.open('w', encoding='utf-8') as out, err_path.open('w', encoding='utf-8') as err:
             try:
-                run = subprocess.run(common+['--image', clip['image'], '-p', PROMPT], stdout=out, stderr=err,
+                run = subprocess.run(common+['--image', clip['image'], '-p', prompt], stdout=out, stderr=err,
                                      timeout=args.timeout_seconds)
                 returncode = run.returncode
             except subprocess.TimeoutExpired:

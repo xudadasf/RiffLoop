@@ -1,0 +1,178 @@
+{
+  "status": "no-candidate-accepted",
+  "date": "2026-10-26",
+  "user_vm_paused": true,
+  "visual_input_control": {
+    "metadata": {
+      "purpose": "Visual input sanity check; not rhythm benchmark",
+      "prompt": "Read the image. Report only JSON with: tempo (printed metronome number), measure_labels (printed numbers above the three measures), measure_2_frets (fret numbers in the second measure, from left to right). Use null if unreadable. Do not transcribe rhythm.",
+      "expected_from_visual_inspection": {
+        "tempo": 100,
+        "measure_labels": [
+          1,
+          2,
+          3
+        ],
+        "measure_2_frets": [
+          7,
+          5,
+          7,
+          5,
+          7
+        ]
+      },
+      "returncode": 0,
+      "seconds": 14.17
+    },
+    "observed_text": "\n```json\n{\n  \"tempo\": 100,\n  \"measure_labels\": [\n    \"1\",\n    \"2\",\n    \"3\"\n  ],\n  \"measure_2_frets\": [\n    7,\n    5,\n    7,\n    5,\n    7\n  ]\n}\n```\n\n\n",
+    "interpretation": "Tempo, measure labels and frets match visual inspection; numeric labels returned as strings. This is not a rhythm pass."
+  },
+  "greedy_compact": {
+    "predictions_sha256": "3942010d70917a2ffe189e024a9c63010265f3784947544647e3ef283cf020cc",
+    "representation": "compact",
+    "totals": {
+      "clips": 4,
+      "bars": 13,
+      "invalid_or_uncertain_clips": 0,
+      "baseline_timing_pass": 11,
+      "model_timing_pass": 1
+    },
+    "clips": [
+      {
+        "id": "case-002-system-000",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          1,
+          2,
+          3
+        ],
+        "model_timing_pass": [
+          1
+        ],
+        "error": null
+      },
+      {
+        "id": "case-011-system-012",
+        "expected_bars": 4,
+        "baseline_timing_pass": [
+          49,
+          50,
+          51,
+          52
+        ],
+        "model_timing_pass": [],
+        "error": null
+      },
+      {
+        "id": "case-026-system-000",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          1
+        ],
+        "model_timing_pass": [],
+        "error": null
+      },
+      {
+        "id": "case-071-system-010",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          31,
+          32,
+          33
+        ],
+        "model_timing_pass": [],
+        "error": null
+      }
+    ]
+  },
+  "greedy_named": {
+    "predictions_sha256": "a5a570674859fcd779d7767347966cbe486c3b1de3da92a0068418c40c267609",
+    "representation": "named",
+    "totals": {
+      "clips": 4,
+      "bars": 13,
+      "invalid_or_uncertain_clips": 1,
+      "baseline_timing_pass": 11,
+      "model_timing_pass": 1
+    },
+    "clips": [
+      {
+        "id": "case-002-system-000",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          1,
+          2,
+          3
+        ],
+        "model_timing_pass": [
+          1
+        ],
+        "error": null
+      },
+      {
+        "id": "case-011-system-012",
+        "expected_bars": 4,
+        "baseline_timing_pass": [
+          49,
+          50,
+          51,
+          52
+        ],
+        "model_timing_pass": [],
+        "error": "Expecting property name enclosed in double quotes: line 608 column 23 (char 10858)"
+      },
+      {
+        "id": "case-026-system-000",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          1
+        ],
+        "model_timing_pass": [],
+        "error": null
+      },
+      {
+        "id": "case-071-system-010",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          31,
+          32,
+          33
+        ],
+        "model_timing_pass": [],
+        "error": null
+      }
+    ]
+  },
+  "old_24_clip_evaluation_unchanged": true,
+  "tests": {
+    "tests": 198,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 137.302
+  },
+  "files_sha256": {
+    "vision-input-control.py": "aae9ba3775006aedbcd412ef44e18a98007fc0de449a0d4a4e198b8a1aa47482",
+    "vision-input-control/control.json": "b0d7a4bb6ba4e7f78a1eb903f3b5f397e63a3d01df1b8df9b290e1b41c32ca0a",
+    "vision-input-control/stdout.txt": "e40b9c0055d3ce6bcf84b9982adae46af0de2f2c5ac16bbbe1b6079e4ebc790e",
+    "vision-input-control/stderr.txt": "73e71c4db9d273f31018681c110039ca8d32f4931e3a158d512f5d2f40e52f7e",
+    "vlm9-greedy-pilot.json": "3942010d70917a2ffe189e024a9c63010265f3784947544647e3ef283cf020cc",
+    "vlm9-named-pilot.json": "a5a570674859fcd779d7767347966cbe486c3b1de3da92a0068418c40c267609",
+    "unit-tests-desktop.log": "e24f30041cbc29ff469fc30bbddc9870f9467b0e2eca0833e6f59e7977f4eac1",
+    "run_desktop_candidate.py": "17765be4b35c9344a23796e1e77c3e90efe194446d0e2bb85190eaf7212d5603"
+  },
+  "code_sha256": {
+    "local_vlm_cli_probe.py": "105936a895553c661b56df5cf1838b5f10cb2d2a0d5ab63de1e66b9387c4b913",
+    "evaluate_vlm_probe.py": "f411e0652e7965b6b3d78aed170dea893edcfd86c444147ec64a7aacd3ea8255",
+    "test_model_probe.py": "b99599e66ee173c8db477abc7d05cf476d899d69334320c707b10ae01ad415c9",
+    "named-rhythm-prompt.txt": "0c1d7d179b566acf0d89cd7b67f8ddcc4e14e8c6545fe65ed96034bed5800e8e"
+  },
+  "next_candidate": {
+    "model": "Qwen3.8-27B Q4_K_M",
+    "status": "main-weight-download-in-progress",
+    "visual_projector_download_verified": true,
+    "inference_results_available": false,
+    "pipeline": "D:/RiffLoop-model-tests/pdf-tab-prototype/local-model-20261026/run_desktop_candidate.py",
+    "acceptance": "No automatic acceptance or production changes"
+  }
+}

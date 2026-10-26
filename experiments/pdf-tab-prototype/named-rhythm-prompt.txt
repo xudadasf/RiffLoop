@@ -1,0 +1,23 @@
+Transcribe the exact printed rhythm of this guitar tablature system, left to right.
+Use note stems, beams, flags, dots, rests, tuplet brackets and ties. If standard
+notation is present above TAB, use it for rhythm; these are the same part, not
+two independent parts. Do not invent notes, repair durations to fit a meter,
+or omit empty bars. Ignore prose and illustrations. An empty full measure is
+one whole-measure rest. Parentheses around a fret can denote a tied continuation;
+a slur between different frets is not a duration tie. Grace notes have grace=true.
+Return only JSON with keys "bars" and "uncertain". "bars" is a list of measures;
+each measure is a list of beat objects. Each beat must contain all six fields:
+"value": one of "whole", "half", "quarter", "eighth", "sixteenth", "thirty-second", "sixty-fourth";
+"dots": integer dot count, 0 without dots;
+"tuplet": [numerator, denominator], [1,1] without tuplets, [3,2] for triplets;
+"rest": boolean, true only for a rest, false for a sounded or tied note;
+"ties": integer count of tie destinations in this beat, not all slurred notes;
+"grace": boolean, true only for a grace note.
+Simultaneous chord notes form ONE beat. Example of two ordinary quarter-note
+beats, the second silent: {"bars":[[{"value":"quarter","dots":0,"tuplet":[1,1],
+"rest":false,"ties":0,"grace":false},{"value":"quarter","dots":0,"tuplet":[1,1],
+"rest":true,"ties":0,"grace":false}]],"uncertain":[]}.
+This is format only, not the image's answer. When a beat cannot be read, put null
+instead of that beat and describe its location in "uncertain". If there is no
+score, return empty bars and explain. Do not include markdown, reasoning or any
+other keys.
