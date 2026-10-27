@@ -18,7 +18,7 @@ class TrialWindow:
         self.events = queue.Queue()
         self.stop = threading.Event()
         self.running = False
-        root.title('RiffLoop · 图片音符对照 / PDF 草稿 · 2026-10-27')
+        root.title('RiffLoop · 图片 / PDF 草稿 · 支持默认占位 · 2026-10-27')
         root.geometry('1080x760')
         root.minsize(940, 700)
         style = ttk.Style(root)
@@ -27,9 +27,9 @@ class TrialWindow:
         style.configure('Treeview', rowheight=34)
         outer = ttk.Frame(root, padding=22)
         outer.pack(fill='both', expand=True)
-        ttk.Label(outer, text='图片 → 音符对照 ｜ 矢量 PDF → GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
+        ttk.Label(outer, text='图片 / PDF → 可人工修改的 GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
         ttk.Label(outer, text='批量选择 PDF、截图或照片，在本机处理；每份文件单独生成结果。', foreground='#46576b').pack(anchor='w', pady=(8, 4))
-        ttk.Label(outer, text='图片已切换为数字与弦线识别；节奏尚未识别，暂不生成 GP。完成后请打开“查看结果 / 问题”。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
+        ttk.Label(outer, text='图片识别数字与横梁；不确定时值按默认值占位并标 ?。完成后可打开 GP 和待修改清单。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
         controls = ttk.Frame(outer)
         controls.pack(fill='x')
         self.add_button = ttk.Button(controls, text='添加 PDF / 截图', command=self.choose_files)
@@ -186,8 +186,7 @@ class TrialWindow:
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())
-                    reviews = sum(v.get('status', '').startswith(('图片音符对照', '图片部分识别')) for v in self.items.values())
-                    self.status.set(f'{"已停止" if self.stop.is_set() else "处理完成"} · {reviews} 份图片对照，{count} 份 PDF 草稿 · 双击文件行查看结果')
+                    self.status.set(f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿 · 双击文件行查看结果和待修改清单')
         except queue.Empty:
             pass
         self.root.after(150, self.poll)
@@ -196,7 +195,7 @@ class TrialWindow:
         selected = self.tree.selection()
         if selected:
             item = self.items[selected[0]]
-            self.detail.set(str(item['source']) + '\n' + item.get('message', '待处理。图片将生成数字与弦线对照；节奏尚未识别，不生成 GP。'))
+            self.detail.set(str(item['source']) + '\n' + item.get('message', '待处理。默认 100 BPM、4/4；可修改设置。图片不确定时值将明确标记为占位。'))
         else:
             self.detail.set('选择文件行查看说明，双击打开结果。')
 

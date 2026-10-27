@@ -1,7 +1,7 @@
 """Feasibility probe: OCR digits + TAB geometry. No GP or rhythm output.
 
-Run with the separate digit-ocr-env interpreter. This is deliberately not
-connected to desktop_batch: inspect frozen predictions before evaluating them.
+Run with the separate digit-ocr-env interpreter. The desktop worker uses this
+numeric front end; rhythm analysis and draft export happen downstream.
 """
 import argparse
 import hashlib

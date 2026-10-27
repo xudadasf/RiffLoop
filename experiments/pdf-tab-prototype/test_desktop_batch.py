@@ -27,10 +27,12 @@ class DesktopBatchTests(unittest.TestCase):
             run.assert_not_called()
             self.assertFalse((root / 'out/score.draft.gp').exists())
 
-    def test_image_entry_uses_digit_review_and_never_calls_gp_export(self):
+    def test_image_entry_exports_explicit_defaults_with_manual_settings(self):
         from PIL import Image
         import cv2
         import numpy as np
+        import subprocess
+        original_run = subprocess.run
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source = root / 'exercise.png'
@@ -41,6 +43,8 @@ class DesktopBatchTests(unittest.TestCase):
                 cv2.line(image, (x, 120), (x, 200), 0, 1)
             Image.fromarray(image).save(source)
             def worker(command, **kwargs):
+                if Path(command[1]).name == 'gp-draft-export.cjs':
+                    return original_run(command, **kwargs)
                 self.assertEqual(Path(command[1]).name, 'raster_digit_probe.py')
                 output = Path(command[command.index('--output') + 1])
                 output.mkdir()
@@ -55,17 +59,20 @@ class DesktopBatchTests(unittest.TestCase):
                 (root / name).touch()
             with patch.dict(os.environ, RIFFLOOP_DIGIT_PYTHON=str(root / 'python.exe'), RIFFLOOP_DIGIT_MODELS=str(root)), patch('subprocess.run', side_effect=worker) as run:
                 result = process_file(source, root / 'out', {'tempo': 88, 'meter': [6, 8]})
-            self.assertEqual(run.call_count, 1)
-            self.assertEqual(result['status'], '图片音符对照 · 未生成 GP')
-            self.assertIsNone(result['draft'])
-            self.assertFalse((root / 'out/score.draft.gp').exists())
+            self.assertEqual(run.call_count, 2)
+            self.assertEqual(result['status'], '图片草稿已生成 · 含占位', result['message'])
+            self.assertIsNotNone(result['draft'])
+            self.assertTrue((root / 'out/score.draft.gp').exists())
             report = (root / 'out/review.html').read_text(encoding='utf-8')
             self.assertIn('digit-ocr/review.html', report)
-            self.assertIn('节奏尚未识别', report)
+            self.assertIn('默认占位', report)
             self.assertIn('BPM 88 · 拍号 6/8', report)
             saved = json.loads((root / 'out/recognized.json').read_text(encoding='utf-8'))
             self.assertEqual(saved['manual_settings']['tempo'], 88)
             self.assertEqual(saved['manual_settings']['meter'], [6, 8])
+            review = json.loads((root / 'out/score.draft.gp.review.json').read_text(encoding='utf-8'))
+            self.assertEqual(review['note_count'], 1)
+            self.assertTrue(all(b['placeholder_beats'] for b in review['bars']))
 
     def test_same_name_and_repeated_runs_keep_separate_results(self):
         with tempfile.TemporaryDirectory() as temp:

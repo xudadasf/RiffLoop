@@ -12,7 +12,7 @@ import traceback
 
 ROOT = Path(__file__).resolve().parent
 IMAGES = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff'}
-NOTICE = '图片 / 扫描件仅生成音符对照，节奏未识别，不导出 GP。矢量 PDF 草稿仍需校正，未知时值可能使用占位；不能直接作为准确伴奏。'
+NOTICE = '实验草稿需人工校正。图片优先读取数字与横梁；未知时值使用默认占位并标 ?，修改清单单独保存。技巧、反复与和弦分组仍需核对。'
 
 
 def default_output():
@@ -108,13 +108,33 @@ def process_file(source, folder, image_settings=None):
                 overlay(source, data, folder / 'overlay.pdf')
         (folder / 'recognized.json').write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
         if data.get('format') == 'raster-digit-review-v1':
+            from raster_beam_rhythm import prepare_image_score
+            score = prepare_image_score(data, folder / 'digit-ocr')
+            (folder / 'recognized.json').write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
             notes = sum(len(s['notes']) for s in data['systems'])
             unresolved = sum(len(s['unresolved']) for s in data['systems'])
-            if notes:
-                outcome.update(status='图片部分识别 · 待核对' if unresolved or data['errors'] else '图片音符对照 · 未生成 GP',
-                               message=f'{notes} 个数字提案，{unresolved} 条识别行未解决。节奏尚未识别，未生成 GP；请打开“查看结果 / 问题”核对原图。')
+            bars = [b for s in score['systems'] for b in s['bars']]
+            if bars and not score['structure_issues']:
+                input_path = folder / 'image-score.json'
+                input_path.write_text(json.dumps(score, ensure_ascii=False, indent=2), encoding='utf-8')
+                node = shutil.which('node')
+                if not node:
+                    raise ValueError('未找到 Node.js，无法导出 GP；图片识别结果已保留')
+                run = subprocess.run([node, str(ROOT / 'gp-draft-export.cjs'), str(input_path),
+                                      str(folder / 'score.draft.gp')], capture_output=True, text=True,
+                                     encoding='utf-8', errors='replace', timeout=120,
+                                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                (folder / 'worker.log').write_text(run.stdout + '\n' + run.stderr, encoding='utf-8')
+                if run.returncode:
+                    raise ValueError('图片草稿导出失败；识别结果已保留，请查看 worker.log')
+                review = json.loads((folder / 'score.draft.gp.review.json').read_text(encoding='utf-8'))
+                placeholders = sum(len(b['placeholder_beats']) for b in review['bars'])
+                outcome.update(status='图片草稿已生成 · 含占位' if placeholders else '图片草稿已生成 · 待核对',
+                               draft=str(folder / 'score.draft.gp'),
+                               message=f'{len(bars)} 小节，{notes} 个音符，{placeholders} 处时值/休止占位，{unresolved} 条 OCR 行待核对。'
+                                       '已通过 GP 保存读回及小节时值检查；占位标 ?，请对照原图人工修改。')
             else:
-                outcome['message'] = '；'.join(data['errors']) or '未得到可用音符提案；请查看识别报告。'
+                outcome['message'] = '；'.join(data['errors'] + score['structure_issues']) or '没有定位到可用小节；请查看识别报告。'
             write_report(source, folder, outcome, data)
             return outcome
         bars = [b for s in data['systems'] for b in s['bars']]

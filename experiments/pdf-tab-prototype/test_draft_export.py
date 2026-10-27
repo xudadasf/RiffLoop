@@ -8,6 +8,30 @@ ROOT = Path(__file__).resolve().parent
 
 
 class DraftExportTests(unittest.TestCase):
+    def test_new_image_draft_accepts_explicit_defaults_but_rejects_overflow(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            data = self.fixture()
+            data.update(format='raster-tab-beamed-v1', meter=[4, 4])
+            bar = data['systems'][0]['bars'][0]
+            bar['beats'] = [{'duration': 16, 'dots': 0, 'tuplet': [1, 1], 'grace': False,
+                             'notes': [{'string': 6, 'fret': 5}], 'rhythm_source': 'manual-default',
+                             'placeholder': True} for _ in range(16)]
+            source = folder / 'image.json'
+            source.write_text(json.dumps(data), encoding='utf-8')
+            output = folder / 'image.draft.gp'
+            run = subprocess.run(['node', str(ROOT/'gp-draft-export.cjs'), str(source), str(output)], capture_output=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            review = json.loads(Path(str(output)+'.review.json').read_text(encoding='utf-8'))
+            self.assertEqual(review['bars'][0]['placeholder_beats'], list(range(1, 17)))
+            for value in (4, None):
+                bar['beats'][0]['duration'] = value
+                source.write_text(json.dumps(data), encoding='utf-8')
+                bad = folder / f'bad-{value}.draft.gp'
+                run = subprocess.run(['node', str(ROOT/'gp-draft-export.cjs'), str(source), str(bad)], capture_output=True)
+                self.assertNotEqual(run.returncode, 0)
+                self.assertFalse(bad.exists())
+
     def fixture(self):
         return {'tuning': [64, 59, 55, 50, 45, 40], 'tempo': 100,
                 'systems': [{'page': 2, 'bars': [{'number': 1, 'meter': [4, 4],
