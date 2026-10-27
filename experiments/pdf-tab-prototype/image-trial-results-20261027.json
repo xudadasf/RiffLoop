@@ -1,0 +1,438 @@
+{
+  "date": "2026-10-27",
+  "scope": "Local raster TAB proposals; all rhythms are placeholders; manual tempo/meter/tuning; not production accuracy acceptance",
+  "tests": {
+    "run": 221,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 113.455
+  },
+  "initial_flow_examples": [
+    {
+      "source": "D:\\RiffLoop-model-tests\\pdf-tab-prototype\\local-model-20261026\\official-example.png",
+      "folder": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance\\official-example-_tidnn3p",
+      "status": "图片草稿 · 全部待校正",
+      "message": "4 小节，23 个音符。已通过保存后读回检查，尚未验证识别准确性。图片音符可能有误，全部时值为占位；请对照谱区检查。",
+      "draft": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance\\official-example-_tidnn3p\\score.draft.gp",
+      "seconds": 4.04
+    },
+    {
+      "source": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\inputs\\倾斜照片模拟.jpg",
+      "folder": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance\\倾斜照片模拟-29nz65qo",
+      "status": "图片草稿 · 全部待校正",
+      "message": "4 小节，22 个音符。已通过保存后读回检查，尚未验证识别准确性。图片音符可能有误，全部时值为占位；请对照谱区检查。",
+      "draft": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance\\倾斜照片模拟-29nz65qo\\score.draft.gp",
+      "seconds": 3.82
+    }
+  ],
+  "page_examples": [
+    {
+      "source": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\inputs\\整页截图.png",
+      "folder": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance-v2\\整页截图-0mang2gx",
+      "status": "图片草稿 · 全部待校正",
+      "message": "24 小节，136 个音符。已通过保存后读回检查，尚未验证识别准确性。图片音符可能有误，全部时值为占位；请对照谱区检查。",
+      "draft": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance-v2\\整页截图-0mang2gx\\score.draft.gp",
+      "seconds": 9.69
+    },
+    {
+      "source": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\inputs\\扫描单页.pdf",
+      "folder": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance-v2\\扫描单页-q5jyi3xw",
+      "status": "图片草稿 · 全部待校正",
+      "message": "24 小节，136 个音符。已通过保存后读回检查，尚未验证识别准确性。图片音符可能有误，全部时值为占位；请对照谱区检查。",
+      "draft": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\acceptance-v2\\扫描单页-q5jyi3xw\\score.draft.gp",
+      "seconds": 9.89
+    }
+  ],
+  "note_audit": {
+    "scope": "Old known material; notes/groups only, not timing; reference read only after inference; not a real camera-photo benchmark",
+    "reports": [
+      {
+        "source": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\inputs\\整页截图.png",
+        "source_sha256": "6866e78bf339ffb32754df689c3e5472a873858cfbe93adc7674db1378a0424a",
+        "prediction_sha256": "e99e5c1a7c58def22123381c7479ce2bbc197605032311108e4cc0b20098cf08",
+        "reference_sha256": "78121167f647549c2a08c0ceb5e20e2a9736515acd709cbc85787c7b1642ae87",
+        "pairing": "consistent",
+        "bars": [
+          {
+            "bar": 1,
+            "exact_groups": true,
+            "predicted_notes": 0,
+            "reference_notes": 0,
+            "ordered_matches": 0
+          },
+          {
+            "bar": 2,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 3,
+            "exact_groups": true,
+            "predicted_notes": 8,
+            "reference_notes": 8,
+            "ordered_matches": 8
+          },
+          {
+            "bar": 4,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 5,
+            "exact_groups": true,
+            "predicted_notes": 7,
+            "reference_notes": 7,
+            "ordered_matches": 7
+          },
+          {
+            "bar": 6,
+            "exact_groups": false,
+            "predicted_notes": 5,
+            "reference_notes": 4,
+            "ordered_matches": 4
+          },
+          {
+            "bar": 7,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 8,
+            "exact_groups": true,
+            "predicted_notes": 8,
+            "reference_notes": 8,
+            "ordered_matches": 8
+          },
+          {
+            "bar": 9,
+            "exact_groups": false,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 4
+          },
+          {
+            "bar": 10,
+            "exact_groups": false,
+            "predicted_notes": 11,
+            "reference_notes": 10,
+            "ordered_matches": 9
+          },
+          {
+            "bar": 11,
+            "exact_groups": true,
+            "predicted_notes": 3,
+            "reference_notes": 3,
+            "ordered_matches": 3
+          },
+          {
+            "bar": 12,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 13,
+            "exact_groups": true,
+            "predicted_notes": 7,
+            "reference_notes": 7,
+            "ordered_matches": 7
+          },
+          {
+            "bar": 14,
+            "exact_groups": false,
+            "predicted_notes": 7,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 15,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 16,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 17,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 18,
+            "exact_groups": true,
+            "predicted_notes": 4,
+            "reference_notes": 4,
+            "ordered_matches": 4
+          },
+          {
+            "bar": 19,
+            "exact_groups": false,
+            "predicted_notes": 5,
+            "reference_notes": 7,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 20,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 21,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 22,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 23,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 24,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          }
+        ],
+        "totals": {
+          "exact_groups": 19,
+          "predicted_notes": 136,
+          "reference_notes": 135,
+          "ordered_matches": 131
+        }
+      },
+      {
+        "source": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\inputs\\扫描单页.pdf",
+        "source_sha256": "d324539c0a971f1db0ea8e196881b05eb5d99af0edef8625cf0a4c71b2d9eb9f",
+        "prediction_sha256": "0f43c3b377230d437977e9715c38255147890f9136679a9e87d5d12aa82a0a86",
+        "reference_sha256": "78121167f647549c2a08c0ceb5e20e2a9736515acd709cbc85787c7b1642ae87",
+        "pairing": "consistent",
+        "bars": [
+          {
+            "bar": 1,
+            "exact_groups": true,
+            "predicted_notes": 0,
+            "reference_notes": 0,
+            "ordered_matches": 0
+          },
+          {
+            "bar": 2,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 3,
+            "exact_groups": false,
+            "predicted_notes": 8,
+            "reference_notes": 8,
+            "ordered_matches": 7
+          },
+          {
+            "bar": 4,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 5,
+            "exact_groups": true,
+            "predicted_notes": 7,
+            "reference_notes": 7,
+            "ordered_matches": 7
+          },
+          {
+            "bar": 6,
+            "exact_groups": false,
+            "predicted_notes": 5,
+            "reference_notes": 4,
+            "ordered_matches": 4
+          },
+          {
+            "bar": 7,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 8,
+            "exact_groups": true,
+            "predicted_notes": 8,
+            "reference_notes": 8,
+            "ordered_matches": 8
+          },
+          {
+            "bar": 9,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 10,
+            "exact_groups": false,
+            "predicted_notes": 11,
+            "reference_notes": 10,
+            "ordered_matches": 7
+          },
+          {
+            "bar": 11,
+            "exact_groups": true,
+            "predicted_notes": 3,
+            "reference_notes": 3,
+            "ordered_matches": 3
+          },
+          {
+            "bar": 12,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 13,
+            "exact_groups": false,
+            "predicted_notes": 7,
+            "reference_notes": 7,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 14,
+            "exact_groups": false,
+            "predicted_notes": 7,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 15,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 16,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 17,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 18,
+            "exact_groups": true,
+            "predicted_notes": 4,
+            "reference_notes": 4,
+            "ordered_matches": 4
+          },
+          {
+            "bar": 19,
+            "exact_groups": false,
+            "predicted_notes": 5,
+            "reference_notes": 7,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 20,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          },
+          {
+            "bar": 21,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 22,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 23,
+            "exact_groups": true,
+            "predicted_notes": 6,
+            "reference_notes": 6,
+            "ordered_matches": 6
+          },
+          {
+            "bar": 24,
+            "exact_groups": true,
+            "predicted_notes": 5,
+            "reference_notes": 5,
+            "ordered_matches": 5
+          }
+        ],
+        "totals": {
+          "exact_groups": 18,
+          "predicted_notes": 136,
+          "reference_notes": 135,
+          "ordered_matches": 128
+        }
+      }
+    ]
+  },
+  "cli_manual_settings_example": {
+    "source": "D:\\RiffLoop-model-tests\\pdf-tab-prototype\\local-model-20261026\\official-example.png",
+    "folder": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\cli-acceptance\\official-example-ml2ow1xw",
+    "status": "图片草稿 · 全部待校正",
+    "message": "4 小节，23 个音符。已通过保存后读回检查，尚未验证识别准确性。图片音符可能有误，全部时值为占位；请对照谱区检查。",
+    "draft": "D:\\RiffLoop-model-tests\\raster-tab-20261027\\cli-acceptance\\official-example-ml2ow1xw\\score.draft.gp"
+  },
+  "code_sha256": {
+    "raster_tab.py": "298b5f2ae6f262ed8780be651e31365c097a7ebf4e9a3642c7a005dd9ad3e8e1",
+    "desktop_batch.py": "2fa60b84da65f56317c653b3e799b358d4bc5e7f1c90500328f0b48a9870a32c",
+    "desktop_gui.py": "2097c9f8e2369ddf1c9178ca82c3af993ddf3548be0dc9b225f53ee06297e673",
+    "gp-draft-export.cjs": "cf42ae8159e202ca3fd763849a41f456f700a2aa562bb82ac47643e6f416c407",
+    "test_raster_tab.py": "c179c40fce397ffd12418413f9c9449175bb28e152e2fdfedc40aeeb571e694a",
+    "test_desktop_batch.py": "0f224244ca4ddef1685b4e79f46a015f7cd9eb2cb9eec4acffaf09614199846c",
+    "test_draft_export.py": "6e4780d1b5cea7780d28ddcaab922bae4061343ca128d58ae43041e28b734b33",
+    "start-desktop.ps1": "b54db56934956a5ecb29fda0e1acce3feaa878fb7ef382583a7029d9b121a086"
+  },
+  "mobile_and_strict_core_changed": false,
+  "full_82_regression_rerun": false,
+  "real_camera_photos_evaluated": false,
+  "ui_automation_performed": false
+}

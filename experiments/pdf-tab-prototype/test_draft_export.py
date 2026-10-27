@@ -46,6 +46,25 @@ class DraftExportTests(unittest.TestCase):
             self.assertNotEqual(run.returncode, 0)
             self.assertFalse(output.exists())
 
+    def test_image_draft_retains_manual_settings_and_model_warning(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            source, output = folder / 'image.json', folder / 'image.draft.gp'
+            data = self.fixture()
+            data.update(format='raster-tab-draft-v1', meter=[4, 4], model_revision='test-model',
+                        model_checkpoint_sha256='test-digest', warnings=['人工设置；音符可能有误'])
+            for beat in data['systems'][0]['bars'][0]['beats']:
+                beat.update(duration=None, dots=0, tuplet=[1, 1])
+            source.write_text(json.dumps(data), encoding='utf-8')
+            run = subprocess.run(['node', str(ROOT/'gp-draft-export.cjs'), str(source), str(output)], capture_output=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            review = json.loads(Path(str(output)+'.review.json').read_text(encoding='utf-8'))
+            self.assertEqual(review['source_kind'], 'image-model-proposal')
+            self.assertEqual(review['manual_settings']['tempo'], 100)
+            self.assertEqual(review['model_revision'], 'test-model')
+            self.assertEqual(review['bars'][0]['placeholder_beats'], [1, 2])
+            self.assertIn('全部时值为四分音符占位', Path(str(output)+'.review.md').read_text(encoding='utf-8'))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -17,15 +17,16 @@ class DesktopBatchTests(unittest.TestCase):
             self.assertEqual(len({first, second, third}), 3)
             self.assertTrue(all(p.parent == root for p in (first, second, third)))
 
-    def test_image_is_not_reported_as_conversion_success(self):
+    def test_blank_image_is_not_reported_as_conversion_success(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source = root / '截图.png'
-            pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 20, 20))
+            pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 200, 200))
             pixmap.clear_with(255)
             pixmap.save(source)
             result = process_file(source, root / 'out')
-            self.assertEqual(result['status'], '暂不支持截图转换')
+            self.assertEqual(result['status'], '未生成草稿')
+            self.assertIn('没有可靠定位到六条谱线', result['message'])
             self.assertIsNone(result['draft'])
             self.assertTrue((root / 'out/review.html').exists())
 
@@ -40,8 +41,8 @@ class DesktopBatchTests(unittest.TestCase):
                 doc.new_page().insert_image(fitz.Rect(0, 0, 300, 300), pixmap=pixmap)
                 doc.save(source)
             result = process_file(source, root / 'out')
-            self.assertEqual(result['status'], '需人工检查图片页')
-            self.assertIn('[2]', result['message'])
+            self.assertEqual(result['status'], '未生成草稿')
+            self.assertIn('第 2 页', result['message'])
             self.assertFalse((root / 'out/score.draft.gp').exists())
 
     def test_failed_file_does_not_prevent_next_file_report(self):

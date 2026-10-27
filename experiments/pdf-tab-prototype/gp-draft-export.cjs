@@ -8,19 +8,28 @@ const targets = [output, output+'.review.json', output+'.review.md'];
 if (targets.some(p=>fs.existsSync(p))) throw Error('Draft or review file already exists');
 const raw = fs.readFileSync(input);
 const data = JSON.parse(raw.toString('utf8'));
+const raster = data.format === 'raster-tab-draft-v1';
 const bars = data.systems.flatMap(s=>s.bars.map(b=>({...b,page:s.page})));
 if (!bars.length || data.structure_issues?.length || bars.some((b,i)=>b.number!==i+1))
     throw Error('Resolve missing, duplicated or reordered bars before drafting');
 if (!Array.isArray(data.tuning) || data.tuning.length!==6 || data.tuning.some(n=>!Number.isInteger(n) || n<0 || n>127) ||
     !Number.isFinite(data.tempo) || data.tempo<=0) throw Error('PDF tuning and tempo are required');
 const score = new alpha.model.Score();
-score.title = 'DRAFT - PDF notes for manual correction';
+score.title = raster ? 'DRAFT - IMAGE model proposal for manual correction' : 'DRAFT - PDF notes for manual correction';
 score.instructions = 'Unverified draft. Rhythm may be wrong. Ties and playing techniques are omitted. Review sidecar before playback.';
+if (raster) score.instructions += ' All notes are model proposals. All rhythms are placeholders. Meter, tempo and tuning are manual draft settings, not recognized from the image.';
 const track = new alpha.model.Track(); score.addTrack(track); track.name = 'DRAFT notes'; track.playbackInfo.program = 25;
 const staff = new alpha.model.Staff(); track.addStaff(staff); staff.stringTuning.tunings = data.tuning;
 const review = {draft:true,playback_verified:false,source_sha256:crypto.createHash('sha256').update(raw).digest('hex'),
     omitted:'ties, harmonics, slides, bends, palm mute, staccato and other playing techniques; repeats',
     tempo_issues:data.tempo_issues??[],note_count:0,bars:[]};
+if (raster) {
+    review.source_kind = 'image-model-proposal';
+    review.manual_settings = {tempo:data.tempo,meter:data.meter,tuning:data.tuning};
+    review.warnings = data.warnings??[];
+    review.model_revision = data.model_revision;
+    review.model_checkpoint_sha256 = data.model_checkpoint_sha256;
+}
 const expected = [];
 for (const source of bars) {
     if (!Array.isArray(source.meter) || source.meter.length!==2 || source.meter.some(n=>!Number.isInteger(n) || n<=0) ||
@@ -89,11 +98,11 @@ for (let i=0;i<actual.length;i++) {
 }
 review.roundtrip = 'passed; serialized content only, not PDF or playback accuracy';
 const lines = ['# 待人工校正草稿','',
-    '音符来自 PDF 识别结果，未经整曲验收。节奏保留识别值；未知时值用四分音符占位，并在谱内标记 placeholder。',
+    raster ? '音符为图片模型提案，可能错弦、错品、漏音或错分组；全部时值为四分音符占位。拍号、BPM、定弦来自人工草稿设置。小节号为检测顺序号，不代表原谱编号。' : '音符来自 PDF 识别结果，未经整曲验收。节奏保留识别值；未知时值用四分音符占位，并在谱内标记 placeholder。',
     '本草稿未导出延音线、泛音、滑音、推弦、掌根闷音、顿音等技巧及反复结构，播放前请对照原谱修改。X 闷音记号本身保留。',
     `音符数：${review.note_count}；小节数：${bars.length}。所有小节均需复核，下面列出识别器已知的问题。`,
-    ...review.tempo_issues.map(x=>'速度待核对：'+JSON.stringify(x)),'',
-    '| PDF 页 | 小节 | 已知问题 | 占位时值的拍序号 |','| --- | --- | --- | --- |',
+    ...review.tempo_issues.map(x=>'速度待核对：'+JSON.stringify(x)),...(review.warnings??[]),'',
+    '| 来源页 | 小节 | 已知问题 | 占位时值的拍序号 |','| --- | --- | --- | --- |',
     ...review.bars.filter(b=>b.issues.length || b.placeholder_beats.length).map(b=>
         `| ${b.page} | ${b.source_bar} | ${b.issues.join('; ').replaceAll('|','/').replaceAll('\n',' ')} | ${b.placeholder_beats.join(', ')} |`)];
 fs.writeFileSync(output,bytes);

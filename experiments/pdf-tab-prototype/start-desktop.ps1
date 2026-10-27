@@ -6,10 +6,10 @@ try {
     $runtime = $null
     foreach ($candidate in ($pythonCandidates | Select-Object -Unique)) {
         if (-not (Test-Path -LiteralPath $candidate)) { continue }
-        & $candidate -c 'import tkinter, fitz' 2>$null
+        & $candidate -c 'import tkinter, fitz, cv2, numpy, PIL' 2>$null
         if ($LASTEXITCODE -eq 0) { $runtime = $candidate; break }
     }
-    if (-not $runtime) { throw 'Python with tkinter and PyMuPDF is required.' }
+    if (-not $runtime) { throw 'Python with tkinter, PyMuPDF, OpenCV, NumPy and Pillow is required.' }
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Node.js is required on PATH.' }
     $env:PYTHONUTF8 = '1'
     $env:PYTHONDONTWRITEBYTECODE = '1'
