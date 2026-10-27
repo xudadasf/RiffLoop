@@ -1,0 +1,282 @@
+{
+  "review_date": "2026-10-27",
+  "decision": "not-accepted-for-integration",
+  "scope": "Fixed 4 existing clips, 13 bars; not a full 24-clip or 82-pair regression",
+  "comparison": {
+    "predictions_sha256": "0652a55de3961e5a2e9758b55e395f420682e097038c02e0b6ab35a0320b8c42",
+    "representation": "compact",
+    "totals": {
+      "clips": 4,
+      "bars": 13,
+      "invalid_or_uncertain_clips": 2,
+      "baseline_timing_pass": 11,
+      "model_timing_pass": 0
+    },
+    "clips": [
+      {
+        "id": "case-002-system-000",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          1,
+          2,
+          3
+        ],
+        "model_timing_pass": [],
+        "error": "Bar count mismatch"
+      },
+      {
+        "id": "case-011-system-012",
+        "expected_bars": 4,
+        "baseline_timing_pass": [
+          49,
+          50,
+          51,
+          52
+        ],
+        "model_timing_pass": [],
+        "error": null
+      },
+      {
+        "id": "case-026-system-000",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          1
+        ],
+        "model_timing_pass": [],
+        "error": "Bar count mismatch"
+      },
+      {
+        "id": "case-071-system-010",
+        "expected_bars": 3,
+        "baseline_timing_pass": [
+          31,
+          32,
+          33
+        ],
+        "model_timing_pass": [],
+        "error": null
+      }
+    ]
+  },
+  "pilot_predictions": {
+    "format": "vlm-compact-rhythm-v1",
+    "transport": "offline-cli",
+    "model": "Qwen3.8-27B-Q4_K_M.gguf",
+    "source": {
+      "repo": "ggml-org/Qwen3.8-27B-GGUF",
+      "revision": "a316ea527fde32c12487be7574e2db5ac2ad2a7e",
+      "files": [
+        {
+          "name": "Qwen3.8-27B-Q4_K_M.gguf",
+          "bytes": 18973870528,
+          "sha256": "c600de0300ae8a0eb3a6c0b8b5561b8b96f16bd2c863c2a66c42de29d391a747",
+          "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/Qwen3.8-27B-Q4_K_M.gguf"
+        },
+        {
+          "name": "mmproj-Qwen3.8-27B-BF16.gguf",
+          "bytes": 931145888,
+          "sha256": "de2a49866988ea272c43dc2a43ee2662c25725a717ca5b9059ea420a97f53fe8",
+          "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/mmproj-Qwen3.8-27B-BF16.gguf"
+        }
+      ]
+    },
+    "template_source": {
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/chat_template.jinja",
+      "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+      "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    "runtime_sha256": "30d0081decaf675f083ee49334fa5d497457abc79bdc9d16999f3bcd701a2d5e",
+    "timeout_seconds": 1200,
+    "temperature": 0.7,
+    "manifest_sha256": "69df95692e4f1826283427c79b84d9840dee392e5d11fa0a5e34081e7666151e",
+    "prompt": "Transcribe the exact printed rhythm of this guitar tablature system, left to right.\nUse note stems, beams, flags, dots, rests, tuplet brackets and ties. If standard\nnotation is present above TAB, use it for rhythm; these are the same part, not\ntwo independent parts. Do not invent notes, repair durations to fit a meter,\nor omit empty bars. Ignore prose and illustrations. An empty full measure is\none whole-measure rest. Parentheses around a fret can denote a tied continuation;\na slur between different frets is not a duration tie. Grace notes have grace=1.\nReturn only JSON with keys \"bars\" and \"uncertain\". \"bars\" is a list of measures;\neach measure is a list of beat arrays. Each beat is exactly seven integers:\n[duration_denominator, dot_count, tuplet_numerator, tuplet_denominator,\n rest, tied_note_count, grace]. Duration denominators: 1,2,4,8,16,32,64.\nUse dot_count=0 without dots, tuplet=1,1 without tuplets, 3,2 for triplets.\nrest and grace are 0 or 1. tied_note_count counts tie destinations in that beat,\nnot all slurred notes. Simultaneous chord notes form ONE beat. Example of two\nordinary quarter-note beats, the second silent: {\"bars\":[[[4,0,1,1,0,0,0],\n[4,0,1,1,1,0,0]]],\"uncertain\":[]}. This is format only, not the image's answer.\nWhen a beat cannot be read, put null instead of that beat and describe its\nlocation in \"uncertain\". If there is no score, return empty bars and explain.\nDo not include markdown, reasoning or any other keys.",
+    "timing_scope": "cold process including model loading",
+    "predictions": [
+      {
+        "id": "case-002-system-000",
+        "image_sha256": "fb39c5f6a953617006a8b34303b053fe693cc27da9700028e3725804e2f20af0",
+        "seconds": 239.505,
+        "returncode": 0,
+        "log_sha256": "5f5887eb2f574d92d18b890909a81e530726f3e8822ac2204ca1b721e1a25a08",
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "message": {
+                "content": "\n{\n  \"bars\": [\n    [\n      [4, 0, 1, 1, 1, 0, 0],\n      [4, 0, 1, 1, 1, 0, 0],\n      [4, 0, 1, 1, 1, 0, 0],\n      [4, 0, 1, 1, 1, 0, 0]\n    ],\n    [\n      [4, 0, 1, 1, 0, 0, 0],\n      [4, 0, 1, 1, 0, 0, 0],\n      [4, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [16, 0, 3, 2, 0, 0, 0],\n      [16, 0, 3, 2, 0, 0, 0],\n      [4, 0, 1, 1, 0, 1, 0]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "case-011-system-012",
+        "image_sha256": "d94a292f4b86829d638b5c6aaaabc3378ac0a1c7135c314bce739f5dc57afe74",
+        "seconds": 141.995,
+        "returncode": 0,
+        "log_sha256": "987a160410418ce155b4ad2f291c2d8a4c0c2c9b946911a557c5874ca633ff3d",
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "message": {
+                "content": "\n{\n\"bars\": [\n[[4, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0]],\n[[8, 0, 1, 1, 0, 0, 0], [16, 0, 1, 1, 0, 0, 0], [16, 0, 1, 1, 0, 0, 0]],\n[[4, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0]],\n[[8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0]]\n],\n\"uncertain\": []\n}\n\n\n"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "case-026-system-000",
+        "image_sha256": "265a3151fae6a71b6cc3dd84d8c01aa131c2ff772c5c367352f672006b255549",
+        "seconds": 249.012,
+        "returncode": 0,
+        "log_sha256": "9e190550b785413876ce712f3228fee814f9bc882e7edaa35d5f729429b8c858",
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "message": {
+                "content": "\n```json\n{\n  \"bars\": [\n    [\n      [2, 1, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [16, 0, 1, 1, 0, 0, 1],\n      [4, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [16, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [4, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [16, 0, 1, 1, 0, 0, 1]\n    ],\n    [\n      [4, 1, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [16, 0, 1, 1, 0, 0, 1],\n      [4, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [16, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [4, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [16, 0, 1, 1, 0, 0, 1]\n    ],\n    [\n      [4, 1, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "case-071-system-010",
+        "image_sha256": "b4a6a9bce44db581eaebc5b39a8cf1fa53977c49e4c9c59294567467e0836430",
+        "seconds": 154.409,
+        "returncode": 0,
+        "log_sha256": "e93a985f62d3af650b1f093692e54aec8ea551f7a748a3af81e897f3cb1b4e85",
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "message": {
+                "content": "\n{\n\"bars\": [\n[[8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0]],\n[[8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0]],\n[[8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0], [8, 0, 1, 1, 0, 0, 0]]\n],\n\"uncertain\": []\n}\n\n\n"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "public_smoke": {
+    "format": "vlm-compact-rhythm-v1",
+    "transport": "offline-cli",
+    "model": "Qwen3.8-27B-Q4_K_M.gguf",
+    "source": {
+      "repo": "ggml-org/Qwen3.8-27B-GGUF",
+      "revision": "a316ea527fde32c12487be7574e2db5ac2ad2a7e",
+      "files": [
+        {
+          "name": "Qwen3.8-27B-Q4_K_M.gguf",
+          "bytes": 18973870528,
+          "sha256": "c600de0300ae8a0eb3a6c0b8b5561b8b96f16bd2c863c2a66c42de29d391a747",
+          "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/Qwen3.8-27B-Q4_K_M.gguf"
+        },
+        {
+          "name": "mmproj-Qwen3.8-27B-BF16.gguf",
+          "bytes": 931145888,
+          "sha256": "de2a49866988ea272c43dc2a43ee2662c25725a717ca5b9059ea420a97f53fe8",
+          "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/mmproj-Qwen3.8-27B-BF16.gguf"
+        }
+      ]
+    },
+    "template_source": {
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0/chat_template.jinja",
+      "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+      "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+    },
+    "runtime_sha256": "30d0081decaf675f083ee49334fa5d497457abc79bdc9d16999f3bcd701a2d5e",
+    "timeout_seconds": 1200,
+    "temperature": 0.7,
+    "manifest_sha256": "20f816c38fad9ea3b39ffe1dd1ed658e17743dc6db4555e33e239ec8b2d0c71c",
+    "prompt": "Transcribe the exact printed rhythm of this guitar tablature system, left to right.\nUse note stems, beams, flags, dots, rests, tuplet brackets and ties. If standard\nnotation is present above TAB, use it for rhythm; these are the same part, not\ntwo independent parts. Do not invent notes, repair durations to fit a meter,\nor omit empty bars. Ignore prose and illustrations. An empty full measure is\none whole-measure rest. Parentheses around a fret can denote a tied continuation;\na slur between different frets is not a duration tie. Grace notes have grace=1.\nReturn only JSON with keys \"bars\" and \"uncertain\". \"bars\" is a list of measures;\neach measure is a list of beat arrays. Each beat is exactly seven integers:\n[duration_denominator, dot_count, tuplet_numerator, tuplet_denominator,\n rest, tied_note_count, grace]. Duration denominators: 1,2,4,8,16,32,64.\nUse dot_count=0 without dots, tuplet=1,1 without tuplets, 3,2 for triplets.\nrest and grace are 0 or 1. tied_note_count counts tie destinations in that beat,\nnot all slurred notes. Simultaneous chord notes form ONE beat. Example of two\nordinary quarter-note beats, the second silent: {\"bars\":[[[4,0,1,1,0,0,0],\n[4,0,1,1,1,0,0]]],\"uncertain\":[]}. This is format only, not the image's answer.\nWhen a beat cannot be read, put null instead of that beat and describe its\nlocation in \"uncertain\". If there is no score, return empty bars and explain.\nDo not include markdown, reasoning or any other keys.",
+    "timing_scope": "cold process including model loading",
+    "predictions": [
+      {
+        "id": "official-example",
+        "image_sha256": "ff439c2c52402ca5f1e0390e718f450bdab0959b4df8ac3d50894cb11fdefda6",
+        "seconds": 168.532,
+        "returncode": 0,
+        "log_sha256": "1988113f5673ed65094624a219fb9a18077fe1893d2e98241e4a16c9152599cd",
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "message": {
+                "content": "\n{\n  \"bars\": [\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [4, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [4, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [4, 0, 1, 1, 0, 0, 0]\n    ],\n    [\n      [8, 0, 1, 1, 0, 0, 0],\n      [8, 0, 1, 1, 0, 0, 0],\n      [4, 0, 1, 1, 0, 0, 0]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "runtime_review": [
+    {
+      "id": "case-002-system-000",
+      "actual_bars": 5,
+      "seconds": 239.505,
+      "log_sha256": "5f5887eb2f574d92d18b890909a81e530726f3e8822ac2204ca1b721e1a25a08",
+      "offload": "offloaded 17/65 layers to GPU",
+      "performance_lines": [
+        "0.08.231.751 I load_tensors:   CPU_Mapped model buffer size = 12987.83 MiB",
+        "0.08.231.752 I load_tensors:        CUDA0 model buffer size =  5096.58 MiB",
+        "3.57.422.769 I llama_perf_context_print: prompt eval time =   22958.67 ms /  1500 tokens (   15.31 ms per token,    65.33 tokens per second)",
+        "3.57.422.770 I llama_perf_context_print:        eval time =  186791.45 ms /   511 runs   (  365.54 ms per token,     2.74 tokens per second)"
+      ]
+    },
+    {
+      "id": "case-011-system-012",
+      "actual_bars": 4,
+      "seconds": 141.995,
+      "log_sha256": "987a160410418ce155b4ad2f291c2d8a4c0c2c9b946911a557c5874ca633ff3d",
+      "offload": "offloaded 17/65 layers to GPU",
+      "performance_lines": [
+        "0.03.114.843 I load_tensors:   CPU_Mapped model buffer size = 12987.83 MiB",
+        "0.03.114.864 I load_tensors:        CUDA0 model buffer size =  5096.58 MiB",
+        "2.20.061.366 I llama_perf_context_print: prompt eval time =   20602.54 ms /  1513 tokens (   13.62 ms per token,    73.44 tokens per second)",
+        "2.20.061.367 I llama_perf_context_print:        eval time =   93936.50 ms /   253 runs   (  371.29 ms per token,     2.69 tokens per second)"
+      ]
+    },
+    {
+      "id": "case-026-system-000",
+      "actual_bars": 7,
+      "seconds": 249.012,
+      "log_sha256": "9e190550b785413876ce712f3228fee814f9bc882e7edaa35d5f729429b8c858",
+      "offload": "offloaded 17/65 layers to GPU",
+      "performance_lines": [
+        "0.03.091.197 I load_tensors:   CPU_Mapped model buffer size = 12987.83 MiB",
+        "0.03.091.198 I load_tensors:        CUDA0 model buffer size =  5096.58 MiB",
+        "4.07.057.342 I llama_perf_context_print: prompt eval time =   30921.83 ms /  1479 tokens (   20.91 ms per token,    47.83 tokens per second)",
+        "4.07.057.343 I llama_perf_context_print:        eval time =  192016.90 ms /   532 runs   (  360.93 ms per token,     2.77 tokens per second)"
+      ]
+    },
+    {
+      "id": "case-071-system-010",
+      "actual_bars": 3,
+      "seconds": 154.409,
+      "log_sha256": "e93a985f62d3af650b1f093692e54aec8ea551f7a748a3af81e897f3cb1b4e85",
+      "offload": "offloaded 17/65 layers to GPU",
+      "performance_lines": [
+        "0.03.091.368 I load_tensors:   CPU_Mapped model buffer size = 12987.83 MiB",
+        "0.03.091.369 I load_tensors:        CUDA0 model buffer size =  5096.58 MiB",
+        "2.32.325.864 I llama_perf_context_print: prompt eval time =   31851.65 ms /  1474 tokens (   21.61 ms per token,    46.28 tokens per second)",
+        "2.32.325.865 I llama_perf_context_print:        eval time =   96931.01 ms /   271 runs   (  357.68 ms per token,     2.80 tokens per second)"
+      ]
+    }
+  ],
+  "pilot_total_seconds": 784.921,
+  "input_manifest_sha256": "69df95692e4f1826283427c79b84d9840dee392e5d11fa0a5e34081e7666151e",
+  "geometry_sha256": "7b01171eb2f3c367656d16139dffe1c043c1747e9e74e879a7c1c85ee4c7c3fa",
+  "limitations": [
+    "Applies only to tested quantization/runtime/prompt/configuration",
+    "Successful process completion does not establish musical accuracy",
+    "Wrong bar counts fail the whole clip; no realignment or reference-assisted repair",
+    "No memory residency/page-fault telemetry collected; mapped buffer size is not physical RAM use"
+  ],
+  "production_baseline_changed": false
+}
