@@ -28,16 +28,16 @@ def render_review(source, folder, outcome, body, *, notes, bars, issues, setting
 <main id="top"><section class="intro"><div><p class="eyebrow">导出草稿 · 在 Guitar Pro 中修改</p>
 <h1>{esc(source.name)}</h1><p class="outcome">{esc(outcome['status'])}</p><p class="summary-text">{esc(outcome['message'])}</p></div>
 <div class="file-actions">{primary}<nav aria-label="文件入口">{link_html(links)}</nav></div></section>
-<div class="notice"><strong>下一步：在 Guitar Pro 中打开 GP 草稿。</strong> 音符和节奏直接在 Guitar Pro 修改；下方原谱与问题说明供参考。<b>?</b> 表示时值或休止占位。</div>
+<div class="notice"><strong>下一步：在 Guitar Pro 中打开 GP 草稿。</strong> 音符和节奏直接在 Guitar Pro 修改；下方优先显示程序发现的疑点，供修改时参考。<b>?</b> 表示时值或休止占位。</div>
 <section class="metrics" aria-label="结果概览"><div><b>{bars}</b><span>小节总数</span></div>
-<div><b>{notes}</b><span>识别音符</span></div><div class="warning-stat"><b>{issues}</b><span>标有待修改项的小节</span></div>
+<div><b>{notes}</b><span>识别音符</span></div><div class="warning-stat"><b>{issues}</b><span>需重点检查的小节</span></div>
 </section>
 {f'<p class="settings-line">{esc(settings)}</p>' if settings else ''}
 <details class="guide"><summary>怎么看这份结果？识别范围与注意事项</summary><div>{guidance}</div></details>
 <div class="review-toolbar" aria-label="查看结果"><div class="filter-control"><label for="review-filter">显示</label>
-<select id="review-filter"><option value="all">全部小节</option><option value="issues">仅有待修改项</option></select></div>
+<select id="review-filter"><option value="all">全部小节</option><option value="issues"{ " selected" if issues else ""}>仅重点检查</option></select></div>
 <label class="search-control"><span class="sr-only">查找页码或小节</span><input id="review-search" type="search" placeholder="查找页码 / 小节，如：小节4"></label>
-<button id="next-issue" class="button">下一处待修改 ↓</button><span id="visible-count" class="filter-count"></span></div>
+<button id="next-issue" class="button">下一处疑点 ↓</button><span id="visible-count" class="filter-count"></span></div>
 <p id="review-feedback" role="status" aria-live="polite"></p>
 <div id="review-content">{body}</div><div id="filter-empty" class="empty-state" hidden>当前筛选下没有小节。<button id="reset-filter" class="button">显示全部</button></div>
 <details class="technical"><summary>识别数据与处理记录</summary><nav>{link_html(technical)}</nav></details>

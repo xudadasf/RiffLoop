@@ -61,7 +61,7 @@ def write_report(source, folder, outcome, data):
                         '</tr>')
         sections.append(f'<section class="system-card"><div class="system-heading"><h2>第 {system["page"]} 页 · 第 {line} 行</h2></div>'
                         '<div class="system-body"><div class="table-wrap"><table><thead><tr><th class="measure-col">小节</th><th>音符分组提案</th>'
-                        '<th class="timing-col">时值 / 待修改</th></tr></thead><tbody>'
+                        '<th class="timing-col">时值 / 疑点位置</th></tr></thead><tbody>'
                         + ''.join(rows) + '</tbody></table></div></div></section>')
     warnings = data.get('warnings', []) + data.get('structure_issues', [])
     previews = ''

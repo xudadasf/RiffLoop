@@ -2,6 +2,7 @@
 import html
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 
@@ -65,23 +66,39 @@ def write_image_review(source, folder, outcome, data):
         for bar in range(1, system['region']['expected_bars'] + 1):
             notes = [n for n in system['notes'] if n['bar'] == bar]
             chips = []
-            for n in notes:
+            for note_index, n in enumerate(notes, 1):
                 review = bool(n.get('review'))
-                chips.append(f'<span class="note-chip{ " needs-review" if review else ""}">{esc(n["string"])}弦 / {esc(n["fret"])}品{ " · 待核对" if review else ""}</span>')
+                chips.append(f'<span class="note-chip{ " needs-review" if review else ""}" title="第 {note_index} 个音符">{esc(n["string"])}弦 / {esc(n["fret"])}品{ " · 待确认" if review else ""}</span>')
             text = '<span class="sequence-arrow">→</span>'.join(chips) or '<span class="bar-count">未提取到音符，请对照原谱确认休止或漏音</span>'
             rhythm = next((b for b in system.get('rhythm_bars', []) if b['source_bar'] == bar), None)
             timing = []
-            for beat in rhythm['beats'] if rhythm else []:
+            for beat_index, beat in enumerate(rhythm['beats'] if rhythm else [], 1):
                 token = ('休止 ' if not beat['notes'] else '') + f'1/{beat["duration"]}' + '.'*beat['dots']
                 if beat.get('tuplet', [1, 1])[0] > 1:
                     token += f'（{beat["tuplet"][0]}连音）'
                 token += ' ?' if beat['placeholder'] else ''
-                timing.append(esc(token))
+                timing.append(f'<span class="timing-token{ " needs-review" if beat["placeholder"] else ""}" title="第 {beat_index} 项时值">{esc(token)}</span>')
             issues = list(rhythm['issues']) if rhythm else ['未得到可用时值']
             placeholders = sum(bool(b.get('placeholder')) for b in rhythm['beats']) if rhythm else 0
             if placeholders and not issues:
                 issues.append(f'{placeholders} 处默认占位，需对照原谱修改')
-            needs_review = bool(issues or placeholders or any(n.get('review') for n in notes) or unresolved or discarded)
+            uncertain_notes = [f'第 {i} 个（{n["string"]}弦/{n["fret"]}品）'
+                               for i, n in enumerate(notes, 1) if n.get('review')]
+            if uncertain_notes:
+                issues.append('音符待确认：' + '、'.join(uncertain_notes))
+            if placeholders:
+                positions = '、'.join(str(i) for i, b in enumerate(rhythm['beats'], 1) if b.get('placeholder'))
+                issues.append(f'时值待确认：第 {positions} 项（含休止；橙色 ? 为占位）')
+            unlocated = False
+            for evidence in unresolved + discarded:
+                match = re.fullmatch(r'bar(\d+)-string(\d+)', str(evidence.get('row', '')))
+                if not match or not 1 <= int(match[1]) <= system['region']['expected_bars']:
+                    unlocated = True
+                elif int(match[1]) == bar:
+                    issues.append(f'第 {match[2]} 弦有未采用或未确认的识别内容，请检查是否漏音；详见本行说明')
+            if unlocated:
+                issues.append('本行有无法定位到具体小节的疑点，需结合整行原谱检查')
+            needs_review = bool(issues)
             total_notes += len(notes)
             total_bars += 1
             issue_bars += needs_review
@@ -103,7 +120,7 @@ def write_image_review(source, folder, outcome, data):
                   + '</ul></details></div>') if unresolved or discarded else ''
         sections.append(f'<section class="system-card"><div class="system-heading"><h2>第 {system["page"]} 页 · 第 {line} 行</h2>'
                         f'<small>{system["region"]["expected_bars"]} 个小节位置 · 按原图顺序展示</small></div><div class="system-body">'
-                        + preview + alerts + '<div class="table-wrap"><table><thead><tr><th class="measure-col">小节</th><th>弦号 / 品位 · 从左到右</th><th class="timing-col">时值 / 待修改</th></tr></thead><tbody>'
+                        + preview + alerts + '<div class="table-wrap"><table><thead><tr><th class="measure-col">小节</th><th>弦号 / 品位 · 从左到右</th><th class="timing-col">时值 / 疑点位置</th></tr></thead><tbody>'
                         + ''.join(rows) + '</tbody></table></div></div></section>')
     body = ''.join(f'<p class="error-message">{esc(e)}</p>' for e in data.get('errors', [])) + ''.join(sections)
     if not sections:
@@ -111,7 +128,7 @@ def write_image_review(source, folder, outcome, data):
     guidance = ('<p>先对照谱图检查弦号、品位和顺序，再在 GP 编辑软件中修改时值。小节位置由竖线检测得到，不能证明完整性。</p>'
                 '<p>明确连接的横梁用于识别时值；不确定处使用默认占位，谱中标 ?。默认四分音符，空间不足时统一缩短，余量用休止占位。</p>'
                 '<p>BPM 决定播放速度，拍号决定小节拍数；两者不能替代每个音符的时值。和弦同时起音、技巧、X 闷音尚未支持；没有报错也不代表没有漏音。</p>'
-                '<p>“仅有待修改项”筛选的是程序已标出的疑点；未标出的音符也需要人工核对。</p>')
+                '<p>“仅重点检查”筛选的是程序已标出的疑点；未标出的音符也需要人工核对。</p>')
     content = render_review(source, folder, outcome, body, notes=total_notes, bars=total_bars,
                             issues=issue_bars, settings=setting_text, guidance=guidance)
     (folder/'review.html').write_text(content, encoding='utf-8')

@@ -1,6 +1,7 @@
 import copy
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -51,9 +52,29 @@ class ReviewPageTests(unittest.TestCase):
         beat['placeholder'] = True
         self.assertIn('data-issue="1"', self.render())
         self.assertIn('1/4 ?', self.render())
+        self.assertIn('时值待确认：第 1 项', self.render())
         beat['placeholder'] = False
         self.data['systems'][0]['notes'][0]['review'] = True
         self.assertIn('data-issue="1"', self.render())
+        self.assertIn('音符待确认：第 1 个（6弦/5品）', self.render())
+
+    def test_weak_evidence_only_flags_its_own_bar(self):
+        system = self.data['systems'][0]
+        system['region']['expected_bars'] = 2
+        second = copy.deepcopy(system['rhythm_bars'][0])
+        second['source_bar'] = 2
+        system['rhythm_bars'].append(second)
+        system['discarded_bands'] = [{'row': 'bar2-string3', 'text': '8', 'reason': '弱证据'}]
+        report = self.render()
+        self.assertEqual(len(re.findall(r'<tr[^>]+data-issue="1"', report)), 1)
+        self.assertEqual(len(re.findall(r'<tr[^>]+data-issue="0"', report)), 1)
+        self.assertIn('第 3 弦有未采用或未确认的识别内容', report)
+
+    def test_unlocated_evidence_is_described_as_line_wide(self):
+        self.data['systems'][0]['unresolved'] = [{'row': 1, 'text': '8', 'reason': '位置不明'}]
+        report = self.render()
+        self.assertIn('无法定位到具体小节', report)
+        self.assertIn('data-issue="1"', report)
 
     def test_report_escapes_untrusted_messages(self):
         attack = '<script>alert("ocr")</script>'
