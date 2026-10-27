@@ -12,7 +12,7 @@ import traceback
 
 ROOT = Path(__file__).resolve().parent
 IMAGES = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff'}
-NOTICE = '待人工校正的实验草稿；节奏可能错误，未知时值使用四分音符占位。延音线、演奏技巧及反复结构未导出。不能直接作为准确伴奏。'
+NOTICE = '图片 / 扫描件仅生成音符对照，节奏未识别，不导出 GP。矢量 PDF 草稿仍需校正，未知时值可能使用占位；不能直接作为准确伴奏。'
 
 
 def default_output():
@@ -28,6 +28,9 @@ def create_output(root, source):
 
 
 def write_report(source, folder, outcome, data):
+    from desktop_image_review import FORMAT, write_image_review
+    if data.get('format') == FORMAT:
+        return write_image_review(source, folder, outcome, data)
     esc = lambda value: html.escape(str(value), quote=True)
     links = [('查看原文件', source.as_uri())]
     for filename, label in [('overlay.pdf', '查看原谱识别标记'), ('score.draft.gp', '打开 / 下载 GP 草稿'),
@@ -84,8 +87,8 @@ def process_file(source, folder, image_settings=None):
         if not source.is_file():
             raise ValueError('原文件不存在或无法读取')
         if source.suffix.lower() in IMAGES:
-            from raster_tab import recognize_raster
-            data = recognize_raster(source, folder, image_settings)
+            from desktop_image_review import recognize_image_review
+            data = recognize_image_review(source, folder)
         elif source.suffix.lower() != '.pdf':
             raise ValueError('请选择 PDF 或常见图片文件')
         else:
@@ -97,13 +100,23 @@ def process_file(source, folder, image_settings=None):
                 raster_pages = [i + 1 for i, page in enumerate(doc) if page.get_images()
                                 and not any(s['count'] == 6 for s in staves(lines_and_shapes(page)[0], page.rect.width))]
             if raster_pages:
-                from raster_tab import recognize_raster
-                data = recognize_raster(source, folder, image_settings)
+                from desktop_image_review import recognize_image_review
+                data = recognize_image_review(source, folder)
             else:
                 from recognize import recognize, overlay
                 data = recognize(source)
                 overlay(source, data, folder / 'overlay.pdf')
         (folder / 'recognized.json').write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        if data.get('format') == 'raster-digit-review-v1':
+            notes = sum(len(s['notes']) for s in data['systems'])
+            unresolved = sum(len(s['unresolved']) for s in data['systems'])
+            if notes:
+                outcome.update(status='图片部分识别 · 待核对' if unresolved or data['errors'] else '图片音符对照 · 未生成 GP',
+                               message=f'{notes} 个数字提案，{unresolved} 条识别行未解决。节奏尚未识别，未生成 GP；请打开“查看结果 / 问题”核对原图。')
+            else:
+                outcome['message'] = '；'.join(data['errors']) or '未得到可用音符提案；请查看识别报告。'
+            write_report(source, folder, outcome, data)
+            return outcome
         bars = [b for s in data['systems'] for b in s['bars']]
         blockers = list(data.get('structure_issues', []))
         if not bars:

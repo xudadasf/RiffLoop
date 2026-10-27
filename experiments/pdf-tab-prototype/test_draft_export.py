@@ -46,7 +46,7 @@ class DraftExportTests(unittest.TestCase):
             self.assertNotEqual(run.returncode, 0)
             self.assertFalse(output.exists())
 
-    def test_image_draft_retains_manual_settings_and_model_warning(self):
+    def test_image_unknown_rhythm_cannot_be_exported_as_quarter_placeholders(self):
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
             source, output = folder / 'image.json', folder / 'image.draft.gp'
@@ -57,13 +57,9 @@ class DraftExportTests(unittest.TestCase):
                 beat.update(duration=None, dots=0, tuplet=[1, 1])
             source.write_text(json.dumps(data), encoding='utf-8')
             run = subprocess.run(['node', str(ROOT/'gp-draft-export.cjs'), str(source), str(output)], capture_output=True)
-            self.assertEqual(run.returncode, 0, run.stderr)
-            review = json.loads(Path(str(output)+'.review.json').read_text(encoding='utf-8'))
-            self.assertEqual(review['source_kind'], 'image-model-proposal')
-            self.assertEqual(review['manual_settings']['tempo'], 100)
-            self.assertEqual(review['model_revision'], 'test-model')
-            self.assertEqual(review['bars'][0]['placeholder_beats'], [1, 2])
-            self.assertIn('全部时值为四分音符占位', Path(str(output)+'.review.md').read_text(encoding='utf-8'))
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn(b'Image GP export is disabled', run.stderr)
+            self.assertFalse(output.exists())
 
 
 if __name__ == '__main__':

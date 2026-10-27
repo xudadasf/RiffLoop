@@ -88,8 +88,7 @@ class RasterTabTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 decode_proposal(invalid)
 
-    def test_mismatched_geometry_exports_actual_proposal_with_warning(self):
-        from desktop_batch import process_file
+    def test_legacy_probe_preserves_actual_proposal_with_geometry_warning(self):
         import subprocess
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -112,19 +111,13 @@ class RasterTabTests(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0)
 
             with patch.dict('os.environ', {'RIFFLOOP_OMR_MODEL_DIR': str(model)}), patch('raster_tab.subprocess.run', side_effect=fake_model_only):
-                result = process_file(source, root / 'out')
-            self.assertIsNotNone(result['draft'], result['message'])
-            data = json.loads((root / 'out/recognized.json').read_text(encoding='utf-8'))
+                (root / 'out').mkdir()
+                data = recognize_raster(source, root / 'out')
             self.assertEqual(len(data['systems'][0]['bars']), 2)
             self.assertEqual(data['structure_issues'], [])
             self.assertTrue(any('数量' in w for w in data['warnings']))
-            review = json.loads((root / 'out/score.draft.gp.review.json').read_text(encoding='utf-8'))
-            self.assertEqual(len(review['bars']), 2)
-            self.assertEqual(review['note_count'], 2)
-            self.assertTrue(all(any('数量' in w for w in b['issues']) for b in review['bars']))
-            page = (root / 'out/review.html').read_text(encoding='utf-8')
-            self.assertIn('模型识别 2 小节', page)
-            self.assertIn('辅助估计', page)
+            self.assertTrue(all(any('数量' in w for w in b['issues']) for b in data['systems'][0]['bars']))
+            self.assertFalse((root / 'out/score.draft.gp').exists())
 
     def test_missing_model_retains_crops_and_does_not_guess_notes(self):
         with tempfile.TemporaryDirectory() as temp:

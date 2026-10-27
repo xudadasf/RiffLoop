@@ -8,6 +8,8 @@ const targets = [output, output+'.review.json', output+'.review.md'];
 if (targets.some(p=>fs.existsSync(p))) throw Error('Draft or review file already exists');
 const raw = fs.readFileSync(input);
 const data = JSON.parse(raw.toString('utf8'));
+if (data.format === 'raster-tab-draft-v1' || data.format === 'raster-digit-review-v1')
+    throw Error('Image GP export is disabled: rhythm is unverified. Use the digit review report; do not substitute quarter notes.');
 const raster = data.format === 'raster-tab-draft-v1';
 const bars = data.systems.flatMap(s=>s.bars.map(b=>({...b,page:s.page})));
 if (!bars.length || data.structure_issues?.length || bars.some((b,i)=>b.number!==i+1))

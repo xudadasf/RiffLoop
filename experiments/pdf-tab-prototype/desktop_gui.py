@@ -18,7 +18,7 @@ class TrialWindow:
         self.events = queue.Queue()
         self.stop = threading.Event()
         self.running = False
-        root.title('RiffLoop · PDF / 图片六线谱试用')
+        root.title('RiffLoop · 图片音符对照 / PDF 草稿 · 2026-10-27')
         root.geometry('1080x760')
         root.minsize(940, 700)
         style = ttk.Style(root)
@@ -27,9 +27,9 @@ class TrialWindow:
         style.configure('Treeview', rowheight=34)
         outer = ttk.Frame(root, padding=22)
         outer.pack(fill='both', expand=True)
-        ttk.Label(outer, text='PDF / 图片六线谱 → 可修改的 GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
+        ttk.Label(outer, text='图片 → 音符对照 ｜ 矢量 PDF → GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
         ttk.Label(outer, text='批量选择 PDF、截图或照片，在本机处理；每份文件单独生成结果。', foreground='#46576b').pack(anchor='w', pady=(8, 4))
-        ttk.Label(outer, text='图片识谱为试用功能：音符可能有误，全部时值使用占位；支持清晰六线谱，需逐一校正。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
+        ttk.Label(outer, text='图片已切换为数字与弦线识别；节奏尚未识别，暂不生成 GP。完成后请打开“查看结果 / 问题”。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
         controls = ttk.Frame(outer)
         controls.pack(fill='x')
         self.add_button = ttk.Button(controls, text='添加 PDF / 截图', command=self.choose_files)
@@ -47,19 +47,6 @@ class TrialWindow:
         ttk.Entry(output_row, textvariable=self.output, state='readonly').pack(side='left', fill='x', expand=True)
         self.output_button = ttk.Button(output_row, text='更改位置', command=self.choose_output)
         self.output_button.pack(side='left', padx=(8, 0))
-        settings_row = ttk.Frame(outer)
-        settings_row.pack(fill='x', pady=(0, 12))
-        ttk.Label(settings_row, text='图片草稿人工设置：BPM').pack(side='left')
-        self.image_tempo = tk.StringVar(value='100')
-        self.image_meter = tk.StringVar(value='4/4')
-        self.image_tuning = tk.StringVar(value='64,59,55,50,45,40')
-        self.settings_inputs = []
-        for variable, label, width in [(self.image_tempo, '拍号', 5), (self.image_meter, '定弦 MIDI（1→6 弦）', 6),
-                                        (self.image_tuning, '默认标准定弦；非图片识别值', 23)]:
-            entry = ttk.Entry(settings_row, textvariable=variable, width=width)
-            entry.pack(side='left', padx=6)
-            self.settings_inputs.append(entry)
-            ttk.Label(settings_row, text=label).pack(side='left')
         table = ttk.Frame(outer)
         table.pack(fill='both', expand=True)
         self.tree = ttk.Treeview(table, columns=('file', 'kind', 'status'), show='headings', selectmode='extended', height=3)
@@ -127,23 +114,19 @@ class TrialWindow:
             return
         output_root = Path(self.output.get())
         try:
-            from raster_tab import validate_settings
-            settings = validate_settings({'tempo': int(self.image_tempo.get()),
-                                          'meter': [int(x) for x in self.image_meter.get().split('/')],
-                                          'tuning': [int(x.strip()) for x in self.image_tuning.get().replace('，', ',').split(',')]})
             output_root.mkdir(parents=True, exist_ok=True)
         except (OSError, ValueError) as error:
-            messagebox.showerror('请检查图片草稿设置与输出位置', str(error))
+            messagebox.showerror('请检查输出位置', str(error))
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, *self.settings_inputs):
+        for button in (self.add_button, self.remove_button, self.start_button, self.output_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
-        threading.Thread(target=self.work, args=(jobs, output_root, settings), daemon=True).start()
+        threading.Thread(target=self.work, args=(jobs, output_root), daemon=True).start()
 
-    def work(self, jobs, output_root, settings):
+    def work(self, jobs, output_root):
         try:
             for index, (key, source) in enumerate(jobs, 1):
                 if self.stop.is_set():
@@ -154,8 +137,7 @@ class TrialWindow:
                     folder = create_output(output_root, source)
                     env = dict(os.environ, PYTHONUTF8='1', PYTHONDONTWRITEBYTECODE='1')
                     with (folder.parent / (folder.name + '.process.log')).open('w', encoding='utf-8') as log:
-                        subprocess.run([sys.executable, str(ROOT / 'desktop_batch.py'), str(source), '--out', str(folder),
-                                        '--image-settings', json.dumps(settings)],
+                        subprocess.run([sys.executable, str(ROOT / 'desktop_batch.py'), str(source), '--out', str(folder)],
                                        stdout=log, stderr=log, env=env, timeout=900, check=True,
                                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                     result = json.loads((folder / 'result.json').read_text(encoding='utf-8'))
@@ -185,11 +167,12 @@ class TrialWindow:
                 elif event == 'done':
                     self.running = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button, *self.settings_inputs):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())
-                    self.status.set(f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份草稿 · 双击文件行查看结果')
+                    reviews = sum(v.get('status', '').startswith(('图片音符对照', '图片部分识别')) for v in self.items.values())
+                    self.status.set(f'{"已停止" if self.stop.is_set() else "处理完成"} · {reviews} 份图片对照，{count} 份 PDF 草稿 · 双击文件行查看结果')
         except queue.Empty:
             pass
         self.root.after(150, self.poll)
@@ -198,7 +181,7 @@ class TrialWindow:
         selected = self.tree.selection()
         if selected:
             item = self.items[selected[0]]
-            self.detail.set(str(item['source']) + '\n' + item.get('message', '待处理。图片将自动定位谱行并调用本地模型；请确认上方人工设置。'))
+            self.detail.set(str(item['source']) + '\n' + item.get('message', '待处理。图片将生成数字与弦线对照；节奏尚未识别，不生成 GP。'))
         else:
             self.detail.set('选择文件行查看说明，双击打开结果。')
 
@@ -208,6 +191,9 @@ class TrialWindow:
             messagebox.showinfo('选择文件', '请先选择列表中的一行。')
             return
         item = self.items[selected[0]]
+        if action == 'draft' and not item.get('draft') and item.get('folder'):
+            messagebox.showinfo('未生成 GP', item.get('message', '') + '\n请点击“查看结果 / 问题”。')
+            return
         target = (Path(item['folder']) / 'review.html' if action == 'report' and item.get('folder')
                   else item.get(action))
         if not target or not Path(target).exists():
