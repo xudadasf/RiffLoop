@@ -24,6 +24,12 @@ def staff(count=6):
 
 
 class RasterTabTests(unittest.TestCase):
+    def test_scattered_ledger_lines_do_not_turn_five_lines_into_six(self):
+        gray = staff(count=5)
+        for x in (80,350,650):
+            cv2.line(gray,(x,200),(x+90,200),0,1)
+        self.assertEqual(locate_systems(gray), [])
+
     def test_beam_touching_staff_does_not_shift_line_to_band_average(self):
         gray = staff()
         cv2.rectangle(gray, (60, 160), (650, 167), 0, -1)

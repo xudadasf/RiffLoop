@@ -23,6 +23,36 @@ def group_characters(characters, gap):
     return groups
 
 
+def recognize_band(gray, x0, x1, y0, y1, gap, engine):
+    def read(a,b):
+        return engine(gray[a:b,x0:x1],use_det=False,use_cls=False,
+                      return_word_box=True,return_single_char_box=True)
+    first=read(y0,y1)
+    candidates=[(first,y0,y1)]
+    text=first.txts[0] if first.txts else ''
+    score=float(first.scores[0]) if first.scores else 0
+    # Weak numeric rows may be cropped a few pixels off-center after deskew.
+    # Retry adjacent bands without crossing half a string; do not hallucinate
+    # numbers from empty bands or perform generative deblurring.
+    if re.search('[0-9]',text) and score<.99:
+        shift=max(1,round(gap*.15))
+        for offset in (-shift,shift):
+            a,b=max(0,y0+offset),min(gray.shape[0],y1+offset)
+            candidates.append((read(a,b),a,b))
+    ranked=[(float(out.scores[0]) if out.scores and re.search('[0-9]',out.txts[0]) else 0,-index,index)
+            for index,(out,_,_) in enumerate(candidates)]
+    selected=max(ranked)[2]
+    selected_score=ranked[selected][0]
+    # A tiny confidence gain is not evidence that a different digit is better.
+    # Weak neighboring-string fragments also must not be promoted just because
+    # moving the crop caught more of the adjacent string.
+    if selected and (selected_score < score+.02 or (score<.8 and selected_score<.9)):
+        selected=0
+    attempts=[{'text':out.txts[0] if out.txts else '', 'score':float(out.scores[0]) if out.scores else 0,
+               'y0':a,'y1':b} for out,a,b in candidates]
+    return (*candidates[selected],attempts,selected!=0)
+
+
 def read_string_bands(gray, region, engine):
     gap = float(np.median(np.diff(region['ys'])))
     notes, unresolved, discarded, raw_rows = [], [], [], []
@@ -33,12 +63,11 @@ def read_string_bands(gray, region, engine):
         for string, y in enumerate(region['ys'], 1):
             y0, y1 = max(0, round(y-gap*.65)), min(gray.shape[0], round(y+gap*.65))
             row = f'bar{bar}-string{string}'
-            out = engine(gray[y0:y1, x0:x1], use_det=False, use_cls=False,
-                         return_word_box=True, return_single_char_box=True)
+            out,y0,y1,attempts,recentered = recognize_band(gray,x0,x1,y0,y1,gap,engine)
             text = out.txts[0] if out.txts else ''
             score = float(out.scores[0]) if out.scores else 0
             record = {'row': row, 'bar': bar, 'string': string, 'box': [x0,y0,x1,y1],
-                      'text': text, 'score': score, 'characters': []}
+                      'text': text, 'score': score, 'characters': [],'attempts':attempts,'recentered':recentered}
             raw_rows.append(record)
             if not re.search('[0-9]', text):
                 continue
@@ -73,7 +102,8 @@ def read_string_bands(gray, region, engine):
                 confidence = min(item['score'] for item in group)
                 notes.append({'bar': bar, 'string': string, 'fret': int(digits),
                               'x': round((a+b)/2, 2), 'y': y, 'ocr_score': confidence,
-                              'review': confidence < .8, 'row': row, 'method': 'string-band-ctc',
+                              'review': confidence < .8 or score < .95 or recentered, 'row': row, 'method': 'string-band-ctc',
+                              'review_reason': '裁剪位置重试后选取，需核对数字与弦位' if recentered else ('OCR 分数偏低，需核对数字与弦位' if confidence < .8 or score < .95 else None),
                               'box': [[a-crop_x,y0-crop_y],[b-crop_x,y0-crop_y],
                                       [b-crop_x,y1-crop_y],[a-crop_x,y1-crop_y]]})
     notes.sort(key=lambda n: (n['bar'], n['x'], n['string']))

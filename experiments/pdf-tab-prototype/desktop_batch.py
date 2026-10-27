@@ -52,9 +52,13 @@ def write_report(source, folder, outcome, data):
     warnings = data.get('warnings', []) + data.get('structure_issues', [])
     previews = ''
     for page in data.get('page_previews', []):
+        if not (folder / page['image']).exists():
+            continue
         previews += (f'<details><summary>第 {page["page"]} 页 · 校正图（倾斜 {page["deskew_degrees"]}°）</summary>'
                      f'<img loading="lazy" src="{esc(page["image"])}" alt="第 {page["page"]} 页校正图"></details>')
     for region in data.get('raster_regions', []):
+        if not (folder / region['image']).exists():
+            continue
         state = '音符提案已生成；请对照下方分组提案逐一检查' if region.get('proposal_ready') else '仅定位到谱行，尚无有效音符提案'
         count = f'模型识别 {region["recognized_bars"]} 小节' if 'recognized_bars' in region else '尚无有效小节提案'
         previews += (f'<section><h3>第 {region["page"]} 页 · {esc(region["id"])} · {count}</h3>'
@@ -138,6 +142,8 @@ def process_file(source, folder, image_settings=None):
             else:
                 outcome['message'] = '；'.join(data['errors'] + score['structure_issues']) or '没有定位到可用小节；请查看识别报告。'
             write_report(source, folder, outcome, data)
+            from desktop_cleanup import register_intermediates
+            register_intermediates(folder)
             return outcome
         bars = [b for s in data['systems'] for b in s['bars']]
         blockers = list(data.get('structure_issues', []))
@@ -171,6 +177,8 @@ def process_file(source, folder, image_settings=None):
         outcome.update(status='处理失败', message=str(error))
         (folder / 'worker.log').write_text(traceback.format_exc(), encoding='utf-8')
     write_report(source, folder, outcome, data)
+    from desktop_cleanup import register_intermediates
+    register_intermediates(folder)
     return outcome
 
 

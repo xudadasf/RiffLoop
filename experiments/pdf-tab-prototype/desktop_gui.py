@@ -18,6 +18,7 @@ class TrialWindow:
         self.events = queue.Queue()
         self.stop = threading.Event()
         self.running = False
+        self.cleaning = False
         root.title('RiffLoop · 图片 / PDF 草稿 · 支持默认占位 · 2026-10-27')
         root.geometry('1080x760')
         root.minsize(940, 700)
@@ -77,6 +78,10 @@ class TrialWindow:
         actions.pack(fill='x')
         for label, action in [('查看结果 / 问题', 'report'), ('打开 GP 草稿', 'draft'), ('打开原文件', 'source'), ('打开该文件结果目录', 'folder')]:
             ttk.Button(actions, text=label, command=lambda a=action: self.open_selected(a)).pack(side='left', padx=(0, 8))
+        self.cleanup_button = ttk.Button(actions, text='清理中间文件', command=self.clean_selected)
+        self.cleanup_button.pack(side='left')
+        ttk.Label(outer, text='保存修正后的 GP 后，可选中结果清理中间文件；未选中时可选择以前的结果目录。原文件和所有 GP 均保留。',
+                  foreground='#46576b', wraplength=880).pack(anchor='w', pady=(8, 0))
         self.progress = ttk.Progressbar(outer, mode='indeterminate')
         self.progress.pack(fill='x', pady=(16, 8))
         self.status = tk.StringVar(value='就绪 · 文件不会上传')
@@ -134,7 +139,7 @@ class TrialWindow:
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input):
+        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -168,6 +173,43 @@ class TrialWindow:
         self.stop_button.configure(state='disabled')
         self.status.set('将在当前文件处理完后停止；剩余文件保留为待处理。')
 
+    def clean_selected(self):
+        if self.running:
+            return
+        jobs = [(key,self.items[key]['folder']) for key in self.tree.selection() if self.items[key].get('folder')]
+        if not jobs:
+            folder = filedialog.askdirectory(title='选择某次结果目录清理中间文件（GP 和原文件保留）', initialdir=self.output.get())
+            if not folder:
+                return
+            jobs = [('',folder)]
+        self.running = self.cleaning = True
+        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+            button.configure(state='disabled')
+        self.progress.start(15)
+        self.status.set('正在清理中间图片、识别缓存和日志；保留 GP、原文件及修改清单…')
+        threading.Thread(target=self.clean_work, args=(jobs,), daemon=True).start()
+
+    def clean_work(self, jobs):
+        from desktop_cleanup import clean_intermediates
+        freed, errors, skipped = 0, [], 0
+        for key, folder in jobs:
+            try:
+                cleaned = clean_intermediates(folder)
+                freed += cleaned['bytes_freed']
+                skipped += len(cleaned['kept_modified_or_unowned'])
+                errors.extend(cleaned['errors'])
+                if key:
+                    result = json.loads((Path(folder)/'result.json').read_text(encoding='utf-8'))
+                    self.events.put(('finished',key,result))
+            except Exception as error:
+                errors.append(f'{Path(folder).name}：{error}')
+        summary = f'清理完成 · 释放 {freed/1048576:.1f} MB · GP、原文件、修改清单保留'
+        if skipped:
+            summary += f' · {skipped} 个已修改/非缓存文件保留'
+        if errors:
+            summary += ' · 未清理项：' + '；'.join(errors)
+        self.events.put(('cleanup_done','',summary))
+
     def poll(self):
         try:
             while True:
@@ -179,14 +221,15 @@ class TrialWindow:
                     self.items[key].update(payload, pending=False)
                     self.tree.set(key, 'status', payload['status'])
                     self.show_details()
-                elif event == 'done':
+                elif event in ('done','cleanup_done'):
                     self.running = False
+                    self.cleaning = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())
-                    self.status.set(f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿 · 双击文件行查看结果和待修改清单')
+                    self.status.set(payload if event=='cleanup_done' else f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿 · 双击文件行查看结果和待修改清单')
         except queue.Empty:
             pass
         self.root.after(150, self.poll)
@@ -219,7 +262,9 @@ class TrialWindow:
             messagebox.showinfo('无法打开', f'请使用支持此格式的软件打开，或打开结果目录。\n{error}')
 
     def close(self):
-        if self.running:
+        if self.cleaning:
+            messagebox.showinfo('正在清理', '清理完成后即可关闭，GP 和原文件会保留。')
+        elif self.running:
             self.request_stop()
             messagebox.showinfo('正在处理文件', '已停止后续队列。当前文件完成后即可关闭窗口，结果会保留。')
         else:

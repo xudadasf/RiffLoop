@@ -21,11 +21,11 @@ class StringDigitTests(unittest.TestCase):
         def recognizer(band, **kwargs):
             calls.append(kwargs)
             index = len(calls)
-            if index == 5:
+            if index in (5,6,7):
                 return SimpleNamespace(txts=['0000'], scores=[.4], word_results=[])
-            if index != 6:
+            if index != 8:
                 return SimpleNamespace(txts=[''], scores=[0], word_results=[])
-            return SimpleNamespace(txts=['A5 8 6 8'], scores=[.98], word_results=[SimpleNamespace(
+            return SimpleNamespace(txts=['A5 8 6 8'], scores=[.999], word_results=[SimpleNamespace(
                 words=[['A'],['5'],['8'],['6'],['8']], word_cols=[[2],[10],[30],[50],[70]],
                 line_txt_len=100, confs=[.98]*8)])
         notes, unresolved, discarded, raw = read_string_bands(np.full((120,220),255,np.uint8),region,recognizer)

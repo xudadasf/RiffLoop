@@ -120,7 +120,7 @@ const lines = ['# 待人工校正草稿','',
     ...review.tempo_issues.map(x=>'速度待核对：'+JSON.stringify(x)),...(review.warnings??[]),'',
     '| 来源页 | 小节 | 已知问题 | 占位时值的拍序号 |','| --- | --- | --- | --- |',
     ...review.bars.filter(b=>b.issues.length || b.placeholder_beats.length || b.note_review_beats?.length).map(b=>
-        `| ${b.page} | ${b.source_bar} | ${[...b.issues,...(b.note_review_beats?.length?['低 OCR 分数待核对音符序号：'+b.note_review_beats.join(', ')]:[])].join('; ').replaceAll('|','/').replaceAll('\n',' ')} | ${b.placeholder_beats.join(', ')} |`)];
+        `| ${b.page} | ${b.source_bar} | ${[...b.issues,...(b.note_review_beats?.length?['数字/弦位待核对音符序号（低分或位置重试）：'+b.note_review_beats.join(', ')]:[])].join('; ').replaceAll('|','/').replaceAll('\n',' ')} | ${b.placeholder_beats.join(', ')} |`)];
 fs.writeFileSync(output,bytes);
 fs.writeFileSync(output+'.review.json',JSON.stringify(review,null,2)+'\n');
 fs.writeFileSync(output+'.review.md',lines.join('\n')+'\n');

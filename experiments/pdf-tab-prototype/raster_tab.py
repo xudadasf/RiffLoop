@@ -129,6 +129,11 @@ def locate_systems(gray):
         left, right = int(xs[0]), int(xs[-1])
         if right - left < max(100, gap * 12):
             continue
+        # Five-line notation with scattered ledger lines must not become TAB.
+        # Every one of the six strings needs substantial horizontal support.
+        supports = [(horizontal[max(0,y-2):y+3,left:right+1].max(axis=0)>0).mean() for y in ys]
+        if min(supports) < .5:
+            continue
         # Do not silently join side-by-side columns into one musical system.
         missing = runs(np.flatnonzero(coverage[left:right + 1] < 2))
         if any(len(g) > gap * 6 for g in missing):
