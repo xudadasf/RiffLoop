@@ -294,5 +294,7 @@ node experiments/pdf-tab-prototype/audit-tremolos.cjs output/pdf-tab-prototype/b
 
 ## 参考 API
 
+图片识别的新路线仍是独立试验，未接入桌面入口：见 [数字 OCR 可行性验证（2026-10-27）](DIGIT-OCR-FEASIBILITY-20261027.md)。用户练习图的音符序列通过人工核对，但整页复杂谱面仍有大量未解决区域，且尚未恢复节奏，不能当作截图转 GP 已完成。
+
 - [PyMuPDF 文字绘制记录](https://pymupdf.readthedocs.io/en/latest/functions.html#Page.get_texttrace)
 - [alphaTab GP7 导出器](https://www.alphatab.net/docs/reference/types/exporter/gp7exporter/)
