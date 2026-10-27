@@ -32,23 +32,37 @@ def write_report(source, folder, outcome, data):
     if data.get('format') == FORMAT:
         return write_image_review(source, folder, outcome, data)
     esc = lambda value: html.escape(str(value), quote=True)
-    links = [('查看原文件', source.as_uri())]
-    for filename, label in [('overlay.pdf', '查看原谱识别标记'), ('score.draft.gp', '打开 / 下载 GP 草稿'),
-                            ('score.draft.gp.review.md', '待修改清单'), ('recognized.json', '识别数据'),
-                            ('worker.log', '处理日志'), ('image-model.log', '图片模型日志')]:
-        if (folder / filename).exists():
-            links.append((label, filename))
+    from review_page import render_review
     raster = data.get('format') == 'raster-tab-draft-v1'
-    rows = []
+    sections, total_notes, total_bars, issue_bars = [], 0, 0, 0
+    page_lines = {}
     for system in data.get('systems', []):
+        page = system["page"]
+        page_lines[page] = page_lines.get(page, 0) + 1
+        line = page_lines[page]
+        rows = []
         for bar in system['bars']:
             notes = sum(len(b['notes']) for b in bar['beats'])
-            issues = '；'.join(bar.get('issues', [])) or '未报告拍数问题；音符、节奏与技巧仍需人工核对'
+            needs_review = bool(bar.get('issues') or raster)
+            issues = '；'.join(bar.get('issues', [])) or ('图片时值为占位，需修改' if raster else '未报告拍数问题；仍需对照原谱')
             groups = ' → '.join(' + '.join(f'{n["string"]}弦/{"X" if n.get("dead") else n["fret"]}品'
-                                          for n in beat['notes']) or '休止'
+                                          for n in beat['notes']) or '休止' for beat in bar['beats'])
+            timing = ' → '.join(f'1/{beat["duration"]}' + '.' * beat.get('dots', 0)
+                                + (f'（{beat["tuplet"][0]}连音）' if beat.get('tuplet', [1, 1])[0] > 1 else '')
                                 for beat in bar['beats'])
-            detail = f'<details><summary>查看音符分组提案</summary><p>{esc(groups)}</p></details>' if raster else ''
-            rows.append(f'<tr><td>{system["page"]}</td><td>{bar["number"]}</td><td>{notes}</td><td>{esc(issues)}{detail}</td></tr>')
+            label = f'第{system["page"]}页 · 第{line}行 · 小节{bar["number"]}'
+            total_notes += notes
+            total_bars += 1
+            issue_bars += needs_review
+            rows.append(f'<tr class="bar-row" tabindex="-1" data-issue="{int(needs_review)}" data-label="{esc(label)}" data-search="{esc(label)}">'
+                        f'<td><span class="bar-label">小节 {bar["number"]}</span><span class="bar-count">{notes} 个音符</span></td>'
+                        f'<td class="notes-cell"><div class="note-sequence">{esc(groups)}</div></td>'
+                        f'<td class="timing-cell"><div class="timing-sequence">{esc(timing)}</div><p class="issue-text">{esc(issues)}</p></td>'
+                        '</tr>')
+        sections.append(f'<section class="system-card"><div class="system-heading"><h2>第 {system["page"]} 页 · 第 {line} 行</h2></div>'
+                        '<div class="system-body"><div class="table-wrap"><table><thead><tr><th class="measure-col">小节</th><th>音符分组提案</th>'
+                        '<th class="timing-col">时值 / 待修改</th></tr></thead><tbody>'
+                        + ''.join(rows) + '</tbody></table></div></div></section>')
     warnings = data.get('warnings', []) + data.get('structure_issues', [])
     previews = ''
     for page in data.get('page_previews', []):
@@ -66,16 +80,14 @@ def write_report(source, folder, outcome, data):
                      + (f'<aside>{esc(region["count_warning"])}</aside>' if region.get('count_warning') else '')
                      + f'<details><summary>谱线辅助估计（仅供核对）</summary><p>{region["expected_bars"]} 小节；由竖线检测得到，可能误检或漏检，不作为导出数量要求。</p></details>'
                      f'<img loading="lazy" src="{esc(region["image"])}" alt="检测到的六线谱行"></section>')
-    content = ('<!doctype html><html lang="zh-CN"><meta charset="utf-8">'
-               '<meta name="viewport" content="width=device-width,initial-scale=1"><title>六线谱试用结果</title>'
-               '<style>body{font:16px "Microsoft YaHei",sans-serif;max-width:1100px;margin:40px auto;padding:0 24px;color:#243247;line-height:1.7}'
-               'h1{font-size:28px}aside{background:#fff3db;padding:18px;border-radius:10px}nav{display:flex;flex-wrap:wrap;gap:16px;margin:24px 0}'
-               'a{color:#175db7}img{max-width:100%;height:auto;border:1px solid #ddd}section,details{margin:16px 0}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}pre{white-space:pre-wrap}</style>'
-               f'<h1>{esc(source.name)}</h1><h2>{esc(outcome["status"])}</h2><p>{esc(outcome["message"])}</p><aside>{esc(NOTICE)}</aside>'
-               '<nav>' + ''.join(f'<a href="{esc(url)}">{esc(label)}</a>' for label, url in links) + '</nav>'
-               + ('<p>图片草稿按模型实际输出的小节数保留；与谱线辅助估计不同时显示待核对提示，不补造小节。小节编号是本次提案顺序号，不是完整性证明。弦号从上方 1 弦到下方 6 弦，箭头为先后分组，加号为同组音符。定位失败或模型输出损坏时仍会阻止导出。</p>' if raster else '<p>蓝框：识别到的音符；红框：待核对小节。绿色仅代表拍数合计通过。</p>') + '<ul>'
-               + ''.join(f'<li>{esc(w)}</li>' for w in warnings) + '</ul>'
-               + previews + '<table><tr><th>页</th><th>小节</th><th>音符数</th><th>待核对内容</th></tr>' + ''.join(rows) + '</table></html>')
+    guidance = ('<p>图片草稿按实际输出的小节数保留，不补造小节。小节编号不是完整性证明。箭头为先后分组，加号为同组音符。图片时值为占位，需人工校正。</p>'
+                if raster else '<p>打开“原谱识别标记”对照：蓝框是识别到的音符，红框是待核对小节；绿色仅代表拍数合计通过。箭头为先后分组，加号为同组音符。</p>')
+    guidance += f'<p>{esc(NOTICE)}</p><p>筛选只包含程序标出的疑点，没有标记的小节也需要人工核对。</p>'
+    body = ''.join(f'<p class="error-message">{esc(w)}</p>' for w in warnings) + previews + ''.join(sections)
+    if not sections:
+        body += '<div class="empty-state">没有可核对的小节。请查看上方处理说明。</div>'
+    content = render_review(source, folder, outcome, body, notes=total_notes, bars=total_bars,
+                            issues=issue_bars, guidance=guidance)
     (folder / 'review.html').write_text(content, encoding='utf-8')
     (folder / 'result.json').write_text(json.dumps(outcome, ensure_ascii=False, indent=2), encoding='utf-8')
 
