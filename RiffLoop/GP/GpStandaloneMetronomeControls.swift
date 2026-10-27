@@ -48,7 +48,7 @@ struct GpStandaloneMetronomeControls: View {
                     Image(systemName: "speaker.wave.2")
                     Slider(value: Binding(
                         get: { viewModel.standaloneVolume }, set: { viewModel.setStandaloneVolume($0) }
-                    ), in: 0...6)
+                    ), in: PracticeAudioVolume.range)
                     .accessibilityLabel("独立节拍音量")
                     Text("\(Int((viewModel.standaloneVolume * 100).rounded()))%")
                         .font(.caption.monospacedDigit()).frame(width: 44, alignment: .trailing)

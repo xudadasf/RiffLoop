@@ -617,8 +617,8 @@ final class PdfPracticeViewModel: ObservableObject {
         let resumeReading = isReadingClockRunning
         bpm = min(max(bpm, 30), 300)
         playbackRate = min(max(playbackRate, 0.25), 1.5)
-        audioVolume = min(max(audioVolume, 0), 2)
-        metronomeVolume = min(max(metronomeVolume, 0), 2)
+        audioVolume = PracticeAudioVolume.clamp(audioVolume)
+        metronomeVolume = PracticeAudioVolume.clamp(metronomeVolume)
         synchronizationOffset = min(max(synchronizationOffset, -0.5), 0.5)
         audioGain.setVolume(audioVolume, player: player)
         rebuildBoundaryObserver()
@@ -1282,12 +1282,12 @@ final class PdfPracticeViewModel: ObservableObject {
         currentTime = max(0, profile.audioPosition)
         duration = 0
         playbackRate = min(max(profile.playbackRate, 0.25), 1.5)
-        audioVolume = min(max(profile.audioVolume, 0), 2)
+        audioVolume = PracticeAudioVolume.clamp(profile.audioVolume)
         bpm = min(max(profile.bpm, 30), 300)
         beatOffset = profile.beatOffset
         synchronizationOffset = min(max(profile.synchronizationOffset, -0.5), 0.5)
         metronomeEnabled = profile.metronomeEnabled
-        metronomeVolume = min(max(profile.metronomeVolume, 0), 2)
+        metronomeVolume = PracticeAudioVolume.clamp(profile.metronomeVolume)
         subdivision = profile.subdivision
         beatsPerMeasure = min(max(profile.beatsPerMeasure, 1), 16)
         beatGrouping = profile.beatGrouping.reduce(0, +) == beatsPerMeasure

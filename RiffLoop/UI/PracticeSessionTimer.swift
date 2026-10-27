@@ -6,30 +6,44 @@ import SwiftUI
 final class PracticeSessionClock: ObservableObject {
     @Published private(set) var accumulated: TimeInterval = 0
     @Published private(set) var activeSince: Date?
+    private(set) var sessionStartedAt: Date?
+    private var activeUptime: TimeInterval?
+    private let uptime: () -> TimeInterval
     private let record: @MainActor (TimeInterval, Date) -> Void
 
-    init(record: @escaping @MainActor (TimeInterval, Date) -> Void = {
-        PracticeHistoryStore.shared.record(seconds: $0, endingAt: $1)
-    }) {
+    init(uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+         record: @escaping @MainActor (TimeInterval, Date) -> Void = {
+             PracticeHistoryStore.shared.record(seconds: $0, forSessionStartedAt: $1)
+         }) {
+        self.uptime = uptime
         self.record = record
     }
 
     func setActive(_ active: Bool, at now: Date = Date()) {
         guard active != (activeSince != nil) else { return }
-        if active { activeSince = now }
-        else { checkpoint(at: now); activeSince = nil }
+        if active {
+            if sessionStartedAt == nil { sessionStartedAt = now }
+            activeSince = now
+            activeUptime = uptime()
+        } else {
+            checkpoint(at: now)
+            activeSince = nil
+            activeUptime = nil
+        }
     }
 
     func checkpoint(at now: Date = Date()) {
-        guard let start = activeSince else { return }
-        let seconds = max(0, now.timeIntervalSince(start))
+        guard let start = activeUptime, let sessionStartedAt else { return }
+        let current = max(start, uptime())
+        let seconds = current - start
         accumulated += seconds
+        activeUptime = current
         activeSince = now
-        if seconds > 0 { record(seconds, now) }
+        if seconds > 0 { record(seconds, sessionStartedAt) }
     }
 
-    func elapsed(at now: Date) -> TimeInterval {
-        accumulated + (activeSince.map { max(0, now.timeIntervalSince($0)) } ?? 0)
+    func elapsed() -> TimeInterval {
+        accumulated + (activeUptime.map { max(0, uptime() - $0) } ?? 0)
     }
 }
 
@@ -52,14 +66,14 @@ struct PracticeSessionTimer: View {
     @ObservedObject var clock: PracticeSessionClock
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            Label(Self.elapsedText(seconds: clock.elapsed(at: context.date)), systemImage: "clock")
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            Label(Self.elapsedText(seconds: clock.elapsed()), systemImage: "clock")
                 .labelStyle(.titleAndIcon)
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .fixedSize()
                 .accessibilityLabel("本次练习时长")
-                .accessibilityValue(Self.elapsedText(seconds: clock.elapsed(at: context.date)))
+                .accessibilityValue(Self.elapsedText(seconds: clock.elapsed()))
         }
     }
 

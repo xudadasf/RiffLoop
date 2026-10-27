@@ -498,12 +498,12 @@ struct GpPracticeView: View {
                             get: { viewModel.metronomeVolume },
                             set: { viewModel.setMetronomeVolume($0) }
                         ),
-                        in: 0...6
+                        in: PracticeAudioVolume.range
                     ) {
                         Text("节拍音量")
                     }
                     LabeledContent("节拍音量", value: percent(viewModel.metronomeVolume))
-                    Text("节拍器和预备拍共用音量，可增强至 600%。")
+                    Text("节拍器和预备拍共用音量，可增强至 1600%。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -569,7 +569,7 @@ struct GpPracticeView: View {
                         get: { viewModel.masterVolume },
                         set: { viewModel.setMasterVolume($0) }
                     ),
-                    in: 0...16
+                    in: PracticeAudioVolume.range
                 ) {
                     Text("合成总音量")
                 }
@@ -587,7 +587,7 @@ struct GpPracticeView: View {
                             get: { viewModel.backingVolume },
                             set: { viewModel.setBackingVolume($0) }
                         ),
-                        in: 0...4
+                        in: PracticeAudioVolume.range
                     ) {
                         Text("伴奏音量")
                     }
@@ -655,7 +655,7 @@ struct GpPracticeView: View {
                                     get: { viewModel.trackVolumes[track.index] ?? Double(track.volume) / 16 },
                                     set: { viewModel.setTrackVolume(index: track.index, volume: $0) }
                                 ),
-                                in: 0...4
+                                in: PracticeAudioVolume.range
                             ) {
                                 Text("\(track.name)音量")
                             }

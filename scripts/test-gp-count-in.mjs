@@ -13,6 +13,10 @@ assert.ok(sequence.pulses[1].gain > sequence.pulses[2].gain);
 assert.equal(sequence.pulses[3].gain, 0);
 assert.equal(plan({ volume: 4 }).pulses[0].gain, plan({ volume: 2 }).pulses[0].gain * 2);
 
+assert.equal(plan({ volume: 16 }).pulses[0].gain, plan({ volume: 1 }).pulses[0].gain * 16, 'Count-in must honor the shared 1600% maximum');
+assert.equal(plan({ volume: 99 }).pulses[0].gain, plan({ volume: 16 }).pulses[0].gain);
+assert.equal(plan({ volume: NaN }).pulses[0].gain, 0);
+
 let resume, completed = 0;
 const oscillators = [], gains = [];
 const context = {

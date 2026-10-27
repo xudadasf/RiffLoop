@@ -47,6 +47,14 @@ final class PracticeHistoryStore: ObservableObject {
         defaults.set(dailySeconds, forKey: storageKey)
     }
 
+    /// A foreground practice visit keeps one calendar day across all checkpoints.
+    /// Existing daily history is preserved; it cannot be repartitioned without session records.
+    func record(seconds: TimeInterval, forSessionStartedAt start: Date) {
+        guard seconds.isFinite, seconds > 0 else { return }
+        dailySeconds[dateKey(for: start), default: 0] += seconds
+        defaults.set(dailySeconds, forKey: storageKey)
+    }
+
     func seconds(on date: Date) -> TimeInterval {
         dailySeconds[dateKey(for: date), default: 0]
     }

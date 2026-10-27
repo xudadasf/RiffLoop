@@ -17,7 +17,7 @@ final class GpBridgeEventTests: XCTestCase {
         viewModel.setMetronomeVolume(0)
         XCTAssertEqual(viewModel.countInVolume, 0)
         viewModel.setMetronomeVolume(9)
-        XCTAssertEqual(viewModel.countInVolume, 6)
+        XCTAssertEqual(viewModel.countInVolume, 9)
     }
 
     @MainActor
@@ -41,12 +41,14 @@ final class GpBridgeEventTests: XCTestCase {
         XCTAssertTrue(model.isPlaying)
         model.handleAudioRouteChange(reason: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue)
         XCTAssertFalse(model.isPlaying)
+        model.handleAudioRouteChange(reason: AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue)
+        XCTAssertFalse(model.isPlaying, "Reconnect must wait for the user, never restart the score")
         XCTAssertNil(model.errorMessage)
         model.setMasterVolume(100)
         XCTAssertEqual(model.masterVolume, 16)
         model.setMetronomeVolume(100)
-        XCTAssertEqual(model.metronomeVolume, 6)
-        XCTAssertEqual(model.countInVolume, 6)
+        XCTAssertEqual(model.metronomeVolume, 16)
+        XCTAssertEqual(model.countInVolume, 16)
     }
 
     func testDecodesScoreMetadataSentByTheOfflineRenderer() throws {

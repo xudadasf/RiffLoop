@@ -692,7 +692,7 @@ struct PracticeView: View {
                     get: { Double(viewModel.mediaVolume) },
                     set: { viewModel.setMediaVolume(Float($0)) }
                 ),
-                in: 0...2
+                in: PracticeAudioVolume.range
             )
             .frame(width: 100)
 
@@ -702,7 +702,7 @@ struct PracticeView: View {
                     get: { Double(viewModel.metronomeVolume) },
                     set: { viewModel.setMetronomeVolume(Float($0)) }
                 ),
-                in: 0...2
+                in: PracticeAudioVolume.range
             )
             .frame(width: 100)
 

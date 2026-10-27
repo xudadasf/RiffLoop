@@ -261,9 +261,9 @@ final class MetronomeEngine {
     }
 }
 
-/// Native independent clicks support the same 0–600% range as score clicks.
+/// Native independent clicks support the same 0–1600% range as score clicks.
 func metronomeClickBoost(volume: Float) -> Float {
-    volume.isFinite ? min(6, max(1, volume)) : 1
+    max(1, PracticeAudioVolume.clamp(volume))
 }
 
 /// Match the score player's soft knee. Gain is not loudness or amplifier power;

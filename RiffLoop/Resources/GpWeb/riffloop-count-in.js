@@ -6,7 +6,7 @@
         return { duration: interval * count, pulses: Array.from({ length: count }, (_, beat) => {
             const accent = accents[beat] || (beat === 0 ? "strong" : "normal");
             const level = { strong: 1, subAccent: 0.62, normal: 0.34, muted: 0 }[accent] ?? 0.34;
-            return { time: beat * interval, gain: level * Math.min(6, Math.max(0, volume)) * 0.2,
+            return { time: beat * interval, gain: level * (Number.isFinite(volume) ? Math.min(16, Math.max(0, volume)) : 0) * 0.2,
                 frequency: { strong: 1600, subAccent: 1100, normal: 750, muted: 750 }[accent] || 750 };
         }) };
     };

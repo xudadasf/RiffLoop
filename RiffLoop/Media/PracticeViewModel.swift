@@ -360,7 +360,7 @@ final class PracticeViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        mediaVolume = min(max(volume, 0), 2)
+        mediaVolume = PracticeAudioVolume.clamp(volume)
         audioGain.setVolume(mediaVolume, player: player)
         saveProfile()
     }
@@ -372,7 +372,7 @@ final class PracticeViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        metronomeVolume = min(max(volume, 0), 2)
+        metronomeVolume = PracticeAudioVolume.clamp(volume)
         saveProfile()
         restartAfterTimingChange()
     }
@@ -946,8 +946,8 @@ final class PracticeViewModel: ObservableObject {
         subdivision = profile.subdivision
         rhythmMode = profile.rhythmMode
         metronomeEnabled = profile.metronomeEnabled
-        mediaVolume = min(max(profile.mediaVolume, 0), 2)
-        metronomeVolume = min(max(profile.metronomeVolume, 0), 2)
+        mediaVolume = PracticeAudioVolume.clamp(profile.mediaVolume)
+        metronomeVolume = PracticeAudioVolume.clamp(profile.metronomeVolume)
         synchronizationOffset = min(max(profile.synchronizationOffset, -0.5), 0.5)
         beatOffset = profile.beatOffset
         pointA = profile.pointA

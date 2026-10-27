@@ -449,7 +449,7 @@ final class PdfPracticeViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.openPdf(at: pdf))
 
         XCTAssertEqual(viewModel.playbackRate, 0.25)
-        XCTAssertEqual(viewModel.audioVolume, 2)
+        XCTAssertEqual(viewModel.audioVolume, 16)
         XCTAssertEqual(viewModel.bpm, 300)
         XCTAssertEqual(viewModel.synchronizationOffset, 0.5)
         XCTAssertEqual(viewModel.metronomeVolume, 0)

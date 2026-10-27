@@ -113,7 +113,7 @@ final class GpNativeBackingPlayer {
     }
 
     func setVolume(_ volume: Double) {
-        let gain = min(max(volume, 0), 4)
+        let gain = PracticeAudioVolume.clamp(volume)
         playerNode.volume = Float(min(gain, 1))
         gainUnit.globalGain = gain > 1 ? Float(20 * log10(gain)) : 0
     }

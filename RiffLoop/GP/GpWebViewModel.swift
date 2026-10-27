@@ -365,7 +365,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setStandaloneVolume(_ value: Double) {
         guard value.isFinite else { return }
-        standaloneVolume = min(6, max(0, value))
+        standaloneVolume = PracticeAudioVolume.clamp(value)
         if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
@@ -553,7 +553,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        trackVolumes[index] = min(max(volume, 0), 4)
+        trackVolumes[index] = PracticeAudioVolume.clamp(volume)
         call("setTrackVolume", arguments: [index, trackVolumes[index] ?? 1])
         saveProfile()
     }
@@ -565,7 +565,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        masterVolume = min(max(volume, 0), 16)
+        masterVolume = PracticeAudioVolume.clamp(volume)
         call("setMasterVolume", arguments: [masterVolume])
         saveProfile()
     }
@@ -577,7 +577,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        backingVolume = min(max(volume, 0), 4)
+        backingVolume = PracticeAudioVolume.clamp(volume)
         nativeBackingPlayer.setVolume(backingVolume)
         call("setBackingVolume", arguments: [backingVolume])
         saveProfile()
@@ -619,7 +619,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        metronomeVolume = min(max(volume, 0), 6)
+        metronomeVolume = PracticeAudioVolume.clamp(volume)
         call("setMetronomeVolume", arguments: [metronomeEnabled ? metronomeVolume : 0])
         call("setCountInVolume", arguments: [effectiveCountInVolume])
         saveProfile()
@@ -1164,7 +1164,7 @@ final class GpWebViewModel: ObservableObject {
             : (metadata.tracks.first?.index ?? 0)
         mutedTracks = pendingProfile.mutedTracks.intersection(validTrackIndices)
         soloTrack = pendingProfile.soloTrack.flatMap { validTrackIndices.contains($0) ? $0 : nil }
-        trackVolumes = pendingProfile.trackVolumes.filter { validTrackIndices.contains($0.key) }
+        trackVolumes = pendingProfile.trackVolumes.mapValues { PracticeAudioVolume.clamp($0) }.filter { validTrackIndices.contains($0.key) }
         scoreZoom = pendingProfile.scoreZoom.isFinite ? min(max(pendingProfile.scoreZoom, 0.8), 1.5) : 1
         playbackSpeed = pendingProfile.playbackSpeed.isFinite ? pendingProfile.playbackSpeed : 1
         let bpmRange = gpCustomBaseBpmRange(originalBpm: metadata.initialBpm ?? 120)
@@ -1175,19 +1175,19 @@ final class GpWebViewModel: ObservableObject {
         playbackSpeed = min(max(playbackSpeed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
         standaloneBpm = min(300, max(30, pendingProfile.standaloneBpm ?? 120))
         standaloneBeatsPerMeasure = min(16, max(1, pendingProfile.standaloneBeatsPerMeasure ?? 4))
-        standaloneVolume = min(6, max(0, pendingProfile.standaloneVolume ?? 1))
+        standaloneVolume = PracticeAudioVolume.clamp(pendingProfile.standaloneVolume ?? 1)
         standaloneSubdivisionFactor = [1, 2, 4, 8].contains(pendingProfile.standaloneSubdivisionFactor ?? 1)
             ? (pendingProfile.standaloneSubdivisionFactor ?? 1) : 1
         let savedStandaloneAccents = pendingProfile.standaloneBeatAccents ?? []
         standaloneBeatAccents = (0..<standaloneBeatsPerMeasure).map { index in
             savedStandaloneAccents.indices.contains(index) ? savedStandaloneAccents[index] : (index == 0 ? .strong : .normal)
         }
-        masterVolume = min(max(pendingProfile.masterVolume, 0), 16)
-        backingVolume = min(max(pendingProfile.backingVolume, 0), 4)
+        masterVolume = PracticeAudioVolume.clamp(pendingProfile.masterVolume)
+        backingVolume = PracticeAudioVolume.clamp(pendingProfile.backingVolume)
         synthEnabled = pendingProfile.synthEnabled
         backingEnabled = pendingProfile.backingEnabled
         metronomeEnabled = pendingProfile.metronomeEnabled
-        metronomeVolume = min(max(pendingProfile.metronomeVolume, 0), 6)
+        metronomeVolume = PracticeAudioVolume.clamp(pendingProfile.metronomeVolume)
         countInAccents = (0..<max(1, metadata.beatsPerMeasure ?? 4)).map { index in
             pendingProfile.countInAccents.indices.contains(index) ? pendingProfile.countInAccents[index] : (index == 0 ? .strong : .normal)
         }

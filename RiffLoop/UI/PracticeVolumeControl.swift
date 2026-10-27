@@ -3,7 +3,7 @@ import SwiftUI
 struct PracticeVolumeControl: View {
     let title: String
     @Binding var value: Double
-    var maximum: Double = 2
+    var maximum: Double = PracticeAudioVolume.maximum
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

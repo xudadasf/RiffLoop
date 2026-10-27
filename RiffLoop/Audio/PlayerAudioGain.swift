@@ -3,7 +3,7 @@ import MediaToolbox
 import os
 
 func boostedAudioSample(_ sample: Float, gain: Float) -> Float {
-    min(1, max(-1, sample * gain))
+    limitedMetronomeSample(sample, gain: gain)
 }
 
 private final class AudioGainState {
@@ -20,7 +20,7 @@ final class PlayerAudioGain {
     private var generation = 0
 
     func setVolume(_ volume: Float, player: AVPlayer) {
-        requestedGain = min(2, max(0, volume))
+        requestedGain = PracticeAudioVolume.clamp(volume)
         player.volume = min(1, requestedGain)
         let boost = max(1, requestedGain)
         for state in states { state.gain.withLock { $0 = boost } }
