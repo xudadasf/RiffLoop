@@ -3,14 +3,16 @@ import XCTest
 
 final class GpMetronomeSettingsTests: XCTestCase {
     @MainActor
-    func testBoostedMetronomeVolumeKeepsZeroAndCapsAtSixHundredPercent() {
+    func testBoostedMetronomeVolumeKeepsZeroAndCapsAtSixteenHundredPercent() {
         let model = GpWebViewModel()
         model.setMetronomeVolume(1.5)
         XCTAssertEqual(model.metronomeVolume, 1.5)
         model.setMetronomeVolume(4)
         XCTAssertEqual(model.metronomeVolume, 4)
         model.setMetronomeVolume(9)
-        XCTAssertEqual(model.metronomeVolume, 6)
+        XCTAssertEqual(model.metronomeVolume, 9)
+        model.setMetronomeVolume(99)
+        XCTAssertEqual(model.metronomeVolume, 16)
         model.setMetronomeVolume(-1)
         XCTAssertEqual(model.metronomeVolume, 0)
     }
