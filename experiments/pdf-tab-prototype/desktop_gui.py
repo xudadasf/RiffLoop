@@ -47,6 +47,17 @@ class TrialWindow:
         ttk.Entry(output_row, textvariable=self.output, state='readonly').pack(side='left', fill='x', expand=True)
         self.output_button = ttk.Button(output_row, text='更改位置', command=self.choose_output)
         self.output_button.pack(side='left', padx=(8, 0))
+        settings_row = ttk.Frame(outer)
+        settings_row.pack(fill='x', pady=(0, 12))
+        ttk.Label(settings_row, text='图片默认设置：BPM').pack(side='left')
+        self.image_tempo = tk.StringVar(value='100')
+        self.image_meter = tk.StringVar(value='4/4')
+        self.tempo_input = ttk.Entry(settings_row, textvariable=self.image_tempo, width=6)
+        self.tempo_input.pack(side='left', padx=8)
+        ttk.Label(settings_row, text='拍号').pack(side='left')
+        self.meter_input = ttk.Entry(settings_row, textvariable=self.image_meter, width=6)
+        self.meter_input.pack(side='left', padx=8)
+        ttk.Label(settings_row, text='可修改；人工设置，不代表已识别每个音符的时值。', foreground='#92520a').pack(side='left')
         table = ttk.Frame(outer)
         table.pack(fill='both', expand=True)
         self.tree = ttk.Treeview(table, columns=('file', 'kind', 'status'), show='headings', selectmode='extended', height=3)
@@ -114,19 +125,22 @@ class TrialWindow:
             return
         output_root = Path(self.output.get())
         try:
+            from raster_tab import DEFAULT_SETTINGS, validate_settings
+            settings = validate_settings({**DEFAULT_SETTINGS, 'tempo': int(self.image_tempo.get()),
+                                          'meter': [int(x) for x in self.image_meter.get().strip().split('/')]})
             output_root.mkdir(parents=True, exist_ok=True)
         except (OSError, ValueError) as error:
-            messagebox.showerror('请检查输出位置', str(error))
+            messagebox.showerror('请检查 BPM、拍号与输出位置', str(error))
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.output_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
-        threading.Thread(target=self.work, args=(jobs, output_root), daemon=True).start()
+        threading.Thread(target=self.work, args=(jobs, output_root, settings), daemon=True).start()
 
-    def work(self, jobs, output_root):
+    def work(self, jobs, output_root, settings):
         try:
             for index, (key, source) in enumerate(jobs, 1):
                 if self.stop.is_set():
@@ -137,7 +151,8 @@ class TrialWindow:
                     folder = create_output(output_root, source)
                     env = dict(os.environ, PYTHONUTF8='1', PYTHONDONTWRITEBYTECODE='1')
                     with (folder.parent / (folder.name + '.process.log')).open('w', encoding='utf-8') as log:
-                        subprocess.run([sys.executable, str(ROOT / 'desktop_batch.py'), str(source), '--out', str(folder)],
+                        subprocess.run([sys.executable, str(ROOT / 'desktop_batch.py'), str(source), '--out', str(folder),
+                                        '--image-settings', json.dumps(settings)],
                                        stdout=log, stderr=log, env=env, timeout=900, check=True,
                                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                     result = json.loads((folder / 'result.json').read_text(encoding='utf-8'))
@@ -167,7 +182,7 @@ class TrialWindow:
                 elif event == 'done':
                     self.running = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())

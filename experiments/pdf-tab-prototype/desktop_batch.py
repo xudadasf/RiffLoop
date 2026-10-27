@@ -88,7 +88,7 @@ def process_file(source, folder, image_settings=None):
             raise ValueError('原文件不存在或无法读取')
         if source.suffix.lower() in IMAGES:
             from desktop_image_review import recognize_image_review
-            data = recognize_image_review(source, folder)
+            data = recognize_image_review(source, folder, image_settings)
         elif source.suffix.lower() != '.pdf':
             raise ValueError('请选择 PDF 或常见图片文件')
         else:
@@ -101,7 +101,7 @@ def process_file(source, folder, image_settings=None):
                                 and not any(s['count'] == 6 for s in staves(lines_and_shapes(page)[0], page.rect.width))]
             if raster_pages:
                 from desktop_image_review import recognize_image_review
-                data = recognize_image_review(source, folder)
+                data = recognize_image_review(source, folder, image_settings)
             else:
                 from recognize import recognize, overlay
                 data = recognize(source)
@@ -156,6 +156,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('--out', required=True, type=Path)
-    parser.add_argument('--image-settings', help='JSON: tempo, meter, tuning; explicit draft settings, not inferred')
+    parser.add_argument('--image-settings', help='JSON: tempo, meter, tuning; optional manual settings, defaults 100 BPM and 4/4, not inferred')
     args = parser.parse_args()
     process_file(args.source, args.out, json.loads(args.image_settings) if args.image_settings else None)

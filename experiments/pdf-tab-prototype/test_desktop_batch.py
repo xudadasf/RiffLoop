@@ -54,7 +54,7 @@ class DesktopBatchTests(unittest.TestCase):
             for name in ('python.exe', 'PP-OCRv6_det_small.onnx', 'PP-OCRv6_rec_small.onnx'):
                 (root / name).touch()
             with patch.dict(os.environ, RIFFLOOP_DIGIT_PYTHON=str(root / 'python.exe'), RIFFLOOP_DIGIT_MODELS=str(root)), patch('subprocess.run', side_effect=worker) as run:
-                result = process_file(source, root / 'out')
+                result = process_file(source, root / 'out', {'tempo': 88, 'meter': [6, 8]})
             self.assertEqual(run.call_count, 1)
             self.assertEqual(result['status'], '图片音符对照 · 未生成 GP')
             self.assertIsNone(result['draft'])
@@ -62,6 +62,10 @@ class DesktopBatchTests(unittest.TestCase):
             report = (root / 'out/review.html').read_text(encoding='utf-8')
             self.assertIn('digit-ocr/review.html', report)
             self.assertIn('节奏尚未识别', report)
+            self.assertIn('BPM 88 · 拍号 6/8', report)
+            saved = json.loads((root / 'out/recognized.json').read_text(encoding='utf-8'))
+            self.assertEqual(saved['manual_settings']['tempo'], 88)
+            self.assertEqual(saved['manual_settings']['meter'], [6, 8])
 
     def test_same_name_and_repeated_runs_keep_separate_results(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -84,6 +88,8 @@ class DesktopBatchTests(unittest.TestCase):
             self.assertIn('没有可靠定位到六条谱线', result['message'])
             self.assertIsNone(result['draft'])
             self.assertTrue((root / 'out/review.html').exists())
+            report = (root / 'out/review.html').read_text(encoding='utf-8')
+            self.assertIn('BPM 100 · 拍号 4/4', report)
 
     def test_mixed_scan_document_is_not_partially_exported(self):
         with tempfile.TemporaryDirectory() as temp:

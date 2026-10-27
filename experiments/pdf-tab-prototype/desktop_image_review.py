@@ -5,15 +5,17 @@ import os
 from pathlib import Path
 import subprocess
 
-from raster_tab import deskew, locate_systems, raster_pages
+from raster_tab import DEFAULT_SETTINGS, deskew, locate_systems, raster_pages, validate_settings
 
 ROOT = Path(__file__).resolve().parent
 BASE = Path('D:/RiffLoop-model-tests/raster-tab-20261027')
 FORMAT = 'raster-digit-review-v1'
 
 
-def recognize_image_review(source, folder):
-    result = {'format': FORMAT, 'systems': [], 'errors': []}
+def recognize_image_review(source, folder, settings=None):
+    manual = validate_settings({**DEFAULT_SETTINGS, **(settings or {})})
+    result = {'format': FORMAT, 'systems': [], 'errors': [], 'manual_settings': manual,
+              'settings_source': 'manual/default; not recognized from image'}
     # Avoid starting the OCR runtime for blank/unsupported pages. Do not silently
     # skip a page in a mixed document and present the remaining pages as complete.
     for page, gray in enumerate(raster_pages(source), 1):
@@ -45,6 +47,8 @@ def recognize_image_review(source, folder):
 
 def write_image_review(source, folder, outcome, data):
     esc = lambda value: html.escape(str(value), quote=True)
+    settings = data['manual_settings']
+    setting_text = f'BPM {settings["tempo"]} · 拍号 {settings["meter"][0]}/{settings["meter"][1]}'
     sections = []
     for system in data.get('systems', []):
         rows = []
@@ -62,6 +66,8 @@ def write_image_review(source, folder, outcome, data):
         '<title>图片音符对照 · 未生成 GP</title><style>body{font:16px system-ui;max-width:1400px;margin:30px auto;padding:20px;line-height:1.7}'
         'img{max-width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}aside{background:#fff2d6;padding:15px}a{margin-right:20px}</style>'
         f'<h1>{esc(source.name)}</h1><h2>{esc(outcome["status"])}</h2><p>{esc(outcome["message"])}</p>'
+        f'<p><strong>{esc(setting_text)}</strong>（人工设置；不是图片识别值）。'
+        'BPM 决定播放速度，拍号决定小节拍数；两者不能替代每个音符的时值。</p>'
         '<aside>当前是数字与弦线识别对照，节奏尚未识别，因此不生成 GP，也不填四分音符占位。'
         '蓝框为数字提案，红框为低 OCR 分数；所有数字仍需核对。小节位置来自检测到的竖线，不能证明完整性。'
         '和弦同时起音、技巧、X 闷音尚未支持；没有报错也不代表没有漏音。</aside>'
