@@ -53,8 +53,11 @@ def write_report(source, folder, outcome, data):
                      f'<img loading="lazy" src="{esc(page["image"])}" alt="第 {page["page"]} 页校正图"></details>')
     for region in data.get('raster_regions', []):
         state = '音符提案已生成；请对照下方分组提案逐一检查' if region.get('proposal_ready') else '仅定位到谱行，尚无有效音符提案'
-        previews += (f'<section><h3>第 {region["page"]} 页 · {esc(region["id"])} · 小节线估计 {region["expected_bars"]} 小节</h3>'
+        count = f'模型识别 {region["recognized_bars"]} 小节' if 'recognized_bars' in region else '尚无有效小节提案'
+        previews += (f'<section><h3>第 {region["page"]} 页 · {esc(region["id"])} · {count}</h3>'
                      f'<p>{esc(region.get("error", state))}</p>'
+                     + (f'<aside>{esc(region["count_warning"])}</aside>' if region.get('count_warning') else '')
+                     + f'<details><summary>谱线辅助估计（仅供核对）</summary><p>{region["expected_bars"]} 小节；由竖线检测得到，可能误检或漏检，不作为导出数量要求。</p></details>'
                      f'<img loading="lazy" src="{esc(region["image"])}" alt="检测到的六线谱行"></section>')
     content = ('<!doctype html><html lang="zh-CN"><meta charset="utf-8">'
                '<meta name="viewport" content="width=device-width,initial-scale=1"><title>六线谱试用结果</title>'
@@ -63,7 +66,7 @@ def write_report(source, folder, outcome, data):
                'a{color:#175db7}img{max-width:100%;height:auto;border:1px solid #ddd}section,details{margin:16px 0}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}pre{white-space:pre-wrap}</style>'
                f'<h1>{esc(source.name)}</h1><h2>{esc(outcome["status"])}</h2><p>{esc(outcome["message"])}</p><aside>{esc(NOTICE)}</aside>'
                '<nav>' + ''.join(f'<a href="{esc(url)}">{esc(label)}</a>' for label, url in links) + '</nav>'
-               + ('<p>图片草稿：弦号从最上方 1 弦到最下方 6 弦。箭头为先后分组，加号为同组音符。小节号是本次提案的顺序号。请先检查裁剪谱区有无遗漏；检测到定位失败或小节数量不一致时，不导出整份 GP。</p>' if raster else '<p>蓝框：识别到的音符；红框：待核对小节。绿色仅代表拍数合计通过。</p>') + '<ul>'
+               + ('<p>图片草稿按模型实际输出的小节数保留；与谱线辅助估计不同时显示待核对提示，不补造小节。小节编号是本次提案顺序号，不是完整性证明。弦号从上方 1 弦到下方 6 弦，箭头为先后分组，加号为同组音符。定位失败或模型输出损坏时仍会阻止导出。</p>' if raster else '<p>蓝框：识别到的音符；红框：待核对小节。绿色仅代表拍数合计通过。</p>') + '<ul>'
                + ''.join(f'<li>{esc(w)}</li>' for w in warnings) + '</ul>'
                + previews + '<table><tr><th>页</th><th>小节</th><th>音符数</th><th>待核对内容</th></tr>' + ''.join(rows) + '</table></html>')
     (folder / 'review.html').write_text(content, encoding='utf-8')

@@ -63,6 +63,11 @@ class RasterTabTests(unittest.TestCase):
         cv2.line(gray, (356, 120), (356, 200), 0, 1)
         self.assertEqual(locate_systems(gray)[0]['expected_bars'], 3)
 
+    def test_final_double_barline_does_not_create_tiny_extra_measure(self):
+        gray = staff()
+        cv2.line(gray, (941, 120), (941, 200), 0, 1)
+        self.assertEqual(locate_systems(gray)[0]['expected_bars'], 3)
+
     def test_full_height_note_stems_are_not_bar_boundaries(self):
         gray = staff()
         cv2.line(gray, (250, 120), (250, 230), 0, 1)
@@ -72,7 +77,7 @@ class RasterTabTests(unittest.TestCase):
     def test_model_notes_preserved_but_rhythm_never_accepted(self):
         prediction = {'eos': True, 'upstream_structure_valid': True,
                       'tokens': 'BAR BEAT DUR_8 DOTS_1 N_S6_F12 NTECH_TIE_DEST N_S2_FX BEAT DUR_2 REST END_BAR'.split()}
-        bars = decode_proposal(prediction, 1)
+        bars = decode_proposal(prediction)
         self.assertEqual([(n['string'], n['fret']) for n in bars[0][0]['notes']], [(1, 12), (5, None)])
         self.assertTrue(bars[0][0]['notes'][1]['dead'])
         self.assertTrue(all(b['duration'] is None for b in bars[0]))
@@ -81,9 +86,45 @@ class RasterTabTests(unittest.TestCase):
         for invalid in (dict(prediction, eos=False), dict(prediction, upstream_structure_valid=False),
                         dict(prediction, tokens='BAR BEAT DUR_4 N_S1_F80 END_BAR'.split())):
             with self.assertRaises(ValueError):
-                decode_proposal(invalid, 1)
-        with self.assertRaisesRegex(ValueError, '模型输出'):
-            decode_proposal(prediction, 2)
+                decode_proposal(invalid)
+
+    def test_mismatched_geometry_exports_actual_proposal_with_warning(self):
+        from desktop_batch import process_file
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'three-measure-image.png'
+            Image.fromarray(staff()).save(source)
+            model = root / 'model'
+            (model / '.venv/Scripts').mkdir(parents=True)
+            (model / '.venv/Scripts/python.exe').touch()
+            (model / 'best.pt').touch()
+            original_run = subprocess.run
+
+            def fake_model_only(command, **kwargs):
+                if str(command[0]) != str(model / '.venv/Scripts/python.exe'):
+                    return original_run(command, **kwargs)
+                manifest = json.loads(Path(command[command.index('--manifest') + 1]).read_text())
+                prediction = {'id': manifest[0]['id'], 'eos': True, 'upstream_structure_valid': True,
+                              'tokens': ('BAR BEAT DUR_8 N_S6_F7 END_BAR BAR BEAT DUR_4 N_S5_F9 END_BAR').split()}
+                Path(command[command.index('--output') + 1]).write_text(json.dumps({
+                    'model_revision': 'test', 'checkpoint_sha256': 'test', 'predictions': [prediction]}))
+                return subprocess.CompletedProcess(command, 0)
+
+            with patch.dict('os.environ', {'RIFFLOOP_OMR_MODEL_DIR': str(model)}), patch('raster_tab.subprocess.run', side_effect=fake_model_only):
+                result = process_file(source, root / 'out')
+            self.assertIsNotNone(result['draft'], result['message'])
+            data = json.loads((root / 'out/recognized.json').read_text(encoding='utf-8'))
+            self.assertEqual(len(data['systems'][0]['bars']), 2)
+            self.assertEqual(data['structure_issues'], [])
+            self.assertTrue(any('数量' in w for w in data['warnings']))
+            review = json.loads((root / 'out/score.draft.gp.review.json').read_text(encoding='utf-8'))
+            self.assertEqual(len(review['bars']), 2)
+            self.assertEqual(review['note_count'], 2)
+            self.assertTrue(all(any('数量' in w for w in b['issues']) for b in review['bars']))
+            page = (root / 'out/review.html').read_text(encoding='utf-8')
+            self.assertIn('模型识别 2 小节', page)
+            self.assertIn('辅助估计', page)
 
     def test_missing_model_retains_crops_and_does_not_guess_notes(self):
         with tempfile.TemporaryDirectory() as temp:

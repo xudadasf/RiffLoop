@@ -139,7 +139,9 @@ def locate_systems(gray):
         span = ink[ys[0]:ys[-1] + 1, left:right + 1] > 0
         vertical = np.flatnonzero(span.mean(axis=0) > .88) + left
         bounds = [float(np.mean(g)) for g in runs(vertical)]
-        bounds = [x for x in bounds if left + gap * 1.5 < x < right - gap * .5]
+        # The right edge is itself a boundary: use the same double-line
+        # tolerance as internal boundaries, or an end double bar adds a sliver.
+        bounds = [x for x in bounds if left + gap * 1.5 < x < right - gap * .8]
         straight = []
         for x in bounds:
             center = round(x)
@@ -196,12 +198,10 @@ def raster_pages(source):
                 yield gray_image(frame.copy())
 
 
-def decode_proposal(prediction, expected_bars):
+def decode_proposal(prediction):
     if not prediction.get('eos') or not prediction.get('upstream_structure_valid'):
         raise ValueError('模型输出未完整结束或结构无效，请裁成较短的谱行后重试')
     bars = parse_tokens(prediction['tokens'])
-    if len(bars) != expected_bars:
-        raise ValueError(f'图片小节线估计为 {expected_bars} 小节，模型输出 {len(bars)} 小节；需核对裁剪/小节线')
     for beats in bars:
         for beat in beats:
             if any(n['fret'] is not None and not 0 <= n['fret'] <= 36 for n in beat['notes']):
@@ -281,18 +281,26 @@ def recognize_raster(source, folder, settings=None):
     number = 0
     for region in regions:
         try:
-            proposal = decode_proposal(by_id[region['id']], region['expected_bars'])
+            proposal = decode_proposal(by_id[region['id']])
         except (ValueError, KeyError) as error:
             region['error'] = str(error)
             data['structure_issues'].append(f'{region["id"]}：{error}')
             number += region['expected_bars']
             continue
+        region['recognized_bars'] = len(proposal)
+        count_issues = []
+        if len(proposal) != region['expected_bars']:
+            warning = (f'小节数量待核对：模型识别 {len(proposal)} 小节，谱线辅助估计 {region["expected_bars"]} 小节。'
+                       '已按模型内容保留草稿，没有补造或删除小节；请检查漏识别、合并或误分。')
+            region['count_warning'] = warning
+            data['warnings'].append(f'{region["id"]}：{warning}')
+            count_issues.append(warning)
         bars = []
         for beats in proposal:
             number += 1
             bars.append({'number': number, 'meter': settings['meter'], 'meter_source': 'manual-draft-settings',
                          'tempo': settings['tempo'], 'beats': beats,
-                         'issues': ['图片模型提案：须核对音符、弦号、品位与分组；全部时值为四分音符占位；拍号和速度为人工设置']})
+                         'issues': ['图片模型提案：须核对音符、弦号、品位与分组；全部时值为四分音符占位；拍号和速度为人工设置'] + count_issues})
         region['proposal_ready'] = True
         data['systems'].append({**region, 'bars': bars})
     return data
