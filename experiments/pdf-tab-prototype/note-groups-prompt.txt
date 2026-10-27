@@ -1,0 +1,15 @@
+Read only the printed fret numbers and X dead-note marks on the six TAB lines
+in this single measure. Ignore the five-line standard staff, prose, bar numbers,
+tempo, time signature and technique labels. Do not infer rhythm or sounding pitch.
+Number the TAB strings 1 at the TOP line through 6 at the BOTTOM line.
+Read left to right. Vertically aligned notes form ONE simultaneous group.
+Keep repeated occurrences as separate groups. Include small grace-note frets
+and parenthesized frets in their printed order; remove only parentheses, not notes.
+Return JSON with exactly "groups" and "uncertain". "groups" is a list of groups,
+each group a list of notes. Each note is [string_number, fret_number, dead].
+Use integers for string and fret, a boolean for dead. For a printed X, use
+[string_number,null,true]. An ordinary fret uses [string_number,fret,false].
+Do not create notes for rests or add missing notes. A measure containing only
+rests has "groups": []. If a note is unreadable, put null at its location and
+describe that location in "uncertain"; do not guess. Otherwise "uncertain": [].
+Return only JSON, no markdown or other keys.

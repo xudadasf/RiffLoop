@@ -1,0 +1,4390 @@
+{
+  "date": "2026-10-27",
+  "goal": "Notes-first editable desktop draft, with explicit rhythm and effect review; no production baseline replacement",
+  "rhythm9": {
+    "comparison": {
+      "mode": "rhythm",
+      "predictions_sha256": "656bd954cbb73902d34de1ef9b425f531a27362fc48be50288b14ede3e5e9900",
+      "geometry_sha256": "9c6ccacd75edc6aa5ecc4280ba27201fea8e8b17f9fb5f6493a2c808e9dafaad",
+      "totals": {
+        "bars": 13,
+        "invalid_bars": 9,
+        "baseline_pass": 11,
+        "model_pass": 1,
+        "new_passes": 0,
+        "lost_passes": 10
+      },
+      "bars": [
+        {
+          "parent_id": "case-002-system-000",
+          "bar_number": 1,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": true
+        },
+        {
+          "parent_id": "case-002-system-000",
+          "bar_number": 2,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-002-system-000",
+          "bar_number": 3,
+          "error": "Unreadable or malformed beat",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 49,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 50,
+          "error": "Expected exactly one measure",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 51,
+          "error": "Unreadable or malformed beat",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 52,
+          "error": "Expecting value: line 1 column 1 (char 0)",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-026-system-000",
+          "bar_number": 1,
+          "error": "Unreadable or malformed beat",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-026-system-000",
+          "bar_number": 2,
+          "error": null,
+          "baseline_pass": false,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-026-system-000",
+          "bar_number": 3,
+          "error": "Expected exactly one measure",
+          "baseline_pass": false,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-071-system-010",
+          "bar_number": 31,
+          "error": "Expecting ',' delimiter: line 1 column 63 (char 62)",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-071-system-010",
+          "bar_number": 32,
+          "error": "Expected exactly one measure",
+          "baseline_pass": true,
+          "model_pass": false
+        },
+        {
+          "parent_id": "case-071-system-010",
+          "bar_number": 33,
+          "error": "Expecting value: line 1 column 1 (char 0)",
+          "baseline_pass": true,
+          "model_pass": false
+        }
+      ]
+    },
+    "predictions": {
+      "format": "vlm-compact-rhythm-v1",
+      "transport": "offline-cli",
+      "model": "Qwen3.5-9B-Q4_K_M.gguf",
+      "source": {
+        "repo": "unsloth/Qwen3.5-9B-GGUF",
+        "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+        "files": [
+          {
+            "name": "Qwen3.5-9B-Q4_K_M.gguf",
+            "bytes": 5680522464,
+            "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+            "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf"
+          },
+          {
+            "name": "mmproj-F16.gguf",
+            "bytes": 918166080,
+            "sha256": "f70dc3509053962b0d0d3ee8a7eacebf5d60aa560cad78254ae8698516ae029f",
+            "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/mmproj-F16.gguf"
+          }
+        ]
+      },
+      "template_source": {
+        "url": "https://huggingface.co/Qwen/Qwen3.5-9B/resolve/c202236235762e1c871ad0ccb60c8ee5ba337b9a/chat_template.jinja",
+        "sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+      },
+      "runtime_sha256": "30d0081decaf675f083ee49334fa5d497457abc79bdc9d16999f3bcd701a2d5e",
+      "timeout_seconds": 300,
+      "temperature": 0.7,
+      "manifest_sha256": "77705cfde4e95373623960ac5c2632fb4f890f76ffa07225b1ea06ca613fe64e",
+      "prompt": "Transcribe the exact printed rhythm of this guitar tablature system, left to right.\nUse note stems, beams, flags, dots, rests, tuplet brackets and ties. If standard\nnotation is present above TAB, use it for rhythm; these are the same part, not\ntwo independent parts. Do not invent notes, repair durations to fit a meter,\nor omit empty bars. Ignore prose and illustrations. An empty full measure is\none whole-measure rest. Parentheses around a fret can denote a tied continuation;\na slur between different frets is not a duration tie. Grace notes have grace=1.\nReturn only JSON with keys \"bars\" and \"uncertain\". \"bars\" is a list of measures;\neach measure is a list of beat arrays. Each beat is exactly seven integers:\n[duration_denominator, dot_count, tuplet_numerator, tuplet_denominator,\n rest, tied_note_count, grace]. Duration denominators: 1,2,4,8,16,32,64.\nUse dot_count=0 without dots, tuplet=1,1 without tuplets, 3,2 for triplets.\nrest and grace are 0 or 1. tied_note_count counts tie destinations in that beat,\nnot all slurred notes. Simultaneous chord notes form ONE beat. Example of two\nordinary quarter-note beats, the second silent: {\"bars\":[[[4,0,1,1,0,0,0],\n[4,0,1,1,1,0,0]]],\"uncertain\":[]}. This is format only, not the image's answer.\nWhen a beat cannot be read, put null instead of that beat and describe its\nlocation in \"uncertain\". If there is no score, return empty bars and explain.\nDo not include markdown, reasoning or any other keys.",
+      "timing_scope": "cold process including model loading",
+      "predictions": [
+        {
+          "id": "case-002-system-000-bar-000",
+          "image_sha256": "ddbf4767c1ae012aef8c4b848f936441dae0b54e0676be29fae3b32c3b3a91d0",
+          "seconds": 8.117,
+          "returncode": 0,
+          "log_sha256": "a636e6630a68207de8fa90351f592e374409d440d8e0cc4acec15dd5d3767fe0",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[[4,0,1,1,1,0,0],[4,0,1,1,1,0,0],[4,0,1,1,1,0,0],[4,0,1,1,1,0,0]]],\"uncertain\":[]}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-002-system-000-bar-001",
+          "image_sha256": "6d16e1faaa30a1dc12eb4e0bbf011c17bd2f8641e1518f77082a8a2cd84caa4c",
+          "seconds": 7.704,
+          "returncode": 0,
+          "log_sha256": "3e9a93c1c8d58ad89fa9050778bbf1d3a329606fffb5c1ea3db7a3863f4572b0",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[[4,0,1,1,0,0,0],[4,0,1,1,0,0,0],[4,0,1,1,0,0,0],[4,0,1,1,0,0,0]]],\"uncertain\":[]}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-002-system-000-bar-002",
+          "image_sha256": "3dc20d4f868683c00ebbe70c122bf13a76ace2fdfa3fc73480000a9db499ad64",
+          "seconds": 6.934,
+          "returncode": 0,
+          "log_sha256": "0d20e65e27fcb044d2482ad79f22a54835a55b4ac131a1adacc06aaa12c12bb0",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[null,null,null,[8,0,1,1,0,0,0],[4,0,1,1,0,0,0]]],\"uncertain\":[]}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-000",
+          "image_sha256": "27974fd429bb78a693822de4c0a7e5a5929b2b2fb246ae0c654d832106d24531",
+          "seconds": 8.347,
+          "returncode": 0,
+          "log_sha256": "7bde42e8be6566f9f9736482b0f2c0e9bb59b703f7616c979c18f7cb4f2b8baa",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[[4,0,1,1,0,0,0],[4,0,1,1,0,0,0],[4,0,1,1,0,0,0],[4,0,1,1,0,0,0],[4,0,1,1,0,0,0]]],\"uncertain\":[]}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-001",
+          "image_sha256": "fda23f7a915f1050063e3d8545f060c556cf23620214ac9ef6c8c7c9e5c712ef",
+          "seconds": 10.314,
+          "returncode": 0,
+          "log_sha256": "d61214643a0f4a3ab410e7018ff21d0185ef38b884cf009b9857b74393856120",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\n  \"bars\": [\n    [\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ],\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ]\n    ],\n    [\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ],\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-002",
+          "image_sha256": "a42b0bf4da54d87431a1a8ed61fda733f39a429d169c976f740d772f35f30bdb",
+          "seconds": 7.358,
+          "returncode": 0,
+          "log_sha256": "edc97c693803cd13923e794bcfd4ca5ba787a7de2ef007af5eb40298605e54d4",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[null,null,[8,0,1,1,0,0,0],[8,0,1,1,0,0,0],[8,0,1,1,0,0,0],[8,0,1,1,0,0,0]]],\"uncertain\":[]}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-003",
+          "image_sha256": "9852024cba2bff199f6b6673b7c0414ea4893684325d8fd4f395a70eb3bb574a",
+          "seconds": 40.658,
+          "returncode": 0,
+          "log_sha256": "41d4fa5ed5622914f16d9dce72a68623eda982c382d83406f323eb816ff0088a",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\nThe provided image is a guitar tablature snippet showing fret numbers and rhythmic notation, but it does not include any standard notation above the TAB. The rhythm must be interpreted from the note stems, beams, flags, dots, and other symbols on the tab itself.\n\nLet’s analyze the rhythm bar by bar:\n\n- There are no vertical bar lines visible in the image to separate measures — only a single continuous staff with fret numbers and rhythmic markings.\n- However, we can infer measure boundaries based on typical guitar tab layout and spacing. But since there are no explicit bar lines or time signature, we cannot reliably determine where one measure ends and another begins.\n- The prompt says: “Do not invent notes, repair durations to fit a meter, or omit empty bars.” Since we cannot confirm the presence of multiple measures (no bar lines), and the image shows only one continuous segment without clear measure divisions, we must treat this as possibly being part of a single measure or an ambiguous fragment.\n\nBut note: the prompt also says: “If there is no score, return empty bars and explain.” — however, there *is* a score (a tab line with notes), so we proceed.\n\nHowever, without bar lines, we cannot assign beats to specific measures. The example output format requires each measure to be a list of beat arrays. We need at least one measure.\n\nLooking again: the image shows what appears to be a single horizontal line (tab staff) with fret numbers and rhythmic notation. There are no vertical bar lines dividing it into measures. Therefore, we cannot determine how many measures exist.\n\nBut wait — the top-left corner has “52”, which might indicate measure 52? That could imply that this is part of a larger piece starting at measure 52. But still, no bar lines are drawn.\n\nGiven the ambiguity and the instruction not to invent or repair durations, and since we cannot reliably parse the rhythm into discrete measures without bar lines, we must conclude that we cannot transcribe this accurately into the required JSON structure.\n\nThus, per instructions: “When a beat cannot be read, put null instead of that beat and describe its location in 'uncertain'.” But here, even individual beats are hard to parse due to lack of context (no bar lines, unclear grouping).\n\nActually, let’s try to interpret the rhythm as written, assuming it's all within one measure for now — but that would be inventing structure.\n\nAlternative approach: Perhaps the entire thing is one measure? Let’s see:\n\nFret numbers: 6, 7, 6, 7, (grace?), 3, 5\n\nRhythmic elements:\n- First note: stem down, with a dot under it → likely dotted quarter or eighth? But in tab, stems indicate duration relative to each other.\n- Then beam connecting first two notes → they are beamed together → likely same duration unit.\n- Next note has a flag → eighth note?\n- Then a grace note (small 7) → grace=1\n- Last two notes: 3 and 5, connected by a beam → likely sixteenth or eighth pair.\n\nBut without knowing the time signature or bar lines, we cannot assign denominators correctly.\n\nMoreover, the instruction says: “Transcribe the exact printed rhythm... If standard notation is present above TAB, use it for rhythm; these are the same part...” — but there is NO standard notation here. So we rely solely on tab symbols.\n\nIn guitar tab, when notes are beamed together, they share the same rhythmic unit. Flags indicate shorter durations. Dots extend duration by half. Grace notes are played quickly before the main note.\n\nBut again — without bar lines, we cannot say how many measures there are. And the output format requires a list of bars (measures).\n\nGiven that the image does not show any vertical bar lines, and no indication of measure boundaries, and the instruction to not invent or repair durations, I must conclude that we cannot reliably transcribe this into the required JSON format without making assumptions that violate the rules.\n\nTherefore, the safest response is to indicate uncertainty for the entire transcription due to missing structural information (bar lines).\n\nBut the prompt says: “If there is no score, return empty bars and explain.” — there IS a score, just incomplete structurally.\n\nAlternatively, perhaps we should treat the entire visible portion as one measure? But that would be inventing structure.\n\nWait — looking back at the image description: it shows \"52\" in the top left — possibly meaning measure 52. And then the tab starts immediately after. In many transcriptions, if only a fragment is shown, we might still try to parse the rhythm as given.\n\nLet me attempt to parse the rhythm as a single measure for demonstration, but I must note this is speculative.\n\nAssume it's one measure (which is risky):\n\nNotes from left to right:\n\n1. Fret 6, stem down, with a dot below → dotted quarter? But in tab, dots usually mean staccato or accent, not necessarily duration extension unless specified. Actually, in guitar tab, a dot under a note often means staccato (shorten the note), not extend duration. Duration is indicated by stems, beams, flags.\n\nActually, in standard practice for guitar tab:\n- Solid stem = quarter note equivalent\n- Stem with beam to another note = tied or grouped duration\n- Flag = half the value of unflagged\n- Dot under note = staccato (play shorter)\n- Dot above note = accent\n\nBut the image shows a dot *under* the first note — likely staccato, not duration extension.\n\nSimilarly, beams connect notes to show they are played in the same rhythmic unit.\n\nLet’s try:\n\n- First two notes: fret 6 and 7, both with stems down, connected by a beam → likely two eighth notes or quarter notes depending on context. But with a dot under the first, it might be staccato eighth.\n\nThis is too ambiguous without standard notation or bar lines.\n\nGiven all this, and adhering strictly to the instructions — do not invent, do not repair, do not omit — I must conclude that we cannot accurately transcribe this into the required JSON format because essential structural information (bar lines, time signature) is missing.\n\nTherefore, I will return an empty bars list and explain in \"uncertain\".\n\nFinal decision:\n\n{\"bars\":[],\"uncertain\":\"The image contains a guitar tablature fragment with fret numbers and rhythmic symbols (stems, beams, flags, dots, grace note), but lacks vertical bar lines to define measure boundaries. Without knowing how many measures exist or where they begin/end, it is impossible to assign beats to specific measures as required by the output format. Additionally, without standard notation above the tab, rhythm interpretation relies solely on ambiguous tab symbols (e.g., dot under note may mean staccato rather than duration extension). Thus, no reliable transcription can be made.\"}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-026-system-000-bar-000",
+          "image_sha256": "249930303fed77601f4fb3af0af9aab919c7bd823968527a1efe34d7b5dbb31d",
+          "seconds": 6.881,
+          "returncode": 0,
+          "log_sha256": "e72270579a997483ee2645689ad06a7cfe39a65a21495bfb8038dbba994234ef",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[null,null],[4,0,1,1,0,0,0]],\"uncertain\":[]}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-026-system-000-bar-001",
+          "image_sha256": "93ca9959982c914c8ed4ccefb9d7bc7434bd57cc198ad19fe15c5ba7bfe8e18a",
+          "seconds": 8.42,
+          "returncode": 0,
+          "log_sha256": "34d5e262c9bb0c3b8157883be83819bf9da684cf1524d3d060e18be29e79f309",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\n  \"bars\": [\n    [\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ],\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-026-system-000-bar-002",
+          "image_sha256": "87162deb0163cd5d011732b4b8dae3365642d7581dfa92e45bcbe33987e56359",
+          "seconds": 16.361,
+          "returncode": 0,
+          "log_sha256": "537a442c2ab4f05cec6078bc93f3628c4bb7b267e431ecaf0b23422d96a4dce7",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\n  \"bars\": [\n    [\n      [\n        16,\n        0,\n        3,\n        2,\n        0,\n        0,\n        0\n      ],\n      [\n        16,\n        0,\n        3,\n        2,\n        0,\n        0,\n        0\n      ]\n    ],\n    [\n      [\n        8,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ],\n      [\n        16,\n        0,\n        3,\n        2,\n        0,\n        0,\n        0\n      ],\n      [\n        8,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ]\n    ],\n    [\n      [\n        4,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ],\n      [\n        8,\n        0,\n        1,\n        1,\n        0,\n        0,\n        0\n      ]\n    ],\n    [\n      [\n        8,\n        0,\n        3,\n        2,\n        0,\n        0,\n        0\n      ],\n      [\n        16,\n        0,\n        3,\n        2,\n        0,\n        0,\n        0\n      ]\n    ],\n    [\n      [\n        8,\n        0,\n        3,\n        2,\n        0,\n        0,\n        0\n      ]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-071-system-010-bar-000",
+          "image_sha256": "dab145baa62b897b8a51f9b3958ef8fa23f3396c63177d557f4af87968dd5509",
+          "seconds": 8.253,
+          "returncode": 0,
+          "log_sha256": "f65abbcb6a732663aeac638ada2fb7cd49e43577cffb174404a0213d2c7b792d",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\"bars\":[[null,null,null,null,null,null,null,null],\"uncertain\":[\"The rhythm is not explicitly indicated with note stems, beams, flags, dots, rests, tuplet brackets or ties. The only rhythmic information present is the 'P.M.' (Palm Mute) symbol at the beginning and the measure numbers 31 and 32. Without explicit rhythmic notation, the exact rhythm cannot be transcribed.\"]}`\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-071-system-010-bar-001",
+          "image_sha256": "a3afeecd8c08f2bad606de3083ec3bedf1a21cc5e0241ad2fb1c7dd4f7d27f31",
+          "seconds": 11.257,
+          "returncode": 0,
+          "log_sha256": "95e4766c27d3be6bbfb625160ab85cbad0804dca1d8d166abaff8ee205905916",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\n  \"bars\": [\n    [\n      [32, 0, 1, 1, 0, 4, 0],\n      [32, 0, 1, 1, 0, 4, 0],\n      [32, 0, 1, 1, 0, 4, 0],\n      [32, 0, 1, 1, 0, 4, 0]\n    ],\n    [\n      [32, 0, 1, 1, 0, 4, 0],\n      [32, 0, 1, 1, 0, 4, 0],\n      [32, 0, 1, 1, 0, 4, 0],\n      [32, 0, 1, 1, 0, 4, 0]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-071-system-010-bar-002",
+          "image_sha256": "716c6037c990f8a0b5794f59ecac07d96eb753d07d00a75048a71c6110e5a294",
+          "seconds": 49.352,
+          "returncode": 0,
+          "log_sha256": "a375965624a4055e470e7cc1d63515b356771e4c66d1024c22ebc66ee5994899",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\nThe provided image is a guitar tablature system showing repeated rhythmic patterns with numbers (frets) and vertical bars indicating measure boundaries. The rhythm shown consists of four beats per measure, each beat being an eighth note (duration denominator 8), with no dots, tuplets, rests, ties, or grace notes. Each beat contains two simultaneous frets: one on the top line and one below it — forming a chord-like structure in TAB notation.\n\nEach group of two such chords (one above the other) is grouped under a beam that spans both eighth notes — but visually, each “beat” in the image appears to be a single eighth note with two frets stacked vertically (i.e., a dyad). However, looking closely at the layout:\n\n- There are 4 groups horizontally.\n- Each group has two vertical lines connecting to three horizontal numbers: top line = 3, middle = 3, bottom = 1 → so each “note” is actually a chord of three notes? Wait — no, in standard TAB, each line represents a string. So if there are three lines drawn with numbers, it’s likely the 6th, 5th, and 4th strings (bottom to top: E-A-D-G-B-e). But here we see only three lines used per beat? Actually, looking again:\n\nThe image shows:\n- Three horizontal lines (strings)\n- On each line, for each beat position, there is a number: bottom line = 1, middle = 3, top = 3 → so each beat is a chord of three notes: fret 1 on lowest string, fret 3 on two higher strings.\n\nAnd these are all eighth notes, beamed in groups of four per measure? Actually, the beam connects pairs: first two beats beamed together, next two beamed together — so it's four eighth-note beats per measure, grouped as two pairs.\n\nBut wait — the example format says: “Each beat is exactly seven integers...” and “Simultaneous chord notes form ONE beat.”\n\nSo if three strings are played simultaneously at one time, that’s ONE beat. In this case, each vertical alignment (three numbers stacked) is one simultaneous event — i.e., one beat containing a chord of three notes.\n\nHow many such events per measure? Looking at the spacing: there are 8 positions horizontally, but they are grouped into 4 pairs by beams. Each pair corresponds to one measure? No — typically, in TAB, beams connect simultaneous or consecutive notes. Here, each “column” of three numbers (frets on three strings) is a single note event (chord), and there are 8 such events per measure? That would be too many.\n\nWait — let’s count the horizontal divisions:\n\nFrom left to right, there are 8 vertical positions where frets appear. They are grouped into 4 pairs by black beams underneath each pair. So each beam covers two adjacent fret columns → meaning each beam represents a group of two eighth notes? But if each column is a chord (three strings), then each beat is a chord, and there are 8 chords per measure? That seems excessive.\n\nAlternatively, perhaps the entire row is one measure, with 8 eighth-note beats, each being a single-fret note on three different strings? But that doesn’t make sense because they’re aligned vertically — same time.\n\nActually, re-examining: in standard TAB notation, when you have multiple numbers on the same horizontal level (same string) at the same vertical position, it’s simultaneous. Here, for each “beat” location, there are three numbers: one on each of the three lines → so yes, each vertical stack is a chord of three notes played together.\n\nNow, how many such chords per measure? The image shows 8 such stacks, grouped into 4 pairs by beams. Each beam connects two adjacent stacks → implying that those two stacks are consecutive eighth notes (since beams usually connect same-duration notes in sequence).\n\nTherefore: one measure contains 8 eighth-note beats, each beat being a chord of three notes (frets 3-3-1 on three strings).\n\nBut wait — the problem says: “Simultaneous chord notes form ONE beat.” So if three strings are played at once, that’s one beat. And here, each vertical alignment is one such simultaneous event.\n\nSo per measure: 8 beats? But the beams suggest grouping into pairs — which might indicate that each pair is a dotted quarter or something? No — in standard notation, beams connect consecutive notes of same duration. If two eighth notes are beamed together, they form a single beam covering both.\n\nIn this image, each beam covers two adjacent vertical stacks → so each beam represents two eighth-note beats (each beat being a chord).\n\nThus: one measure = 4 groups × 2 beats/group = 8 eighth-note beats.\n\nEach beat: duration denominator 8, dot_count=0, tuplet=1,1, rest=0, tied_note_count=0, grace=0.\n\nAnd the frets are not part of the rhythm JSON — only rhythm matters. The fret numbers are for pitch/fingering, not rhythm transcription.\n\nThe instruction says: “Transcribe the exact printed rhythm...” and “Use note stems, beams, flags, dots, rests, tuplet brackets and ties.” But in the output format, we only encode duration properties per beat — not pitches.\n\nAlso: “Do not invent notes... Ignore prose and illustrations.” So we ignore the fret numbers entirely for rhythm transcription — we only care about timing structure.\n\nSo what is the rhythm?\n\nLooking at the image: there are 8 identical rhythmic units (each being a chord on three strings) per measure, grouped into 4 pairs by beams. Each pair is beamed together → so each beat is an eighth note, and within each group of two, they are consecutive eighth notes (so beam connects them).\n\nTherefore, per measure: 8 eighth-note beats.\n\nBut wait — the example given in the problem shows a measure with two quarter-note beats: {\"bars\":[[[4,0,1,1,0,0,0],[4,0,1,1,1,0,0]]]...} — note that each beat is listed separately even if beamed.\n\nSo for our case: 8 eighth-note beats per measure.\n\nEach beat: [8, 0, 1, 1, 0, 0, 0]\n\nAnd since all are identical and consecutive, no rests or ties.\n\nBut is there only one measure? The image shows a dashed line above and vertical bar at start and end — suggesting one full measure.\n\nAlso, the number \"33\" at top-left might be a repeat sign or something, but it's outside the staff — probably not part of rhythm.\n\nSo final answer: one measure with 8 eighth-note beats.\n\nBut let me double-check: in some TAB systems, beams can indicate ties or slurs, but here they are clearly grouping consecutive notes.\n\nMoreover, the instruction says: “a slur between different frets is not a duration tie” — so we don't interpret beams as ties.\n\nThus, rhythm is 8 consecutive eighth notes per measure.\n\nJSON structure:\n\n{\n  \"bars\": [\n    [\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0],\n      [8,0,1,1,0,0,0]\n    ]\n  ],\n  \"uncertain\": []\n}\n\nBut wait — the example shows beats as separate elements in the list, even if beamed. Yes.\n\nHowever, I recall that in some interpretations, if multiple notes are played simultaneously (chord), they count as one beat regardless of how many strings. Here, each vertical stack is one beat (three strings simultaneous). And there are 8 such stacks per measure.\n\nYes.\n\nBut let me confirm the count: from left to right, there are 8 columns of frets, each column has three numbers (one per string), and they are grouped into 4 pairs by beams. Each pair is two consecutive eighth-note beats.\n\nSo yes, 8 beats per measure.\n\nFinal decision.\n\n\n"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "total_seconds": 189.956
+  },
+  "notes9": {
+    "comparison": {
+      "mode": "notes",
+      "predictions_sha256": "a92d1b6f2731c3d12a49bd930dd1600d407a9ceed44b7971860b225758b0cbac",
+      "geometry_sha256": "9c6ccacd75edc6aa5ecc4280ba27201fea8e8b17f9fb5f6493a2c808e9dafaad",
+      "totals": {
+        "bars": 13,
+        "invalid_bars": 6,
+        "baseline_pass": 13,
+        "model_pass": 1,
+        "new_passes": 0,
+        "lost_passes": 12,
+        "reference_notes": 131,
+        "predicted_notes": 48,
+        "matched_notes": 4,
+        "ordered_note_precision": 0.08333333333333333,
+        "ordered_note_recall": 0.030534351145038167,
+        "nonempty_bars_pass": 0
+      },
+      "bars": [
+        {
+          "parent_id": "case-002-system-000",
+          "bar_number": 1,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": true,
+          "reference_notes": 0,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-002-system-000",
+          "bar_number": 2,
+          "error": "Uncertain or invalid notes",
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 5,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-002-system-000",
+          "bar_number": 3,
+          "error": "Uncertain or invalid notes",
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 8,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 49,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 6,
+          "predicted_notes": 9,
+          "matched_notes": 1
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 50,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 4,
+          "predicted_notes": 3,
+          "matched_notes": 1
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 51,
+          "error": "Invalid string/fret/dead values",
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 7,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-011-system-012",
+          "bar_number": 52,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 6,
+          "predicted_notes": 9,
+          "matched_notes": 1
+        },
+        {
+          "parent_id": "case-026-system-000",
+          "bar_number": 1,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 3,
+          "predicted_notes": 3,
+          "matched_notes": 1
+        },
+        {
+          "parent_id": "case-026-system-000",
+          "bar_number": 2,
+          "error": "Uncertain or invalid notes",
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 10,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-026-system-000",
+          "bar_number": 3,
+          "error": "Uncertain or invalid notes",
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 10,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-071-system-010",
+          "bar_number": 31,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 24,
+          "predicted_notes": 12,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-071-system-010",
+          "bar_number": 32,
+          "error": null,
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 24,
+          "predicted_notes": 12,
+          "matched_notes": 0
+        },
+        {
+          "parent_id": "case-071-system-010",
+          "bar_number": 33,
+          "error": "Uncertain or invalid notes",
+          "baseline_pass": true,
+          "model_pass": false,
+          "reference_notes": 24,
+          "predicted_notes": 0,
+          "matched_notes": 0
+        }
+      ]
+    },
+    "predictions": {
+      "format": "vlm-compact-rhythm-v1",
+      "transport": "offline-cli",
+      "model": "Qwen3.5-9B-Q4_K_M.gguf",
+      "source": {
+        "repo": "unsloth/Qwen3.5-9B-GGUF",
+        "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+        "files": [
+          {
+            "name": "Qwen3.5-9B-Q4_K_M.gguf",
+            "bytes": 5680522464,
+            "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+            "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf"
+          },
+          {
+            "name": "mmproj-F16.gguf",
+            "bytes": 918166080,
+            "sha256": "f70dc3509053962b0d0d3ee8a7eacebf5d60aa560cad78254ae8698516ae029f",
+            "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/mmproj-F16.gguf"
+          }
+        ]
+      },
+      "template_source": {
+        "url": "https://huggingface.co/Qwen/Qwen3.5-9B/resolve/c202236235762e1c871ad0ccb60c8ee5ba337b9a/chat_template.jinja",
+        "sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+      },
+      "runtime_sha256": "30d0081decaf675f083ee49334fa5d497457abc79bdc9d16999f3bcd701a2d5e",
+      "timeout_seconds": 300,
+      "temperature": 0.7,
+      "manifest_sha256": "77705cfde4e95373623960ac5c2632fb4f890f76ffa07225b1ea06ca613fe64e",
+      "prompt": "Read only the printed fret numbers and X dead-note marks on the six TAB lines\nin this single measure. Ignore the five-line standard staff, prose, bar numbers,\ntempo, time signature and technique labels. Do not infer rhythm or sounding pitch.\nNumber the TAB strings 1 at the TOP line through 6 at the BOTTOM line.\nRead left to right. Vertically aligned notes form ONE simultaneous group.\nKeep repeated occurrences as separate groups. Include small grace-note frets\nand parenthesized frets in their printed order; remove only parentheses, not notes.\nReturn JSON with exactly \"groups\" and \"uncertain\". \"groups\" is a list of groups,\neach group a list of notes. Each note is [string_number, fret_number, dead].\nUse integers for string and fret, a boolean for dead. For a printed X, use\n[string_number,null,true]. An ordinary fret uses [string_number,fret,false].\nDo not create notes for rests or add missing notes. A measure containing only\nrests has \"groups\": []. If a note is unreadable, put null at its location and\ndescribe that location in \"uncertain\"; do not guess. Otherwise \"uncertain\": [].\nReturn only JSON, no markdown or other keys.\n",
+      "timing_scope": "cold process including model loading",
+      "predictions": [
+        {
+          "id": "case-002-system-000-bar-000",
+          "image_sha256": "ddbf4767c1ae012aef8c4b848f936441dae0b54e0676be29fae3b32c3b3a91d0",
+          "seconds": 6.613,
+          "returncode": 0,
+          "log_sha256": "46faaa58076e17f9dc54aa50fc39a325b6cd70eb469da32b68f09996f32fe76e",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-002-system-000-bar-001",
+          "image_sha256": "6d16e1faaa30a1dc12eb4e0bbf011c17bd2f8641e1518f77082a8a2cd84caa4c",
+          "seconds": 8.723,
+          "returncode": 0,
+          "log_sha256": "f0edcc333d0a1c307cabc5f5817afe336ab05b87e12d6dc6f8c56915c3d52735",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n[\n  {\n    \"groups\": [\n      [\n        [2, null, false],\n        [3, 7, false]\n      ],\n      [\n        [5, 5, false],\n        [6, null, false]\n      ],\n      [\n        [5, 7, false],\n        [6, null, false]\n      ],\n      [\n        [5, 5, false],\n        [6, 7, false]\n      ]\n    ],\n    \"uncertain\": []\n  }\n]\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-002-system-000-bar-002",
+          "image_sha256": "3dc20d4f868683c00ebbe70c122bf13a76ace2fdfa3fc73480000a9db499ad64",
+          "seconds": 8.772,
+          "returncode": 0,
+          "log_sha256": "2f7ee9b25d4a2a656f9eb9a17e589798d97da6467f86b6b4fe8231ba1a8d56ea",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n[\n  {\n    \"groups\": [\n      [\n        [3, null, true],\n        [7, 7, false]\n      ],\n      [\n        [6, 12, false],\n        [5, 10, false]\n      ],\n      [\n        [4, 9, false],\n        [4, 12, false],\n        [4, 9, false]\n      ]\n    ],\n    \"uncertain\": []\n  }\n]\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-000",
+          "image_sha256": "27974fd429bb78a693822de4c0a7e5a5929b2b2fb246ae0c654d832106d24531",
+          "seconds": 9.341,
+          "returncode": 0,
+          "log_sha256": "117ca5f1736f703dc9ae66be8a2bdc58c36eca3f26e07b87d7804df8eefa34cf",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [\n    [\n      [6, 3, false]\n    ],\n    [\n      [5, 5, false],\n      [4, 5, false],\n      [3, 5, false]\n    ],\n    [\n      [2, 2, false]\n    ],\n    [\n      [6, null, true],\n      [5, null, true],\n      [4, null, true],\n      [3, 3, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-001",
+          "image_sha256": "fda23f7a915f1050063e3d8545f060c556cf23620214ac9ef6c8c7c9e5c712ef",
+          "seconds": 7.717,
+          "returncode": 0,
+          "log_sha256": "5249c3941fb525e6f214fa08920ea46745e2c5f617b66e3ba836f75babfc1253",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [\n    [\n      [5, 5, false],\n      [6, null, true]\n    ],\n    [\n      [4, 5, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-002",
+          "image_sha256": "a42b0bf4da54d87431a1a8ed61fda733f39a429d169c976f740d772f35f30bdb",
+          "seconds": 10.652,
+          "returncode": 0,
+          "log_sha256": "6be0cb01e035a896cd61e79ee5eb0b10db10e45e514d02fc7fa6bd204927a328",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [\n    [\n      [1, null, false],\n      [2, 7, false]\n    ],\n    [\n      [1, null, false],\n      [2, 7, false]\n    ],\n    [\n      [1, null, false],\n      [2, 5, false]\n    ],\n    [\n      [1, null, false],\n      [2, 7, false]\n    ],\n    [\n      [1, null, false],\n      [2, 5, false]\n    ],\n    [\n      [1, null, false],\n      [2, 7, false]\n    ],\n    [\n      [1, null, false],\n      [2, 5, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-011-system-012-bar-003",
+          "image_sha256": "9852024cba2bff199f6b6673b7c0414ea4893684325d8fd4f395a70eb3bb574a",
+          "seconds": 9.092,
+          "returncode": 0,
+          "log_sha256": "57da6d9b221457fdead0980287d67270565fc1140d68e47fed9dc760d33ca084",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [\n    [\n      [1, 6, false],\n      [2, null, true]\n    ],\n    [\n      [1, 7, false],\n      [2, 7, false]\n    ],\n    [\n      [1, 6, false],\n      [2, 7, false]\n    ],\n    [\n      [1, 9, false]\n    ],\n    [\n      [3, null, true],\n      [4, 5, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-026-system-000-bar-000",
+          "image_sha256": "249930303fed77601f4fb3af0af9aab919c7bd823968527a1efe34d7b5dbb31d",
+          "seconds": 7.442,
+          "returncode": 0,
+          "log_sha256": "e96af9b2a3f4f2f09303702d3880edc4066b75905e632cb456985e141f52c188",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [\n    [\n      [6, null, true],\n      [5, 6, false],\n      [4, 8, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-026-system-000-bar-001",
+          "image_sha256": "93ca9959982c914c8ed4ccefb9d7bc7434bd57cc198ad19fe15c5ba7bfe8e18a",
+          "seconds": 10.061,
+          "returncode": 0,
+          "log_sha256": "5c989317d1f385499bc75319a452cbf5ea9ea446e92f4bbacde91c571d449ae8",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n[\n  {\n    \"groups\": [\n      [\n        [1, 8, false],\n        [2, null, true]\n      ],\n      [\n        [1, 10, false]\n      ],\n      [\n        [3, 8, false]\n      ],\n      [\n        [4, 8, false],\n        [5, 10, false]\n      ],\n      [\n        [6, 8, false]\n      ],\n      [\n        [4, 8, false]\n      ],\n      [\n        [3, 6, false],\n        [4, 8, false]\n      ]\n    ],\n    \"uncertain\": []\n  }\n]\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-026-system-000-bar-002",
+          "image_sha256": "87162deb0163cd5d011732b4b8dae3365642d7581dfa92e45bcbe33987e56359",
+          "seconds": 9.406,
+          "returncode": 0,
+          "log_sha256": "b5cb3ca3d4316fe83a6418d77930f2720e48597273ba7eaf644adf524212cabd",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n[\n  {\n    \"groups\": [\n      [\n        [1, 8, false],\n        [2, null, true]\n      ],\n      [\n        [3, 10, false]\n      ],\n      [\n        [3, 8, false]\n      ],\n      [\n        [4, 10, false]\n      ],\n      [\n        [4, 8, false]\n      ],\n      [\n        [5, null, true],\n        [6, 8, false]\n      ]\n    ],\n    \"uncertain\": []\n  }\n]\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-071-system-010-bar-000",
+          "image_sha256": "dab145baa62b897b8a51f9b3958ef8fa23f3396c63177d557f4af87968dd5509",
+          "seconds": 9.763,
+          "returncode": 0,
+          "log_sha256": "d70f779d626bcbfdd9025b34bf8569c9b15ffa2165336b1b34a21162e5985b18",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n{\n  \"groups\": [\n    [\n      [1, 7, false],\n      [2, 7, false],\n      [3, 5, false]\n    ],\n    [\n      [1, 7, false],\n      [2, 7, false],\n      [3, 5, false]\n    ],\n    [\n      [1, 7, false],\n      [2, 7, false],\n      [3, 5, false]\n    ],\n    [\n      [1, 7, false],\n      [2, 7, false],\n      [3, 5, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-071-system-010-bar-001",
+          "image_sha256": "a3afeecd8c08f2bad606de3083ec3bedf1a21cc5e0241ad2fb1c7dd4f7d27f31",
+          "seconds": 10.147,
+          "returncode": 0,
+          "log_sha256": "cfdee169266d19951e5f6e8a0fea26f45315cc7cb12e31b839fac765fd116abe",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n```json\n{\n  \"groups\": [\n    [\n      [1, 3, false],\n      [2, 3, false],\n      [3, 1, false]\n    ],\n    [\n      [1, 3, false],\n      [2, 3, false],\n      [3, 1, false]\n    ],\n    [\n      [1, 3, false],\n      [2, 3, false],\n      [3, 1, false]\n    ],\n    [\n      [1, 3, false],\n      [2, 3, false],\n      [3, 1, false]\n    ]\n  ],\n  \"uncertain\": []\n}\n```\n\n\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "case-071-system-010-bar-002",
+          "image_sha256": "716c6037c990f8a0b5794f59ecac07d96eb753d07d00a75048a71c6110e5a294",
+          "seconds": 10.113,
+          "returncode": 0,
+          "log_sha256": "bbbff62a7e08df640844caab9d61bdb7b373b29ef596912ce5ead42fb9f62710",
+          "response": {
+            "choices": [
+              {
+                "finish_reason": "stop",
+                "message": {
+                  "content": "\n[\n  {\n    \"groups\": [\n      [\n        [3, 1, false],\n        [3, 1, false],\n        [3, 1, false]\n      ],\n      [\n        [3, 1, false],\n        [3, 1, false],\n        [3, 1, false]\n      ],\n      [\n        [3, 1, false],\n        [3, 1, false],\n        [3, 1, false]\n      ],\n      [\n        [3, 1, false],\n        [3, 1, false],\n        [3, 1, false]\n      ]\n    ],\n    \"uncertain\": []\n  }\n]\n\n\n"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "total_seconds": 117.842
+  },
+  "geometry": [
+    {
+      "id": "case-002-system-000-bar-000",
+      "case": "case-002",
+      "system_index": 0,
+      "page": 1,
+      "ys": [
+        133.9,
+        140.3,
+        146.7,
+        153.1,
+        159.5,
+        165.8
+      ],
+      "rect": [
+        26.346460342407227,
+        108.9000015258789,
+        187.9790496826172,
+        203.10000610351562
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\EVA-新世纪福音战士OP-残酷天使的行动纲领-DMB313\\《残酷天使纲领》-DMB313.pdf",
+      "pdf_sha256": "0542c6e38e9d1305445130a6b2fe6fa76d5b3087dc1a42afc187a303edb0dc94",
+      "image_sha256": "ddbf4767c1ae012aef8c4b848f936441dae0b54e0676be29fae3b32c3b3a91d0",
+      "parent_id": "case-002-system-000",
+      "bar_index": 0,
+      "parent_bar_count": 3,
+      "left": 28.346460342407227,
+      "right": 185.9790496826172
+    },
+    {
+      "id": "case-002-system-000-bar-001",
+      "case": "case-002",
+      "system_index": 0,
+      "page": 1,
+      "ys": [
+        133.9,
+        140.3,
+        146.7,
+        153.1,
+        159.5,
+        165.8
+      ],
+      "rect": [
+        183.9790496826172,
+        108.9000015258789,
+        338.958251953125,
+        203.10000610351562
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\EVA-新世纪福音战士OP-残酷天使的行动纲领-DMB313\\《残酷天使纲领》-DMB313.pdf",
+      "pdf_sha256": "0542c6e38e9d1305445130a6b2fe6fa76d5b3087dc1a42afc187a303edb0dc94",
+      "image_sha256": "6d16e1faaa30a1dc12eb4e0bbf011c17bd2f8641e1518f77082a8a2cd84caa4c",
+      "parent_id": "case-002-system-000",
+      "bar_index": 1,
+      "parent_bar_count": 3,
+      "left": 185.9790496826172,
+      "right": 336.958251953125
+    },
+    {
+      "id": "case-002-system-000-bar-002",
+      "case": "case-002",
+      "system_index": 0,
+      "page": 1,
+      "ys": [
+        133.9,
+        140.3,
+        146.7,
+        153.1,
+        159.5,
+        165.8
+      ],
+      "rect": [
+        334.958251953125,
+        108.9000015258789,
+        568.759033203125,
+        203.10000610351562
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\EVA-新世纪福音战士OP-残酷天使的行动纲领-DMB313\\《残酷天使纲领》-DMB313.pdf",
+      "pdf_sha256": "0542c6e38e9d1305445130a6b2fe6fa76d5b3087dc1a42afc187a303edb0dc94",
+      "image_sha256": "3dc20d4f868683c00ebbe70c122bf13a76ace2fdfa3fc73480000a9db499ad64",
+      "parent_id": "case-002-system-000",
+      "bar_index": 2,
+      "parent_bar_count": 3,
+      "left": 336.958251953125,
+      "right": 566.7590026855469
+    },
+    {
+      "id": "case-011-system-012-bar-000",
+      "case": "case-011",
+      "system_index": 12,
+      "page": 2,
+      "ys": [
+        370.1,
+        376.4,
+        382.8,
+        389.2,
+        395.6,
+        402.0
+      ],
+      "rect": [
+        26.346460342407227,
+        345.1000061035156,
+        173.61514282226562,
+        423.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\哪吒2-我乃哪吒三太子-谱子伴奏-大毛笔\\哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "pdf_sha256": "9aa07c11d8236985bb2750495f488418e5120973060627940fbeabab8332b7db",
+      "image_sha256": "27974fd429bb78a693822de4c0a7e5a5929b2b2fb246ae0c654d832106d24531",
+      "parent_id": "case-011-system-012",
+      "bar_index": 0,
+      "parent_bar_count": 4,
+      "left": 28.346460342407227,
+      "right": 171.61515045166016
+    },
+    {
+      "id": "case-011-system-012-bar-001",
+      "case": "case-011",
+      "system_index": 12,
+      "page": 2,
+      "ys": [
+        370.1,
+        376.4,
+        382.8,
+        389.2,
+        395.6,
+        402.0
+      ],
+      "rect": [
+        169.61514282226562,
+        345.1000061035156,
+        305.2730407714844,
+        423.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\哪吒2-我乃哪吒三太子-谱子伴奏-大毛笔\\哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "pdf_sha256": "9aa07c11d8236985bb2750495f488418e5120973060627940fbeabab8332b7db",
+      "image_sha256": "fda23f7a915f1050063e3d8545f060c556cf23620214ac9ef6c8c7c9e5c712ef",
+      "parent_id": "case-011-system-012",
+      "bar_index": 1,
+      "parent_bar_count": 4,
+      "left": 171.61515045166016,
+      "right": 303.2730407714844
+    },
+    {
+      "id": "case-011-system-012-bar-002",
+      "case": "case-011",
+      "system_index": 12,
+      "page": 2,
+      "ys": [
+        370.1,
+        376.4,
+        382.8,
+        389.2,
+        395.6,
+        402.0
+      ],
+      "rect": [
+        301.2730407714844,
+        345.1000061035156,
+        436.9310607910156,
+        423.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\哪吒2-我乃哪吒三太子-谱子伴奏-大毛笔\\哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "pdf_sha256": "9aa07c11d8236985bb2750495f488418e5120973060627940fbeabab8332b7db",
+      "image_sha256": "a42b0bf4da54d87431a1a8ed61fda733f39a429d169c976f740d772f35f30bdb",
+      "parent_id": "case-011-system-012",
+      "bar_index": 2,
+      "parent_bar_count": 4,
+      "left": 303.2730407714844,
+      "right": 434.9310607910156
+    },
+    {
+      "id": "case-011-system-012-bar-003",
+      "case": "case-011",
+      "system_index": 12,
+      "page": 2,
+      "ys": [
+        370.1,
+        376.4,
+        382.8,
+        389.2,
+        395.6,
+        402.0
+      ],
+      "rect": [
+        432.9310607910156,
+        345.1000061035156,
+        568.759033203125,
+        423.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\_MineShared_\\哪吒2-我乃哪吒三太子-谱子伴奏-大毛笔\\哪吒2-我乃哪吒三太子-大毛笔.pdf",
+      "pdf_sha256": "9aa07c11d8236985bb2750495f488418e5120973060627940fbeabab8332b7db",
+      "image_sha256": "9852024cba2bff199f6b6673b7c0414ea4893684325d8fd4f395a70eb3bb574a",
+      "parent_id": "case-011-system-012",
+      "bar_index": 3,
+      "parent_bar_count": 4,
+      "left": 434.9310607910156,
+      "right": 566.7590026855469
+    },
+    {
+      "id": "case-026-system-000-bar-000",
+      "case": "case-026",
+      "system_index": 0,
+      "page": 1,
+      "ys": [
+        191.6,
+        198.0,
+        204.4,
+        210.8,
+        217.1,
+        223.5
+      ],
+      "rect": [
+        26.34645652770996,
+        117.5999984741211,
+        179.13919067382812,
+        264.1000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\此生不换 (2).pdf",
+      "pdf_sha256": "28e5e8b3d5e21dccfb473bcea03a091ff535c7d5e47c089977dc4425a0648abd",
+      "image_sha256": "249930303fed77601f4fb3af0af9aab919c7bd823968527a1efe34d7b5dbb31d",
+      "parent_id": "case-026-system-000",
+      "bar_index": 0,
+      "parent_bar_count": 3,
+      "left": 28.34645652770996,
+      "right": 177.1391830444336
+    },
+    {
+      "id": "case-026-system-000-bar-001",
+      "case": "case-026",
+      "system_index": 0,
+      "page": 1,
+      "ys": [
+        191.6,
+        198.0,
+        204.4,
+        210.8,
+        217.1,
+        223.5
+      ],
+      "rect": [
+        175.13919067382812,
+        117.5999984741211,
+        373.8640441894531,
+        264.1000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\此生不换 (2).pdf",
+      "pdf_sha256": "28e5e8b3d5e21dccfb473bcea03a091ff535c7d5e47c089977dc4425a0648abd",
+      "image_sha256": "93ca9959982c914c8ed4ccefb9d7bc7434bd57cc198ad19fe15c5ba7bfe8e18a",
+      "parent_id": "case-026-system-000",
+      "bar_index": 1,
+      "parent_bar_count": 3,
+      "left": 177.1391830444336,
+      "right": 371.8640441894531
+    },
+    {
+      "id": "case-026-system-000-bar-002",
+      "case": "case-026",
+      "system_index": 0,
+      "page": 1,
+      "ys": [
+        191.6,
+        198.0,
+        204.4,
+        210.8,
+        217.1,
+        223.5
+      ],
+      "rect": [
+        369.8640441894531,
+        117.5999984741211,
+        568.7589111328125,
+        264.1000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\此生不换 (2).pdf",
+      "pdf_sha256": "28e5e8b3d5e21dccfb473bcea03a091ff535c7d5e47c089977dc4425a0648abd",
+      "image_sha256": "87162deb0163cd5d011732b4b8dae3365642d7581dfa92e45bcbe33987e56359",
+      "parent_id": "case-026-system-000",
+      "bar_index": 2,
+      "parent_bar_count": 3,
+      "left": 371.8640441894531,
+      "right": 566.7589416503906
+    },
+    {
+      "id": "case-071-system-010-bar-000",
+      "case": "case-071",
+      "system_index": 10,
+      "page": 2,
+      "ys": [
+        229.1,
+        235.5,
+        241.9,
+        248.2,
+        254.6,
+        261.0
+      ],
+      "rect": [
+        26.34645652770996,
+        204.10000610351562,
+        217.48977661132812,
+        289.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\花花\\烟火里的尘埃 演唱会版\\烟火里的尘埃 分解吉他.pdf",
+      "pdf_sha256": "10831b86cc418115c7904c1d81696abfd282ba2f041c00e5a4f308684dcec0b0",
+      "image_sha256": "dab145baa62b897b8a51f9b3958ef8fa23f3396c63177d557f4af87968dd5509",
+      "parent_id": "case-071-system-010",
+      "bar_index": 0,
+      "parent_bar_count": 3,
+      "left": 28.34645652770996,
+      "right": 215.4897689819336
+    },
+    {
+      "id": "case-071-system-010-bar-001",
+      "case": "case-071",
+      "system_index": 10,
+      "page": 2,
+      "ys": [
+        229.1,
+        235.5,
+        241.9,
+        248.2,
+        254.6,
+        261.0
+      ],
+      "rect": [
+        213.48977661132812,
+        204.10000610351562,
+        393.03936767578125,
+        289.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\花花\\烟火里的尘埃 演唱会版\\烟火里的尘埃 分解吉他.pdf",
+      "pdf_sha256": "10831b86cc418115c7904c1d81696abfd282ba2f041c00e5a4f308684dcec0b0",
+      "image_sha256": "a3afeecd8c08f2bad606de3083ec3bedf1a21cc5e0241ad2fb1c7dd4f7d27f31",
+      "parent_id": "case-071-system-010",
+      "bar_index": 1,
+      "parent_bar_count": 3,
+      "left": 215.4897689819336,
+      "right": 391.03936767578125
+    },
+    {
+      "id": "case-071-system-010-bar-002",
+      "case": "case-071",
+      "system_index": 10,
+      "page": 2,
+      "ys": [
+        229.1,
+        235.5,
+        241.9,
+        248.2,
+        254.6,
+        261.0
+      ],
+      "rect": [
+        389.03936767578125,
+        204.10000610351562,
+        568.759033203125,
+        289.6000061035156
+      ],
+      "pdf": "C:\\Users\\sadada\\Desktop\\素材\\花花\\烟火里的尘埃 演唱会版\\烟火里的尘埃 分解吉他.pdf",
+      "pdf_sha256": "10831b86cc418115c7904c1d81696abfd282ba2f041c00e5a4f308684dcec0b0",
+      "image_sha256": "716c6037c990f8a0b5794f59ecac07d96eb753d07d00a75048a71c6110e5a294",
+      "parent_id": "case-071-system-010",
+      "bar_index": 2,
+      "parent_bar_count": 3,
+      "left": 391.03936767578125,
+      "right": 566.7590637207031
+    }
+  ],
+  "existing_rule_note_audit": {
+    "scope": "Primary voice string/fret/dead groups and order, including tie-destination notes; not timing/rest/tie/technique correctness. Missing/extra bars retained; ambiguous frozen track names excluded, never reselected.",
+    "baseline_results_sha256": "746547b92b393bc876fdfa9bb86812702314eee48271eaf66c151ca8b854bdd8",
+    "rows": [
+      {
+        "case": "case-000",
+        "pairing": "uncertain",
+        "bars": 9,
+        "exact_note_groups": 7,
+        "reference_notes": 70,
+        "predicted_notes": 68,
+        "matched_notes": 68,
+        "missing_bars": 1,
+        "extra_bars": 0,
+        "prediction_sha256": "0340514ea60fe4b72d58ffa9d8e9f07d1651ab9b68e03d649a69620ad426f7d1",
+        "reference_sha256": "5048d6a2801723630a90a879872b5e4b1dc05755372fed525a2dd52114c2a054"
+      },
+      {
+        "case": "case-002",
+        "pairing": "consistent",
+        "bars": 67,
+        "exact_note_groups": 67,
+        "reference_notes": 463,
+        "predicted_notes": 463,
+        "matched_notes": 463,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "2b8315042cf3a99097da29df85b48edfa6a7a5e0b360e831489a389a2bec681a",
+        "reference_sha256": "78121167f647549c2a08c0ceb5e20e2a9736515acd709cbc85787c7b1642ae87"
+      },
+      {
+        "case": "case-004",
+        "pairing": "consistent",
+        "bars": 95,
+        "exact_note_groups": 95,
+        "reference_notes": 371,
+        "predicted_notes": 371,
+        "matched_notes": 371,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "6427350c94ef370b05d49a8533a4a8f7ce28a207168edaf25e9af85e6216ad2d",
+        "reference_sha256": "d9d5b250469818ea6530c783270b2dc31ea58724ac0d48bb8aec68fa29f9995b"
+      },
+      {
+        "case": "case-005",
+        "pairing": "consistent",
+        "bars": 74,
+        "exact_note_groups": 74,
+        "reference_notes": 231,
+        "predicted_notes": 231,
+        "matched_notes": 231,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "e0c1b170fd19b45cd777ec47f113f982ebe04389ae19972ae075bffe9496f9ff",
+        "reference_sha256": "ff27ed709439b8e18c72a97870059e3b6d6242c361573c2c198e70ced6f44a03"
+      },
+      {
+        "case": "case-006",
+        "pairing": "consistent",
+        "bars": 82,
+        "exact_note_groups": 82,
+        "reference_notes": 785,
+        "predicted_notes": 785,
+        "matched_notes": 785,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "66d5b73ad868399f182c1f1aec84f5f59d311be8560db87604f552b2a42af24b",
+        "reference_sha256": "2813e724c317b6980077f4dd81f9f555aa01016da46b177675c6f46167e7a1c3"
+      },
+      {
+        "case": "case-008",
+        "pairing": "uncertain",
+        "bars": 101,
+        "exact_note_groups": 100,
+        "reference_notes": 554,
+        "predicted_notes": 552,
+        "matched_notes": 552,
+        "missing_bars": 1,
+        "extra_bars": 0,
+        "prediction_sha256": "ed4e89308605c7dc87a9247bc4918ff3eb657ba132ab6244c26ae4712846b869",
+        "reference_sha256": "f4f9e8dc8ab79826966a4ef71c82a0de69a1bfd67e19c7d183710f5ae14a99be"
+      },
+      {
+        "case": "case-009",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 421,
+        "predicted_notes": 421,
+        "matched_notes": 421,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "4a9c644ed7e8f07d92878042a58383069d8a7492135ee9b4cf8299a66314d423",
+        "reference_sha256": "1fe6433597e8fc0f5191911d2794dd883b127b07f009582e8f1167a8b20700b9"
+      },
+      {
+        "case": "case-011",
+        "pairing": "consistent",
+        "bars": 98,
+        "exact_note_groups": 98,
+        "reference_notes": 508,
+        "predicted_notes": 508,
+        "matched_notes": 508,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "eaeb2c597bbcb73ae62d85e7f466757e461e1cc9dd68f1fb7f4ce5aec4248637",
+        "reference_sha256": "c985042b8b16895bd08b85dadade7c6c865f00f5370062f853c0d05474e5c4f3"
+      },
+      {
+        "case": "case-012",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 302,
+        "predicted_notes": 302,
+        "matched_notes": 302,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "ecd86bd24a4c6c65666a75899660f917168eb562e094da706642c4bfbcd18bad",
+        "reference_sha256": "085cd12956151c1ecb7d6370eb38c5c239ca7b1b3ab40266af8fd896afa5233b"
+      },
+      {
+        "case": "case-013",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 340,
+        "predicted_notes": 340,
+        "matched_notes": 340,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "094bfe7b8ccc45f55a307e22173261b3aa033f64d01c7d6001831c0228e3fdc5",
+        "reference_sha256": "6e8931d8224aef9f6775cb9472d58ce0b0a6d7c587123e4f0b3b77812a868299"
+      },
+      {
+        "case": "case-016",
+        "pairing": "consistent",
+        "bars": 66,
+        "exact_note_groups": 66,
+        "reference_notes": 272,
+        "predicted_notes": 272,
+        "matched_notes": 272,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "8adfb650a0743a96776583b28a5ee28f4e184ef36372ba32548024988603d630",
+        "reference_sha256": "158e30c41fc2ec6d5c6025bcc7c6af9500bf1d70adf878556bd3db3bfbdd5e09"
+      },
+      {
+        "case": "case-019",
+        "pairing": "consistent",
+        "bars": 96,
+        "exact_note_groups": 96,
+        "reference_notes": 585,
+        "predicted_notes": 585,
+        "matched_notes": 585,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "a6d960dd9b35167aad187cccba16549a8aada253d261ac38c7ef472a48a95db4",
+        "reference_sha256": "e8e2e0162c6e0129d13aee7ab6b28d5a3961b51e9cd51d4beb6d607754919251"
+      },
+      {
+        "case": "case-022",
+        "pairing": "consistent",
+        "bars": 81,
+        "exact_note_groups": 81,
+        "reference_notes": 389,
+        "predicted_notes": 389,
+        "matched_notes": 389,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "28eeec1713ae9583fa3f9f944978094272bcbd860643a588e94e0954b8b6c4cc",
+        "reference_sha256": "98d08c7ef39a1c91d2803ac62e92e933d02c7aa85626fc40a6a01d51925fa6a4"
+      },
+      {
+        "case": "case-023",
+        "pairing": "consistent",
+        "bars": 95,
+        "exact_note_groups": 91,
+        "reference_notes": 575,
+        "predicted_notes": 568,
+        "matched_notes": 568,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "05a44a4af4cd8297784f416de83e3905bc40aa5d6eea6761292d999706c24a2a",
+        "reference_sha256": "ec8cdbe82de01bbaafa3d88fe8944b98eaad49db9d47df722d8587ffb1b52118"
+      },
+      {
+        "case": "case-024",
+        "pairing": "consistent",
+        "bars": 66,
+        "exact_note_groups": 66,
+        "reference_notes": 377,
+        "predicted_notes": 377,
+        "matched_notes": 377,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "3e0b38d72615a3cf7b62c51cdc346a471a40a0408cf3f664888b1fd818ae185c",
+        "reference_sha256": "1fbc88e1f589a38b65a51b649f6fc1d6a962940d3c6ba85775eb8504c20108a7"
+      },
+      {
+        "case": "case-025",
+        "pairing": "consistent",
+        "bars": 56,
+        "exact_note_groups": 56,
+        "reference_notes": 339,
+        "predicted_notes": 339,
+        "matched_notes": 339,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "f779e2b419234cf4ff542dd3170e410539b5e9a707dd2588e3de61d21dea2896",
+        "reference_sha256": "828d9adbc7022aafcf084d7e0aa3b503ca2b0b980a8ad822ea27444ccefea299"
+      },
+      {
+        "case": "case-026",
+        "pairing": "consistent",
+        "bars": 38,
+        "exact_note_groups": 37,
+        "reference_notes": 290,
+        "predicted_notes": 290,
+        "matched_notes": 281,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "46d02c73b43439a934582ab718224f5bad9203062f4a282ca781be40e8cf6ee1",
+        "reference_sha256": "ec22ef595eb209a1cf5eb555553a505981b11daf317115fda7b0ff559c0ef854"
+      },
+      {
+        "case": "case-027",
+        "pairing": "uncertain",
+        "bars": 291,
+        "exact_note_groups": 0,
+        "reference_notes": 306,
+        "predicted_notes": 1091,
+        "matched_notes": 0,
+        "missing_bars": 0,
+        "extra_bars": 257,
+        "prediction_sha256": "8f743a206a35d88eb986f42e8d19f3ab5f1b4914633cb4c629f9b31a1577cf34",
+        "reference_sha256": "5f17d60304fb633d6d65694c3a8b1735c0644b7feada3fd209c9c473f29642af"
+      },
+      {
+        "case": "case-028",
+        "pairing": "uncertain",
+        "bars": 22,
+        "exact_note_groups": 22,
+        "reference_notes": 239,
+        "predicted_notes": 239,
+        "matched_notes": 239,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "12f9213c3f6d2396beebd30ead07c858b4c8448f6b919f73928d405dd4bda2d6",
+        "reference_sha256": "27b52217645c7ca57dad99a2b90b58ec59b48e8831bb002458acd5e7821de0b3"
+      },
+      {
+        "case": "case-034",
+        "pairing": "consistent",
+        "bars": 152,
+        "exact_note_groups": 80,
+        "reference_notes": 486,
+        "predicted_notes": 414,
+        "matched_notes": 414,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "c783b107d83caf7e62a2ea85a94bdbe46f078b6558e3fb8547d7a9b73dcd499e",
+        "reference_sha256": "1932be46bd20820b59f6a0eaf97651dd144f41f3ac6223d725d9661520caac21"
+      },
+      {
+        "case": "case-035",
+        "pairing": "uncertain",
+        "bars": 152,
+        "exact_note_groups": 146,
+        "reference_notes": 295,
+        "predicted_notes": 295,
+        "matched_notes": 279,
+        "missing_bars": 4,
+        "extra_bars": 0,
+        "prediction_sha256": "ca980659a2b759d74e18f7b0697ecfe379695fa5d3ee1dd6610bf6b3845e0803",
+        "reference_sha256": "1932be46bd20820b59f6a0eaf97651dd144f41f3ac6223d725d9661520caac21"
+      },
+      {
+        "case": "case-036",
+        "pairing": "consistent",
+        "bars": 152,
+        "exact_note_groups": 152,
+        "reference_notes": 1058,
+        "predicted_notes": 1058,
+        "matched_notes": 1058,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "65efc0caa514a6518a5bedb715bd375277b43ce2ab2c80155504997a95721fff",
+        "reference_sha256": "1932be46bd20820b59f6a0eaf97651dd144f41f3ac6223d725d9661520caac21"
+      },
+      {
+        "case": "case-037",
+        "pairing": "consistent",
+        "bars": 143,
+        "exact_note_groups": 143,
+        "reference_notes": 875,
+        "predicted_notes": 875,
+        "matched_notes": 875,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "e384b41f187e182dd976435481d163ef6e74fa9a9b5790cd54a270fd2349f608",
+        "reference_sha256": "897d4c4e82c288f51a0804091c94ceaafff74b9095a9a24880d129cb48f7fec5"
+      },
+      {
+        "case": "case-038",
+        "pairing": "consistent",
+        "bars": 143,
+        "exact_note_groups": 142,
+        "reference_notes": 1187,
+        "predicted_notes": 1187,
+        "matched_notes": 1171,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "af404a42ed7c61077b841f8bd63de5aa0fa6ea0675dd681e4db199e9ac760d30",
+        "reference_sha256": "897d4c4e82c288f51a0804091c94ceaafff74b9095a9a24880d129cb48f7fec5"
+      },
+      {
+        "case": "case-039",
+        "pairing": "consistent",
+        "bars": 143,
+        "exact_note_groups": 143,
+        "reference_notes": 26,
+        "predicted_notes": 26,
+        "matched_notes": 26,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "b38bb84a95c767d145325487f1c02ca8b715d9e528a5bef87a3ae90f8cde6682",
+        "reference_sha256": "897d4c4e82c288f51a0804091c94ceaafff74b9095a9a24880d129cb48f7fec5"
+      },
+      {
+        "case": "case-040",
+        "pairing": "consistent",
+        "bars": 143,
+        "exact_note_groups": 143,
+        "reference_notes": 2842,
+        "predicted_notes": 2842,
+        "matched_notes": 2842,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "ac41cfdbb45d6221c79dd95ccaf17ddf4061d7e7233dd63600aa9c18a5fe2611",
+        "reference_sha256": "897d4c4e82c288f51a0804091c94ceaafff74b9095a9a24880d129cb48f7fec5"
+      },
+      {
+        "case": "case-041",
+        "pairing": "uncertain",
+        "bars": 74,
+        "exact_note_groups": 74,
+        "reference_notes": 60,
+        "predicted_notes": 60,
+        "matched_notes": 60,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "d7086e608b2b99d5735f8f6755d5ce7706ad6c7f3d6fd92d2e6188503ad626ef",
+        "reference_sha256": "8530c9f4c2b0a78dd1760235a40778c576f80bfc28d904de19606e6a9d96a7d6"
+      },
+      {
+        "case": "case-042",
+        "pairing": "uncertain",
+        "bars": 74,
+        "exact_note_groups": 74,
+        "reference_notes": 1017,
+        "predicted_notes": 1017,
+        "matched_notes": 1017,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "c519e07b35d7813a49b0ca26eddb1da93afb2f1572c52303407b16e401c67422",
+        "reference_sha256": "8530c9f4c2b0a78dd1760235a40778c576f80bfc28d904de19606e6a9d96a7d6"
+      },
+      {
+        "case": "case-044",
+        "pairing": "consistent",
+        "bars": 172,
+        "exact_note_groups": 172,
+        "reference_notes": 782,
+        "predicted_notes": 782,
+        "matched_notes": 782,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "79790cd5b1674dd1a5ba73b3e6dab07c2f6abbcd4f2516f92d2270eacd3f7834",
+        "reference_sha256": "032b189e811880183c01d0885bd2a432bd5ad72edaa9f3e9e446517d009c3f14"
+      },
+      {
+        "case": "case-045",
+        "pairing": "consistent",
+        "bars": 105,
+        "exact_note_groups": 105,
+        "reference_notes": 554,
+        "predicted_notes": 554,
+        "matched_notes": 554,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "ab4128f1e992480527dba59984d5f55cd9ea0443e0f481e0c2fc2e7701724a1a",
+        "reference_sha256": "999205bf7a0f6d7e53404706a9d67e13764bb40cab6214053178ba6846b2c1c6"
+      },
+      {
+        "case": "case-046",
+        "pairing": "consistent",
+        "bars": 105,
+        "exact_note_groups": 105,
+        "reference_notes": 775,
+        "predicted_notes": 775,
+        "matched_notes": 775,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "e0e12573cd06d4df322953001ac096a0032548a6c3c097069f1c9fca0731edef",
+        "reference_sha256": "999205bf7a0f6d7e53404706a9d67e13764bb40cab6214053178ba6846b2c1c6"
+      },
+      {
+        "case": "case-047",
+        "pairing": "consistent",
+        "bars": 79,
+        "exact_note_groups": 79,
+        "reference_notes": 256,
+        "predicted_notes": 256,
+        "matched_notes": 256,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "16103d90e99d31a5afca2122e2f396b4f75e07373dd9022ce84947b18a2b4686",
+        "reference_sha256": "b269c2f46d1c79e5cfa2ff8449920edff09cf8e2a531fee45f772ca479ad2088"
+      },
+      {
+        "case": "case-057",
+        "pairing": "uncertain",
+        "bars": 79,
+        "exact_note_groups": 75,
+        "reference_notes": 794,
+        "predicted_notes": 666,
+        "matched_notes": 666,
+        "missing_bars": 4,
+        "extra_bars": 0,
+        "prediction_sha256": "505d82d2c5206ccee4320c25a51ff182a39469805108b0fe2256cb1d25667f19",
+        "reference_sha256": "c35f3f631d1c3aa2ae20cc7e3e5da50ed8715a726029b96f748e9a5144f7d536"
+      },
+      {
+        "case": "case-058",
+        "pairing": "uncertain",
+        "bars": 79,
+        "exact_note_groups": 68,
+        "reference_notes": 344,
+        "predicted_notes": 238,
+        "matched_notes": 238,
+        "missing_bars": 3,
+        "extra_bars": 0,
+        "prediction_sha256": "34312bf3fcae690b9a33fa77ebce0d7b8da2223e27b9bf123d85f21cac8dcb3b",
+        "reference_sha256": "c35f3f631d1c3aa2ae20cc7e3e5da50ed8715a726029b96f748e9a5144f7d536"
+      },
+      {
+        "case": "case-059",
+        "pairing": "consistent",
+        "bars": 79,
+        "exact_note_groups": 79,
+        "reference_notes": 98,
+        "predicted_notes": 98,
+        "matched_notes": 98,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "7143d1c77bdcee7f2b2987c3cc248c04a100201329329096450bc9bf6fef23b2",
+        "reference_sha256": "c35f3f631d1c3aa2ae20cc7e3e5da50ed8715a726029b96f748e9a5144f7d536"
+      },
+      {
+        "case": "case-060",
+        "pairing": "uncertain",
+        "bars": 79,
+        "exact_note_groups": 0,
+        "reference_notes": 794,
+        "predicted_notes": 65,
+        "matched_notes": 2,
+        "missing_bars": 67,
+        "extra_bars": 0,
+        "prediction_sha256": "4c5ec6e0904d6f556759a1f131fc212a4145329f030d70db62818bed0ba56af8",
+        "reference_sha256": "c35f3f631d1c3aa2ae20cc7e3e5da50ed8715a726029b96f748e9a5144f7d536"
+      },
+      {
+        "case": "case-061",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 586,
+        "predicted_notes": 586,
+        "matched_notes": 586,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "addf73a86668fad514d3ea2a020e17f39c948781b4d69f7d66c90698fcd79e0c",
+        "reference_sha256": "73eeaf938bd000f251d587c0a62517d988f537712618753a58e3be1f1cbc28d6"
+      },
+      {
+        "case": "case-062",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 736,
+        "predicted_notes": 736,
+        "matched_notes": 736,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "8048816741ece1157963715a50d1422f0faceaf9e7dfeec32f0dcb53f1be3b6f",
+        "reference_sha256": "73eeaf938bd000f251d587c0a62517d988f537712618753a58e3be1f1cbc28d6"
+      },
+      {
+        "case": "case-063",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 249,
+        "predicted_notes": 249,
+        "matched_notes": 249,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "0afe1e93be183a21b448f6797fe4102a6896494eb26948ca9b220a85cbb840e9",
+        "reference_sha256": "73eeaf938bd000f251d587c0a62517d988f537712618753a58e3be1f1cbc28d6"
+      },
+      {
+        "case": "case-064",
+        "pairing": "consistent",
+        "bars": 87,
+        "exact_note_groups": 87,
+        "reference_notes": 376,
+        "predicted_notes": 376,
+        "matched_notes": 376,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "fef7eb1cb1db190f39040dde1a56884dde97d7daf411bcb52bbab592b4c4f2a5",
+        "reference_sha256": "73eeaf938bd000f251d587c0a62517d988f537712618753a58e3be1f1cbc28d6"
+      },
+      {
+        "case": "case-065",
+        "pairing": "uncertain",
+        "bars": 16,
+        "exact_note_groups": 16,
+        "reference_notes": 49,
+        "predicted_notes": 49,
+        "matched_notes": 49,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "73a1f9faa4beed41d0465510b923748dd11b07b472f2344944fd49d981f83a40",
+        "reference_sha256": "b3d7ed4c56efa3307060ded14ead2423e583da42c882e078973ded2d3a27090e"
+      },
+      {
+        "case": "case-069",
+        "pairing": "consistent",
+        "bars": 22,
+        "exact_note_groups": 22,
+        "reference_notes": 64,
+        "predicted_notes": 64,
+        "matched_notes": 64,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "d0d64e670ccf314903300c7a9c2a8507f8dbf367d34f0bd6e4ffeb71af1acaee",
+        "reference_sha256": "956fec8cfba76469153cf024846b45f6c0551df2f742ffd7cdf5622eef9a0d68"
+      },
+      {
+        "case": "case-071",
+        "pairing": "consistent",
+        "bars": 62,
+        "exact_note_groups": 62,
+        "reference_notes": 1020,
+        "predicted_notes": 1020,
+        "matched_notes": 1020,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "dd2c5a6bff5f2f8f753a51273dc468d63cb40ffcc217e6a18b91d57f199882f5",
+        "reference_sha256": "d3c78b06eab41c01f5a3a2976b46cb79458656e44953e1bab1a1ba671d99f11a"
+      },
+      {
+        "case": "case-072",
+        "pairing": "consistent",
+        "bars": 62,
+        "exact_note_groups": 62,
+        "reference_notes": 1302,
+        "predicted_notes": 1302,
+        "matched_notes": 1302,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "efd2133ef7900aa806e32fb080d765aa01620f5f9b27ceb43924ec164e20a213",
+        "reference_sha256": "d3c78b06eab41c01f5a3a2976b46cb79458656e44953e1bab1a1ba671d99f11a"
+      },
+      {
+        "case": "case-077",
+        "pairing": "consistent",
+        "bars": 32,
+        "exact_note_groups": 32,
+        "reference_notes": 402,
+        "predicted_notes": 402,
+        "matched_notes": 402,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "7c93c4ed69b783e8ead4f187a742a3748c7461fa71dae4f1cc0495f369795ca1",
+        "reference_sha256": "0a82055e0949c4b7d4f2253e0a9ed46acb83c255bef1ca09bd3c95a7d510b6ee"
+      },
+      {
+        "case": "case-078",
+        "pairing": "consistent",
+        "bars": 148,
+        "exact_note_groups": 148,
+        "reference_notes": 1544,
+        "predicted_notes": 1544,
+        "matched_notes": 1544,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "a5edfb8fb2294c967d9292f64aea853b559aabeecb05f725fb2416442233ae3a",
+        "reference_sha256": "52cc8857767bf28daf64104d76f595676c236d3d444b6ee51c06a35045791c26"
+      },
+      {
+        "case": "case-079",
+        "pairing": "consistent",
+        "bars": 148,
+        "exact_note_groups": 148,
+        "reference_notes": 553,
+        "predicted_notes": 553,
+        "matched_notes": 553,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "8bc8ab529e0147011fe6788562224db03c3d165d20cb375c7c2cb5b3ef80af6b",
+        "reference_sha256": "52cc8857767bf28daf64104d76f595676c236d3d444b6ee51c06a35045791c26"
+      },
+      {
+        "case": "case-080",
+        "pairing": "consistent",
+        "bars": 148,
+        "exact_note_groups": 148,
+        "reference_notes": 632,
+        "predicted_notes": 632,
+        "matched_notes": 632,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "3bb4ceafc5ea534f7ceb9b190cded03946e473bf36cb7a20fabf6e27e0ebe976",
+        "reference_sha256": "52cc8857767bf28daf64104d76f595676c236d3d444b6ee51c06a35045791c26"
+      },
+      {
+        "case": "case-081",
+        "pairing": "consistent",
+        "bars": 90,
+        "exact_note_groups": 90,
+        "reference_notes": 607,
+        "predicted_notes": 607,
+        "matched_notes": 607,
+        "missing_bars": 0,
+        "extra_bars": 0,
+        "prediction_sha256": "99c69eeeeecf6acd0821800678232f203e50ea4cfa1f41c40c425e48c92fc2b2",
+        "reference_sha256": "24387ffd8773f8c296da60a5449c314b29ed16664a09ead0dd8ebd1bbbb24a77"
+      }
+    ],
+    "excluded": [
+      {
+        "case": "case-001",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-003",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-007",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-010",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-014",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-015",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-017",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-018",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-020",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-021",
+        "reason": "unsupported-no-six-line-staff"
+      },
+      {
+        "case": "case-029",
+        "reason": "error"
+      },
+      {
+        "case": "case-030",
+        "reason": "error"
+      },
+      {
+        "case": "case-031",
+        "reason": "error"
+      },
+      {
+        "case": "case-032",
+        "reason": "error"
+      },
+      {
+        "case": "case-033",
+        "reason": "error"
+      },
+      {
+        "case": "case-043",
+        "reason": "unsupported-no-six-line-staff"
+      },
+      {
+        "case": "case-048",
+        "reason": "error"
+      },
+      {
+        "case": "case-049",
+        "reason": "error"
+      },
+      {
+        "case": "case-050",
+        "reason": "error"
+      },
+      {
+        "case": "case-051",
+        "reason": "error"
+      },
+      {
+        "case": "case-052",
+        "reason": "error"
+      },
+      {
+        "case": "case-053",
+        "reason": "error"
+      },
+      {
+        "case": "case-054",
+        "reason": "error"
+      },
+      {
+        "case": "case-055",
+        "reason": "error"
+      },
+      {
+        "case": "case-056",
+        "reason": "error"
+      },
+      {
+        "case": "case-066",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-067",
+        "reason": "ambiguous frozen reference track name"
+      },
+      {
+        "case": "case-068",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-070",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-073",
+        "reason": "unsupported-no-six-line-staff"
+      },
+      {
+        "case": "case-074",
+        "reason": "unsupported-no-six-line-staff"
+      },
+      {
+        "case": "case-075",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      },
+      {
+        "case": "case-076",
+        "reason": "unsupported-multiple-parts-or-repeated-bar-numbers"
+      }
+    ],
+    "all": {
+      "bars": 4627,
+      "exact_note_groups": 4155,
+      "reference_notes": 27780,
+      "predicted_notes": 27519,
+      "matched_notes": 26324,
+      "missing_bars": 80,
+      "extra_bars": 257,
+      "cases": 49
+    },
+    "consistent": {
+      "bars": 3651,
+      "exact_note_groups": 3573,
+      "reference_notes": 23258,
+      "predicted_notes": 23179,
+      "matched_notes": 23154,
+      "missing_bars": 0,
+      "extra_bars": 0,
+      "cases": 38
+    },
+    "uncertain": {
+      "bars": 976,
+      "exact_note_groups": 582,
+      "reference_notes": 4522,
+      "predicted_notes": 4340,
+      "matched_notes": 3170,
+      "missing_bars": 80,
+      "extra_bars": 257,
+      "cases": 11
+    }
+  },
+  "draft_example": {
+    "path": "D:\\RiffLoop-model-tests\\bar-model-20261027\\drafts\\case-034.draft.gp",
+    "sha256": "8e7b7f1945a53302fb4ed0c8f51d42186c8a9dc77282b4d67dd7937abea0ae37",
+    "review": {
+      "draft": true,
+      "playback_verified": false,
+      "source_sha256": "c783b107d83caf7e62a2ea85a94bdbe46f078b6558e3fb8547d7a9b73dcd499e",
+      "omitted": "ties, harmonics, slides, bends, palm mute, staccato and other playing techniques; repeats",
+      "tempo_issues": [],
+      "note_count": 414,
+      "bars": [
+        {
+          "page": 1,
+          "source_bar": 1,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 2,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 3,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 4,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 5,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 6,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 7,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 8,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 9,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 10,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 11,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 12,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 13,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 14,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 15,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 16,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 17,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 1,
+          "source_bar": 18,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 19,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 20,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 21,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 22,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 23,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 24,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 25,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 26,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 27,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 28,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 29,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 30,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 31,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 32,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 33,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 34,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 35,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 36,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 37,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 38,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 2,
+          "source_bar": 39,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 40,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 41,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 42,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 43,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 44,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 45,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 46,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 47,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 48,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 49,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 50,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 51,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 52,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 53,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 54,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 55,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 56,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 57,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1
+          ],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 58,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 59,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 3,
+          "source_bar": 60,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 61,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 62,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 63,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 64,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 65,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 66,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 67,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 68,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 69,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 70,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 71,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 72,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 73,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 74,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 75,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 76,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 77,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 78,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 79,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 80,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 4,
+          "source_bar": 81,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 82,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 83,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 84,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 85,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 86,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 87,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 88,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 89,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 90,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 91,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 92,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 93,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 94,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 95,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 96,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 97,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 98,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 99,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 100,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 101,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 5,
+          "source_bar": 102,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 103,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 104,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 105,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 106,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 107,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 108,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 109,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 110,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 111,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 112,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 113,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 114,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 115,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 116,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 117,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 118,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 119,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 120,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 121,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 122,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 6,
+          "source_bar": 123,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 124,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 125,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 126,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 127,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 128,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 129,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 130,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 131,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 132,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 133,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 134,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 135,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 136,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 137,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 138,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 139,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 140,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 141,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 142,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 143,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 7,
+          "source_bar": 144,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 145,
+          "issues": [
+            "存在未识别时值"
+          ],
+          "placeholder_beats": [
+            1,
+            2
+          ],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 146,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 147,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 148,
+          "issues": [
+            "时值合计 3.5 拍，拍号需要 4 拍"
+          ],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 149,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 150,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 151,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        },
+        {
+          "page": 8,
+          "source_bar": 152,
+          "issues": [],
+          "placeholder_beats": [],
+          "review_required": true
+        }
+      ],
+      "roundtrip": "passed; serialized content only, not PDF or playback accuracy"
+    },
+    "attack_only_diagnostic": {
+      "case": "case-034",
+      "scope": "Additional attack-only diagnostic; excludes tie destinations, not a timing pass",
+      "bars": [
+        {
+          "bar": 1,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 2,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 3,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 4,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 5,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 6,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 7,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 8,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 9,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 10,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 11,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 12,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 13,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 14,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 15,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 16,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 17,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 18,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 19,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 20,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 21,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 22,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 23,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 24,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 25,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 26,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 27,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 28,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 29,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 30,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 31,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 32,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 33,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 34,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 35,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 36,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 37,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 38,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 39,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 40,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 41,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 42,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 43,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 44,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 45,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 46,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 47,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 48,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 49,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 50,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 51,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 52,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 53,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 54,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 55,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 56,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 57,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 58,
+          "attack_groups_equal": true,
+          "recognized_attacks": 3,
+          "reference_attacks": 3,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 59,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 60,
+          "attack_groups_equal": true,
+          "recognized_attacks": 6,
+          "reference_attacks": 6,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 61,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 62,
+          "attack_groups_equal": true,
+          "recognized_attacks": 3,
+          "reference_attacks": 3,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 63,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 64,
+          "attack_groups_equal": true,
+          "recognized_attacks": 6,
+          "reference_attacks": 6,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 65,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 66,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 67,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 68,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 69,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 70,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 71,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 72,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 73,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 74,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 75,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 76,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 77,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 78,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 79,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 80,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 81,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 82,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 83,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 84,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 85,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 86,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 87,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 88,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 89,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 90,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 91,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 92,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 93,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 94,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 95,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 96,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 97,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 98,
+          "attack_groups_equal": true,
+          "recognized_attacks": 12,
+          "reference_attacks": 12,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 99,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 100,
+          "attack_groups_equal": true,
+          "recognized_attacks": 12,
+          "reference_attacks": 12,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 101,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 102,
+          "attack_groups_equal": true,
+          "recognized_attacks": 12,
+          "reference_attacks": 12,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 103,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 104,
+          "attack_groups_equal": true,
+          "recognized_attacks": 12,
+          "reference_attacks": 12,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 105,
+          "attack_groups_equal": true,
+          "recognized_attacks": 9,
+          "reference_attacks": 9,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 106,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 107,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 108,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 109,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 110,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 111,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 112,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 113,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 114,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 115,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 116,
+          "attack_groups_equal": true,
+          "recognized_attacks": 24,
+          "reference_attacks": 24,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 117,
+          "attack_groups_equal": true,
+          "recognized_attacks": 3,
+          "reference_attacks": 3,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 118,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 119,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 120,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 121,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 122,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 123,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 124,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 125,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 126,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 127,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 128,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 129,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 130,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 131,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 132,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 133,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 134,
+          "attack_groups_equal": true,
+          "recognized_attacks": 8,
+          "reference_attacks": 8,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 135,
+          "attack_groups_equal": true,
+          "recognized_attacks": 6,
+          "reference_attacks": 6,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 136,
+          "attack_groups_equal": true,
+          "recognized_attacks": 6,
+          "reference_attacks": 6,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 137,
+          "attack_groups_equal": true,
+          "recognized_attacks": 7,
+          "reference_attacks": 7,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 138,
+          "attack_groups_equal": true,
+          "recognized_attacks": 8,
+          "reference_attacks": 8,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 139,
+          "attack_groups_equal": true,
+          "recognized_attacks": 6,
+          "reference_attacks": 6,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 140,
+          "attack_groups_equal": true,
+          "recognized_attacks": 6,
+          "reference_attacks": 6,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 141,
+          "attack_groups_equal": true,
+          "recognized_attacks": 7,
+          "reference_attacks": 7,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 142,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 143,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 144,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 145,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 146,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 147,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 148,
+          "attack_groups_equal": true,
+          "recognized_attacks": 2,
+          "reference_attacks": 2,
+          "reference_tie_destinations": 1
+        },
+        {
+          "bar": 149,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 150,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 151,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        },
+        {
+          "bar": 152,
+          "attack_groups_equal": true,
+          "recognized_attacks": 0,
+          "reference_attacks": 0,
+          "reference_tie_destinations": 0
+        }
+      ],
+      "totals": {
+        "attack_groups_equal": 152,
+        "recognized_attacks": 409,
+        "reference_attacks": 409,
+        "reference_tie_destinations": 77
+      }
+    }
+  },
+  "tests": {
+    "tests": 205,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 148.069
+  },
+  "unit_log_sha256": "6ab061eeea42b6b84dc5554843af9e3a0c4bd994da1b49c85a2ec74d4d960d66",
+  "code_sha256": {
+    "prepare_bar_probe.py": "e24dcff75a9364771719948743d74fc394a08648241cbd9761e5aa353527d519",
+    "evaluate_bar_probe.py": "a5df48183971ebbf8184505900d981fb74771dccfca2b2903ecc9cf235ee3725",
+    "audit_note_groups.py": "c26ddcca9f817a82f4260b6c95664bcaef20eb5323789baca56f63876f7329d5",
+    "test_bar_probe.py": "d333d1ed036b1ff5c8551a7acf1fcd518f1eb00578139da81119e273d8f7c9af",
+    "note-groups-prompt.txt": "e0bfd0b60119636723a915077ac566d69b303b0300442914cefe69caa7bfc654",
+    "gp-draft-export.cjs": "915c1d40843f148b1a4b4841113bedf3580759277b7127506daec1349585c54a",
+    "test_draft_export.py": "5e906569b4956c5dd816555ef21ae734f6d01f1f5c05893fdd636884e10ab207"
+  },
+  "strict_core_files_changed": false,
+  "full_82_conversion_rerun": false,
+  "new_model_accepted": false
+}
