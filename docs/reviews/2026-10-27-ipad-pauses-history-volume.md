@@ -54,3 +54,11 @@
 - IPA SHA-256：`E04620A2A380BFEEEE03892E4219892BB0B9592755311812357AE5D6CF08602D`。
 - 安装包位于本工作树 `output/release-0.25.68-build112-0e64a1a/`，附 `build-info.json` 和 `安装说明.txt`；安装及后续真机触控/听感由用户操作。设备检查时仍为 0.25.67（111），不能把新构建成功称为安装完成。
 - 当前偏好中有 44 天历史，无负数或非有限时长。本次没有改写设备历史，也未自动迁移旧日统计。
+
+## 安装完成补记（2026-10-27）
+
+用户授权安装，完成原账号覆盖安装。期间 Sideloadly 报登录认证 -80046；用户依提示切换 Remote Anisette 后重试成功。未卸载旧应用。
+
+USB 设备回读确认 0.25.68（112）、原 Bundle ID 与 SignerIdentity 保持一致，ProfileValidated=true。安装前备份的 14 个 Documents 文件（169,785,536 字节）大小与 SHA-256 全部一致；偏好字典全部键值保持一致，包括原练习历史。证据保存于本地忽略目录 output/install-02568/verification-after.json，私有设备元数据不提交。
+
+已把经校验的新版安装包及清单同步到旧 playback 工作树的同名 output/release-0.25.68-build112-0e64a1a/ 目录，供既有续签流程使用；桌面 RiffLoop-0.25.68 文件夹保留便于手动安装的同一 IPA。未将安装成功等同于跨天练习、长时间播放或 Spark MINI 实际听感验收。
