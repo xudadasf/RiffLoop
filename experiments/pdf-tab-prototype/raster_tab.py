@@ -99,8 +99,12 @@ def locate_systems(gray):
     h, w = ink.shape
     horizontal = cv2.morphologyEx(ink, cv2.MORPH_OPEN,
                                   cv2.getStructuringElement(cv2.MORPH_RECT, (max(20, w // 40), 1)))
-    row_groups = runs(np.flatnonzero((horizontal > 0).sum(axis=1) > max(65, w * .20)))
-    rows = [int(round(np.mean(g))) for g in row_groups]
+    row_coverage = (horizontal > 0).sum(axis=1)
+    row_groups = runs(np.flatnonzero(row_coverage > max(65, w * .20)))
+    # A thick beam may touch a string and make its row band asymmetric. The
+    # longest horizontal row locates the string; a band average drifts toward
+    # the shorter beam and can reject a perfectly ordinary six-line staff.
+    rows = [int(round(np.mean([y for y in g if row_coverage[y] == max(row_coverage[g])]))) for g in row_groups]
     found = []
     used = set()
     for start in range(len(rows) - 5):

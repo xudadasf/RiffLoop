@@ -113,6 +113,7 @@ def process_file(source, folder, image_settings=None):
             (folder / 'recognized.json').write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
             notes = sum(len(s['notes']) for s in data['systems'])
             unresolved = sum(len(s['unresolved']) for s in data['systems'])
+            discarded = sum(len(s.get('discarded_bands', [])) for s in data['systems'])
             bars = [b for s in score['systems'] for b in s['bars']]
             if bars and not score['structure_issues']:
                 input_path = folder / 'image-score.json'
@@ -132,7 +133,8 @@ def process_file(source, folder, image_settings=None):
                 outcome.update(status='图片草稿已生成 · 含占位' if placeholders else '图片草稿已生成 · 待核对',
                                draft=str(folder / 'score.draft.gp'),
                                message=f'{len(bars)} 小节，{notes} 个音符，{placeholders} 处时值/休止占位，{unresolved} 条 OCR 行待核对。'
-                                       '已通过 GP 保存读回及小节时值检查；占位标 ?，请对照原图人工修改。')
+                                       f'{discarded} 条低分弦带未采用，需检查是否漏音。'
+                                       'GP 文件读回与拍数检查通过，不代表音符识别准确；占位标 ?，请对照原图核对。')
             else:
                 outcome['message'] = '；'.join(data['errors'] + score['structure_issues']) or '没有定位到可用小节；请查看识别报告。'
             write_report(source, folder, outcome, data)

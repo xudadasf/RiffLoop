@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image
 
 from raster_tab import deskew, locate_systems, raster_pages, runs
+from raster_string_digits import read_string_bands
 
 
 def digest(path):
@@ -100,7 +101,7 @@ def run_probe(source, output, model_root):
                              'EngineConfig.onnxruntime.intra_op_num_threads': 4,
                              'EngineConfig.onnxruntime.inter_op_num_threads': 1})
     result = {'source': str(source.resolve()), 'source_sha256': digest(source),
-              'method': 'OCR numeric rows, pixel glyph spacing, nearest TAB string and measure geometry',
+              'method': 'Direct narrow-string OCR; CTC character spacing; measured string and bar geometry',
               'scope': 'Experimental notes-only; no timing, techniques, GP export or accuracy claim',
               'versions': {name: importlib.metadata.version(name) for name in ('rapidocr', 'onnxruntime')},
               'systems': [], 'errors': [], 'pages': []}
@@ -122,37 +123,14 @@ def run_probe(source, output, model_root):
             crop = gray[y0:y1, x0:x1]
             clip_id = f'p{page_number}-s{index}'
             Image.fromarray(crop).save(output / f'{clip_id}.png')
-            raw = engine(crop, use_cls=False, return_word_box=True, return_single_char_box=True)
-            raw_data = {name: json_value(getattr(raw, name)) for name in ('txts', 'scores', 'boxes', 'word_results')}
-            (output / f'{clip_id}-ocr.json').write_text(json.dumps(raw_data, ensure_ascii=False, indent=2), encoding='utf-8')
-            system = {'id': clip_id, 'page': page_number, 'region': region, 'notes': [], 'unresolved': [], 'ignored': []}
+            notes, unresolved, discarded, raw_rows = read_string_bands(gray, region, engine)
+            (output / f'{clip_id}-bands.json').write_text(json.dumps(raw_rows, ensure_ascii=False, indent=2), encoding='utf-8')
+            system = {'id': clip_id, 'page': page_number, 'region': region, 'notes': notes,
+                      'unresolved': unresolved, 'discarded_bands': discarded, 'ignored': []}
             annotated = cv2.cvtColor(crop, cv2.COLOR_GRAY2RGB)
-            for row_index, (text, box, words) in enumerate(zip(raw.txts or [], raw.boxes if raw.boxes is not None else [], raw.word_results or [])):
-                if not any(c.isdigit() for c in text):
-                    system['ignored'].append({'row': row_index, 'text': text, 'reason': 'non-numeric; not interpreted'})
-                    continue
-                try:
-                    groups = read_row(crop, text, box, words)
-                    for group in groups:
-                        points = np.array(group['box'])
-                        x, y = points.mean(axis=0) + [x0, y0]
-                        gap = float(np.median(np.diff(region['ys'])))
-                        distances = [abs(y - line) for line in region['ys']]
-                        string = int(np.argmin(distances)) + 1
-                        if min(distances) > gap * .4:
-                            raise ValueError('数字距弦线过远，无法确定弦号')
-                        bars = [(a, b) for a, b in zip(region['bar_boundaries'], region['bar_boundaries'][1:]) if a <= x < b]
-                        if len(bars) != 1:
-                            raise ValueError('数字无法归入唯一小节')
-                        bar = next(i + 1 for i, (a, b) in enumerate(zip(region['bar_boundaries'], region['bar_boundaries'][1:])) if a <= x < b)
-                        note = {'bar': bar, 'string': string, 'fret': group['fret'], 'x': round(float(x), 2),
-                                'y': round(float(y), 2), 'ocr_score': group['ocr_score'],
-                                'review': group['ocr_score'] < .8, 'row': row_index, 'box': group['box']}
-                        system['notes'].append(note)
-                        color = (200, 60, 30) if note['review'] else (35, 110, 210)
-                        cv2.polylines(annotated, [points.round().astype(np.int32)], True, color, 1)
-                except ValueError as error:
-                    system['unresolved'].append({'row': row_index, 'text': text, 'reason': str(error)})
+            for note in notes:
+                color = (200, 60, 30) if note['review'] else (35, 110, 210)
+                cv2.polylines(annotated, [np.asarray(note['box']).round().astype(np.int32)], True, color, 1)
             system['notes'].sort(key=lambda n: (n['bar'], n['x'], n['string']))
             Image.fromarray(annotated).save(output / f'{clip_id}-boxes.png')
             result['systems'].append(system)
@@ -169,6 +147,7 @@ def run_probe(source, output, model_root):
             rows.append(f'<tr><td>{bar}</td><td>{len(notes)}</td><td>{esc(content)}</td></tr>')
         sections.append(f'<h2>第 {system["page"]} 页 · {system["id"]}</h2><img src="{system["id"]}-boxes.png">'
                         + '<ul>' + ''.join(f'<li>{esc(v)}</li>' for v in system['unresolved']) + '</ul>'
+                        + f'<p>另有 {len(system["discarded_bands"])} 条弱证据弦带未采用，可能是邻弦字形干扰，也可能包含漏识别；见 bands.json 原始记录。</p>'
                         + '<table><tr><th>辅助小节号</th><th>提案音符数</th><th>弦号与品位（从左到右）</th></tr>' + ''.join(rows) + '</table>')
     (output / 'review.html').write_text('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>数字识别可行性对照</title>'
         '<style>body{font:16px system-ui;max-width:1400px;margin:30px auto;padding:20px;line-height:1.7}img{max-width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}aside{background:#fff2d6;padding:15px}</style>'

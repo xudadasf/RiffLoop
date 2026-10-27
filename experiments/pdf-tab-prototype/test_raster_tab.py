@@ -24,6 +24,13 @@ def staff(count=6):
 
 
 class RasterTabTests(unittest.TestCase):
+    def test_beam_touching_staff_does_not_shift_line_to_band_average(self):
+        gray = staff()
+        cv2.rectangle(gray, (60, 160), (650, 167), 0, -1)
+        systems = locate_systems(gray)
+        self.assertEqual(len(systems), 1)
+        self.assertEqual(systems[0]['ys'], [120, 136, 152, 168, 184, 200])
+
     def test_detects_six_lines_and_measures_without_pdf_geometry(self):
         systems = locate_systems(staff())
         self.assertEqual(len(systems), 1)

@@ -64,7 +64,9 @@ def write_image_review(source, folder, outcome, data):
                         f'<img src="digit-ocr/{esc(system["id"])}-boxes.png" alt="数字定位对照">'
                         '<table><tr><th>小节位置</th><th>数字提案数</th><th>弦号 / 品位（从左到右）</th><th>时值 / 待修改</th></tr>'
                         + ''.join(rows) + '</table><ul>'
-                        + ''.join(f'<li>{esc(v["text"])}：{esc(v["reason"])}</li>' for v in system['unresolved']) + '</ul>')
+                        + ''.join(f'<li>{esc(v["text"])}：{esc(v["reason"])}</li>' for v in system['unresolved']) + '</ul>'
+                        + f'<details><summary>未采用的弱证据弦带：{len(system.get("discarded_bands", []))} 条（需检查是否漏音）</summary><ul>'
+                        + ''.join(f'<li>{esc(v["row"])}：{esc(v["text"])}；{esc(v["reason"])}</li>' for v in system.get('discarded_bands', [])) + '</ul></details>')
     (folder / 'review.html').write_text(
         '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
         '<title>图片 GP 草稿与识别对照</title><style>body{font:16px system-ui;max-width:1400px;margin:30px auto;padding:20px;line-height:1.7}'
@@ -79,6 +81,7 @@ def write_image_review(source, folder, outcome, data):
         f'<p><a href="{esc(source.as_uri())}">查看原图 / 原文件</a><a href="recognized.json">识别数据</a>'
         + ('<a href="score.draft.gp">打开 / 下载 GP 草稿</a><a href="score.draft.gp.review.md">待修改清单</a>' if outcome.get('draft') else '')
         + ('<a href="worker.log">GP 导出日志</a>' if (folder / 'worker.log').exists() else '')
+        + ('<a href="note-verification.json">本次另行完成的音符核对记录</a>' if (folder / 'note-verification.json').exists() else '')
         + ('<a href="digit-ocr/review.html">详细数字识别报告</a>' if (folder / 'digit-ocr/review.html').exists() else '')
         + ('<a href="image-digits.log">处理日志</a>' if (folder / 'image-digits.log').exists() else '') + '</p>'
         + ''.join(f'<p>{esc(e)}</p>' for e in data.get('errors', [])) + ''.join(sections) + '</html>', encoding='utf-8')
