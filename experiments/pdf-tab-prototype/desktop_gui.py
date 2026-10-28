@@ -19,7 +19,7 @@ class TrialWindow:
         self.stop = threading.Event()
         self.running = False
         self.cleaning = False
-        root.title('RiffLoop · 图片 / PDF 草稿 · 支持默认占位 · 2026-10-27')
+        root.title('RiffLoop · 图片 / PDF 草稿 · 支持拼接与空白分隔')
         root.geometry('1080x760')
         root.minsize(940, 700)
         style = ttk.Style(root)
@@ -29,7 +29,7 @@ class TrialWindow:
         outer = ttk.Frame(root, padding=22)
         outer.pack(fill='both', expand=True)
         ttk.Label(outer, text='图片 / PDF → 可人工修改的 GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
-        ttk.Label(outer, text='批量选择 PDF、截图或照片，在本机处理；每份文件单独生成结果。', foreground='#46576b').pack(anchor='w', pady=(8, 4))
+        ttk.Label(outer, text='批量选择 PDF、截图或照片；可单独处理，也可选中多份拼接为一份 GP。', foreground='#46576b').pack(anchor='w', pady=(8, 4))
         ttk.Label(outer, text='图片识别数字与横梁；不确定时值按默认值占位并标 ?。完成后可打开 GP 和待修改清单。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
         controls = ttk.Frame(outer)
         controls.pack(fill='x')
@@ -39,6 +39,8 @@ class TrialWindow:
         self.remove_button.pack(side='left', padx=8)
         self.start_button = ttk.Button(controls, text='开始处理待处理文件', command=self.start)
         self.start_button.pack(side='left', padx=8)
+        self.join_button = ttk.Button(controls, text='拼接所选文件…', command=self.join_selected)
+        self.join_button.pack(side='left', padx=(0, 8))
         self.stop_button = ttk.Button(controls, text='本文件完成后停止', command=self.request_stop, state='disabled')
         self.stop_button.pack(side='left')
         output_row = ttk.Frame(outer)
@@ -139,7 +141,7 @@ class TrialWindow:
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -173,6 +175,54 @@ class TrialWindow:
         self.stop_button.configure(state='disabled')
         self.status.set('将在当前文件处理完后停止；剩余文件保留为待处理。')
 
+    def join_selected(self):
+        if self.running:
+            return
+        selected = set(self.tree.selection())
+        sources = [self.items[key]['source'] for key in self.tree.get_children()
+                   if key in selected and not self.items[key].get('is_join')]
+        if len(sources) < 2:
+            messagebox.showinfo('选择多份原文件', '按住 Ctrl 或 Shift 选中至少两份 PDF / 截图，再设置拼接顺序和空白小节。')
+            return
+        from desktop_join_dialog import JoinDialog
+        JoinDialog(self.root, [Path(s) for s in sources], self.start_join)
+
+    def start_join(self, sources, gaps, title):
+        output_root = Path(self.output.get())
+        try:
+            from raster_tab import DEFAULT_SETTINGS, validate_settings
+            settings = validate_settings({**DEFAULT_SETTINGS, 'tempo': int(self.image_tempo.get()),
+                                          'meter': [int(x) for x in self.image_meter.get().strip().split('/')]})
+            output_root.mkdir(parents=True, exist_ok=True)
+        except (OSError, ValueError) as error:
+            messagebox.showerror('请检查 BPM、拍号与输出位置', str(error))
+            return
+        key = self.tree.insert('', 'end', values=(title, '拼接 GP', '待处理'))
+        self.items[key] = {'source': Path(title + '.gp'), 'pending': False, 'is_join': True}
+        self.tree.selection_set(key)
+        self.tree.see(key)
+        self.running = True
+        self.stop.clear()
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button,
+                       self.tempo_input, self.meter_input, self.cleanup_button):
+            button.configure(state='disabled')
+        self.stop_button.configure(state='normal')
+        self.progress.start(15)
+        threading.Thread(target=self.join_work, args=(key, sources, gaps, title, output_root, settings), daemon=True).start()
+
+    def join_work(self, key, sources, gaps, title, output_root, settings):
+        folder = None
+        try:
+            from desktop_join import process_join
+            folder = create_output(output_root, title + '.gp')
+            result = process_join(sources, gaps, title, folder, settings, stop=self.stop,
+                                  progress=lambda text: self.events.put(('started', key, text)))
+        except Exception as error:
+            result = {'status': '拼接失败', 'message': str(error), 'draft': None,
+                      'folder': str(folder) if folder else None}
+        self.events.put(('finished', key, result))
+        self.events.put(('done', '', ''))
+
     def clean_selected(self):
         if self.running:
             return
@@ -183,7 +233,7 @@ class TrialWindow:
                 return
             jobs = [('',folder)]
         self.running = self.cleaning = True
-        for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.progress.start(15)
         self.status.set('正在清理中间图片、识别缓存和日志；保留 GP、原文件及修改清单…')
@@ -225,7 +275,7 @@ class TrialWindow:
                     self.running = False
                     self.cleaning = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())

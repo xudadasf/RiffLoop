@@ -45,21 +45,31 @@ def write_report(source, folder, outcome, data):
             notes = sum(len(b['notes']) for b in bar['beats'])
             needs_review = bool(bar.get('issues') or raster)
             issues = '；'.join(bar.get('issues', [])) or ('图片时值为占位，需修改' if raster else '未报告拍数问题；仍需对照原谱')
-            groups = ' → '.join(' + '.join(f'{n["string"]}弦/{"X" if n.get("dead") else n["fret"]}品'
-                                          for n in beat['notes']) or '休止' for beat in bar['beats'])
-            timing = ' → '.join(f'1/{beat["duration"]}' + '.' * beat.get('dots', 0)
-                                + (f'（{beat["tuplet"][0]}连音）' if beat.get('tuplet', [1, 1])[0] > 1 else '')
-                                for beat in bar['beats'])
+            if bar.get('separator'):
+                issues = '手动插入的空白分隔，播放时按此拍号休止'
+            groups, timing = [], []
+            for beat_index, beat in enumerate(bar['beats'], 1):
+                group = ' + '.join(f'{n["string"]}弦/{"X" if n.get("dead") else n["fret"]}品' for n in beat['notes']) or '休止'
+                groups.append(f'<span class="note-chip{ " needs-review" if beat.get("note_review") else ""}" title="第 {beat_index} 项">{esc(group)}</span>')
+                token = (f'1/{beat["duration"]}' + '.' * beat.get('dots', 0)
+                         + (f'（{beat["tuplet"][0]}连音）' if beat.get('tuplet', [1, 1])[0] > 1 else '')
+                         + (' ?' if beat.get('placeholder') else ''))
+                timing.append(f'<span class="timing-token{ " needs-review" if beat.get("placeholder") else ""}" title="第 {beat_index} 项时值">{esc(token)}</span>')
             label = f'第{system["page"]}页 · 第{line}行 · 小节{bar["number"]}'
+            if system.get('source_name'):
+                label = f'{system["source_name"]} · 原第{system.get("source_page", system["page"])}页 · 小节{bar["number"]}'
+            origin = f'<span class="bar-count">原小节 {bar["original_bar"]}</span>' if 'original_bar' in bar else ''
             total_notes += notes
             total_bars += 1
             issue_bars += needs_review
             rows.append(f'<tr class="bar-row" tabindex="-1" data-issue="{int(needs_review)}" data-label="{esc(label)}" data-search="{esc(label)}">'
-                        f'<td><span class="bar-label">小节 {bar["number"]}</span><span class="bar-count">{notes} 个音符</span></td>'
-                        f'<td class="notes-cell"><div class="note-sequence">{esc(groups)}</div></td>'
-                        f'<td class="timing-cell"><div class="timing-sequence">{esc(timing)}</div><p class="issue-text">{esc(issues)}</p></td>'
+                        f'<td><span class="bar-label">小节 {bar["number"]}</span><span class="bar-count">{notes} 个音符</span>{origin}</td>'
+                        f'<td class="notes-cell"><div class="note-sequence">{" → ".join(groups)}</div></td>'
+                        f'<td class="timing-cell"><div class="timing-sequence">{" → ".join(timing)}</div><p class="issue-text">{esc(issues)}</p></td>'
                         '</tr>')
-        sections.append(f'<section class="system-card"><div class="system-heading"><h2>第 {system["page"]} 页 · 第 {line} 行</h2></div>'
+        heading = (f'{system["source_name"]} · 原第 {system.get("source_page", system["page"])} 页'
+                   if system.get('source_name') else f'第 {system["page"]} 页 · 第 {line} 行')
+        sections.append(f'<section class="system-card"><div class="system-heading"><h2>{esc(heading)}</h2></div>'
                         '<div class="system-body"><div class="table-wrap"><table><thead><tr><th class="measure-col">小节</th><th>音符分组提案</th>'
                         '<th class="timing-col">时值 / 疑点位置</th></tr></thead><tbody>'
                         + ''.join(rows) + '</tbody></table></div></div></section>')
@@ -83,7 +93,15 @@ def write_report(source, folder, outcome, data):
     guidance = ('<p>图片草稿按实际输出的小节数保留，不补造小节。小节编号不是完整性证明。箭头为先后分组，加号为同组音符。图片时值为占位，需人工校正。</p>'
                 if raster else '<p>打开“原谱识别标记”对照：蓝框是识别到的音符，红框是待核对小节；绿色仅代表拍数合计通过。箭头为先后分组，加号为同组音符。</p>')
     guidance += f'<p>{esc(NOTICE)}</p><p>筛选只包含程序标出的疑点，没有标记的小节也需要人工核对。</p>'
-    body = ''.join(f'<p class="error-message">{esc(w)}</p>' for w in warnings) + previews + ''.join(sections)
+    joined = ''
+    if data.get('join_parts'):
+        entries = []
+        for part in data['join_parts']:
+            position = (f' → 合并后小节 {part["start_bar"]}–{part["end_bar"]}；之后空白 {part["gap_after"]} 小节'
+                        if 'start_bar' in part else ' · 已处理片段')
+            entries.append(f'<li>{esc(part["name"])}{esc(position)} · <a href="{esc(part["report"])}">查看原谱和该片段疑点</a></li>')
+        joined = '<section class="system-card"><div class="system-body"><h2>拼接顺序与分隔</h2><ol>' + ''.join(entries) + '</ol></div></section>'
+    body = joined + ''.join(f'<p class="error-message">{esc(w)}</p>' for w in warnings) + previews + ''.join(sections)
     if not sections:
         body += '<div class="empty-state">没有可核对的小节。请查看上方处理说明。</div>'
     content = render_review(source, folder, outcome, body, notes=total_notes, bars=total_bars,

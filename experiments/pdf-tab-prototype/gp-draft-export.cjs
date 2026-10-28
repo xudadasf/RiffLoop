@@ -11,13 +11,14 @@ const data = JSON.parse(raw.toString('utf8'));
 if (data.format === 'raster-tab-draft-v1' || data.format === 'raster-digit-review-v1')
     throw Error('Image GP export is disabled: rhythm is unverified. Use the digit review report; do not substitute quarter notes.');
 const raster = data.format === 'raster-tab-beamed-v1';
+const joined = data.format === 'joined-tab-draft-v1';
 const bars = data.systems.flatMap(s=>s.bars.map(b=>({...b,page:s.page})));
 if (!bars.length || data.structure_issues?.length || bars.some((b,i)=>b.number!==i+1))
     throw Error('Resolve missing, duplicated or reordered bars before drafting');
 if (!Array.isArray(data.tuning) || data.tuning.length!==6 || data.tuning.some(n=>!Number.isInteger(n) || n<0 || n>127) ||
     !Number.isFinite(data.tempo) || data.tempo<=0) throw Error('PDF tuning and tempo are required');
 const score = new alpha.model.Score();
-score.title = raster ? 'IMAGE TAB - editable draft' : 'DRAFT - PDF notes for manual correction';
+score.title = joined ? data.title : raster ? 'IMAGE TAB - editable draft' : 'DRAFT - PDF notes for manual correction';
 score.instructions = 'Unverified draft. Rhythm may be wrong. Ties and playing techniques are omitted. Review sidecar before playback.';
 if (raster) score.instructions += ' Notes from digit OCR; supported rhythms from image beams. Question marks indicate explicit timing defaults; see review file. Meter, tempo and tuning are manual settings.';
 const track = new alpha.model.Track(); score.addTrack(track); track.name = 'DRAFT notes'; track.playbackInfo.program = 25;
@@ -31,11 +32,13 @@ if (raster) {
     review.warnings = data.warnings??[];
     review.model_sha256 = data.model_sha256;
 }
+if (joined) { review.join_parts = data.join_parts; review.warnings = data.warnings ?? []; }
 const expected = [];
 for (const source of bars) {
+    const imageBar = raster || (joined && source.image_source === true);
     if (!Array.isArray(source.meter) || source.meter.length!==2 || source.meter.some(n=>!Number.isInteger(n) || n<=0) ||
         !Array.isArray(source.beats) || !source.beats.length) throw Error('Missing meter or beat content');
-    if (raster) {
+    if (imageBar) {
         if (source.beats.some(b=>![1,2,4,8,16,32,64].includes(b.duration) || ![0,1,2].includes(b.dots) ||
             b.grace || JSON.stringify(b.tuplet)!=='[1,1]' ||
             !['image-beams','manual-default','manual-rest-default'].includes(b.rhythm_source) ||
@@ -53,7 +56,7 @@ for (const source of bars) {
         master.tempoAutomations.push(alpha.model.Automation.buildTempoAutomation(false,0,tempo,2));
     const bar = new alpha.model.Bar(); staff.addBar(bar); const voice = new alpha.model.Voice(); bar.addVoice(voice);
     const row = {page:source.page,source_bar:source.number,issues:source.issues??[],placeholder_beats:[],review_required:true};
-    if (raster) { row.note_review_beats=[]; row.rhythm_evidence=[]; }
+    if (imageBar) { row.note_review_beats=[]; row.rhythm_evidence=[]; }
     const beats = [];
     for (const [index,item] of source.beats.entries()) {
         if (item.voice && item.voice!==0) throw Error('Multiple voices need separate review');
@@ -64,14 +67,18 @@ for (const source of bars) {
         beat.duration = valid?item.duration:4; beat.dots = valid?item.dots:0;
         [beat.tupletNumerator,beat.tupletDenominator] = valid?item.tuplet:[1,1];
         if (item.grace) beat.graceType = alpha.model.GraceType.BeforeBeat;
-        if (index===0 && !raster) beat.text = `DRAFT p${source.page} m${source.number}: review rhythm and effects`;
-        if (raster) {
+        if (index===0 && !imageBar && !(joined && source.separator)) beat.text = `DRAFT p${source.page} m${source.number}: review rhythm and effects`;
+        if (imageBar) {
             row.rhythm_evidence.push({beat:index+1,source:item.rhythm_source,evidence:item.rhythm_evidence??null,reason:item.rhythm_reason??null});
             if (item.note_review) row.note_review_beats.push(index+1);
         }
-        if (!valid || (raster && item.placeholder)) {
+        if (!valid || (imageBar && item.placeholder)) {
             row.placeholder_beats.push(index+1);
-            beat.text = raster ? '?' : (beat.text?beat.text+'; ':'')+'UNKNOWN RHYTHM: quarter placeholder';
+            beat.text = imageBar ? '?' : (beat.text?beat.text+'; ':'')+'UNKNOWN RHYTHM: quarter placeholder';
+        }
+        if (joined && index === 0) {
+            const label = source.separator ? '空白分隔' : source.segment_label;
+            if (label) beat.text = label + (beat.text ? '; ' + beat.text : '');
         }
         const notes = [];
         for (const n of item.notes) {
@@ -114,7 +121,7 @@ for (let i=0;i<actual.length;i++) {
 }
 review.roundtrip = 'passed; serialized content only, not PDF or playback accuracy';
 const lines = ['# 待人工校正草稿','',
-    raster ? '音符来自图片数字识别，仍需人工核对。明确连接的横梁用于识别时值；其余按默认值占位，并在谱内用 ? 标记。默认四分音符，剩余空间不足时统一缩短；剩余拍数补休止占位。BPM、拍号、定弦为人工设置。小节号为检测顺序号。' : '音符来自 PDF 识别结果，未经整曲验收。节奏保留识别值；未知时值用四分音符占位，并在谱内标记 placeholder。',
+    joined ? '多份原文件按指定顺序拼接；空白分隔是用户主动插入的休止小节。疑点按拼接后的小节号列出，图片未知时值保留 ? 标记。' : raster ? '音符来自图片数字识别，仍需人工核对。明确连接的横梁用于识别时值；其余按默认值占位，并在谱内用 ? 标记。默认四分音符，剩余空间不足时统一缩短；剩余拍数补休止占位。BPM、拍号、定弦为人工设置。小节号为检测顺序号。' : '音符来自 PDF 识别结果，未经整曲验收。节奏保留识别值；未知时值用四分音符占位，并在谱内标记 placeholder。',
     '本草稿未导出延音线、泛音、滑音、推弦、掌根闷音、顿音等技巧及反复结构，播放前请对照原谱修改。X 闷音记号本身保留。',
     `音符数：${review.note_count}；小节数：${bars.length}。所有小节均需复核，下面列出识别器已知的问题。`,
     ...review.tempo_issues.map(x=>'速度待核对：'+JSON.stringify(x)),...(review.warnings??[]),'',
