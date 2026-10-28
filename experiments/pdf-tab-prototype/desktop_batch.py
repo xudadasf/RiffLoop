@@ -58,7 +58,7 @@ def write_report(source, folder, outcome, data):
             label = f'第{system["page"]}页 · 第{line}行 · 小节{bar["number"]}'
             if system.get('source_name'):
                 label = f'{system["source_name"]} · 原第{system.get("source_page", system["page"])}页 · 小节{bar["number"]}'
-            origin = f'<span class="bar-count">原小节 {bar["original_bar"]}</span>' if 'original_bar' in bar else ''
+            origin = f'<div class="bar-count">原小节 {bar["original_bar"]}</div>' if 'original_bar' in bar else ''
             total_notes += notes
             total_bars += 1
             issue_bars += needs_review
