@@ -29,7 +29,7 @@
 
         // alphaTab advances the cursor when a block is rendered, before the audio
         // device presents it. Delay that receipt, not MIDI/audio generation itself.
-        let pending = [], timer, epoch = 0, lastReport = -Infinity;
+        let pending = [], timer, epoch = 0, lastReport = -Infinity, playbackAllowed = true;
         const delivered = output.onSamplesPlayed.bind(output);
         const clear = () => { epoch++; unschedule(timer); timer = undefined; pending = []; };
         const flush = () => {
@@ -41,7 +41,7 @@
             if (generation === epoch && pending.length) timer = schedule(flush, Math.max(1, pending[0].due - now()));
         };
         output.onSamplesPlayed = samples => {
-            if (!(samples > 0)) return;
+            if (!playbackAllowed || !(samples > 0)) return;
             const time = now(), delay = latency(context, nativeLatency());
             if (time - lastReport >= 1000) {
                 lastReport = time;
@@ -59,6 +59,15 @@
                 return original(...args);
             };
         }
+        // Worker commands are asynchronous. Stop the local audio node immediately
+        // and reject a queued play receipt until the user requests another start.
+        const play = output.play?.bind(output);
+        if (play) output.play = (...args) => { if (playbackAllowed) return play(...args); };
+        output.riffloopSetPlaybackAllowed = allowed => {
+            playbackAllowed = Boolean(allowed);
+            input.gain.value = playbackAllowed ? 1 / 32 : 0;
+            if (!playbackAllowed) output.pause();
+        };
         context.addEventListener?.("statechange", () => report({ event: "statechange", state: context.state,
             time: context.currentTime, sampleRate: context.sampleRate }));
     };

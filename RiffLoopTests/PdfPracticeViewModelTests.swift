@@ -5,6 +5,53 @@ import UIKit
 
 @MainActor
 final class PdfPracticeViewModelTests: XCTestCase {
+    func testSecondAudioTapCancelsPendingColdStart() async throws {
+        let audio = try makeTransportAudioFixture()
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: audio)
+        }
+        // Audio gain attachment completes asynchronously. Both taps happen before
+        // it can finish, exactly as a user cancelling a still-preparing start.
+        model.bindAudio(at: audio)
+        model.toggleAudioPlayback()
+        model.toggleAudioPlayback()
+        try await Task.sleep(for: .seconds(1))
+        XCTAssertFalse(model.isAudioPlaying, "The second tap must cancel the pending start")
+        XCTAssertEqual(model.player.rate, 0)
+        model.toggleAudioPlayback()
+        try await waitForTransport { model.isAudioPlaying }
+        model.pauseAudio()
+        XCTAssertFalse(model.isAudioPlaying)
+    }
+
+    func testStopFollowCancelsPendingSeekWithoutStartingAudio() async throws {
+        let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
+        let audio = try makeTransportAudioFixture()
+        let store = FilePracticeSettingsStore()
+        try store.save(PdfPracticeProfile(readingPoints: [
+            PdfReadingPoint(time: 1, pageIndex: 0, verticalProgress: 0),
+            PdfReadingPoint(time: 4, pageIndex: 0, verticalProgress: 1)
+        ]), kind: .pdf, fileName: pdf.lastPathComponent)
+        let model = PdfPracticeViewModel()
+        defer {
+            model.pause()
+            try? FileManager.default.removeItem(at: pdf)
+            try? FileManager.default.removeItem(at: audio)
+            store.remove(kind: .pdf, fileName: pdf.lastPathComponent)
+        }
+        XCTAssertTrue(model.openPdf(at: pdf))
+        model.bindAudio(at: audio)
+        model.toggleReadingFollowPlayback()
+        model.stopReadingFollowPlayback()
+        try await Task.sleep(for: .seconds(1))
+        XCTAssertFalse(model.isAutoFollowing)
+        XCTAssertFalse(model.isAudioPlaying, "A cancelled follow seek cannot start accompaniment later")
+        XCTAssertFalse(model.isMetronomePlaying, "A cancelled follow seek cannot start clicks later")
+        XCTAssertEqual(model.player.rate, 0)
+    }
+
     func testMetronomeResumesAfterPermittedInterruptionButNotAfterManualPause() async throws {
         let pdf = try makePdf(named: "\(UUID().uuidString).pdf")
         let model = PdfPracticeViewModel()

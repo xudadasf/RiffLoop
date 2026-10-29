@@ -290,6 +290,11 @@ final class GpWebViewModel: ObservableObject {
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
         guard playerReady else { return }
+        if isPlaying {
+            // Silence native accompaniment at the tap, without waiting for WebKit.
+            pause()
+            return
+        }
         if !isPlaying {
             do {
                 let session = AVAudioSession.sharedInstance()
@@ -426,6 +431,8 @@ final class GpWebViewModel: ObservableObject {
         nativeBackingPlayer.pause()
         nativeBackingPlaybackRequested = false
         nativeBackingStarted = false
+        isPlaying = false
+        updatePracticeClock(isPlaying: false)
         call("stop")
     }
 

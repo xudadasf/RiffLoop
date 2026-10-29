@@ -532,6 +532,7 @@
         const pause = (manual = false) => {
             resetMainBeforePlay = resetMainBeforePlay || manual;
             wantsPlayback = false;
+            api.player?.output?.riffloopSetPlaybackAllowed?.(false);
             deps.cancelCountIn?.();
             resetBackingPriming();
             const generation = ++pauseGeneration;
@@ -544,6 +545,8 @@
             schedule(pauseAgain, 240);
         };
         const play = (skipCountIn = false) => {
+            // Count-in shares this output's gain node, so reopen it before clicks.
+            api.player?.output?.riffloopSetPlaybackAllowed?.(true);
             if (!skipCountIn && deps.startCountIn?.(() => play(true))) {
                 wantsPlayback = true;
                 pauseGeneration += 1;
@@ -608,12 +611,14 @@
             return finishBackingPriming();
         };
         const toggle = () => {
-            if (wantsPlayback || playerIsPlaying(api) || playerIsPlaying(synthApi)) pause(true);
+            // Cached worker state can still be Playing after a completed user tap.
+            if (wantsPlayback) pause(true);
             else play();
         };
         const stop = () => {
             resetMainBeforePlay = false;
             wantsPlayback = false;
+            api.player?.output?.riffloopSetPlaybackAllowed?.(false);
             deps.cancelCountIn?.();
             resetBackingPriming();
             pauseGeneration += 1;

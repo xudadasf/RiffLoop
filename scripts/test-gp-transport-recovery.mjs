@@ -6,6 +6,57 @@ const alphaTab = createRequire(import.meta.url)('../RiffLoop/Resources/GpWeb/alp
 const implementation = source.slice(source.indexOf('    const createTransportController ='), source.indexOf('    const backingAligner ='));
 const createTransport = new Function('alphaTab', `${implementation}; return createTransportController;`)(alphaTab);
 
+// Real worker API, with its asynchronous receipts deliberately held back. The
+// transport must stop local output before the worker acknowledges the command.
+{
+    const scope = {};
+    new Function('window', readFileSync(new URL('../RiffLoop/Resources/GpWeb/riffloop-audio.js', import.meta.url), 'utf8'))(scope);
+    for (const action of ['pause', 'stop']) {
+        const event = () => ({ on() {} });
+        const node = () => ({ gain: {}, connect() {}, disconnect() {} });
+        const commands = [], callbacks = [], receipts = [];
+        const output = {
+            context: { createGain: node, createWaveShaper: node, destination: {} },
+            ready: event(), sampleRequest: event(), samplesPlayed: event(), sampleRate: 44100,
+            open() {}, activate() {}, resetSamples() {}, destroy() {},
+            play() { this.running = true; }, pause() { this.running = false; },
+            onSamplesPlayed(value) { receipts.push(value); }, running: false
+        };
+        scope.RiffLoopAudio.install(output, { schedule: callback => callbacks.push(callback), unschedule() {} });
+        const worker = { addEventListener() {}, postMessage: message => commands.push(message) };
+        const player = new alphaTab.synth.AlphaSynthWebWorkerApi(output, new alphaTab.Settings(), worker);
+        const receive = data => player.handleWorkerMessage({ data });
+        const api = {
+            player, timePosition: 0, tickPosition: 0,
+            get playerState() { return player.state; },
+            play: () => player.play(), pause: () => player.pause(), stop: () => player.stop()
+        };
+        const controller = createTransport({ api, synthApi: { pause() {}, stop() {} },
+            canUseBacking: () => false, schedule: callback => callbacks.push(callback) });
+        for (let cycle = 0; cycle < 20; cycle++) {
+            controller.play();
+            receive({ cmd: 'alphaSynth.playerStateChanged', state: 1, stopped: false });
+            receive({ cmd: 'alphaSynth.output.play' });
+            assert.equal(output.running, true);
+            controller[action](true);
+            assert.equal(output.running, false, `${action}: local output must stop before a worker receipt`);
+            receive({ cmd: 'alphaSynth.output.play' });
+            assert.equal(output.running, false, `${action}: a late worker play cannot undo a user stop`);
+            output.onSamplesPlayed(128);
+            for (const callback of callbacks.splice(0)) callback();
+            assert.deepEqual(receipts, [], 'Stopped output cannot advance the cursor');
+            controller.toggle();
+            assert.equal(controller.isPlayingIntent(), true, 'Replay must not be mistaken for pause while cached worker state is Playing');
+            assert.equal(commands.at(-1).cmd, 'alphaSynth.play');
+            receive({ cmd: 'alphaSynth.output.pause' });
+            receive({ cmd: 'alphaSynth.playerStateChanged', state: 0, stopped: true });
+            receive({ cmd: 'alphaSynth.output.play' });
+            assert.equal(output.running, true, 'A fresh play must reopen output');
+        }
+    }
+    console.log('GP real-worker delayed pause/stop receipts and immediate replay passed (40 cycles)');
+}
+
 // Use the shipped synthesizer's actual rejection branch while a replacement MIDI
 // is not ready. Rejected play must not leave the next tap acting as a pause.
 const synth = { state: alphaTab.synth.PlayerState.Paused, qp: false };
