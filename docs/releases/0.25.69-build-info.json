@@ -1,0 +1,21 @@
+{
+  "head_sha": "7f93577d86481611ef9305190af98bd9fd7c6f3a",
+  "ipa_file": "RiffLoop-iPad-0.25.69-unsigned-arm64.ipa",
+  "sha256": "d7ad85db50b3678364f920aa57cc2d2daf4455c4c902c560c25ecd4bec2c8d4a",
+  "version": "0.25.69",
+  "build": "113",
+  "run_id": 40811585478,
+  "html_url": "https://github.com/xudadasf/RiffLoop/actions/runs/40811585478",
+  "artifact_id": 12870796563,
+  "artifact_expires_at": "2026-11-28T03:23:35Z",
+  "verification": "in-memory; no IPA/ZIP written to disk",
+  "web_resources_match_commit": true,
+  "arm64_device_bundle": true,
+  "installed": false,
+  "validation_head_sha": "15fbe739afb73bde0c3e6261c12346244d69b41d",
+  "validation_run_id": 40813473034,
+  "validation_status": "success",
+  "application_tree_matches_validation_commit": true,
+  "swift_tests": 180,
+  "swift_test_failures": 0
+}
