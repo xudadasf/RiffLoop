@@ -12,6 +12,8 @@ Fix: pause/stop locally silences and pauses the installed Web Audio output befor
 
 Regression covers 40 delayed-worker pause/stop/replay cycles, stale play receipts, output gain and cursor receipts, in addition to existing real synth count-in recovery, 50-round range restart, gain and follow tests. The new local-output assertion failed before the fix and passes after it. Physical device/DAC buffering cannot be measured by this harness.
 
+A separate delayed-boundary regression also failed: after manual pause/stop cancelled the loop restarter, a queued non-seek position beyond B could invoke `handleCommittedRangeCompletion` and prepare another count-in loop. Range enforcement now requires current playback intent before initiating a new loop. It still processes the pending seek-to-A acknowledgement needed by active loops. The regression passes without weakening the existing 50-round restart/cancellation checks.
+
 ## Other transport paths
 
 - Independent GP metronome: native `AVAudioPlayerNode.stop()` and timer/generation invalidation run in the stop path; it does not wait for the GP worker. Existing WKWebView integration exercises independence and switching back to score playback. No matching stop defect reproduced here.

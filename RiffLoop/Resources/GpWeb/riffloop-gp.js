@@ -833,7 +833,8 @@
             return false;
         }
         if (
-            position.isSeek
+            !transport.isPlayingIntent()
+            || position.isSeek
             || Number(position.currentTick) < committedRange.endTick
         ) return false;
         return handleCommittedRangeCompletion();

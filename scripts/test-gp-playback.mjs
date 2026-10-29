@@ -492,6 +492,7 @@ assert.doesNotMatch(
         "committedRange",
         "loopCountInEnabled",
         "rangeCountInRestarter",
+        "transport = { isPlayingIntent: () => true }",
         `${loopImplementation}\nreturn { enforceCommittedRange, completeCommittedRangeLoop, handleCommittedRangeCompletion };`
     );
     const seeks = [];
@@ -572,6 +573,17 @@ assert.doesNotMatch(
         "a trailing playerFinished signal must not prepare or replay the same B boundary twice"
     );
     assert.deepEqual(countInBoundaryCalls, [["post", "rangeLoopCompleted"], ["prepare", 30720]]);
+
+    const stoppedBoundaryCalls = [];
+    const stoppedRange = makeRangeEnforcer(
+        () => stoppedBoundaryCalls.push('seek'), () => stoppedBoundaryCalls.push('complete'),
+        true, { startTick: 30720, endTick: 34560 }, true,
+        { prepare: () => stoppedBoundaryCalls.push('restart') },
+        { isPlayingIntent: () => false }
+    );
+    assert.equal(stoppedRange.enforceCommittedRange({ currentTick: 34563, isSeek: false }), false,
+        'A late boundary receipt after manual pause/stop cannot initiate another loop');
+    assert.deepEqual(stoppedBoundaryCalls, []);
 
     const countInStartMarker = "    const createRangeCountInRestarter = (deps) => {";
     const countInEndMarker = "\n    const rangeCountInRestarter";
