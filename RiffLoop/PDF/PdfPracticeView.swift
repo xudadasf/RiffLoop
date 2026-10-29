@@ -355,7 +355,7 @@ struct PdfPracticeView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack {
-                    Button(viewModel.isAudioPlaying ? "暂停伴奏" : "播放伴奏", action: viewModel.toggleAudioPlayback)
+                    Button(viewModel.isAudioPlaybackRequested ? "暂停伴奏" : "播放伴奏", action: viewModel.toggleAudioPlayback)
                         .buttonStyle(.borderedProminent)
                     Button("停止伴奏", action: viewModel.stopAudio)
                     Button("更换", action: { ReproductionStore.shared.record("action", "pdf.tap_files", ["target": "audioLibraryPresented"]); audioLibraryPresented = true })

@@ -291,9 +291,27 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         // Leave before the asynchronous recovery read finishes, then reopen. The
         // old task must neither reload the abandoned page nor replace saved settings.
         model.setBaseBpm(70)
+        _ = try await webView.evaluateJavaScript("""
+            window.testStopTrace = [];
+            const handler = window.webkit.messageHandlers.riffloop;
+            const original = handler.postMessage.bind(handler);
+            handler.postMessage = message => {
+                if (['positionChanged', 'playerStateChanged', 'error'].includes(message.event)) {
+                    window.testStopTrace.push(message);
+                    if (window.testStopTrace.length > 30) window.testStopTrace.shift();
+                }
+                original(message);
+            };
+            """)
         model.seek(to: 3840)
-        try await waitUntil("Save a nonzero practice position before recovery") {
-            abs(model.position.currentTick - 3840) < 2
+        do {
+            try await waitUntil("Save a nonzero practice position before recovery") {
+                abs(model.position.currentTick - 3840) < 2
+            }
+        } catch {
+            let trace = try? await webView.evaluateJavaScript("JSON.stringify(window.testStopTrace)")
+            print("[DEBUG-stop-20261029] tick=\(model.position.currentTick), playing=\(model.isPlaying), error=\(model.errorMessage ?? "none"), trace=\(trace ?? "none")")
+            throw error
         }
         model.setBaseBpm(70)
         let store = FilePracticeSettingsStore()

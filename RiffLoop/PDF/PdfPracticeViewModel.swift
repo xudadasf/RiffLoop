@@ -16,6 +16,8 @@ final class PdfPracticeViewModel: ObservableObject {
     @Published private(set) var player = AVPlayer()
     @Published private(set) var audioFileName: String?
     @Published private(set) var isAudioPlaying = false
+    @Published private(set) var isAudioPlaybackPending = false
+    @Published private var isReadingFollowPending = false
     @Published private(set) var isMetronomePlaying = false
     @Published private(set) var currentTime = 0.0
     @Published private(set) var duration = 0.0
@@ -84,7 +86,8 @@ final class PdfPracticeViewModel: ObservableObject {
     private var readinessObserver: NSKeyValueObservation?
     private var speedLadderBaseRate: Float?
 
-    var isPlaying: Bool { isAudioPlaying || isMetronomePlaying || isReadingClockRunning }
+    var isAudioPlaybackRequested: Bool { isAudioPlaying || isAudioPlaybackPending }
+    var isPlaying: Bool { isAudioPlaybackRequested || isMetronomePlaying || isReadingClockRunning || isReadingFollowPending }
     // The independent practice clock can continue after the accompaniment ends.
     var audioTimelinePosition: Double { min(max(currentTime, 0), max(duration, 0)) }
     var currentBeatCue: String {
@@ -314,6 +317,16 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     private func stopFollowingOnly() {
+        if isReadingFollowPending {
+            // Follow has not started yet. Invalidate its seek/readiness callback
+            // instead of allowing it to start accompaniment after this stop.
+            transportGeneration &+= 1
+            player.currentItem?.cancelPendingSeeks()
+            readinessObserver = nil
+            pendingAudioPlayback = nil
+            isAudioPlaybackPending = false
+            isReadingFollowPending = false
+        }
         isAutoFollowing = false
         autoFollowSuspended = false
         isReadingClockRunning = false
@@ -335,7 +348,7 @@ final class PdfPracticeViewModel: ObservableObject {
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
         guard player.currentItem != nil else { return }
-        isAudioPlaying ? pauseAudio() : startPlayback(
+        isAudioPlaybackRequested ? pauseAudio() : startPlayback(
             audio: true,
             metronome: isMetronomePlaying
         )
@@ -407,8 +420,11 @@ final class PdfPracticeViewModel: ObservableObject {
         }
         pendingAudioPlayback = nil
         readinessObserver = nil
+        isAudioPlaybackPending = false
+        isReadingFollowPending = false
         transportGeneration &+= 1
         recordPracticeTime()
+        player.currentItem?.cancelPendingSeeks()
         player.pause()
         metronome.stop()
         stopMetronomeOnlyClock()
@@ -435,7 +451,11 @@ final class PdfPracticeViewModel: ObservableObject {
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
         pendingAudioPlayback = nil
+        readinessObserver = nil
+        isAudioPlaybackPending = false
+        if isReadingFollowPending { stopFollowingOnly() }
         transportGeneration &+= 1
+        player.currentItem?.cancelPendingSeeks()
         recordPracticeTime()
         countInStopTask?.cancel()
         countInStopTask = nil
@@ -952,6 +972,12 @@ final class PdfPracticeViewModel: ObservableObject {
         let startReadingClock = isAutoFollowing || isRecordingReadingTrack
         guard startAudio || startMetronome || startReadingClock else { return }
 
+        // A pending start is already a playback request: the next tap cancels it.
+        pendingAudioPlayback = nil
+        readinessObserver = nil
+        transportGeneration &+= 1
+        isAudioPlaybackPending = startAudio
+
         if startAudio, !audioGainReady {
             pendingAudioPlayback = (shouldPlayMetronome, includeCountIn, stopMetronomeAfterCountIn)
             return
@@ -1038,6 +1064,8 @@ final class PdfPracticeViewModel: ObservableObject {
         }
 
         isAudioPlaying = startAudio
+        isAudioPlaybackPending = false
+        isReadingFollowPending = false
         isMetronomePlaying = metronomeStarted
         isReadingClockRunning = startReadingClock
         activeTransportAnchor = anchor
@@ -1126,6 +1154,7 @@ final class PdfPracticeViewModel: ObservableObject {
     }
 
     private func prepareReadingFollow(at time: TimeInterval, startPlayback shouldStartPlayback: Bool) {
+        isReadingFollowPending = shouldStartPlayback
         transportGeneration &+= 1
         let generation = transportGeneration
         let target = max(0, time)
@@ -1150,6 +1179,7 @@ final class PdfPracticeViewModel: ObservableObject {
                     metronome: self.metronomeEnabled
                 )
             } else {
+                self.isReadingFollowPending = false
                 self.lastPracticeSampleDate = nil
                 self.save()
             }

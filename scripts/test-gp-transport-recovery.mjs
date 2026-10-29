@@ -40,6 +40,7 @@ const createTransport = new Function('alphaTab', `${implementation}; return crea
             assert.equal(output.running, true);
             controller[action](true);
             assert.equal(output.running, false, `${action}: local output must stop before a worker receipt`);
+            assert.equal(output.riffloopDestination.gain.value, 0, 'The shared synth/count-in output must be muted immediately');
             receive({ cmd: 'alphaSynth.output.play' });
             assert.equal(output.running, false, `${action}: a late worker play cannot undo a user stop`);
             output.onSamplesPlayed(128);
@@ -47,6 +48,7 @@ const createTransport = new Function('alphaTab', `${implementation}; return crea
             assert.deepEqual(receipts, [], 'Stopped output cannot advance the cursor');
             controller.toggle();
             assert.equal(controller.isPlayingIntent(), true, 'Replay must not be mistaken for pause while cached worker state is Playing');
+            assert.equal(output.riffloopDestination.gain.value, 1 / 32, 'Replay must restore normal output gain');
             assert.equal(commands.at(-1).cmd, 'alphaSynth.play');
             receive({ cmd: 'alphaSynth.output.pause' });
             receive({ cmd: 'alphaSynth.playerStateChanged', state: 0, stopped: true });

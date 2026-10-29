@@ -4,6 +4,22 @@ import AVFAudio
 
 final class GpBridgeEventTests: XCTestCase {
     @MainActor
+    func testManualPauseAndStopUpdateStateWithoutAWebReceipt() {
+        let model = GpWebViewModel()
+        model.receive(.playerReady)
+        for countIn in [false, true] {
+            let state = GpPlaybackState(state: countIn ? 0 : 1, stopped: false, transitioning: countIn)
+            model.receive(.playerStateChanged(state))
+            XCTAssertTrue(model.isPlaying)
+            model.togglePlayback()
+            XCTAssertFalse(model.isPlaying, "The pause tap cannot wait for WebKit")
+            model.receive(.playerStateChanged(state))
+            model.stop()
+            XCTAssertFalse(model.isPlaying, "Stop cannot wait for WebKit")
+        }
+    }
+
+    @MainActor
     func testCountInSharesVolumeWhileMetronomeIsDisabled() {
         let viewModel = GpWebViewModel()
         viewModel.setMetronomeVolume(1.7)
