@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 import XCTest
 @testable import RiffLoop
 
@@ -77,10 +78,10 @@ final class PracticeExperienceTests: XCTestCase {
         }
         try await capture(AnyView(PdfPracticeView(initialURL: pdf)), name: "PDF-paused-independent-controls")
         try await capture(AnyView(PracticeView(initialURL: video)), name: "Video-paused-controls")
-        try await capture(AnyView(GpPracticeView(initialURL: gp)), name: "GP-paused-controls", delay: 4)
+        try await capture(AnyView(GpPracticeView(initialURL: gp)), name: "GP-paused-controls", waitForGpScore: true)
     }
 
-    private func capture(_ page: AnyView, name: String, delay: Double = 1, expectAwake: Bool = true) async throws {
+    private func capture(_ page: AnyView, name: String, delay: Double = 1, expectAwake: Bool = true, waitForGpScore: Bool = false) async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: AnyView(NavigationStack { page }
@@ -99,6 +100,12 @@ final class PracticeExperienceTests: XCTestCase {
             window.rootViewController = nil
         }
         try await Task.sleep(for: .seconds(delay))
+        if waitForGpScore {
+            // WebKit startup varies on shared CI runners. Screen-awake policy is
+            // meaningful after a score has loaded, not after an arbitrary sleep.
+            let rendered = try await waitForRenderedGpScore(in: controller.view)
+            XCTAssertTrue(rendered, "GP fixture must render before checking its paused screen-awake policy")
+        }
         XCTAssertEqual(UIApplication.shared.isIdleTimerDisabled, expectAwake, "\(name) screen-awake policy")
         let image = UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
             controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
@@ -113,4 +120,22 @@ final class PracticeExperienceTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled, "Leaving \(name) must release screen awake")
     }
+
+    private func waitForRenderedGpScore(in root: UIView) async throws -> Bool {
+        func webView(in view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            return view.subviews.lazy.compactMap { webView(in: $0) }.first
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+        while ContinuousClock.now < deadline {
+            if let web = webView(in: root),
+               let result = try? await web.evaluateJavaScript("Boolean(document.querySelector('#score svg'))"),
+               result as? Bool == true {
+                return true
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        return false
+    }
+
 }
