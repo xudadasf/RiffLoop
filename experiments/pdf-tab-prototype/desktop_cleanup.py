@@ -62,6 +62,8 @@ def register_intermediates(folder):
 
 def clean_intermediates(folder):
     root,result = context(folder)
+    if result.get('is_regions'):
+        raise ValueError('分区图片是后续识别的输入文件，本操作保留分区图与裁剪图片')
     source=Path(result['source']).resolve()
     manifest_path=root/'cleanup-manifest.json'
     # Older results predate ownership manifests. Only the strict generated-file

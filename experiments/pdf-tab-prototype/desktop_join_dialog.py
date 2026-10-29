@@ -6,15 +6,15 @@ from desktop_join import validate_join
 
 
 class JoinDialog(tk.Toplevel):
-    def __init__(self, parent, sources, submit):
+    def __init__(self, parent, sources, submit, default_gap=0):
         super().__init__(parent)
         self.title('拼接生成一份 GP')
         self.geometry('780x520')
-        self.minsize(680, 440)
+        self.minsize(680, 520)
         self.transient(parent)
         self.submit = submit
         self.sources = {str(i): source for i, source in enumerate(sources)}
-        self.gaps = {key: tk.StringVar(value='0') for key in self.sources}
+        self.gaps = {key: tk.StringVar(value=str(default_gap)) for key in self.sources}
         self.last_gap = tk.StringVar(value='0')
         outer = ttk.Frame(self, padding=18)
         outer.pack(fill='both', expand=True)
@@ -46,7 +46,8 @@ class JoinDialog(tk.Toplevel):
         self.gap_input = ttk.Spinbox(row, from_=0, to=99, width=5)
         self.gap_input.pack(side='left')
         ttk.Label(row, text=' 小节（最后一份不追加）').pack(side='left')
-        ttk.Label(outer, text='截图应按完整小节切分；重叠内容不会自动去重。\n将从原文件生成新草稿，不带入已在 Guitar Pro 中手工修改的内容。',
+        region_note = '教材仅拼接列表中的已采用区域；未采用和漏检内容不包含。\n' if default_gap else ''
+        ttk.Label(outer, text=region_note + '截图应按完整小节切分；重叠内容不会自动去重。\n将从原文件生成新草稿，不带入已在 Guitar Pro 中手工修改的内容。',
                   foreground='#46576b', wraplength=700).pack(anchor='w')
         actions = ttk.Frame(outer)
         actions.pack(fill='x', pady=(12, 0))

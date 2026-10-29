@@ -21,7 +21,7 @@ class TrialWindow:
         self.cleaning = False
         root.title('RiffLoop · 图片 / PDF 草稿 · 支持拼接与空白分隔')
         root.geometry('1080x760')
-        root.minsize(940, 700)
+        root.minsize(940, 760)
         style = ttk.Style(root)
         style.theme_use('clam')
         style.configure('.', font=('Microsoft YaHei UI', 10))
@@ -43,6 +43,12 @@ class TrialWindow:
         self.join_button.pack(side='left', padx=(0, 8))
         self.stop_button = ttk.Button(controls, text='本文件完成后停止', command=self.request_stop, state='disabled')
         self.stop_button.pack(side='left')
+        textbook_row = ttk.Frame(outer)
+        textbook_row.pack(fill='x', pady=(8, 0))
+        self.regions_button = ttk.Button(textbook_row, text='教材 PDF：先划分乐谱区域', command=self.extract_selected)
+        self.regions_button.pack(side='left')
+        ttk.Label(textbook_row, text='混排教材先分区；区域间默认空 1 小节，拼接时可改为 0。',
+                  foreground='#46576b').pack(side='left', padx=8)
         output_row = ttk.Frame(outer)
         output_row.pack(fill='x', pady=12)
         self.output = tk.StringVar(value=str(default_output()))
@@ -78,7 +84,7 @@ class TrialWindow:
         detail_label.pack(anchor='w', pady=12)
         actions = ttk.Frame(outer)
         actions.pack(fill='x')
-        for label, action in [('查看结果 / 问题', 'report'), ('打开 GP 草稿', 'draft'), ('打开原文件', 'source'), ('打开该文件结果目录', 'folder')]:
+        for label, action in [('查看分区 / 结果', 'report'), ('打开 GP 草稿', 'draft'), ('打开原文件', 'source'), ('打开该文件结果目录', 'folder')]:
             ttk.Button(actions, text=label, command=lambda a=action: self.open_selected(a)).pack(side='left', padx=(0, 8))
         self.cleanup_button = ttk.Button(actions, text='清理中间文件', command=self.clean_selected)
         self.cleanup_button.pack(side='left')
@@ -87,11 +93,12 @@ class TrialWindow:
         self.progress = ttk.Progressbar(outer, mode='indeterminate')
         self.progress.pack(fill='x', pady=(16, 8))
         self.status = tk.StringVar(value='就绪 · 文件不会上传')
-        ttk.Label(outer, textvariable=self.status).pack(anchor='w')
+        status_label = ttk.Label(outer, textvariable=self.status, wraplength=990)
+        status_label.pack(anchor='w')
         notice_label = ttk.Label(outer, text=NOTICE, wraplength=990, foreground='#92520a')
         notice_label.pack(anchor='w', pady=(12, 0))
         outer.bind('<Configure>', lambda event: [label.configure(wraplength=max(400, event.width - 44))
-                                                for label in (detail_label, notice_label)])
+                                                for label in (detail_label, status_label, notice_label)])
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(150, self.poll)
 
@@ -141,7 +148,7 @@ class TrialWindow:
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -180,12 +187,45 @@ class TrialWindow:
             return
         selected = set(self.tree.selection())
         sources = [self.items[key]['source'] for key in self.tree.get_children()
-                   if key in selected and not self.items[key].get('is_join')]
+                   if key in selected and not self.items[key].get('is_join') and not self.items[key].get('is_regions')]
         if len(sources) < 2:
             messagebox.showinfo('选择多份原文件', '按住 Ctrl 或 Shift 选中至少两份 PDF / 截图，再设置拼接顺序和空白小节。')
             return
         from desktop_join_dialog import JoinDialog
-        JoinDialog(self.root, [Path(s) for s in sources], self.start_join)
+        gap = 1 if any(self.items[key].get('from_textbook') for key in selected) else 0
+        JoinDialog(self.root, [Path(s) for s in sources], self.start_join, default_gap=gap)
+
+    def extract_selected(self):
+        if self.running:
+            return
+        selected = self.tree.selection()
+        if len(selected) != 1 or Path(self.items[selected[0]]['source']).suffix.lower() != '.pdf':
+            messagebox.showinfo('选择教材', '请选中一份 PDF；分区后可查看原页上的区域框，再拼接生成 GP。')
+            return
+        key = selected[0]
+        self.running = True
+        self.stop.clear()
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button,
+                       self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+            button.configure(state='disabled')
+        self.stop_button.configure(state='normal')
+        self.progress.start(15)
+        threading.Thread(target=self.regions_work,
+                         args=(key, Path(self.items[key]['source']), Path(self.output.get())), daemon=True).start()
+
+    def regions_work(self, key, source, output_root):
+        folder = None
+        try:
+            from textbook_regions import extract_regions
+            folder = create_output(output_root, source.stem + '-分区.pdf')
+            result = extract_regions(source, folder, stop=self.stop,
+                                     progress=lambda text: self.events.put(('started', key, text)))
+        except Exception as error:
+            result = {'status': '分区失败', 'message': str(error), 'draft': None,
+                      'folder': str(folder) if folder else None}
+        self.events.put(('finished', key, result))
+        self.events.put(('regions_ready', key, result.get('region_sources', [])))
+        self.events.put(('done', '', result['status'] + ' · ' + result['message']))
 
     def start_join(self, sources, gaps, title):
         output_root = Path(self.output.get())
@@ -203,7 +243,7 @@ class TrialWindow:
         self.tree.see(key)
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button,
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button,
                        self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
@@ -233,7 +273,7 @@ class TrialWindow:
                 return
             jobs = [('',folder)]
         self.running = self.cleaning = True
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.progress.start(15)
         self.status.set('正在清理中间图片、识别缓存和日志；保留 GP、原文件及修改清单…')
@@ -271,15 +311,30 @@ class TrialWindow:
                     self.items[key].update(payload, pending=False)
                     self.tree.set(key, 'status', payload['status'])
                     self.show_details()
+                elif event == 'regions_ready':
+                    added = []
+                    for path in payload:
+                        source = Path(path)
+                        row = self.tree.insert('', 'end', values=(source.name, '教材区域', '待处理 · 区域间默认空 1 小节'))
+                        self.items[row] = {'source': source, 'pending': True, 'from_textbook': True,
+                            'region_report': str(Path(self.items[key]['folder']) / 'review.html'),
+                            'message': '点击“查看分区 / 结果”看原页区域框；点击“拼接所选文件…”生成一份 GP。'
+                                       '区域间默认空 1 小节，连续谱可改为 0；不确定候选未加入队列。'}
+                        added.append(row)
+                    if added:
+                        self.tree.selection_set(added)
+                        self.tree.see(added[0])
+                        self.detail.set('已选中教材区域。点击“拼接所选文件…”生成一份 GP；默认每个区域间空 1 小节。'
+                                        '选择原 PDF 行并查看结果，可浏览分区图和未采用候选。')
                 elif event in ('done','cleanup_done'):
                     self.running = False
                     self.cleaning = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())
-                    self.status.set(payload if event=='cleanup_done' else f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿 · 双击文件行查看结果和待修改清单')
+                    self.status.set(payload or f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿 · 双击文件行查看结果和待修改清单')
         except queue.Empty:
             pass
         self.root.after(150, self.poll)
@@ -299,10 +354,10 @@ class TrialWindow:
             return
         item = self.items[selected[0]]
         if action == 'draft' and not item.get('draft') and item.get('folder'):
-            messagebox.showinfo('未生成 GP', item.get('message', '') + '\n请点击“查看结果 / 问题”。')
+            messagebox.showinfo('未生成 GP', item.get('message', '') + '\n请点击“查看分区 / 结果”。')
             return
         target = (Path(item['folder']) / 'review.html' if action == 'report' and item.get('folder')
-                  else item.get(action))
+                  else item.get('region_report') if action == 'report' else item.get(action))
         if not target or not Path(target).exists():
             messagebox.showinfo('尚无此结果', '此文件尚未生成对应结果。请查看处理状态或问题说明。')
             return
