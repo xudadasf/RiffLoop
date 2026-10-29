@@ -6,6 +6,37 @@ const alphaTab = createRequire(import.meta.url)('../RiffLoop/Resources/GpWeb/alp
 const implementation = source.slice(source.indexOf('    const createTransportController ='), source.indexOf('    const backingAligner ='));
 const createTransport = new Function('alphaTab', `${implementation}; return createTransportController;`)(alphaTab);
 
+// The real alphaTab Paused callback snaps back to its last beat. A seek issued
+// before this delayed receipt must be restored after that internal callback.
+{
+    const seeks = [];
+    let stateChanged;
+    const api = { playerState: 1, playerStateChanged: { on(fn) { stateChanged = fn; } },
+        set tickPosition(value) { seeks.push(value); } };
+    const seekSource = source.slice(source.indexOf('    let pendingPausedSeek ='), source.indexOf('    const stopTick ='));
+    const receiptSource = source.slice(source.indexOf('    api.playerStateChanged.on(state =>'), source.indexOf('    window.setInterval(() =>', source.indexOf('    api.playerStateChanged.on(state =>')));
+    const seek = new Function('api', 'alphaTab', `
+        const synthApi = {}, transport = { isPlayingIntent: () => false };
+        const boundsForTick = () => null, refreshPendingRangeHighlight = () => {};
+        let playbackProgressAt = 0;
+        ${seekSource}
+        ${receiptSource}
+        return seekBoth;
+    `)(api, alphaTab);
+    seek(3840);
+    seek(7680); // The newest user target wins.
+    api.playerState = 0;
+    let prototype = alphaTab.AlphaTabApi.prototype;
+    while (!Object.prototype.hasOwnProperty.call(prototype, 'zw')) prototype = Object.getPrototypeOf(prototype);
+    prototype.zw.call({ _w: false, Fw: { beat: {} }, Qw: { getBeatStart: () => 0 },
+        Mw: api, scrollToCursor() {}, uiFacade: { triggerEvent: (_, __, state) => stateChanged(state) }
+    }, { state: 0, stopped: false });
+    assert.deepEqual(seeks, [3840, 7680, 0, 7680]);
+    stateChanged({ state: 0, stopped: false });
+    assert.equal(seeks.length, 4, 'A duplicate receipt cannot replay an old seek');
+    console.log('GP explicit seek survives the actual alphaTab pause-to-beat snap callback');
+}
+
 // Real worker API, with its asynchronous receipts deliberately held back. The
 // transport must stop local output before the worker acknowledges the command.
 {
@@ -101,8 +132,9 @@ console.log('GP replacement-player rejection and retry passed');
     const watchStart = source.indexOf('    api.playerStateChanged.on(state =>');
     const watchEnd = source.indexOf('    document.addEventListener("playing"', watchStart);
     assert.ok(reportStart > 0 && reportEnd > reportStart && watchEnd > watchStart);
-    const controller = new Function('createTransport', 'api', 'countIn', 'performance', 'window', 'post', `
+    const controller = new Function('createTransport', 'api', 'countIn', 'performance', 'window', 'post', 'alphaTab', `
         let playbackProgressAt = 0;
+        const pendingPausedSeek = null;
         const loopTransitioning = false;
         const rangeCountInRestarter = { cancel() {} };
         const transport = createTransport({ api, synthApi: { pause() {}, stop() {} },
@@ -113,7 +145,7 @@ console.log('GP replacement-player rejection and retry passed');
         return transport;
     `)(createTransport, api, countIn, { now: () => time }, {
         setInterval(fn) { check = fn; }, set complete(fn) { completeCountIn = fn; }
-    }, (name, details) => reports.push({ name, details }));
+    }, (name, details) => reports.push({ name, details }), alphaTab);
     controller.pause(true);
     controller.play();
     time += 4025;

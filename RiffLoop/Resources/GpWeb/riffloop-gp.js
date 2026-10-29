@@ -785,8 +785,14 @@
         scoreFollow.follow(boundsForTick(tick), loopTargetTop());
     };
     const restoreScoreScrollPolicy = () => scoreFollow.reset();
+    let pendingPausedSeek = null;
     const seekBoth = (tick, options = {}) => {
         const position = Number(tick);
+        // alphaTab snaps to its last beat when the asynchronous Paused receipt
+        // arrives. Preserve an explicit seek issued before that receipt.
+        pendingPausedSeek = !transport.isPlayingIntent()
+            && api.playerState === alphaTab.synth.PlayerState.Playing
+            ? { position, options } : null;
         // Set the visual policy before alphaTab emits seek/position callbacks.
         if (options.user) scoreFollow.select(boundsForTick(position));
         api.tickPosition = position;
@@ -1073,7 +1079,13 @@
             transport.markBackingStarted(api.timePosition);
         }
     });
-    api.playerStateChanged.on(state => { if (state.state === 1) playbackProgressAt = performance.now(); });
+    api.playerStateChanged.on(state => {
+        if (state.state === 1) playbackProgressAt = performance.now();
+        if (state.state !== alphaTab.synth.PlayerState.Paused || !pendingPausedSeek) return;
+        const { position, options } = pendingPausedSeek;
+        pendingPausedSeek = null;
+        seekBoth(position, options);
+    });
     window.setInterval(() => {
         if (!transport.isPlayingIntent() || countIn.active || loopTransitioning) return;
         if (performance.now() - playbackProgressAt < 3500) return;
@@ -1401,6 +1413,7 @@
         },
         loadScore(base64) {
             reproductionGeneration += 1;
+            pendingPausedSeek = null;
             post("reproductionLoad", { base64Characters: base64.length });
             try {
                 zoomAnchor = null;
