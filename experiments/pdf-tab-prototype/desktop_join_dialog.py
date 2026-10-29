@@ -46,7 +46,7 @@ class JoinDialog(tk.Toplevel):
         self.gap_input = ttk.Spinbox(row, from_=0, to=99, width=5)
         self.gap_input.pack(side='left')
         ttk.Label(row, text=' 小节（最后一份不追加）').pack(side='left')
-        region_note = '教材仅拼接列表中的已采用区域；未采用和漏检内容不包含。\n' if default_gap else ''
+        region_note = '教材仅拼接已确认页中采用的区域；未确认页不包含。\n' if default_gap else ''
         ttk.Label(outer, text=region_note + '截图应按完整小节切分；重叠内容不会自动去重。\n将从原文件生成新草稿，不带入已在 Guitar Pro 中手工修改的内容。',
                   foreground='#46576b', wraplength=700).pack(anchor='w')
         actions = ttk.Frame(outer)

@@ -103,7 +103,8 @@ class RegionTests(unittest.TestCase):
             self.assertEqual(manifest['default_gap'], 1)
             self.assertEqual(result['region_sources'], [])
             self.assertEqual(source.read_bytes(), before)
-            self.assertIn('PDF 第 41 页', (root/'out/review.html').read_text(encoding='utf-8'))
+            self.assertIn('"page": 41', (root/'out/review.html').read_text(encoding='utf-8'))
+            self.assertIn('确认本页并下一页', (root/'out/review.html').read_text(encoding='utf-8'))
             with self.assertRaisesRegex(ValueError, '输入文件'):
                 clean_intermediates(root/'out')
 

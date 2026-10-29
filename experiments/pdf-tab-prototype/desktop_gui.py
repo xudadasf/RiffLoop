@@ -47,7 +47,9 @@ class TrialWindow:
         textbook_row.pack(fill='x', pady=(8, 0))
         self.regions_button = ttk.Button(textbook_row, text='教材 PDF：先划分乐谱区域', command=self.extract_selected)
         self.regions_button.pack(side='left')
-        ttk.Label(textbook_row, text='混排教材先分区；区域间默认空 1 小节，拼接时可改为 0。',
+        self.region_plan_button = ttk.Button(textbook_row, text='导入分区确认方案', command=self.import_region_plan)
+        self.region_plan_button.pack(side='left', padx=8)
+        ttk.Label(textbook_row, text='先确定完整区域，再识别；默认空 1 小节。',
                   foreground='#46576b').pack(side='left', padx=8)
         output_row = ttk.Frame(outer)
         output_row.pack(fill='x', pady=12)
@@ -148,7 +150,7 @@ class TrialWindow:
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -205,7 +207,7 @@ class TrialWindow:
         key = selected[0]
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button,
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button,
                        self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
@@ -227,6 +229,56 @@ class TrialWindow:
         self.events.put(('regions_ready', key, result.get('region_sources', [])))
         self.events.put(('done', '', result['status'] + ' · ' + result['message']))
 
+    def import_region_plan(self):
+        if self.running:
+            return
+        selected = self.tree.selection()
+        item = self.items[selected[0]] if len(selected) == 1 else {}
+        plan = filedialog.askopenfilename(title='选择浏览器保存的分区方案', filetypes=[('分区方案', '*.json')])
+        if not plan:
+            return
+        try:
+            saved = json.loads(Path(plan).read_text(encoding='utf-8'))
+            if not isinstance(saved, dict):
+                raise ValueError('请选择浏览器保存的 RiffLoop 分区方案')
+            location = saved.get('review_folder') or (item.get('region_manifest_folder', item.get('folder')) if item.get('is_regions') else None)
+            if not location or not (Path(location) / 'regions.json').is_file():
+                location = filedialog.askdirectory(title='原分区目录已移动：选择包含 regions.json 的分区结果文件夹')
+                if not location:
+                    return
+            source_folder = Path(location)
+            manifest = json.loads((source_folder / 'regions.json').read_text(encoding='utf-8'))
+            from region_review import validate_plan
+            validate_plan(saved, manifest)
+            source = Path(manifest['source'])
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            messagebox.showerror('请检查分区方案', str(error))
+            return
+        key = self.tree.insert('', 'end', values=(source.stem + ' · 人工确认区域', '教材分区', '正在应用'))
+        self.items[key] = {'source': source, 'pending': False, 'is_regions': True,
+                           'region_manifest_folder': str(source_folder)}
+        self.running = True
+        self.stop.clear()
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button,
+                       self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+            button.configure(state='disabled')
+        self.progress.start(15)
+        threading.Thread(target=self.region_plan_work,
+                         args=(key, Path(plan), source_folder, Path(self.output.get())), daemon=True).start()
+
+    def region_plan_work(self, key, plan, source_folder, output_root):
+        folder = None
+        try:
+            from region_review import apply_region_plan
+            folder = create_output(output_root, '教材人工确认')
+            result = apply_region_plan(plan, source_folder, folder)
+        except Exception as error:
+            result = {'status': '确认方案未应用', 'message': str(error), 'draft': None,
+                      'folder': str(folder) if folder else None}
+        self.events.put(('finished', key, result))
+        self.events.put(('regions_ready', key, result.get('region_sources', [])))
+        self.events.put(('done', '', result['status'] + ' · ' + result['message']))
+
     def start_join(self, sources, gaps, title):
         output_root = Path(self.output.get())
         try:
@@ -243,7 +295,7 @@ class TrialWindow:
         self.tree.see(key)
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button,
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button,
                        self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
@@ -273,7 +325,7 @@ class TrialWindow:
                 return
             jobs = [('',folder)]
         self.running = self.cleaning = True
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
             button.configure(state='disabled')
         self.progress.start(15)
         self.status.set('正在清理中间图片、识别缓存和日志；保留 GP、原文件及修改清单…')
@@ -319,7 +371,7 @@ class TrialWindow:
                         self.items[row] = {'source': source, 'pending': True, 'from_textbook': True,
                             'region_report': str(Path(self.items[key]['folder']) / 'review.html'),
                             'message': '点击“查看分区 / 结果”看原页区域框；点击“拼接所选文件…”生成一份 GP。'
-                                       '区域间默认空 1 小节，连续谱可改为 0；不确定候选未加入队列。'}
+                                       '区域间默认空 1 小节，连续谱可改为 0；只包含已确认页中采用的区域。'}
                         added.append(row)
                     if added:
                         self.tree.selection_set(added)
@@ -330,7 +382,7 @@ class TrialWindow:
                     self.running = False
                     self.cleaning = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())

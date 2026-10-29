@@ -1,6 +1,6 @@
 """Locate paired notation/TAB regions before textbook recognition."""
-import html
 import json
+import uuid
 from pathlib import Path
 
 import cv2
@@ -105,7 +105,7 @@ def locate_regions(gray):
 
 
 def extract_regions(source, folder, stop=None, progress=None):
-    """Render one PDF page at a time; only paired regions enter the OCR queue."""
+    """Render every page and retain broad candidates for human confirmation."""
     import fitz
     from PIL import Image, ImageDraw
 
@@ -127,7 +127,11 @@ def extract_regions(source, folder, stop=None, progress=None):
                 pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), colorspace=fitz.csGRAY, alpha=False)
                 gray, angle = deskew(gray_image(Image.frombytes('L', (pix.width, pix.height), pix.samples)))
                 data = locate_regions(gray)
+                from textbook_recall import add_recall_candidates
+                data['regions'] = add_recall_candidates(gray, data['regions'])
                 original = Image.fromarray(gray)
+                original_name = f'page-{number:03d}-source.png'
+                original.save(folder/original_name)
                 preview = original.convert('RGB')
                 draw = ImageDraw.Draw(preview)
                 for index, region in enumerate(data['regions'], 1):
@@ -144,58 +148,27 @@ def extract_regions(source, folder, stop=None, progress=None):
                               stroke_width=1, stroke_fill='white')
                 name = f'page-{number:03d}.jpg'
                 preview.save(folder/name, quality=88)
-                pages.append(dict(data, page=number, preview=name, deskew_degrees=angle,
+                pages.append(dict(data, page=number, preview=name, original=original_name, deskew_degrees=angle,
                                   width=gray.shape[1], height=gray.shape[0]))
     except Exception as caught:
         error = str(caught)
     complete = not error and len(pages) == total
-    manifest = {'source': str(source), 'pages': pages, 'total_pages': total, 'complete': complete,
+    manifest = {'document_id': uuid.uuid4().hex, 'source': str(source), 'pages': pages, 'total_pages': total, 'complete': complete,
                 'default_gap': 1, 'accepted_count': len(crops), 'candidate_count': candidates,
                 'coordinate_space': 'deskewed-page-pixels', 'error': error}
     (folder/'regions.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
-    message = (f'已检查 {len(pages)}/{total} 页，自动采用 {len(crops)} 个区域，另有 {candidates} 个不确定候选。'
-               '区域间默认空 1 小节，可在拼接设置中改为 0。纯六线谱、跨页衔接及漏检仍需看原页。')
+    message = (f'已检查 {len(pages)}/{total} 页，建议采用 {len(crops)} 个区域，另保留 {candidates} 个候选。'
+               '请查看分区，补画或重画漏框，确认后保存并导入方案。区域间默认空 1 小节。')
     if error:
         message += ' ' + error
     outcome = {'source': str(source), 'folder': str(folder), 'draft': None,
-               'status': '分区完成' if complete else '分区未完成', 'message': message,
-               'region_sources': crops if complete else [], 'is_regions': True}
+               'status': '待人工确定分区' if complete else '分区未完成', 'message': message,
+               'region_sources': [], 'is_regions': True}
     (folder/'result.json').write_text(json.dumps(outcome, ensure_ascii=False, indent=2), encoding='utf-8')
     write_region_report(folder, manifest, outcome)
     return outcome
 
 
 def write_region_report(folder, manifest, outcome):
-    esc = lambda text: html.escape(str(text), quote=True)
-    sections = []
-    for page in manifest['pages']:
-        accepted = sum(r['accepted'] for r in page['regions'])
-        links = ''.join(f'<li class="{"accepted" if r["accepted"] else "candidate"}">'
-            f'<a href="{esc(r["image"])}" target="_blank">区域 {r["index"]} · {r["systems"]} 行谱 ↗</a> · '
-            f'{"自动采用" if r["accepted"] else "不确定，未加入识别"} · {esc(r["reason"])}</li>'
-            for r in page['regions'])
-        sections.append(f'<details><summary>PDF 第 {page["page"]} 页 · 自动采用 {accepted} 个 · '
-            f'不确定 {len(page["regions"])-accepted} 个</summary><ul>{links}</ul>'
-            + ('' if page['regions'] else '<p>未定位到配对乐谱；不代表已确认本页没有谱子。</p>')
-            + f'<a href="{page["preview"]}" target="_blank"><img loading="lazy" src="{page["preview"]}" '
-            f'alt="PDF 第 {page["page"]} 页分区图"></a></details>')
-    document = f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>教材乐谱分区 · RiffLoop</title>
-<style>body{{font:16px/1.7 system-ui,sans-serif;background:#f4f6fa;color:#17263b;margin:0}}
-main{{max-width:1100px;margin:auto;padding:28px}}h1{{font-size:28px}}a{{color:#1858a8}}
-details,.notice{{background:white;border:1px solid #d6deea;border-radius:10px;padding:16px;margin:14px 0}}
-summary{{cursor:pointer;font-weight:650}}img{{display:block;max-width:100%;height:auto;margin:auto}}
-.accepted{{color:#15803d}}.candidate{{color:#a35405}}.notice{{border-left:5px solid #d97706}}
-button{{font:inherit;padding:8px 14px;cursor:pointer}}</style><main>
-<p>RiffLoop · 本机教材分区</p><h1>{esc(Path(manifest['source']).name)}</h1>
-<p>{esc(outcome['message'])}</p><div class="notice"><strong>先分区，再识别。</strong>
-绿色是依据六线谱和配对五线谱自动采用的区域；橙色是未采用的候选。颜色不是准确率保证。
-点击页码展开原页，点击图片查看大图。文字和插图页也保留，便于发现漏检。
-<br>返回程序后，已采用区域会加入列表并选中；点击“拼接所选文件”识别导出。
-不同区域默认隔 1 个完整休止小节；连续谱跨页或分块时，请将相应间隔改为 0。
-区域包含上方五线谱，后续音符识别仍有节奏占位，疑点会保留在 GP 和问题清单中。</div>
-<p><a href="{esc(Path(manifest['source']).as_uri())}">打开原 PDF</a> · <a href="regions.json">分区记录</a></p>
-<button onclick="document.querySelectorAll('details').forEach(d=>d.open=true)">展开全部页</button>
-<button onclick="document.querySelectorAll('details').forEach(d=>d.open=false)">收起全部页</button>
-{''.join(sections)}</main></html>'''
-    (folder/'review.html').write_text(document, encoding='utf-8')
+    from region_review import write_editor
+    write_editor(folder, manifest, outcome)
