@@ -26,14 +26,16 @@
     if(!temporary){const text=document.createElementNS(svgNS,'text');text.setAttribute('x',x+6);text.setAttribute('y',y+25);
       text.setAttribute('font-size','24');text.setAttribute('fill',color);text.style.pointerEvents='none';text.textContent=index+1;el('overlay').append(text);}
   }
-  function paint(){el('overlay').replaceChildren();current().regions.forEach((r,i)=>rectangle(r.box,i));}
+  function paint(){el('overlay').replaceChildren();const view=el('box-view').value;
+    current().regions.forEach((r,i)=>{if(view==='all'||(view==='adopted'&&r.selected))rectangle(r.box,i);});}
   function render(){
     const p=current(),original=data.pages[pageIndex];
     el('page').replaceChildren(...pages.map((item,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`PDF 第 ${item.page} 页 · ${item.confirmed?'已确认':'未确认'} · ${item.regions.length} 框`;return o;}));
     el('page').value=pageIndex;
     el('source').src=original.original;el('overlay').setAttribute('viewBox',`0 0 ${original.width} ${original.height}`);
     el('progress').textContent=`已确认 ${pages.filter(p=>p.confirmed).length}/${pages.length} 页`;
-    el('page-status').textContent=p.confirmed?'本页已确认':'本页未确认';
+    const adopted=p.regions.filter(r=>r.selected).length;
+    el('page-status').textContent=`${p.confirmed?'本页已确认':'本页未确认'} · 采用 ${adopted} / 未采用 ${p.regions.length-adopted}`;
     el('prev').disabled=pageIndex===0;el('next').disabled=pageIndex===pages.length-1;
     el('redraw').disabled=selected<0;el('remove').disabled=selected<0;
     el('add').classList.toggle('active',mode==='add');el('redraw').classList.toggle('active',mode==='redraw');
@@ -44,7 +46,7 @@
       label.append(check,` 采用区域 ${i+1}`);card.append(label);
       const reason=document.createElement('p');reason.textContent=r.reason||'人工画框';card.append(reason);
       const row=document.createElement('div');row.className='toolbar';
-      for(const [text,action] of [['选中',()=>{selected=i;mode='';render();}],['↑',()=>move(i,-1)],['↓',()=>move(i,1)]]){
+      for(const [text,action] of [['选中',()=>{selected=i;mode='';el('box-view').value='all';render();}],['↑',()=>move(i,-1)],['↓',()=>move(i,1)]]){
         const button=document.createElement('button');button.textContent=text;button.onclick=action;row.append(button);}
       card.append(row);return card;
     }));
@@ -70,8 +72,9 @@
     mode='';change();feedback('边界已修改；请查看是否框住全部乐谱，然后确认本页。');render();
   };
   el('overlay').onpointercancel=()=>{drag=null;paint();};
-  el('add').onclick=()=>{mode=mode==='add'?'':'add';feedback(mode?'在原页拖出新区域。':'已退出画框。');render();};
-  el('redraw').onclick=()=>{mode='redraw';feedback('在原页重新拖出所选区域的完整边界。');render();};
+  el('box-view').onchange=()=>{mode='';drag=null;render();};
+  el('add').onclick=()=>{mode=mode==='add'?'':'add';el('box-view').value='all';feedback(mode?'在原页拖出新区域。':'已退出画框。');render();};
+  el('redraw').onclick=()=>{mode='redraw';el('box-view').value='all';feedback('在原页重新拖出所选区域的完整边界。');render();};
   el('remove').onclick=()=>{if(selected<0)return;current().regions.splice(selected,1);selected=-1;change();render();};
   el('page').onchange=()=>navigate(Number(el('page').value));el('prev').onclick=()=>navigate(pageIndex-1);el('next').onclick=()=>navigate(pageIndex+1);
   el('unconfirmed').onclick=()=>{for(let step=1;step<=pages.length;step++){const i=(pageIndex+step)%pages.length;if(!pages[i].confirmed){navigate(i);return;}}feedback('全部页面已确认。');};

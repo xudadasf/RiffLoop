@@ -30,6 +30,8 @@ def write_editor(folder, manifest, outcome):
 <option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label></nav>
 <p id="feedback" role="status" aria-live="polite"></p><main><section>
 <div class="toolbar"><button id="add">补画区域</button><button id="redraw">重画所选框</button><button id="remove">删除所选框</button>
+<label>框显示 <select id="box-view" aria-label="分区框显示"><option value="all">全部框</option>
+<option value="adopted">只看采用框</option><option value="none">只看原页</option></select></label>
 <span id="page-status"></span></div><p class="tip">蓝框是当前所选；勾选“采用”决定是否识别。点击“补画”或“重画”后，在谱图上拖出完整区域。</p>
 <div id="stage"><div id="sheet"><img id="source" alt="未画框的原页"><svg id="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="可编辑分区框"></svg></div></div>
 </section><aside><h2>本页区域</h2><p>按列表顺序输出，可用 ↑ ↓ 调整。一个连续练习可画成一个大框，并取消原来的小框。</p>

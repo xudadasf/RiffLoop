@@ -28,12 +28,16 @@ def staff_proposals(gray):
             for strength, ys, gap in sorted(ranked,key=lambda x:-x[0]):
                 if any(abs(int(ys[0])-y)<gap*3 for y in used):
                     continue
-                support = sum((horizontal[y-1:y+2,left:right]>0).any(axis=0).astype(np.uint8) for y in ys)
+                # Use the local fit to follow the row across the whole page.
+                # A small vertical tolerance handles scan curvature; real
+                # column whitespace still splits the horizontal spans.
+                radius=max(1,min(3,round(gap*.3)))
+                support = sum((horizontal[max(0,y-radius):y+radius+1]>0).any(axis=0).astype(np.uint8) for y in ys)
                 mask = (support>=count-2).astype(np.uint8).reshape(1,-1)
                 mask = cv2.morphologyEx(mask,cv2.MORPH_CLOSE,np.ones((1,max(5,round(gap*2))),np.uint8)).ravel()
                 spans = [g for g in runs(np.flatnonzero(mask)) if len(g)>max(100,gap*12)]
                 for xs in spans:
-                    x0,x1 = left+xs[0],left+xs[-1]
+                    x0,x1 = xs[0],xs[-1]
                     if any(abs(ys[0]-p['core'][1])<gap*3 and min(x1,p['core'][2])-max(x0,p['core'][0]) > min(x1-x0,p['core'][2]-p['core'][0])*.7 for p in proposals):
                         continue
                     core = [int(x0),int(ys[0]),int(x1),int(ys[-1])]
@@ -41,7 +45,23 @@ def staff_proposals(gray):
                            min(width,round(x1+2*gap)),min(height,round(ys[-1]+(6 if count==6 else 24)*gap))]
                     proposals.append({'core':core,'box':box,'gap':gap,'lines':count})
                 used.append(int(ys[0]))
-    return proposals
+    # A slightly sloping row may only fit within each half-page pass. Join
+    # adjoining fragments of the same staff, but keep real column gaps apart.
+    merged=[]
+    for proposal in sorted(proposals,key=lambda p:p['core'][0]):
+        b=proposal['core']; gap=proposal['gap']
+        previous=next((p for p in merged if p['lines']==proposal['lines']
+            and abs(p['gap']-gap)<=gap*.2
+            and abs(p['core'][1]-b[1])<=gap*.6
+            and abs(p['core'][3]-b[3])<=gap*.6
+            and b[0]-p['core'][2]<=gap*3),None)
+        if previous:
+            for key in ('core','box'):
+                a=previous[key]; other=proposal[key]
+                previous[key]=[min(a[0],other[0]),min(a[1],other[1]),max(a[2],other[2]),max(a[3],other[3])]
+        else:
+            merged.append(proposal)
+    return merged
 
 
 def add_recall_candidates(gray, regions):
@@ -55,9 +75,16 @@ def add_recall_candidates(gray, regions):
         def covered(r):
             a=r['box']
             return max(0,min(a[2],core[2])-max(a[0],core[0]))*max(0,min(a[3],core[3])-max(a[1],core[1]))/area
-        if any(covered(r)>.85 for r in regions):
+        if any(r['accepted'] and covered(r)>.99 for r in regions):
             continue
-        partial = next((r for r in regions if not r['accepted'] and covered(r)>.2),None)
+        # Covering only TAB lines is insufficient: the candidate also needs
+        # the notation margin above. Large unrelated boxes must not absorb it.
+        if any(not r['accepted'] and r['box'][0]<=box[0] and r['box'][1]<=box[1]
+               and r['box'][2]>=box[2] and r['box'][3]>=box[3] for r in regions):
+            continue
+        partial = max((r for r in regions if not r['accepted'] and covered(r)>.2
+                       and r['box'][3]-r['box'][1] <= (box[3]-box[1])*1.6),
+                      key=covered,default=None)
         if partial:
             a=partial['box']
             partial['box']=[min(a[0],box[0]),min(a[1],box[1]),max(a[2],box[2]),max(a[3],box[3])]
@@ -77,6 +104,7 @@ def add_recall_candidates(gray, regions):
         b=r['box']
         previous=next((p for p in reversed(merged) if not p['accepted'] and not r['accepted']
             and min(p['box'][2]-p['box'][0],b[2]-b[0])/max(p['box'][2]-p['box'][0],b[2]-b[0])>.75
+            and abs((p['box'][1]+p['box'][3])-(b[1]+b[3])) <= min(p['box'][3]-p['box'][1],b[3]-b[1])
             and overlap(p['box'],b)/min(area(p['box']),area(b))>.15),None)
         if previous:
             a=previous['box'];previous['box']=[min(a[0],b[0]),min(a[1],b[1]),max(a[2],b[2]),max(a[3],b[3])]
