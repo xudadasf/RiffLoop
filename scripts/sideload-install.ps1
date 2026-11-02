@@ -1,4 +1,4 @@
-# Drive the local Sideloadly GUI to cover-install an unsigned IPA onto the iPad.
+﻿# Drive the local Sideloadly GUI to cover-install an unsigned IPA onto the iPad.
 #
 # This script automates exactly the manual sequence proven on 2026-08-19:
 #   1. Load the IPA into Sideloadly via the command-line argument.
@@ -22,6 +22,7 @@ param(
     [string]$ExpectedRef = 'HEAD',
     [string]$ExpectedAppleId = '',
     [string]$ExpectedUdid = '',
+    [ValidateSet('Any', 'Network', 'USB')][string]$ConnectionType = 'Any',
     [int]$TimeoutMinutes = 20,
     [switch]$DryRun
 )
@@ -55,15 +56,21 @@ $stderrLog = "$stdoutLog.err"
 #    the AppleMobileDeviceService session locked for a while, so settle first and
 #    retry the launch if the device never shows up.
 Get-Process -Name Sideloadly -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Host "等待 40 秒释放旧的设备连接…"
 Start-Sleep -Seconds 40
 $proc = Start-Process -FilePath $sideloadlyExe -ArgumentList "`"$IpaPath`"" -PassThru `
-    -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+    -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Normal
+try {
 Write-Host "Sideloadly PID: $($proc.Id), log: $stdoutLog"
 
 function Wait-Until([scriptblock]$Condition, [string]$What) {
     $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
     while ((Get-Date) -lt $deadline) {
         if (& $Condition) { return $true }
+        $currentLog = Get-Content $stdoutLog -Raw -ErrorAction SilentlyContinue
+        if ($currentLog -match '(?im)^.*(ERROR:|Installation failed|Sideloading failed).*$') {
+            throw "Sideloadly 报告失败，请查看日志：$stdoutLog"
+        }
         if ($proc.HasExited) {
             $tail = Get-Content $stdoutLog -Tail 10 -ErrorAction SilentlyContinue
             throw "Sideloadly 提前退出（exit $($proc.ExitCode)）。日志末尾：`n$tail"
@@ -106,24 +113,40 @@ function Find-DeviceName {
         Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ComboBox } |
         Select-Object -First 1
     if (-not $combo) { return $null }
+    function Test-TargetName([string]$Name) {
+        if (-not $Name -or $Name -eq '<no devices detected>') { return $false }
+        if ($ExpectedUdid -and $Name -notlike "*$ExpectedUdid*") { return $false }
+        $wireless = $Name -match '(?i)wi[ -]?fi|wireless|network|无线'
+        if ($ConnectionType -eq 'Network') { return $wireless }
+        if ($ConnectionType -eq 'USB') { return (-not $wireless) }
+        return $true
+    }
     try {
-        $value = $combo.GetCurrentPattern(
-            [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
-        if ($value -and $value -ne "<no devices detected>") { return $value }
+        $value = $combo.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        if (Test-TargetName $value) { return $value }
     } catch {}
-    $items = $combo.FindAll([System.Windows.Automation.TreeScope]::Descendants,
-        [System.Windows.Automation.Condition]::TrueCondition)
-    foreach ($it in $items) {
-        if ($it.Current.Name -and $it.Current.Name -ne "<no devices detected>") {
-            return $it.Current.Name
+    try {
+        $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+        $items = $combo.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.Condition]::TrueCondition)
+        foreach ($it in $items) {
+            if (Test-TargetName $it.Current.Name) {
+                try {
+                    $it.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+                    $value = $combo.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+                    if (Test-TargetName $value) { return $value }
+                } catch {}
+            }
         }
+    } catch {} finally {
+        try { $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse() } catch {}
     }
     return $null
 }
 
 $deviceName = $null
 $hintShown = $false
-$deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+$deadline = (Get-Date).AddSeconds(45)
 while ((Get-Date) -lt $deadline -and -not $deviceName) {
     $deviceName = Find-DeviceName
     if (-not $deviceName) {
@@ -134,7 +157,7 @@ while ((Get-Date) -lt $deadline -and -not $deviceName) {
         Start-Sleep -Seconds 10
     }
 }
-if (-not $deviceName) { throw "等待超时仍未检测到 iPad：请确认 USB 连接并在 iPad 上点「信任」后重试" }
+if (-not $deviceName) { throw "未能选择目标 iPad 的 $ConnectionType 连接，请检查配对、Wi-Fi 同步或 USB 数据线" }
 Write-Host "设备：$deviceName"
 if ($ExpectedUdid -and $deviceName -notlike "*$ExpectedUdid*") {
     throw 'Sideloadly 当前选择的设备与待续签 iPad 不一致；请在窗口选择正确设备后重试。'
@@ -207,3 +230,11 @@ print(json.dumps(dict(r), ensure_ascii=False, default=str))
 $verify = python $pyScript $dbCopy
 Write-Host "数据库最新记录：$verify"
 Write-Host "完成。若 Apple 弹出登录/验证窗口，请由用户在窗口中完成。"
+
+} catch {
+    # Do not leave a wireless attempt running while the caller falls back to USB.
+    if ($proc -and -not $proc.HasExited) {
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw
+}

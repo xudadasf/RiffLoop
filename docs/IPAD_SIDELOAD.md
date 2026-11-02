@@ -44,13 +44,19 @@ pwsh -File scripts/download-ipa.ps1 -AllowOlderCommit  # 最近一次成功构�
 
 在这台已配置好的 Windows 电脑上，双击桌面的 **RiffLoop 一键续签**：
 
-1. USB 连接并解锁 iPad，电脑保持联网；出现“信任此电脑”时确认。
-2. 双击入口，等待 Sideloadly 完成。Apple 密码或验证码只在 Sideloadly 窗口输入。
+1. 首次先 USB 连接、解锁并信任电脑，运行桌面 **RiffLoop 无线续签设置**。它启用设备的 Wi-Fi 连接，不重装 App；同时在 iTunes 设备摘要中确认“通过 Wi-Fi 与此 iPad 同步”，点击应用。
+2. 拔掉 USB，保持 iPad 解锁亮屏、电脑和 iPad 连接同一可互通局域网，再双击 **RiffLoop 一键续签**。入口先等待无线发现；连接不可用时才转 USB。Apple 密码或验证码只在 Sideloadly 窗口输入。
 3. 窗口显示续签安装完成后，在 iPad 打开 RiffLoop 检查。
 
 入口调用 `scripts/renew-ipad.ps1`，读取 iPad 的实际版本，从本地 `output/release-*` 找到同版本、同构建号的原安装包，检查内部版本、Git 提交及哈希。点击安装前核对 Sideloadly 所选设备和原 Apple 账号；安装后再次读取设备版本。不匹配或缺少原安装包时停止，不自动升级或降级，不卸载应用。复用 Sideloadly 的账号会话，不保存密码。
 
-用 `scripts/create-renew-shortcut.ps1` 可重新创建桌面快捷方式。快捷方式依赖当前工作副本及其中的安装包，不能删除或移动该目录。`pwsh -File scripts/renew-ipad.ps1 -DryRun` 仅做设备与安装包检查，不启动签名；Sideloadly 中当前所选账号与设备只在实际安装前核对。
+用 `scripts/create-renew-shortcut.ps1` 可重新创建上述两个桌面快捷方式。快捷方式依赖当前工作副本及其中的安装包，不能删除或移动该目录。`pwsh -File scripts/renew-ipad.ps1 -DryRun -Mode Network` 仅检查无线设备与安装包，不启动签名；Sideloadly 中当前所选账号与设备只在实际安装前核对。版本、原账号或安装包检查失败时停止，不通过 USB 重复尝试签名。
+
+2.4 GHz 和 5 GHz 无需相同，但必须允许两端局域网互通；相同 Wi-Fi 名称和关闭 AP 隔离本身不能证明无线配对及设备发现正常。访客网络、频段隔离、VPN 路由或防火墙仍可能影响发现。不要为此关闭整个防火墙。
+
+`pwsh -File scripts/renew-ipad.ps1 -DiagnoseWifi` 只读检查 USB、Apple 服务中的无线设备和局域网设备广播数量。广播存在而无线设备为零时，优先检查 iTunes 配对和 Wi-Fi 同步；广播也为零时，继续检查亮屏状态及局域网互通。`-SetupWifi` 必须通过已信任的 USB 连接执行。最终应拔线验证；USB 检查成功不代表无线续签成功。
+
+设备读取仅输出 RiffLoop 续签所需的版本、Bundle ID 和签名身份，忽略包含二进制数据的收据等字段，避免 `Object of type bytes is not JSON serializable`。账号信息仅供本机核对，不要将设备输出或配对记录上传到 Git。
 
 ### iPad 提示“未受信任的开发者”
 
