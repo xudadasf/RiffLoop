@@ -15,6 +15,7 @@
 - Restarted Apple Mobile Device Service. **USB 0 / Network 1**, then the Network-only renewal dry-run read the original app's 0.25.68 (112) and passed package validation. No router, VPN or broad firewall settings were changed.
 - The first actual renewal attempt was interrupted before Start by Sideloadly's automatic update/restart. Subsequent discovery saw no wireless device; requested that the user keep the iPad unlocked and awake for another attempt. Actual signing/install success remains unverified at this point.
 - Added missing/stopped Bonjour guidance and an explicit updater-restart message. Do not infer successful renewal from a discovery check or a successful process exit alone.
+- Further checks still received a physical-WLAN mDNS response while Apple Network discovery was zero. Stopped the hidden iTunes instance launched for this investigation and restarted Bonjour and Apple Mobile Device Service. Bonjour then bound the physical WLAN discovery socket, but Network discovery still did not recover during the next bounded attempt. Therefore the wireless path has worked once but is not yet demonstrated stable; missing Bonjour alone does not explain every later disappearance. No actual renewal completed, and the request to keep the iPad unlocked/awake remains pending.
 
 ## Changes and validation
 
