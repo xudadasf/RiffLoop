@@ -15,6 +15,12 @@ function Get-DeviceSnapshot([string]$Transport, [int]$WaitSeconds = 0, [switch]$
 
 function Show-WifiHelp {
     Write-Host '2.4 GHz 与 5 GHz 可以互通，不要求同频段；需要同一可互通局域网。'
+    $bonjour = Get-Service 'Bonjour Service' -ErrorAction SilentlyContinue
+    if (-not $bonjour) {
+        Write-Host '电脑缺少 Bonjour 无线发现服务。请安装 Apple 官方 Bonjour：https://support.apple.com/106380；安装后重启 Apple Mobile Device Service。'
+    } elseif ($bonjour.Status -ne 'Running') {
+        Write-Host 'Bonjour 服务未运行；请在 Windows 服务中启动 Bonjour Service，再重试无线连接。'
+    }
     Write-Host '首次无线设置：USB 连接并信任电脑，运行“RiffLoop 无线续签设置”。'
     Write-Host 'iTunes 设备摘要 → 选项 → 通过 Wi-Fi 与此 iPad 同步 → 应用。然后拔线、解锁 iPad，再尝试无线续签。'
     Write-Host '若仍未发现：检查访客网络/频段间隔离、VPN 的局域网访问和防火墙中的 Apple 服务；不要关闭整个防火墙。'
@@ -102,9 +108,11 @@ if ($SetupWifi -or $DiagnoseWifi) {
             Write-Host "USB 设备：$($state.USB)；Apple 服务中的无线设备：$($state.Network)；局域网设备广播：$($state.BonjourAdvertisements)。"
             $appleService = Get-Service 'Apple Mobile Device Service' -ErrorAction SilentlyContinue
             Write-Host ('Apple 设备服务：' + $(if ($appleService) { $appleService.Status } else { '未安装' }))
+            $bonjour = Get-Service 'Bonjour Service' -ErrorAction SilentlyContinue
+            Write-Host ('Bonjour 无线发现服务：' + $(if ($bonjour) { $bonjour.Status } else { '未安装' }))
             if ($state.Network -gt 0) { Write-Host 'Apple 服务已发现无线设备；仍需续签前核对目标设备、原账号和安装包。' }
             elseif ($state.BonjourAdvertisements -gt 0) { Write-Host '有设备广播，但 Apple 服务未提供无线连接；请用 iTunes 检查配对及 Wi-Fi 同步。' }
-            else { Write-Host '未收到设备广播；可能尚未启用无线连接、设备锁屏或网络未互通。' }
+            else { Write-Host '基础探测未收到设备广播；虚拟网卡可能造成漏检，不能据此认定 Wi-Fi 不通。请先检查 Bonjour、Wi-Fi 同步及亮屏状态。' }
         }
         Show-WifiHelp
         return

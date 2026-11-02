@@ -72,6 +72,10 @@ function Wait-Until([scriptblock]$Condition, [string]$What) {
             throw "Sideloadly 报告失败，请查看日志：$stdoutLog"
         }
         if ($proc.HasExited) {
+            if ($proc.ExitCode -eq 0 -and $currentLog -match 'Update successful' -and
+                $currentLog -match 'Restarting') {
+                throw 'Sideloadly 已自动更新并重启，本次流程中断。请等待新窗口加载完成后重试一键续签。'
+            }
             $tail = Get-Content $stdoutLog -Tail 10 -ErrorAction SilentlyContinue
             throw "Sideloadly 提前退出（exit $($proc.ExitCode)）。日志末尾：`n$tail"
         }

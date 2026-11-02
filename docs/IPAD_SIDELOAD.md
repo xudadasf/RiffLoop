@@ -25,6 +25,7 @@ pwsh -File scripts/download-ipa.ps1 -AllowOlderCommit  # 最近一次成功构�
 1. 从 Apple 官网安装独立版 iTunes 和 iCloud；不要安装 Microsoft Store 版。
 2. USB 连接 iPad，在 iPad 上选择信任这台电脑。
 3. 在 iTunes 的设备摘要中启用“通过 Wi-Fi 与此 iPad 同步”，并完成一次同步。
+   Windows 还需要运行 Bonjour 无线发现服务。缺少时可安装 [Apple 官方 Bonjour](https://support.apple.com/106380)，然后重启 Apple Mobile Device Service；无需重装或删除 iPad 上的 RiffLoop。
 4. 在 iPad 的“设置 → 隐私与安全性 → 开发者模式”中开启开发者模式，按系统要求重启并确认。
 5. 安装并打开 Sideloadly。建议使用一个只用于侧载签名的 Apple 账号；正常 iCloud 账号可以继续留在 iPad 上。
 
@@ -54,7 +55,7 @@ pwsh -File scripts/download-ipa.ps1 -AllowOlderCommit  # 最近一次成功构�
 
 2.4 GHz 和 5 GHz 无需相同，但必须允许两端局域网互通；相同 Wi-Fi 名称和关闭 AP 隔离本身不能证明无线配对及设备发现正常。访客网络、频段隔离、VPN 路由或防火墙仍可能影响发现。不要为此关闭整个防火墙。
 
-`pwsh -File scripts/renew-ipad.ps1 -DiagnoseWifi` 只读检查 USB、Apple 服务中的无线设备和局域网设备广播数量。广播存在而无线设备为零时，优先检查 iTunes 配对和 Wi-Fi 同步；广播也为零时，继续检查亮屏状态及局域网互通。`-SetupWifi` 必须通过已信任的 USB 连接执行。最终应拔线验证；USB 检查成功不代表无线续签成功。
+`pwsh -File scripts/renew-ipad.ps1 -DiagnoseWifi` 只读检查 USB、Apple 服务中的无线设备、Bonjour 服务状态和基础局域网广播探测结果。广播存在而无线设备为零时，优先检查 Bonjour、iTunes 配对和 Wi-Fi 同步；广播也为零时不能直接认定网络隔离，多网卡环境下基础探测可能漏检。`-SetupWifi` 必须通过已信任的 USB 连接执行。最终应拔线验证；USB 检查成功不代表无线续签成功。
 
 设备读取仅输出 RiffLoop 续签所需的版本、Bundle ID 和签名身份，忽略包含二进制数据的收据等字段，避免 `Object of type bytes is not JSON serializable`。账号信息仅供本机核对，不要将设备输出或配对记录上传到 Git。
 
