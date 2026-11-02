@@ -36,7 +36,10 @@ def write_editor(folder, manifest, outcome):
 <option value="adopted">只看采用框</option><option value="none">只看原页</option></select></label>
 <span id="page-status"></span></div><p class="tip">蓝框是当前所选；勾选“采用”决定是否识别。可先用上方 ＋ 放大，再滚动谱图找到位置，点击“补画”或“重画”拖出区域；画框模式中也可缩放。</p>
 <div id="stage"><div id="sheet"><img id="source" alt="未画框的原页"><svg id="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="可编辑分区框"></svg></div></div>
-</section><aside><h2>本页区域</h2><p>区域编号对应图上的框。“写入位置”只计算本页已采用区域，直接改数字即可调整顺序，其他区域自动顺移。页面之间按 PDF 页码输出。</p>
+</section><aside><h2>本页写入顺序</h2><p>在顺序表中直接填写已采用的方框编号。填入表中另一个编号时，两个位置交换，避免重复写入。页面之间按 PDF 页码输出。</p>
+<table id="order-table"><thead><tr><th scope="col">写入位置</th><th scope="col">方框编号</th><th scope="col">后接空白<br>（小节）</th></tr></thead><tbody id="order-rows"></tbody></table>
+<p id="order-empty" class="tip">先在下方勾选采用的区域，顺序表会列出对应编号。</p>
+<p class="tip">空白填 0 连续写入；最后一个输出区域不追加空白。</p><h2>本页区域</h2>
 <div id="regions"></div><p class="tip">没有候选框的页也要查看原图；无谱页可直接确认。修改已确认页会取消该页的确认状态。
 后接空白填 0 表示连续写入，默认 1 小节。设置随区域保存并带入拼接窗口，最后一个输出区域不追加空白。</p></aside></main>
 <script id="region-data" type="application/json">{payload}</script><script>{js}</script></body></html>'''

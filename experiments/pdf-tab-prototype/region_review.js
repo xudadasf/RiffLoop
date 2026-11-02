@@ -40,8 +40,8 @@
     el('redraw').disabled=selected<0;el('remove').disabled=selected<0;
     el('zoom-out').disabled=el('zoom').selectedIndex===0;el('zoom-in').disabled=el('zoom').selectedIndex===el('zoom').options.length-1;
     el('add').classList.toggle('active',mode==='add');el('redraw').classList.toggle('active',mode==='redraw');
-    let writePosition=0;
-    el('regions').replaceChildren(...p.regions.map((r,i)=>{
+    renderOrder();
+    el('regions').replaceChildren(...p.regions.map((r,i)=>({r,i})).sort((a,b)=>a.r.id-b.r.id).map(({r,i})=>{
       const card=document.createElement('div');card.className='region'+(i===selected?' current':'');
       const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=r.selected;
       check.setAttribute('aria-label',`采用区域 ${r.id}`);check.onchange=()=>{r.selected=check.checked;selected=i;change();render();};
@@ -50,33 +50,40 @@
       const row=document.createElement('div');row.className='toolbar';
       const button=document.createElement('button');button.textContent='选中';
       button.onclick=()=>{selected=i;mode='';el('box-view').value='all';render();};row.append(button);
-      if(r.selected){
-        const positionLabel=document.createElement('label'),position=document.createElement('input');
-        position.type='number';position.min=1;position.max=adopted;position.step=1;position.value=++writePosition;
-        position.setAttribute('aria-label',`区域 ${r.id} 的本页写入位置`);
-        position.onchange=()=>reorder(r,position.value);
-        position.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();position.blur();}};
-        positionLabel.append('写入位置 ',position);row.append(positionLabel);
-        const gapLabel=document.createElement('label'),gap=document.createElement('input');
-        gap.type='number';gap.min=0;gap.max=99;gap.step=1;gap.value=r.gap_after;
-        gap.setAttribute('aria-label',`区域 ${r.id} 后的空白小节`);
-        gap.onchange=()=>{const value=Number(gap.value);
-          if(gap.value.trim()===''||!Number.isInteger(value)||value<0||value>99){feedback('空白小节请输入 0–99 的整数；0 表示连续写入。');gap.value=r.gap_after;return;}
-          if(value!==r.gap_after){r.gap_after=value;change();render();}};
-        gapLabel.append('后接空白 ',gap,' 小节');row.append(gapLabel);
-      }
       card.append(row);return card;
     }));
     if(!p.regions.length)el('regions').textContent='尚无候选框。请查看原页；有谱子时用“补画区域”，无谱时直接确认本页。';
     fit();paint();
   }
-  function reorder(region,value){
+  function renderOrder(){
+    const adopted=current().regions.filter(r=>r.selected);
+    el('order-table').hidden=!adopted.length;el('order-empty').hidden=!!adopted.length;
+    el('order-rows').replaceChildren(...adopted.map((r,index)=>{
+      const row=document.createElement('tr'),position=document.createElement('th');
+      position.scope='row';position.textContent=index+1;row.append(position);
+      const numberCell=document.createElement('td'),number=document.createElement('input');
+      number.type='number';number.min=1;number.step=1;number.value=r.id;
+      number.setAttribute('aria-label',`写入位置 ${index+1} 的方框编号`);
+      number.onchange=()=>assignRegion(index,number.value);
+      number.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();number.blur();}};
+      numberCell.append(number);row.append(numberCell);
+      const gapCell=document.createElement('td'),gap=document.createElement('input');
+      gap.type='number';gap.min=0;gap.max=99;gap.step=1;gap.value=r.gap_after;
+      gap.setAttribute('aria-label',`区域 ${r.id} 后的空白小节`);
+      gap.onchange=()=>{const value=Number(gap.value);
+        if(gap.value.trim()===''||!Number.isInteger(value)||value<0||value>99){feedback('空白小节请输入 0–99 的整数；0 表示连续写入。');gap.value=r.gap_after;return;}
+        if(value!==r.gap_after){r.gap_after=value;change();render();}};
+      gap.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();gap.blur();}};
+      gapCell.append(gap);row.append(gapCell);return row;
+    }));
+  }
+  function assignRegion(position,value){
     const regions=current().regions,slots=regions.map((r,i)=>r.selected?i:-1).filter(i=>i>=0);
-    const adopted=slots.map(i=>regions[i]),target=Number(value)-1;
-    if(value.trim()===''||!Number.isInteger(target)||target<0||target>=adopted.length){feedback(`写入位置请输入 1–${adopted.length} 的整数。`);render();return;}
-    const from=adopted.indexOf(region);if(from===target)return;
-    adopted.splice(from,1);adopted.splice(target,0,region);slots.forEach((slot,i)=>{regions[slot]=adopted[i];});
-    selected=regions.indexOf(region);change();feedback(`区域 ${region.id} 已移到本页第 ${target+1} 个写入位置，其他采用区域已顺移。`);render();
+    const id=Number(value),other=slots.findIndex(i=>regions[i].id===id);
+    if(value.trim()===''||!Number.isSafeInteger(id)||other<0){feedback('请填写本页已勾选采用的方框编号。');render();return;}
+    if(position===other)return;
+    const a=slots[position],b=slots[other];[regions[a],regions[b]]=[regions[b],regions[a]];
+    selected=a;change();feedback(`第 ${position+1} 个写入位置已改为方框 ${id}，与原第 ${other+1} 个位置交换。`);render();
   }
   function navigate(i){pageIndex=Math.max(0,Math.min(pages.length-1,i));selected=-1;mode='';drag=null;render();el('stage').scrollTo(0,0);}
   function point(e){const rect=el('overlay').getBoundingClientRect(),p=data.pages[pageIndex];
