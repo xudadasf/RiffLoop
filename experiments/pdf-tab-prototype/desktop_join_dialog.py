@@ -6,7 +6,7 @@ from desktop_join import validate_join
 
 
 class JoinDialog(tk.Toplevel):
-    def __init__(self, parent, sources, submit, default_gap=0):
+    def __init__(self, parent, sources, submit, default_gap=0, source_gaps=None):
         super().__init__(parent)
         self.title('拼接生成一份 GP')
         self.geometry('780x520')
@@ -14,7 +14,7 @@ class JoinDialog(tk.Toplevel):
         self.transient(parent)
         self.submit = submit
         self.sources = {str(i): source for i, source in enumerate(sources)}
-        self.gaps = {key: tk.StringVar(value=str(default_gap)) for key in self.sources}
+        self.gaps = {key: tk.StringVar(value=str(source_gaps[int(key)] if source_gaps is not None else default_gap)) for key in self.sources}
         self.last_gap = tk.StringVar(value='0')
         outer = ttk.Frame(self, padding=18)
         outer.pack(fill='both', expand=True)

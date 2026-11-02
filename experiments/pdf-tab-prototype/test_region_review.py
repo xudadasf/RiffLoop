@@ -30,6 +30,7 @@ class RegionPlanTests(unittest.TestCase):
             path=root/'plan.json';path.write_text(json.dumps(plan),encoding='utf-8')
             result=apply_region_plan(path,root,root/'result')
             self.assertEqual(len(result['region_sources']),1)
+            self.assertEqual(result['region_gaps'],[1])  # Older plans keep the default.
             with Image.open(result['region_sources'][0]) as image:
                 np.testing.assert_array_equal(np.asarray(image),pixels[20:80,10:90])
             self.assertIn('1/2',result['message'])
@@ -51,6 +52,29 @@ class RegionPlanTests(unittest.TestCase):
                 p=copy.deepcopy(plan);p['pages'][0]['regions'][0]['box']=box;bad.append(p)
             for p in bad:
                 with self.assertRaises(ValueError):validate_plan(p,manifest)
+
+    def test_reordered_regions_keep_their_gaps_across_pages(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);pixels,_,plan=fixtures(root)
+            a,b=plan['pages'][0]['regions']
+            a['gap_after']=2;b.update(selected=True,gap_after=0)
+            plan['pages'][0]['regions']=[b,a]
+            plan['pages'][1]['confirmed']=True
+            plan['pages'][1]['regions'][0]['gap_after']=9
+            path=root/'plan.json';path.write_text(json.dumps(plan),encoding='utf-8')
+            result=apply_region_plan(path,root,root/'result')
+            self.assertEqual(result['region_gaps'],[0,2,9])
+            for source,expected in zip(result['region_sources'],[pixels[15:90,100:150],pixels[20:80,10:90],pixels[0:100,0:100]]):
+                with Image.open(source) as image:
+                    np.testing.assert_array_equal(np.asarray(image),expected)
+
+    def test_invalid_region_gaps_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            _,manifest,plan=fixtures(Path(temp))
+            for gap in (-1,100,1.5,True,None,'2'):
+                plan['pages'][0]['regions'][0]['gap_after']=gap
+                with self.subTest(gap=gap),self.assertRaisesRegex(ValueError,'空白小节'):
+                    validate_plan(plan,manifest)
 
     def test_no_confirmations_or_no_selected_music_does_not_make_queue(self):
         with tempfile.TemporaryDirectory() as temp:

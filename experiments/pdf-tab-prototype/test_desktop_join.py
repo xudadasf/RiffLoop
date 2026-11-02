@@ -153,6 +153,33 @@ class JoinTests(unittest.TestCase):
         self.assertEqual(submitted[0][0], [Path('c.png'), Path('a.png'), Path('b.png')])
         self.assertEqual(submitted[0][1], [0, 2])
 
+    def test_region_import_events_keep_order_and_gaps_through_join_dialog(self):
+        import tkinter as tk
+        from desktop_gui import TrialWindow
+        from desktop_join_dialog import JoinDialog
+        try:
+            root=tk.Tk()
+        except tk.TclError:
+            self.skipTest('Tk display is unavailable')
+        root.withdraw();self.addCleanup(root.destroy)
+        with patch.object(root,'after'):
+            app=TrialWindow(root)
+            key=app.tree.insert('','end',values=('regions','教材分区','正在应用'))
+            app.items[key]={'source':Path('book.pdf'),'is_regions':True}
+            sources=['b.png','a.png','c.png']
+            result={'status':'人工分区已应用','folder':'.','region_sources':sources,'region_gaps':[0,2,9]}
+            app.events.put(('finished',key,result));app.events.put(('regions_ready',key,sources));app.poll()
+            submitted=[];app.start_join=lambda *args:submitted.append(args)
+            app.join_selected()
+            dialog=next(child for child in root.winfo_children() if isinstance(child,JoinDialog))
+            self.assertEqual([dialog.gaps[str(i)].get() for i in range(3)],['0','2','9'])
+            dialog.confirm()
+        self.assertEqual(submitted[0][0],[Path(p) for p in sources])
+        self.assertEqual(submitted[0][1],[0,2])  # Never append the final region's gap.
+        data=combine_scores([part(p,i+3) for i,p in enumerate(sources)],submitted[0][1],'imported')
+        bars=[bar for system in data['systems'] for bar in system['bars']]
+        self.assertEqual([b['number'] for b in bars if b.get('separator')],[3,4])
+
 
 if __name__ == '__main__':
     unittest.main()

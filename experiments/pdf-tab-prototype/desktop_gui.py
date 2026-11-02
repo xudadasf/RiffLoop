@@ -188,14 +188,16 @@ class TrialWindow:
         if self.running:
             return
         selected = set(self.tree.selection())
-        sources = [self.items[key]['source'] for key in self.tree.get_children()
+        ordered = [self.items[key] for key in self.tree.get_children()
                    if key in selected and not self.items[key].get('is_join') and not self.items[key].get('is_regions')]
+        sources = [item['source'] for item in ordered]
         if len(sources) < 2:
             messagebox.showinfo('选择多份原文件', '按住 Ctrl 或 Shift 选中至少两份 PDF / 截图，再设置拼接顺序和空白小节。')
             return
         from desktop_join_dialog import JoinDialog
         gap = 1 if any(self.items[key].get('from_textbook') for key in selected) else 0
-        JoinDialog(self.root, [Path(s) for s in sources], self.start_join, default_gap=gap)
+        JoinDialog(self.root, [Path(s) for s in sources], self.start_join, default_gap=gap,
+                   source_gaps=[item.get('gap_after',gap) for item in ordered])
 
     def extract_selected(self):
         if self.running:
@@ -365,18 +367,21 @@ class TrialWindow:
                     self.show_details()
                 elif event == 'regions_ready':
                     added = []
-                    for path in payload:
+                    gaps = self.items[key].get('region_gaps',[1]*len(payload))
+                    for index,path in enumerate(payload):
                         source = Path(path)
-                        row = self.tree.insert('', 'end', values=(source.name, '教材区域', '待处理 · 区域间默认空 1 小节'))
-                        self.items[row] = {'source': source, 'pending': True, 'from_textbook': True,
+                        gap = gaps[index]
+                        connection = f'后接空白 {gap} 小节' if gap else '后接连续写入'
+                        row = self.tree.insert('', 'end', values=(source.name, '教材区域', '待处理 · '+connection))
+                        self.items[row] = {'source': source, 'pending': True, 'from_textbook': True, 'gap_after':gap,
                             'region_report': str(Path(self.items[key]['folder']) / 'review.html'),
                             'message': '点击“查看分区 / 结果”看原页区域框；点击“拼接所选文件…”生成一份 GP。'
-                                       '区域间默认空 1 小节，连续谱可改为 0；只包含已确认页中采用的区域。'}
+                                       +connection+'（若是最后一段则不追加空白）；只包含已确认页中采用的区域。'}
                         added.append(row)
                     if added:
                         self.tree.selection_set(added)
                         self.tree.see(added[0])
-                        self.detail.set('已选中教材区域。点击“拼接所选文件…”生成一份 GP；默认每个区域间空 1 小节。'
+                        self.detail.set('已选中教材区域。点击“拼接所选文件…”生成一份 GP；按方案顺序及各段空白小节设置输出。'
                                         '选择原 PDF 行并查看结果，可浏览分区图和未采用候选。')
                 elif event in ('done','cleanup_done'):
                     self.running = False

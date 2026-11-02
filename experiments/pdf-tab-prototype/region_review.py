@@ -26,17 +26,19 @@ def write_editor(folder, manifest, outcome):
 <input id="plan-file" type="file" accept=".json" hidden><span id="progress"></span></div></header>
 <nav class="toolbar"><button id="prev">上一页</button><select id="page" aria-label="选择 PDF 页码"></select>
 <button id="next">下一页</button><button id="unconfirmed">下一未确认页</button>
-<button id="confirm">确认本页并下一页</button><label>放大 <select id="zoom" aria-label="谱图缩放"><option value="1">适合窗口</option>
-<option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label></nav>
+<button id="confirm">确认本页并下一页</button><button id="zoom-out" aria-label="缩小谱图">− 缩小</button>
+<label>谱图缩放 <select id="zoom" aria-label="谱图缩放"><option value="1">适合窗口</option>
+<option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option><option value="4">400%</option></select></label>
+<button id="zoom-in" aria-label="放大谱图">＋ 放大</button></nav>
 <p id="feedback" role="status" aria-live="polite"></p><main><section>
 <div class="toolbar"><button id="add">补画区域</button><button id="redraw">重画所选框</button><button id="remove">删除所选框</button>
 <label>框显示 <select id="box-view" aria-label="分区框显示"><option value="all">全部框</option>
 <option value="adopted">只看采用框</option><option value="none">只看原页</option></select></label>
-<span id="page-status"></span></div><p class="tip">蓝框是当前所选；勾选“采用”决定是否识别。点击“补画”或“重画”后，在谱图上拖出完整区域。</p>
+<span id="page-status"></span></div><p class="tip">蓝框是当前所选；勾选“采用”决定是否识别。可先用上方 ＋ 放大，再滚动谱图找到位置，点击“补画”或“重画”拖出区域；画框模式中也可缩放。</p>
 <div id="stage"><div id="sheet"><img id="source" alt="未画框的原页"><svg id="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="可编辑分区框"></svg></div></div>
-</section><aside><h2>本页区域</h2><p>按列表顺序输出，可用 ↑ ↓ 调整。一个连续练习可画成一个大框，并取消原来的小框。</p>
+</section><aside><h2>本页区域</h2><p>区域编号对应图上的框。“写入位置”只计算本页已采用区域，直接改数字即可调整顺序，其他区域自动顺移。页面之间按 PDF 页码输出。</p>
 <div id="regions"></div><p class="tip">没有候选框的页也要查看原图；无谱页可直接确认。修改已确认页会取消该页的确认状态。
-区域之间默认空 1 小节，导入后在拼接窗口调整。</p></aside></main>
+后接空白填 0 表示连续写入，默认 1 小节。设置随区域保存并带入拼接窗口，最后一个输出区域不追加空白。</p></aside></main>
 <script id="region-data" type="application/json">{payload}</script><script>{js}</script></body></html>'''
     (folder/'review.html').write_text(document,encoding='utf-8')
 
@@ -68,6 +70,9 @@ def validate_plan(plan, manifest):
                 raise ValueError('分区框超出原页或过小，请重新画框')
             if type(r.get('selected')) is not bool:
                 raise ValueError('区域采用状态无效')
+            gap=r.get('gap_after',1)
+            if type(gap) is not int or not 0<=gap<=99:
+                raise ValueError('区域后的空白小节必须是 0–99 的整数')
             if entry['confirmed'] and r['selected']:
                 for a in adopted:
                     intersection=max(0,min(a[2],x1)-max(a[0],x0))*max(0,min(a[3],y1)-max(a[1],y0))
@@ -90,7 +95,8 @@ def apply_region_plan(plan_path, source_folder, target_folder):
     target_folder.mkdir(parents=True,exist_ok=True)
     if any(target_folder.iterdir()):
         raise ValueError('确认结果目录必须为空，避免覆盖已有文件')
-    sources=[]
+    sources,gaps=[],[]
+    plan_pages={p['page']:p for p in plan['pages']}
     for page,index,box in selected:
         image_path=(source_folder/page['original']).resolve()
         if not image_path.is_relative_to(source_folder) or not image_path.is_file():
@@ -101,11 +107,12 @@ def apply_region_plan(plan_path, source_folder, target_folder):
             output=target_folder/f'page-{page["page"]:03d}-region-{index:02d}.png'
             image.crop(box).save(output)
             sources.append(str(output))
+            gaps.append(plan_pages[page['page']]['regions'][index-1].get('gap_after',1))
     confirmed=sum(p['confirmed'] for p in plan['pages'])
     result={'source':manifest['source'],'folder':str(target_folder),'draft':None,'is_regions':True,
-            'status':'人工分区已应用','region_sources':sources,'region_report':str(source_folder/'review.html'),
+            'status':'人工分区已应用','region_sources':sources,'region_gaps':gaps,'region_report':str(source_folder/'review.html'),
             'message':f'已按确认方案重新裁剪 {len(sources)} 个区域，来自 {confirmed}/{len(plan["pages"])} 个已确认页。'
-                      '未确认页不包含；区域间默认空 1 小节，可在拼接设置中修改。'}
+                      '未确认页不包含；写入顺序与各区域的空白小节设置已保留，最后一段不追加空白。'}
     (target_folder/'applied-plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2),encoding='utf-8')
     (target_folder/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     previews=''.join('<section><h2>'+html.escape(Path(path).name)+'</h2><img style="max-width:100%" src="'
