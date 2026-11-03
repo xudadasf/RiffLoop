@@ -15,6 +15,12 @@ class StringDigitTests(unittest.TestCase):
         chars = [{'char': c, 'x': x} for c, x in zip('1h0', [10,14,18])]
         self.assertEqual([''.join(v['char'] for v in g) for g in group_characters(chars, 14)], ['1','0'])
 
+    def test_dense_double_digit_frets_split_only_at_distinct_larger_gap(self):
+        chars = [{'char': c, 'x': x} for c,x in zip('1113',[0,10.66,24.87,35.53])]
+        self.assertEqual([''.join(v['char'] for v in g) for g in group_characters(chars, 16)], ['11','13'])
+        ambiguous = [{'char': c, 'x': x} for c,x in zip('1113',[0,10,20,30])]
+        self.assertEqual([''.join(v['char'] for v in g) for g in group_characters(ambiguous, 16)], ['1113'])
+
     def test_direct_band_reader_keeps_isolated_notes_and_records_rejected_band(self):
         region = {'ys': [30,44,58,72,86,100], 'crop': [0,0,220,120], 'bar_boundaries': [0,220]}
         calls = []
@@ -32,6 +38,10 @@ class StringDigitTests(unittest.TestCase):
         self.assertEqual([(n['string'],n['fret']) for n in notes], [(6,5),(6,8),(6,6),(6,8)])
         self.assertEqual(unresolved, [])
         self.assertEqual(len(discarded), 1)
+        self.assertEqual(discarded[0]['text'], '0000')
+        self.assertEqual(discarded[0]['score'], .4)
+        self.assertEqual(len(discarded[0]['box']), 4)
+        self.assertEqual(len(discarded[0]['attempts']), 3)
         self.assertEqual(len(raw), 6)
         self.assertTrue(all(c['use_det'] is False for c in calls))
 

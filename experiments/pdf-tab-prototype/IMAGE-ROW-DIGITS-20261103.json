@@ -1,0 +1,313 @@
+{
+  "source_sha256": "78a0ce3503b94c969410833d89692ef8cfecb2c1f8f909676efa71ca223bbab9",
+  "before": {
+    "systems": 2,
+    "bars": 5,
+    "printed_frets": 23
+  },
+  "after": {
+    "systems": 3,
+    "bars": 8,
+    "printed_frets": 46,
+    "ordered_string_fret_bar_exact": true,
+    "gp_sha256": "499204b1b55cfb5552cfa2b6c28af32b4e539b21866f184dd5f4e806a6562a0c"
+  },
+  "manual_tempo": 70,
+  "meter": [
+    4,
+    4
+  ],
+  "scope": "Printed fret positions only, including held-note parentheses. Timing and techniques are placeholders/omitted. Source image is not bundled. Real OCR -> GP test passed.",
+  "model_sha256": {
+    "PP-OCRv6_det_small.onnx": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
+    "PP-OCRv6_rec_small.onnx": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+  },
+  "unit_and_real_tests": 59,
+  "previous_images": {
+    "exact": 36,
+    "total": 40,
+    "regressions": 0,
+    "cases": [
+      {
+        "id": "1-clean",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-blur-0.7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-blur-1.2",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-blur-1.8",
+        "before_exact": false,
+        "after_exact": false,
+        "notes": 0,
+        "bars": 0
+      },
+      {
+        "id": "1-shadow-55",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-shadow-25",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-tilt-minus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-tilt-plus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1-tilt-plus7",
+        "before_exact": false,
+        "after_exact": false,
+        "notes": 65,
+        "bars": 4
+      },
+      {
+        "id": "1-combined",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.1-clean",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-blur-0.7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-blur-1.2",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-blur-1.8",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-shadow-55",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-shadow-25",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-tilt-minus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-tilt-plus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-tilt-plus7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.1-combined",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 32,
+        "bars": 4
+      },
+      {
+        "id": "1.2-clean",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-blur-0.7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-blur-1.2",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-blur-1.8",
+        "before_exact": false,
+        "after_exact": false,
+        "notes": 28,
+        "bars": 4
+      },
+      {
+        "id": "1.2-shadow-55",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-shadow-25",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-tilt-minus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-tilt-plus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-tilt-plus7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.2-combined",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 30,
+        "bars": 4
+      },
+      {
+        "id": "1.3-clean",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-blur-0.7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-blur-1.2",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-blur-1.8",
+        "before_exact": false,
+        "after_exact": false,
+        "notes": 0,
+        "bars": 0
+      },
+      {
+        "id": "1.3-shadow-55",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-shadow-25",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-tilt-minus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-tilt-plus3",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-tilt-plus7",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      },
+      {
+        "id": "1.3-combined",
+        "before_exact": true,
+        "after_exact": true,
+        "notes": 64,
+        "bars": 4
+      }
+    ]
+  }
+}

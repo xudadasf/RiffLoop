@@ -69,6 +69,8 @@ class ReviewPageTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r'<tr[^>]+data-issue="1"', report)), 1)
         self.assertEqual(len(re.findall(r'<tr[^>]+data-issue="0"', report)), 1)
         self.assertIn('第 3 弦有未采用或未确认的识别内容', report)
+        # The candidate must be visible in its bar, not only a collapsed log.
+        self.assertIn('第 3 弦候选“8”尚未写入 GP', report)
 
     def test_unlocated_evidence_is_described_as_line_wide(self):
         self.data['systems'][0]['unresolved'] = [{'row': 1, 'text': '8', 'reason': '位置不明'}]

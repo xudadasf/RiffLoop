@@ -115,11 +115,6 @@ def locate_systems(gray):
             continue
         if any(y in used for y in ys):
             continue
-        # A seven-line table or larger grid must not become six-string TAB.
-        if start > 0 and abs(ys[0] - rows[start - 1] - gap) < gap * .18:
-            continue
-        if start + 6 < len(rows) and abs(rows[start + 6] - ys[-1] - gap) < gap * .18:
-            continue
         coverage = np.zeros(w, dtype=np.int32)
         for y in ys:
             coverage += (horizontal[max(0, y - 2):y + 3].max(axis=0) > 0)
@@ -133,6 +128,17 @@ def locate_systems(gray):
         # Every one of the six strings needs substantial horizontal support.
         supports = [(horizontal[max(0,y-2):y+3,left:right+1].max(axis=0)>0).mean() for y in ys]
         if min(supports) < .5:
+            continue
+        # A true seventh grid line must have the same horizontal support as
+        # a string. Short slurs/beams at one string-spacing above/below TAB
+        # must not veto the entire system before its six lines are inspected.
+        neighbors = []
+        if start > 0 and abs(ys[0] - rows[start - 1] - gap) < gap * .18:
+            neighbors.append(rows[start - 1])
+        if start + 6 < len(rows) and abs(rows[start + 6] - ys[-1] - gap) < gap * .18:
+            neighbors.append(rows[start + 6])
+        if any((horizontal[max(0,y-2):y+3,left:right+1].max(axis=0)>0).mean() >= .5
+               for y in neighbors):
             continue
         # Do not silently join side-by-side columns into one musical system.
         missing = runs(np.flatnonzero(coverage[left:right + 1] < 2))

@@ -9,6 +9,42 @@ from raster_string_digits import recognize_band
 
 
 class ImageQualityTests(unittest.TestCase):
+    def test_recenter_score_gain_cannot_silently_drop_a_digit(self):
+        sequence=iter([('611',.80916),('1011611',.78218),('61',.89133)])
+        def engine(image,**kwargs):
+            text,score=next(sequence)
+            return SimpleNamespace(txts=[text],scores=[score])
+        out,_,_,_,recentered=recognize_band(np.full((60,100),255,np.uint8),0,100,20,40,14,engine)
+        self.assertEqual(out.txts,['611'])
+        self.assertFalse(recentered)
+
+    def test_consistent_isolated_digits_recover_with_stronger_centering(self):
+        sequence=iter([('13',.78064),('13',.86301),('13',.81675)])
+        def engine(image,**kwargs):
+            text,score=next(sequence)
+            return SimpleNamespace(txts=[text],scores=[score])
+        out,_,_,_,recentered=recognize_band(np.full((60,100),255,np.uint8),0,100,20,40,14,engine)
+        self.assertEqual(out.scores,[.86301])
+        self.assertTrue(recentered)
+
+    def test_strong_centered_reading_can_remove_neighbor_edge_noise(self):
+        sequence=iter([('0710810910',.94762),('0710810910',.96643),('710810910',.98147)])
+        def engine(image,**kwargs):
+            text,score=next(sequence)
+            return SimpleNamespace(txts=[text],scores=[score])
+        out,_,_,_,recentered=recognize_band(np.full((60,100),255,np.uint8),0,100,20,40,14,engine)
+        self.assertEqual(out.txts,['710810910'])
+        self.assertTrue(recentered)
+
+    def test_disagreeing_weak_digits_stay_unconfirmed(self):
+        sequence=iter([('13',.78),('18',.86),('13',.81)])
+        def engine(image,**kwargs):
+            text,score=next(sequence)
+            return SimpleNamespace(txts=[text],scores=[score])
+        out,_,_,_,recentered=recognize_band(np.full((60,100),255,np.uint8),0,100,20,40,14,engine)
+        self.assertEqual(out.txts,['13'])
+        self.assertFalse(recentered)
+
     def test_clear_paper_is_not_changed(self):
         image=np.full((200,800),245,np.uint8)
         cv2.putText(image,'7 10 8 10',(60,110),cv2.FONT_HERSHEY_SIMPLEX,1,30,2)

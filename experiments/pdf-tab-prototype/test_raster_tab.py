@@ -24,6 +24,16 @@ def staff(count=6):
 
 
 class RasterTabTests(unittest.TestCase):
+    def test_short_extra_stroke_does_not_erase_whole_tab_system(self):
+        for y in (104, 216):
+            with self.subTest(y=y):
+                gray = staff()
+                cv2.line(gray, (150, y), (450, y), 0, 1)
+                systems = locate_systems(gray)
+                self.assertEqual(len(systems), 1)
+                self.assertEqual(systems[0]['ys'], [120,136,152,168,184,200])
+                self.assertEqual(systems[0]['expected_bars'], 3)
+
     def test_scattered_ledger_lines_do_not_turn_five_lines_into_six(self):
         gray = staff(count=5)
         for x in (80,350,650):

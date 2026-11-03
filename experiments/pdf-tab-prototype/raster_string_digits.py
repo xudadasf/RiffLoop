@@ -20,7 +20,22 @@ def group_characters(characters, gap):
         else:
             groups.append([item])
         join_allowed = True
-    return groups
+    separated = []
+    for group in groups:
+        # Dense adjacent two-digit frets can fall just inside the global
+        # joining radius. Split only when the character geometry itself has
+        # a distinct wider gap. Never chunk an ambiguous string into pairs.
+        distances = np.diff([item['x'] for item in group])
+        cuts = ([i+1 for i,d in enumerate(distances)
+                 if d >= max(gap*.7, float(np.median(distances))*1.3)]
+                if len(group)>2 else [])
+        pieces = [group[a:b] for a,b in zip([0]+cuts, cuts+[len(group)])]
+        if cuts and all(len(p)<=2 and (len(p)==1 or p[0]['char']!='0')
+                        and int(''.join(c['char'] for c in p))<=36 for p in pieces):
+            separated.extend(pieces)
+        else:
+            separated.append(group)
+    return separated
 
 
 def recognize_band(gray, x0, x1, y0, y1, gap, engine):
@@ -46,8 +61,25 @@ def recognize_band(gray, x0, x1, y0, y1, gap, engine):
     # A tiny confidence gain is not evidence that a different digit is better.
     # Weak neighboring-string fragments also must not be promoted just because
     # moving the crop caught more of the adjacent string.
-    if selected and (selected_score < score+.02 or (score<.8 and selected_score<.9)):
+    # Agreement at all three nearby positions can rescue a moderately weak
+    # isolated digit without accepting a different neighboring-string reading.
+    # Such notes still carry the recentered/review flag; confidence is not truth.
+    stable = (len(candidates) == 3 and .7 <= score < .8 and selected_score >= .85
+              and re.fullmatch(r'[0-9 ]+', text) is not None
+              and all(out.txts and out.txts[0] == text for out,_,_ in candidates))
+    if selected and (selected_score < score+.02 or (score<.8 and selected_score<.9 and not stable)):
         selected=0
+    if selected and score >= .8:
+        original_digits = re.sub('[^0-9]', '', text)
+        selected_digits = re.sub('[^0-9]', '', candidates[selected][0].txts[0])
+        collapsed_repeat = any(original_digits[i] == original_digits[i-1]
+                               and original_digits[:i]+original_digits[i+1:] == selected_digits
+                               for i in range(1,len(original_digits)))
+        if collapsed_repeat and selected_score < .95:
+            # Average confidence can increase merely by losing a difficult
+            # repeated character (e.g. 6,11 -> 6,1). A still-uncertain
+            # replacement is insufficient evidence for collapsing that pair.
+            selected=0
     attempts=[{'text':out.txts[0] if out.txts else '', 'score':float(out.scores[0]) if out.scores else 0,
                'y0':a,'y1':b} for out,a,b in candidates]
     return (*candidates[selected],attempts,selected!=0)
@@ -72,7 +104,9 @@ def read_string_bands(gray, region, engine):
             if not re.search('[0-9]', text):
                 continue
             if score < .8:
-                discarded.append({'row': row, 'text': text, 'reason': '窄弦带 OCR 分数不足；可能是邻弦字形边缘或漏识别，未采用'})
+                discarded.append({'row': row, 'bar': bar, 'string': string, 'text': text,
+                                  'score': score, 'box': [x0,y0,x1,y1], 'attempts': attempts,
+                                  'reason': '低分数字候选保留供核对，尚未写入 GP；可能是邻弦字形边缘，请对照原图确认'})
                 continue
             if not out.word_results:
                 unresolved.append({'row': row, 'text': text, 'reason': '没有字符定位结果'})

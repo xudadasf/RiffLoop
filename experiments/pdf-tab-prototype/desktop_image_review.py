@@ -96,6 +96,8 @@ def write_image_review(source, folder, outcome, data):
                     unlocated = True
                 elif int(match[1]) == bar:
                     issues.append(f'第 {match[2]} 弦有未采用或未确认的识别内容，请检查是否漏音；详见本行说明')
+                    if evidence in discarded:
+                        issues.append(f'第 {match[2]} 弦候选“{evidence["text"]}”尚未写入 GP，请对照原图确认后补入')
             if unlocated:
                 issues.append('本行有无法定位到具体小节的疑点，需结合整行原谱检查')
             needs_review = bool(issues)
