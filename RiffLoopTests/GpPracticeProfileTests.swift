@@ -16,6 +16,7 @@ final class GpPracticeProfileTests: XCTestCase {
             mutedTracks: [0, 1],
             soloTrack: 2,
             trackVolumes: [0: 0.4, 2: 0.9],
+            trackTimbres: [0: 27, 2: 30],
             loopRange: GpLoopBarRange(
                 firstBar: 4,
                 lastBar: 7,
@@ -48,5 +49,6 @@ final class GpPracticeProfileTests: XCTestCase {
         XCTAssertEqual(profile.loopsPerSpeedStep, 3)
         XCTAssertEqual(profile.speedLadderStep, 0.05)
         XCTAssertNil(profile.baseBpm)
+        XCTAssertTrue(profile.trackTimbres.isEmpty)
     }
 }

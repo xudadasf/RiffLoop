@@ -1,5 +1,24 @@
 import Foundation
 
+enum GpTrackTimbre: Int, CaseIterable, Identifiable {
+    case nylon = 24, steel = 25, jazz = 26, clean = 27
+    case muted = 28, overdrive = 29, distortion = 30
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .nylon: "尼龙弦吉他"
+        case .steel: "钢弦木吉他"
+        case .jazz: "爵士电吉他"
+        case .clean: "电吉他清音"
+        case .muted: "电吉他闷音"
+        case .overdrive: "过载吉他"
+        case .distortion: "失真吉他"
+        }
+    }
+}
+
 struct GpPracticeProfile: Codable, Equatable, Sendable {
     var standaloneBpm: Double?
     var standaloneBeatsPerMeasure: Int?
@@ -14,6 +33,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     var mutedTracks: Set<Int> = []
     var soloTrack: Int?
     var trackVolumes: [Int: Double] = [:]
+    var trackTimbres: [Int: Int] = [:]
     var loopRange: GpLoopBarRange?
     var masterVolume = 0.75
     var backingVolume = 0.75
@@ -51,6 +71,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         mutedTracks: Set<Int> = [],
         soloTrack: Int? = nil,
         trackVolumes: [Int: Double] = [:],
+        trackTimbres: [Int: Int] = [:],
         loopRange: GpLoopBarRange? = nil,
         masterVolume: Double = 0.75,
         backingVolume: Double = 0.75,
@@ -87,6 +108,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         self.mutedTracks = mutedTracks
         self.soloTrack = soloTrack
         self.trackVolumes = trackVolumes
+        self.trackTimbres = trackTimbres
         self.loopRange = loopRange
         self.masterVolume = masterVolume
         self.backingVolume = backingVolume
@@ -126,6 +148,7 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         mutedTracks = try values.decodeIfPresent(Set<Int>.self, forKey: .mutedTracks) ?? []
         soloTrack = try values.decodeIfPresent(Int.self, forKey: .soloTrack)
         trackVolumes = try values.decodeIfPresent([Int: Double].self, forKey: .trackVolumes) ?? [:]
+        trackTimbres = try values.decodeIfPresent([Int: Int].self, forKey: .trackTimbres) ?? [:]
         loopRange = try values.decodeIfPresent(GpLoopBarRange.self, forKey: .loopRange)
         masterVolume = try values.decodeIfPresent(Double.self, forKey: .masterVolume) ?? 0.75
         backingVolume = try values.decodeIfPresent(Double.self, forKey: .backingVolume) ?? 0.75

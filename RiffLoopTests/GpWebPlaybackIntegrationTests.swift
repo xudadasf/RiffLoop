@@ -330,6 +330,94 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         add(attachment)
     }
 
+    func testTimbreChangeKeepsPlaybackPositionLoopAndSavedScore() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        let model = GpWebViewModel()
+        let controller = UIHostingController(rootView: GpWebView(viewModel: model))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        let folder = RiffLoopDocumentStore().folderURL(for: .guitarPro)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let name = "timbre-test-\(UUID().uuidString).gp"
+        defer {
+            model.pause()
+            window.isHidden = true
+            window.rootViewController = nil
+            FilePracticeSettingsStore().remove(kind: .guitarPro, fileName: name)
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(name))
+        }
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "transport", withExtension: "gp", subdirectory: "Fixtures"))
+        let data = try Data(contentsOf: url)
+        try data.write(to: folder.appendingPathComponent(name))
+        model.loadScore(data: data, fileName: name)
+        try await waitUntil("GP must be ready before changing timbre") { model.playerReady }
+        XCTAssertEqual(model.score?.tracks.first?.canChangeTimbre, true)
+
+        func findWebView(_ view: UIView) -> WKWebView? {
+            if let webView = view as? WKWebView { return webView }
+            return view.subviews.compactMap { findWebView($0) }.first
+        }
+        let webView = try XCTUnwrap(findWebView(controller.view))
+        _ = try await webView.evaluateJavaScript("""
+            (() => {
+                window.testTimbrePrograms = [];
+                const proto = alphaTab.AlphaTabApiBase.prototype;
+                const original = proto.loadMidiForScore;
+                proto.loadMidiForScore = function () {
+                    if (this.container?.element?.id === 'score' && !this.testTimbreHook) {
+                        this.testTimbreHook = true;
+                        this.midiLoad.on(midi => window.testTimbrePrograms.push(
+                            midi.events.filter(event => event instanceof alphaTab.midi.ProgramChangeEvent
+                                && event.track === 0 && (event.channel === 0 || event.channel === 1))
+                                .map(event => event.program)
+                        ));
+                    }
+                    return original.call(this);
+                };
+            })()
+            """)
+        model.setPlaybackSpeed(0.8)
+        model.setTrackVolume(index: 0, volume: 0.6)
+        model.receive(.pointerDown(GpBarHit(index: 1, startTick: 3840, endTick: 7680)))
+        model.receive(.pointerUp)
+        let range = try XCTUnwrap(model.loopRange)
+        model.seek(to: 4800)
+        try await waitUntil("Seek before changing timbre") { abs(model.position.currentTick - 4800) < 2 }
+        model.togglePlayback()
+        try await waitUntil("Playback must advance before changing timbre") { model.isPlaying && model.position.currentTick > 5000 }
+        let before = model.position.currentTick
+        model.setTrackTimbre(index: 0, program: 30)
+        XCTAssertFalse(model.isPlaying)
+        try await waitUntil("Timbre reload must preserve the playing position") {
+            model.playerReady && abs(model.position.currentTick - before) < 400
+        }
+        XCTAssertEqual(model.loopRange, range)
+        XCTAssertEqual(model.playbackSpeed, 0.8)
+        XCTAssertEqual(model.trackVolumes[0], 0.6)
+        XCTAssertEqual(model.trackTimbres[0], 30)
+        let selected = try await webView.evaluateJavaScript("window.testTimbrePrograms.at(-1)") as? [Int]
+        XCTAssertEqual(selected, [30, 30])
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent(name)), data)
+        XCTAssertNil(model.errorMessage)
+
+        let pausedTick = model.position.currentTick
+        model.togglePlayback()
+        try await waitUntil("Playback must resume after changing timbre") {
+            model.isPlaying && model.position.currentTick > pausedTick + 100
+        }
+        model.pause()
+        model.loadScore(data: data, fileName: name)
+        try await waitUntil("Reopening must restore the chosen timbre") { model.playerReady && model.trackTimbres[0] == 30 }
+        let restored = try await webView.evaluateJavaScript("window.testTimbrePrograms.at(-1)") as? [Int]
+        XCTAssertEqual(restored, [30, 30])
+        model.setTrackTimbre(index: 0, program: -1)
+        try await waitUntil("Original timbre must be restored") { model.playerReady && model.trackTimbres[0] == nil }
+        let original = try await webView.evaluateJavaScript("window.testTimbrePrograms.at(-1)") as? [Int]
+        XCTAssertEqual(original, [25, 25])
+        XCTAssertNil(model.errorMessage)
+    }
+
     private func waitUntil(_ description: String, condition: () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(30)
         while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }

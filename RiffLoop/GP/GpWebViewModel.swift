@@ -35,6 +35,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var mutedTracks = Set<Int>()
     @Published private(set) var soloTrack: Int?
     @Published private(set) var trackVolumes: [Int: Double] = [:]
+    @Published private(set) var trackTimbres: [Int: Int] = [:]
     @Published private(set) var masterVolume = 0.75
     @Published private(set) var backingVolume = 0.75
     @Published private(set) var synthEnabled = true
@@ -565,6 +566,22 @@ final class GpWebViewModel: ObservableObject {
         saveProfile()
     }
 
+    func setTrackTimbre(index: Int, program: Int) {
+        guard playerReady,
+              score?.tracks.first(where: { $0.index == index })?.canChangeTimbre == true,
+              program == -1 || GpTrackTimbre(rawValue: program) != nil,
+              (trackTimbres[index] ?? -1) != program else { return }
+        pause()
+        if program == -1 {
+            trackTimbres.removeValue(forKey: index)
+        } else {
+            trackTimbres[index] = program
+        }
+        playerReady = false
+        call("setTrackTimbre", arguments: [index, program])
+        saveProfile()
+    }
+
     func setMasterVolume(_ volume: Double) {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setMasterVolume", details: ["volume": String(describing: volume)])
@@ -897,6 +914,8 @@ final class GpWebViewModel: ObservableObject {
                     )
                 )
             }
+        case let .timbreReloadStarted(reload):
+            if reload.tick.isFinite { pendingResumeTick = max(0, reload.tick) }
         case let .positionChanged(position):
             if position.isSeek != true && isPlaying { recoveryAttempts = 0 }
             self.position = position
@@ -1087,6 +1106,7 @@ final class GpWebViewModel: ObservableObject {
     private func sendScore(_ data: Data) {
         call("prepareMetronomeSubdivision", arguments: [metronomeSubdivisionFactor])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
+        call("prepareTrackTimbres", arguments: [pendingProfile.trackTimbres.map { [$0.key, $0.value] }])
         call("loadScore", arguments: [data.base64EncodedString()])
     }
 
@@ -1172,6 +1192,10 @@ final class GpWebViewModel: ObservableObject {
         mutedTracks = pendingProfile.mutedTracks.intersection(validTrackIndices)
         soloTrack = pendingProfile.soloTrack.flatMap { validTrackIndices.contains($0) ? $0 : nil }
         trackVolumes = pendingProfile.trackVolumes.mapValues { PracticeAudioVolume.clamp($0) }.filter { validTrackIndices.contains($0.key) }
+        let timbreTrackIndices = Set(metadata.tracks.filter { $0.canChangeTimbre == true }.map(\.index))
+        trackTimbres = pendingProfile.trackTimbres.filter {
+            timbreTrackIndices.contains($0.key) && GpTrackTimbre(rawValue: $0.value) != nil
+        }
         scoreZoom = pendingProfile.scoreZoom.isFinite ? min(max(pendingProfile.scoreZoom, 0.8), 1.5) : 1
         playbackSpeed = pendingProfile.playbackSpeed.isFinite ? pendingProfile.playbackSpeed : 1
         let bpmRange = gpCustomBaseBpmRange(originalBpm: metadata.initialBpm ?? 120)
@@ -1344,6 +1368,7 @@ final class GpWebViewModel: ObservableObject {
                 mutedTracks: mutedTracks,
                 soloTrack: soloTrack,
                 trackVolumes: trackVolumes,
+                trackTimbres: trackTimbres,
                 loopRange: loopRange,
                 masterVolume: masterVolume,
                 backingVolume: backingVolume,

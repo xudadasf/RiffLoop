@@ -85,6 +85,7 @@ final class GpBridgeEventTests: XCTestCase {
                         "volume": 15,
                         "isMute": false,
                         "isSolo": true,
+                        "canChangeTimbre": true,
                     ],
                 ],
             ],
@@ -105,7 +106,8 @@ final class GpBridgeEventTests: XCTestCase {
                             shortName: "E.Gt",
                             volume: 15,
                             isMute: false,
-                            isSolo: true
+                            isSolo: true,
+                            canChangeTimbre: true
                         ),
                     ],
                     initialBpm: 120,
@@ -119,6 +121,41 @@ final class GpBridgeEventTests: XCTestCase {
         XCTAssertThrowsError(
             try GpBridgeEvent.decode(messageBody: ["event": "futureEvent"])
         )
+    }
+
+    func testDecodesTimbreReloadPosition() throws {
+        XCTAssertEqual(
+            try GpBridgeEvent.decode(messageBody: ["event": "timbreReloadStarted", "payload": ["tick": 3840]]),
+            .timbreReloadStarted(GpTimbreReload(tick: 3840))
+        )
+    }
+
+    @MainActor
+    func testTimbreChangePausesAndRejectsUnavailableTracks() {
+        let model = GpWebViewModel()
+        model.receive(.scoreLoaded(GpScoreMetadata(
+            title: "test", artist: "", bars: 4, hasBackingTrack: false,
+            tracks: [
+                GpTrackMetadata(index: 0, name: "Guitar", shortName: "", volume: 16,
+                                isMute: false, isSolo: false, canChangeTimbre: true),
+                GpTrackMetadata(index: 1, name: "Drums", shortName: "", volume: 16,
+                                isMute: false, isSolo: false, canChangeTimbre: false)
+            ]
+        )))
+        model.receive(.playerReady)
+        model.setTrackTimbre(index: 1, program: 30)
+        model.setTrackTimbre(index: 0, program: 127)
+        XCTAssertTrue(model.trackTimbres.isEmpty)
+        XCTAssertTrue(model.playerReady)
+        model.receive(.playerStateChanged(GpPlaybackState(state: 1, stopped: false)))
+        model.setTrackTimbre(index: 0, program: 30)
+        XCTAssertEqual(model.trackTimbres, [0: 30])
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertFalse(model.playerReady)
+        model.receive(.timbreReloadStarted(GpTimbreReload(tick: 3840)))
+        model.receive(.playerReady)
+        model.setTrackTimbre(index: 0, program: -1)
+        XCTAssertTrue(model.trackTimbres.isEmpty)
     }
 
     func testDecodesPreciseBeatTickForTapSeeking() throws {

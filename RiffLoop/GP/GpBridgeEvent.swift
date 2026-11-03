@@ -7,6 +7,11 @@ struct GpTrackMetadata: Codable, Equatable, Sendable {
     let volume: Int
     let isMute: Bool
     let isSolo: Bool
+    var canChangeTimbre: Bool? = nil
+}
+
+struct GpTimbreReload: Codable, Equatable, Sendable {
+    let tick: Double
 }
 
 struct GpScoreMetadata: Codable, Equatable, Sendable {
@@ -120,6 +125,7 @@ enum GpBridgeEvent: Equatable, Sendable {
     case scoreLoaded(GpScoreMetadata)
     case renderFinished(GpRenderMetrics)
     case playerReady
+    case timbreReloadStarted(GpTimbreReload)
     case positionChanged(GpPlaybackPosition)
     case playerStateChanged(GpPlaybackState)
     case playerFinished
@@ -151,6 +157,8 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .renderFinished(try decoder.decode(GpRenderMetrics.self, from: envelope.payloadData))
         case "playerReady":
             return .playerReady
+        case "timbreReloadStarted":
+            return .timbreReloadStarted(try decoder.decode(GpTimbreReload.self, from: envelope.payloadData))
         case "positionChanged":
             return .positionChanged(try decoder.decode(GpPlaybackPosition.self, from: envelope.payloadData))
         case "playerStateChanged":

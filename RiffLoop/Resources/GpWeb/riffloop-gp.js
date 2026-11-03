@@ -290,6 +290,8 @@
     let backingEnabled = true;
     let backingVolume = 0.75;
     let soundFontBytes = null;
+    let preparedTrackTimbres = [];
+    let trackTimbres = [];
     let committedRange = null;
     let rangeLoopingEnabled = false;
     let wholeSongLoopingEnabled = false;
@@ -457,6 +459,7 @@
             }
             addMetronomeAccentControls(midiFile);
             reinforceLongLegatoTargets(midiFile, api.score);
+            window.RiffLoopTimbre.apply(midiFile, api.score, trackTimbres, alphaTab);
         });
     };
     configureMetronomeEvents(api);
@@ -935,7 +938,8 @@
         shortName: track.shortName || "",
         volume: track.playbackInfo?.volume ?? 16,
         isMute: track.playbackInfo?.isMute ?? false,
-        isSolo: track.playbackInfo?.isSolo ?? false
+        isSolo: track.playbackInfo?.isSolo ?? false,
+        canChangeTimbre: window.RiffLoopTimbre.canChange(api.score, track.index)
     });
 
     const barPayload = (index) => {
@@ -1415,6 +1419,8 @@
         loadScore(base64) {
             reproductionGeneration += 1;
             pendingPausedSeek = null;
+            trackTimbres = preparedTrackTimbres;
+            preparedTrackTimbres = [];
             post("reproductionLoad", { base64Characters: base64.length });
             try {
                 zoomAnchor = null;
@@ -1549,6 +1555,27 @@
             synthOutput.setTrackVolume(index, volume);
             const synthTrack = synthApi.score?.tracks[index];
             if (synthTrack) synthApi.changeTrackVolume([synthTrack], Number(volume));
+        },
+        prepareTrackTimbres(entries) {
+            preparedTrackTimbres = Array.isArray(entries) ? entries.map(entry => entry.slice()) : [];
+        },
+        setTrackTimbre(index, program) {
+            const trackIndex = Number(index);
+            const value = Number(program);
+            if (!Number.isInteger(trackIndex) || !Number.isInteger(value) ||
+                (value !== -1 && (value < 24 || value > 30)) ||
+                !window.RiffLoopTimbre.canChange(api.score, trackIndex)) return;
+            const previous = trackTimbres.find(entry => entry[0] === trackIndex)?.[1] ?? -1;
+            if (previous === value) return;
+            trackTimbres = trackTimbres.filter(entry => entry[0] !== trackIndex);
+            if (value !== -1) trackTimbres.push([trackIndex, value]);
+            rangeCountInRestarter.cancel();
+            if (transport.isPlayingIntent()) transport.pause(true);
+            const tick = Number(api.tickPosition);
+            post("timbreReloadStarted", { tick: Number.isFinite(tick) ? Math.max(0, tick) : 0 });
+            didNotifyPlayerReady = false;
+            mainPlayerReadyForScore = false;
+            api.loadMidiForScore();
         },
         setPlaybackRange(startTick, endTick) {
             api.playbackRange = {

@@ -627,7 +627,7 @@ struct GpPracticeView: View {
                     }
                 }
 
-                Section("轨道声音") {
+                Section {
                     ForEach(score.tracks, id: \.index) { track in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -650,6 +650,22 @@ struct GpPracticeView: View {
                                 }
                                 .buttonStyle(.bordered)
                             }
+                            if track.canChangeTimbre == true {
+                                Picker("音色", selection: Binding(
+                                    get: { viewModel.trackTimbres[track.index] ?? -1 },
+                                    set: { viewModel.setTrackTimbre(index: track.index, program: $0) }
+                                )) {
+                                    Text("原谱音色").tag(-1)
+                                    ForEach(GpTrackTimbre.allCases) { timbre in
+                                        Text(timbre.label).tag(timbre.rawValue)
+                                    }
+                                }
+                                .disabled(!viewModel.playerReady)
+                            } else {
+                                Text("鼓轨或共用通道的轨道暂不支持单独更换音色。")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             Slider(
                                 value: Binding(
                                     get: { viewModel.trackVolumes[track.index] ?? Double(track.volume) / 16 },
@@ -662,6 +678,10 @@ struct GpPracticeView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                } header: {
+                    Text("轨道声音")
+                } footer: {
+                    Text("切换音色时暂停播放；仅改变谱面合成，不影响内嵌伴奏。")
                 }
             } else {
                 ContentUnavailableView("尚未载入轨道", systemImage: "slider.horizontal.3")
