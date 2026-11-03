@@ -27,6 +27,15 @@ param(
     [switch]$DryRun
 )
 
+function Test-SelectedAppleId([string]$Selected, [string]$Expected) {
+    $selectedId = $Selected.Trim() -replace '\s+\[\d+\s+App IDs? Remaining\]$', ''
+    return $selectedId -eq $Expected.Trim()
+}
+
+function Test-SideloadInstallComplete([string]$Log) {
+    return $Log -match '(?m)^Installing(?:[ \t]+100%:[ \t]+Complete|:[ \t]+100%[ \t]+Complete)[ \t]*\r?$'
+}
+
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
@@ -188,7 +197,7 @@ if ($acct) {
     }
 }
 if (-not $acctOk) { throw "Sideloadly 没有记住的 Apple 账号，请先在 GUI 中登录一次" }
-if ($ExpectedAppleId -and $accountValue.Trim() -ne $ExpectedAppleId) {
+if ($ExpectedAppleId -and -not (Test-SelectedAppleId $accountValue $ExpectedAppleId)) {
     throw 'Sideloadly 当前选择的 Apple 账号与原安装账号不一致；请在窗口选择原账号后重试。'
 }
 Write-Host "Apple 账号已记住"
@@ -206,13 +215,12 @@ $start.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Inv
 Write-Host "已点击 Start，等待安装完成…"
 
 $null = Wait-Until {
-    (Get-Content $stdoutLog -ErrorAction SilentlyContinue) -match "Installing 100%: Complete|Done work"
+    Test-SideloadInstallComplete (Get-Content $stdoutLog -Raw -ErrorAction SilentlyContinue)
 } "安装完成"
 $log = Get-Content $stdoutLog -Raw
-if ($log -notmatch "Installing 100%: Complete") { throw "安装未确认完成，请查看日志：$stdoutLog" }
 if ($log -notmatch "will mangle bundleID") { throw "未确认自动 Bundle ID，请不要启动应用并检查 Sideloadly 设置" }
 if ($log -notmatch "App successfully prepared for auto-refresh") { throw "未确认 Automatic Refresh 已登记" }
-Write-Host "安装完成：Installing 100%: Complete"
+Write-Host "安装完成：Sideloadly 已确认安装完成。"
 
 # 7. Verify the daemon registered the install for auto-refresh.
 Start-Sleep -Seconds 5
