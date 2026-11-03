@@ -28,7 +28,7 @@ param(
 )
 
 function Test-SelectedAppleId([string]$Selected, [string]$Expected) {
-    $selectedId = $Selected.Trim() -replace '\s+\[\d+\s+App IDs? Remaining\]$', ''
+    $selectedId = $Selected.Trim() -replace '\s+\[\d+\s+App IDs? Remaining(?:,\s*updates\s+\d+[dhm])?\]$', ''
     return $selectedId -eq $Expected.Trim()
 }
 
