@@ -1,3 +1,17 @@
+# 最新接手状态：2026-11-03，0.25.70（114）已无线安装并回读核验
+
+用户明确授权使用脚本无线安装。已通过原账号和原应用标识覆盖安装至 iPad，设备回读 0.25.70（114）、ProfileValidated=true。14 个 Documents 文件共 169,785,536 字节，安装前后 SHA-256 全部一致；未卸载或清除应用数据。五项偏好载荷哈希发生变化，现有偏好含新音色字段、当天练习和最近项目记录，历史仍可读取；不能称所有偏好字节完全不变。Sideloadly 自动续签已登记，安装器窗口已正常关闭，daemon 保留。
+
+此前无线设备未被 Apple 服务列出；用户解锁后刷新一次 Apple Mobile Device Service 即恢复，未修改配对。账号校验误拒绝已定位为 Sideloadly 新增 `updates 6d` 显示后缀，保留完整账号校验并补充失败到通过的回归；修复在旧无线脚本工作树的 `8d46db147e0ca0b5afaecbc1ebd0857b1a0968d9`，已推送。第一次脚本在 Start 前退出；实际只安装了一次新版。
+
+产品仍为 `097a9cb35167b1605a5aa2d9c2de3fa1450b77ec`，183 项 Swift 测试通过，IPA 41563105270 第 2 次上传成功。主工作树/分支为 `C:/Users/sadada/.codex/worktrees/riffloop-practice-controls-20261015` / `codex/ipad-gp-timbre-20261103`。安装记录见 [无线安装核验](reviews/2026-11-03-wireless-install.md)。实际音色听感由用户试听；USB 断连重连仍保持暂停、手动继续。
+
+本次下载的 IPA、临时 manifest、安装 wrapper/log/result 已删除；六份 TEMP 日志/核验文件及两个空目录的后续清理被自动审批拒绝（blocked by policy），残留清单见安装记录，未绕过。Sideloadly 管理的续签缓存保留。以后若手动续签脚本要求 output/release-*，需重新取回对应验证包。之前被审批拦截的浏览器测试目录没有改动。
+
+---
+
+以下为历史状态，以本节最新记录为准。
+
 # 最新接手状态：2026-11-03，0.25.70（114）音色功能及安装包已核验，未安装
 
 最新目标为 iPad 版 GP 每轨音色选择；用户明确要求尽量不影响其他功能。已接续此前因额度停止的未提交改动，完成复查、回归和提交。工作树 `C:/Users/sadada/.codex/worktrees/riffloop-practice-controls-20261015`，当前分支 `codex/ipad-gp-timbre-20261103`；原 0.25.69 分支没有改动。
