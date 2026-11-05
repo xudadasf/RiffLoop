@@ -1,6 +1,7 @@
 """Batch trial window for the standalone PDF tab experiment."""
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 import queue
 import subprocess
@@ -9,6 +10,34 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from desktop_batch import ROOT, NOTICE, create_output, default_output
+
+
+def recover_draft_after_error(folder, error, *, source=None, sources=None):
+    """Keep a completed draft only when its own readback record proves it."""
+    if not folder:
+        return None
+    try:
+        folder = Path(folder).resolve()
+        draft = folder/'score.draft.gp'
+        review = json.loads((folder/'score.draft.gp.review.json').read_text(encoding='utf-8'))
+        if not draft.is_file() or draft.stat().st_size == 0 or not str(review.get('roundtrip', '')).startswith('passed'):
+            return None
+        if sources is not None:
+            parts = review.get('join_parts')
+            if not isinstance(parts,list) or [Path(p['source']).resolve() for p in parts] != [Path(s).resolve() for s in sources]:
+                return None
+            result = {'folder':str(folder), 'draft':str(draft), 'status':'拼接草稿已生成 · 后处理异常', 'message':''}
+        else:
+            result = json.loads((folder/'result.json').read_text(encoding='utf-8'))
+            if not isinstance(result,dict) or Path(result['folder']).resolve() != folder or \
+               Path(result['source']).resolve() != Path(source).resolve() or \
+               Path(result['draft']).resolve() != draft or '草稿已生成' not in result['status']:
+                return None
+            result['status'] = '草稿已生成 · 后处理异常'
+        result['message'] = result.get('message','') + f' GP 已生成并通过读回检查，但后处理异常：{error}；请查看结果目录旁的日志。'
+        return result
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return None
 
 
 class TrialWindow:
@@ -185,9 +214,12 @@ class TrialWindow:
                                        stdout=log, stderr=log, env=env, timeout=900, check=True,
                                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                     result = json.loads((folder / 'result.json').read_text(encoding='utf-8'))
+                    if not isinstance(result,dict) or not isinstance(result.get('status'),str) or not isinstance(result.get('message'),str):
+                        raise ValueError('处理结果记录格式不完整')
                 except Exception as error:
-                    result = {'status': '处理失败', 'message': f'{error}；可查看结果目录旁的 process.log',
-                              'folder': str(folder) if folder else None, 'draft': None}
+                    result = recover_draft_after_error(folder, error, source=source) or {
+                        'status': '处理失败', 'message': f'{error}；可查看结果目录旁的 process.log',
+                        'folder': str(folder) if folder else None, 'draft': None}
                 self.events.put(('finished', key, result))
         finally:
             self.events.put(('done', '', ''))
@@ -323,8 +355,9 @@ class TrialWindow:
             result = process_join(sources, gaps, title, folder, settings, stop=self.stop,
                                   progress=lambda text: self.events.put(('started', key, text)))
         except Exception as error:
-            result = {'status': '拼接失败', 'message': str(error), 'draft': None,
-                      'folder': str(folder) if folder else None}
+            result = recover_draft_after_error(folder, error, sources=sources) or {
+                'status': '拼接失败', 'message': str(error), 'draft': None,
+                'folder': str(folder) if folder else None}
         self.events.put(('finished', key, result))
         self.events.put(('done', '', ''))
 
@@ -373,7 +406,13 @@ class TrialWindow:
                     self.tree.set(key, 'status', '处理中…')
                     self.status.set(payload)
                 elif event == 'finished':
-                    self.items[key].update(payload, pending=False)
+                    if key not in self.items:
+                        continue
+                    if not isinstance(payload,dict) or not isinstance(payload.get('status'),str):
+                        payload = {'status':'处理失败', 'message':'处理结果记录格式不完整，请查看结果目录或日志。', 'draft':None}
+                    retry = (payload['status'] == '处理失败' and not self.items[key].get('is_join')
+                             and not self.items[key].get('is_regions'))
+                    self.items[key].update(payload, pending=retry)
                     self.tree.set(key, 'status', payload['status'])
                     self.show_details()
                 elif event == 'regions_ready':
@@ -402,10 +441,13 @@ class TrialWindow:
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())
-                    self.status.set(payload or f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿 · 双击文件行查看结果和待修改清单')
+                    failed = sum(v.get('status') == '处理失败' and v.get('pending') for v in self.items.values())
+                    retry_hint = f' · {failed} 份处理失败，可重新点击开始处理' if failed else ''
+                    self.status.set(payload or f'{"已停止" if self.stop.is_set() else "处理完成"} · 共 {count} 份 GP 草稿{retry_hint} · 双击文件行查看结果和待修改清单')
         except queue.Empty:
             pass
-        self.root.after(150, self.poll)
+        finally:
+            self.root.after(150, self.poll)
 
     def show_details(self, _event=None):
         selected = self.tree.selection()
@@ -420,7 +462,13 @@ class TrialWindow:
         if not selected:
             messagebox.showinfo('选择文件', '请先选择列表中的一行。')
             return
+        if len(selected) != 1:
+            messagebox.showinfo('选择一份结果', '请只选择一行，再打开对应文件。')
+            return
         item = self.items[selected[0]]
+        if action == 'source' and item.get('is_join'):
+            messagebox.showinfo('拼接原文件', '拼接结果包含多份原文件，请打开结果页面查看各片段。')
+            return
         if action == 'draft' and not item.get('draft') and item.get('folder'):
             messagebox.showinfo('未生成 GP', item.get('message', '') + '\n请点击“查看分区 / 结果”。')
             return
@@ -432,7 +480,14 @@ class TrialWindow:
         try:
             os.startfile(str(target))
         except OSError as error:
-            messagebox.showinfo('无法打开', f'请使用支持此格式的软件打开，或打开结果目录。\n{error}')
+            folder = item.get('folder')
+            if folder:
+                try:
+                    with (Path(folder)/'open-error.log').open('a',encoding='utf-8') as log:
+                        log.write(f'{datetime.now().astimezone().isoformat()} {action} {target}: {error!r}\n')
+                except OSError:
+                    pass
+            messagebox.showinfo('无法打开', f'请使用支持此格式的软件打开，或打开结果目录。\n文件：{target}\n{error}')
 
     def close(self):
         if self.cleaning:
