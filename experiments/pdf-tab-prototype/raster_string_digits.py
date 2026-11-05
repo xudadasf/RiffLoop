@@ -5,7 +5,10 @@ coordinates and discarded bands are retained; scores are not accuracy claims.
 """
 import re
 
+import cv2
 import numpy as np
+
+from raster_tab import ink_mask
 
 
 def group_characters(characters, gap):
@@ -85,6 +88,61 @@ def recognize_band(gray, x0, x1, y0, y1, gap, engine):
     return (*candidates[selected],attempts,selected!=0)
 
 
+def recover_isolated_digits(gray, region, notes, rows, engine):
+    """Retry isolated glyphs only when a whole string band produced no digit."""
+    gap = float(np.median(np.diff(region['ys'])))
+    crop_x, crop_y = region['crop'][:2]
+    ink = ink_mask(gray)
+    recovered = []
+    for row in rows:
+        if re.search('[0-9]', row['text']):
+            continue
+        x0, y0, x1, y1 = row['box']
+        line = region['ys'][row['string']-1]
+        band = ink[y0:y1, x0:x1]
+        horizontal = cv2.morphologyEx(band, cv2.MORPH_OPEN,
+            cv2.getStructuringElement(cv2.MORPH_RECT, (max(8, round(gap*1.5)), 1)))
+        _, _, stats, _ = cv2.connectedComponentsWithStats(cv2.subtract(band, horizontal))
+        components = [tuple(map(int, item)) for item in stats[1:]]
+        candidates = []
+        for x, y, w, h, area in components:
+            center = x0+x+w/2
+            if (center >= region.get('left', region['bar_boundaries'][0])+gap*4
+                and gap*.28 <= w <= gap*1.1 and gap*.55 <= h <= gap*1.4
+                and area >= gap*gap*.14 and y0+y <= line <= y0+y+h-1
+                and all(abs(center-n['x']) > gap*.9 for n in notes+recovered)):
+                candidates.append((x, y, w, h))
+        for x, y, w, h in candidates:
+            center = x0+x+w/2
+            # Do not read one half of a multi-digit fret or merge nearby marks.
+            if any(gap*.2 < abs(x+w/2-(a+c/2)) < gap*.95
+                   and d >= gap*.5 and area >= gap*gap*.04
+                   for a,b,c,d,area in components if (a,b,c,d)!=(x,y,w,h)):
+                continue
+            readings = []
+            for margin in (max(2, round(gap*.15)), max(3, round(gap*.25))):
+                crop = gray[max(y0,y0+y-margin):min(y1,y0+y+h+margin),
+                            max(x0,x0+x-margin):min(x1,x0+x+w+margin)]
+                result = engine(crop, use_det=False, use_cls=False,
+                                return_word_box=True, return_single_char_box=True)
+                readings.append((result.txts[0] if result.txts else '',
+                                 float(result.scores[0]) if result.scores else 0))
+            if not (all(re.fullmatch('[0-9]', text) and score >= .95 for text,score in readings)
+                    and readings[0][0] == readings[1][0]):
+                continue
+            if any(abs(center-n['x']) <= gap*.9 for n in notes+recovered):
+                continue
+            row.setdefault('isolated_retries', []).append({'box':[x0+x,y0+y,x0+x+w,y0+y+h],
+                                                           'readings':readings})
+            recovered.append({'bar':row['bar'], 'string':row['string'], 'fret':int(readings[0][0]),
+                              'x':round(center, 2), 'y':line, 'ocr_score':min(score for _,score in readings),
+                              'review':True, 'row':row['row'], 'method':'isolated-digit-retry',
+                              'review_reason':'整弦带漏读，局部一致复检补回；请核对数字与弦位',
+                              'box':[[x0+x-crop_x,y0-crop_y],[x0+x+w-crop_x,y0-crop_y],
+                                     [x0+x+w-crop_x,y1-crop_y],[x0+x-crop_x,y1-crop_y]]})
+    return recovered
+
+
 def read_string_bands(gray, region, engine):
     gap = float(np.median(np.diff(region['ys'])))
     notes, unresolved, discarded, raw_rows = [], [], [], []
@@ -140,5 +198,6 @@ def read_string_bands(gray, region, engine):
                               'review_reason': '裁剪位置重试后选取，需核对数字与弦位' if recentered else ('OCR 分数偏低，需核对数字与弦位' if confidence < .8 or score < .95 else None),
                               'box': [[a-crop_x,y0-crop_y],[b-crop_x,y0-crop_y],
                                       [b-crop_x,y1-crop_y],[a-crop_x,y1-crop_y]]})
+    notes.extend(recover_isolated_digits(gray, region, notes, raw_rows, engine))
     notes.sort(key=lambda n: (n['bar'], n['x'], n['string']))
     return notes, unresolved, discarded, raw_rows

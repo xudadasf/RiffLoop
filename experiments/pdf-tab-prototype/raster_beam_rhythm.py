@@ -8,6 +8,8 @@ from fractions import Fraction
 import cv2
 import numpy as np
 
+from raster_tab import CUT_OFF_WARNING
+
 
 def read_beamed_notes(gray, notes, region):
     gap = float(np.median(np.diff(region['ys'])))
@@ -79,6 +81,52 @@ def read_beamed_notes(gray, notes, region):
     return result
 
 
+def read_plain_stems(gray, notes, region, readings):
+    """Offer reviewable quarter notes only for isolated, unmarked stems."""
+    if 'bar_boundaries' not in region:
+        return readings
+    gap = float(np.median(np.diff(region['ys'])))
+    ink = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                               cv2.THRESH_BINARY_INV, 31, 10)
+    vertical = cv2.morphologyEx(ink, cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_RECT, (1, round(gap*1.4))))
+    _, _, stats, _ = cv2.connectedComponentsWithStats(vertical)
+    result = list(readings)
+    for index, (note, reading) in enumerate(zip(notes, readings)):
+        if reading['duration'] is not None:
+            continue
+        x = note['x']-region['crop'][0]
+        bottom = float(np.asarray(note['box'])[:,1].max())
+        matches = []
+        for xx, yy, width, height, _ in stats[1:]:
+            mid, end = xx+(width-1)/2, yy+height-1
+            if width > gap*.4 or abs(mid-x) > gap*.35 or height < gap*1.8:
+                continue
+            if not (bottom-gap*.55 <= yy <= bottom+gap*.7 and end > bottom+gap*1.5
+                    and end > region['ys'][-1]-region['crop'][1]+gap*.4):
+                continue
+            y0, y1 = max(0,round(end-gap*1.1)), min(gray.shape[0],round(end+gap*.4))
+            x0, x1 = max(0,round(mid-gap*1.1)), min(gray.shape[1],round(mid+gap*1.1))
+            left = ink[y0:y1,x0:max(x0,round(mid-gap*.25))]
+            right = ink[y0:y1,min(x1,round(mid+gap*.25)):x1]
+            if not left.size or not right.size or (left>0).mean() >= .01 or (right>0).mean() >= .01:
+                continue
+            bar = note['bar']
+            bar_left = max(0,round(region['bar_boundaries'][bar-1]-region['crop'][0]))
+            bar_right = min(gray.shape[1],round(region['bar_boundaries'][bar]-region['crop'][0]))
+            under = ink[min(gray.shape[0],round(end+gap*.35)):min(gray.shape[0],round(end+gap*2)),bar_left:bar_right]
+            if under.size:
+                horizontal = cv2.morphologyEx(under, cv2.MORPH_OPEN,
+                    cv2.getStructuringElement(cv2.MORPH_RECT, (max(8,round(gap*1.5)),1)))
+                if np.any(horizontal):
+                    continue
+            matches.append({'stem_box':[int(xx),int(yy),int(width),int(height)], 'direction':'down'})
+        if len(matches) == 1:
+            result[index] = {'duration':4, 'source':'image-stem', 'evidence':matches[0],
+                             'review_reason':'仅检测到独立符干，需核对四分时值、附点和连音'}
+    return result
+
+
 def validate_bar_timing(durations, meter):
     if not durations or any(d not in (1, 2, 4, 8, 16, 32, 64) for d in durations):
         return '存在未确定的音符时值'
@@ -114,14 +162,14 @@ def fill_bar(notes, readings, meter):
     for note, reading, value in zip(notes, readings, values):
         beats.append({'duration': value or default, 'dots': 0, 'tuplet': [1, 1], 'grace': False,
                       'notes': [{'string': note['string'], 'fret': note['fret'], 'dead': False}],
-                      'rhythm_source': 'image-beams' if value else 'manual-default',
+                      'rhythm_source': reading.get('source', 'image-beams') if value else 'manual-default',
                       'placeholder': not bool(value), 'note_review': bool(note.get('review')),
                       'rhythm_review': bool(value and reading.get('review_reason')),
                       'rhythm_reason': reading.get('review_reason') if value else reading.get('reason', '未知时值或小节时值冲突'),
                       'rhythm_evidence': reading.get('evidence') if value else None})
-    weak = [str(i) for i, beat in enumerate(beats, 1) if beat['rhythm_review']]
-    if weak:
-        issues.append(f'第 {"、".join(weak)} 项符干较弱，时值由同组横梁辅助识别；? 表示待核对，不是默认占位')
+    for i, beat in enumerate(beats, 1):
+        if beat['rhythm_review']:
+            issues.append(f'第 {i} 项时值证据不完整：{beat["rhythm_reason"]}；? 表示待核对，不是默认占位')
     remaining = expected - sum((Fraction(4, b['duration']) for b in beats), Fraction())
     if remaining:
         issues.append(f'余下 {remaining} 拍使用休止占位并放在小节末尾；需核对是否漏音以及原谱的休止位置')
@@ -153,16 +201,20 @@ def prepare_image_score(data, image_folder):
         # via pathlib and decode, rather than silently losing all beam evidence.
         gray = cv2.imdecode(np.frombuffer(image_path.read_bytes(), np.uint8), cv2.IMREAD_GRAYSCALE) if image_path.exists() else None
         if gray is None or not all('x' in n and 'box' in n for n in system['notes']):
-            readings = [{'duration': None, 'reason': '没有可用的符干/横梁图像证据'} for n in system['notes']]
+            baseline = [{'duration': None, 'reason': '没有可用的符干/横梁图像证据'} for n in system['notes']]
+            readings = baseline
         else:
-            readings = read_beamed_notes(gray, system['notes'], region)
+            baseline = read_beamed_notes(gray, system['notes'], region)
+            readings = read_plain_stems(gray, system['notes'], region, baseline)
         output_system = {'page': system['page'], 'bars': []}
         system['rhythm_bars'] = []
         for local_bar in range(1, region['expected_bars']+1):
             number += 1
-            pairs = [(note, reading) for note, reading in zip(system['notes'], readings) if note['bar'] == local_bar]
+            pairs = [(note, reading, previous) for note, reading, previous in zip(system['notes'], readings, baseline)
+                     if note['bar'] == local_bar]
             notes = [p[0] for p in pairs]
             timing = [p[1] for p in pairs]
+            previous_timing = [p[2] for p in pairs]
             try:
                 # Simultaneous/multi-voice notes are retained sequentially for
                 # manual editing, with the entire bar explicitly marked.
@@ -171,10 +223,20 @@ def prepare_image_score(data, image_folder):
                 if simultaneous:
                     timing = [{'duration': None, 'reason': '可能同时起音，需人工分组'} for _ in notes]
                 beats, issues = fill_bar(notes, timing, settings['meter'])
+                if not simultaneous and any(r.get('source') == 'image-stem' for r in timing):
+                    previous_beats, previous_issues = fill_bar(notes, previous_timing, settings['meter'])
+                    changed_others = any(
+                        (old['placeholder'] and current['placeholder'] and old['duration'] != current['duration'])
+                        or (not old['placeholder'] and (current['placeholder'] or old['duration'] != current['duration']))
+                        for old,current in zip(previous_beats[:len(notes)], beats[:len(notes)]))
+                    if changed_others:
+                        beats, issues, timing = previous_beats, previous_issues, previous_timing
                 if simultaneous:
                     issues.append('存在可能的和弦或多声部；音符暂按顺序保留，须人工合并分组')
                 if system['unresolved']:
                     issues.append('本行有未解决 OCR 区域，须核对是否漏音')
+                if local_bar == region['expected_bars'] and region.get('right_may_be_cut'):
+                    issues.append(CUT_OFF_WARNING)
                 bar = {'number': number, 'source_bar': local_bar, 'meter': settings['meter'],
                        'beats': beats, 'issues': issues,
                        'recognition_timing_issue': validate_bar_timing([r['duration'] for r in timing], settings['meter'])}

@@ -82,7 +82,7 @@ class JoinTests(unittest.TestCase):
     def test_weak_recognized_timing_is_distinct_from_a_default_in_gp_review(self):
         score = part('A', 3)['score']
         first = score['systems'][0]['bars'][0]['beats'][0]
-        first.update(placeholder=False, rhythm_source='image-beams', rhythm_review=True)
+        first.update(placeholder=False, rhythm_source='image-stem', rhythm_review=True)
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
             source, target = folder/'score.json', folder/'score.draft.gp'

@@ -9,7 +9,7 @@ import cv2
 import fitz
 import numpy as np
 
-from textbook_regions import extract_regions, locate_regions
+from textbook_regions import add_extended_candidates, extract_regions, locate_regions
 from desktop_cleanup import clean_intermediates
 
 
@@ -22,6 +22,29 @@ def draw_pair(gray, top, left=60, right=940):
 
 
 class RegionTests(unittest.TestCase):
+    def test_extended_staff_is_an_unselected_alternative_not_a_replacement(self):
+        original = [{'box':[40,80,850,320], 'accepted':True, 'gap':10, 'reason':'原建议'}]
+        extended = [{'box':[40,80,960,320], 'accepted':True, 'gap':10, 'reason':'完整谱行'}]
+        result = add_extended_candidates(original, extended)
+        self.assertEqual(result[0], original[0])
+        self.assertEqual(len(result), 2)
+        self.assertFalse(result[1]['accepted'])
+        self.assertEqual(result[1]['box'], [40,80,960,320])
+        self.assertIn('可能与已有框重叠', result[1]['reason'])
+
+    def test_extended_candidate_already_covered_is_not_duplicated(self):
+        original = [{'box':[40,80,960,320], 'accepted':True, 'gap':10, 'reason':'原建议'}]
+        extended = [{'box':[42,81,958,319], 'accepted':True, 'gap':10, 'reason':'完整谱行'}]
+        self.assertEqual(add_extended_candidates(original, extended), original)
+
+    def test_merged_exercise_can_offer_individual_unselected_staffs(self):
+        original = [{'box':[40,80,960,620], 'accepted':True, 'gap':10, 'systems':2, 'reason':'原建议'}]
+        extended = [{'box':[40,80,960,320], 'accepted':True, 'gap':10, 'systems':1},
+                    {'box':[40,340,960,620], 'accepted':True, 'gap':10, 'systems':1}]
+        result = add_extended_candidates(original, extended)
+        self.assertEqual([r['box'] for r in result if r['accepted']], [[40,80,960,620]])
+        self.assertEqual([r['box'] for r in result if not r['accepted']],
+                         [[40,80,960,320],[40,340,960,620]])
     def test_music_bounds_include_notation_and_tab(self):
         gray = np.full((600, 1000), 255, np.uint8)
         draw_pair(gray, 130)

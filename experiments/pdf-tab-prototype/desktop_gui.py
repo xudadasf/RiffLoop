@@ -30,7 +30,7 @@ class TrialWindow:
         outer.pack(fill='both', expand=True)
         ttk.Label(outer, text='图片 / PDF → 可人工修改的 GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
         ttk.Label(outer, text='批量选择 PDF、截图或照片；可单独处理，也可选中多份拼接为一份 GP。', foreground='#46576b').pack(anchor='w', pady=(8, 4))
-        ttk.Label(outer, text='图片识别数字与横梁；默认占位及证据较弱的时值标 ?。完成后可打开 GP 和待修改清单。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
+        ttk.Label(outer, text='图片识别数字与节奏符号；默认占位及证据较弱的时值标 ?。完成后可打开 GP 和待修改清单。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
         controls = ttk.Frame(outer)
         controls.pack(fill='x')
         self.add_button = ttk.Button(controls, text='添加 PDF / 截图', command=self.choose_files)
@@ -69,6 +69,15 @@ class TrialWindow:
         self.meter_input = ttk.Entry(settings_row, textvariable=self.image_meter, width=6)
         self.meter_input.pack(side='left', padx=8)
         ttk.Label(settings_row, text='可修改；人工设置，不代表已识别每个音符的时值。', foreground='#92520a').pack(side='left')
+        tuning_row = ttk.Frame(outer)
+        tuning_row.pack(fill='x', pady=(0, 12))
+        ttk.Label(tuning_row, text='图片定弦（6→1 弦）').pack(side='left')
+        self.image_tuning = tk.StringVar(value='E2 A2 D3 G3 B3 E4')
+        self.tuning_input = ttk.Combobox(tuning_row, textvariable=self.image_tuning, width=25,
+            values=('E2 A2 D3 G3 B3 E4', 'D2 A2 D3 G3 B3 E4',
+                    'Eb2 Ab2 Db3 Gb3 Bb3 Eb4', 'D2 G2 C3 F3 A3 D4'))
+        self.tuning_input.pack(side='left', padx=8)
+        ttk.Label(tuning_row, text='可选择标准、降 D、降半音、降全音，或输入六个音名。', foreground='#46576b').pack(side='left')
         table = ttk.Frame(outer)
         table.pack(fill='both', expand=True)
         self.tree = ttk.Treeview(table, columns=('file', 'kind', 'status'), show='headings', selectmode='extended', height=3)
@@ -132,6 +141,12 @@ class TrialWindow:
         if selected:
             self.output.set(selected)
 
+    def image_settings(self):
+        from raster_tab import DEFAULT_SETTINGS, parse_tuning, validate_settings
+        return validate_settings({**DEFAULT_SETTINGS, 'tempo': int(self.image_tempo.get()),
+                                  'meter': [int(x) for x in self.image_meter.get().strip().split('/')],
+                                  'tuning': parse_tuning(self.image_tuning.get())})
+
     def start(self):
         if self.running:
             return
@@ -141,16 +156,14 @@ class TrialWindow:
             return
         output_root = Path(self.output.get())
         try:
-            from raster_tab import DEFAULT_SETTINGS, validate_settings
-            settings = validate_settings({**DEFAULT_SETTINGS, 'tempo': int(self.image_tempo.get()),
-                                          'meter': [int(x) for x in self.image_meter.get().strip().split('/')]})
+            settings = self.image_settings()
             output_root.mkdir(parents=True, exist_ok=True)
         except (OSError, ValueError) as error:
-            messagebox.showerror('请检查 BPM、拍号与输出位置', str(error))
+            messagebox.showerror('请检查 BPM、拍号、定弦与输出位置', str(error))
             return
         self.running = True
         self.stop.clear()
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.tuning_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -210,7 +223,7 @@ class TrialWindow:
         self.running = True
         self.stop.clear()
         for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button,
-                       self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+                       self.output_button, self.tempo_input, self.meter_input, self.tuning_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -262,7 +275,7 @@ class TrialWindow:
         self.running = True
         self.stop.clear()
         for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button,
-                       self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+                       self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.tuning_input, self.cleanup_button):
             button.configure(state='disabled')
         self.progress.start(15)
         threading.Thread(target=self.region_plan_work,
@@ -284,12 +297,10 @@ class TrialWindow:
     def start_join(self, sources, gaps, title):
         output_root = Path(self.output.get())
         try:
-            from raster_tab import DEFAULT_SETTINGS, validate_settings
-            settings = validate_settings({**DEFAULT_SETTINGS, 'tempo': int(self.image_tempo.get()),
-                                          'meter': [int(x) for x in self.image_meter.get().strip().split('/')]})
+            settings = self.image_settings()
             output_root.mkdir(parents=True, exist_ok=True)
         except (OSError, ValueError) as error:
-            messagebox.showerror('请检查 BPM、拍号与输出位置', str(error))
+            messagebox.showerror('请检查 BPM、拍号、定弦与输出位置', str(error))
             return
         key = self.tree.insert('', 'end', values=(title, '拼接 GP', '待处理'))
         self.items[key] = {'source': Path(title + '.gp'), 'pending': False, 'is_join': True}
@@ -298,7 +309,7 @@ class TrialWindow:
         self.running = True
         self.stop.clear()
         for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button,
-                       self.tempo_input, self.meter_input, self.cleanup_button):
+                       self.tempo_input, self.meter_input, self.tuning_input, self.cleanup_button):
             button.configure(state='disabled')
         self.stop_button.configure(state='normal')
         self.progress.start(15)
@@ -327,7 +338,7 @@ class TrialWindow:
                 return
             jobs = [('',folder)]
         self.running = self.cleaning = True
-        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+        for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.tuning_input, self.cleanup_button):
             button.configure(state='disabled')
         self.progress.start(15)
         self.status.set('正在清理中间图片、识别缓存和日志；保留 GP、原文件及修改清单…')
@@ -387,7 +398,7 @@ class TrialWindow:
                     self.running = False
                     self.cleaning = False
                     self.progress.stop()
-                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.cleanup_button):
+                    for button in (self.add_button, self.remove_button, self.start_button, self.join_button, self.regions_button, self.region_plan_button, self.output_button, self.tempo_input, self.meter_input, self.tuning_input, self.cleanup_button):
                         button.configure(state='normal')
                     self.stop_button.configure(state='disabled')
                     count = sum(bool(v.get('draft')) for v in self.items.values())

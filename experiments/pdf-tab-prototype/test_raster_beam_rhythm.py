@@ -3,11 +3,12 @@ from fractions import Fraction
 from pathlib import Path
 import tempfile
 from PIL import Image
+from unittest.mock import patch
 
 import cv2
 import numpy as np
 
-from raster_beam_rhythm import fill_bar, prepare_image_score, read_beamed_notes, validate_bar_timing
+from raster_beam_rhythm import fill_bar, prepare_image_score, read_beamed_notes, read_plain_stems, validate_bar_timing
 
 
 def example(beam_counts=(2, 2, 2, 2), stems=True, down=False):
@@ -44,6 +45,17 @@ def shared_beams():
     return gray, notes, {'ys': list(range(60, 131, 14)), 'crop': [0, 0, 240, 180]}
 
 
+def plain_stem():
+    gray = np.full((220, 260), 255, np.uint8)
+    ys = [40, 55, 70, 85, 100, 115]
+    for y in ys:
+        cv2.line(gray, (10, y), (250, y), 0, 1)
+    cv2.line(gray, (80, 78), (80, 150), 0, 2)
+    notes = [{'bar':1, 'x':80, 'string':3, 'fret':5,
+              'box':[[75,62],[85,62],[85,78],[75,78]]}]
+    return gray, notes, {'ys':ys, 'crop':[0,0,260,220], 'bar_boundaries':[10,250]}
+
+
 class BeamRhythmTests(unittest.TestCase):
     def test_chinese_output_path_does_not_silently_replace_readable_beams(self):
         gray, notes, region = example()
@@ -57,6 +69,17 @@ class BeamRhythmTests(unittest.TestCase):
             beats = score['systems'][0]['bars'][0]['beats']
             self.assertTrue(all(b['rhythm_source'] == 'image-beams' and not b['placeholder'] for b in beats[:4]))
 
+    def test_possible_cutoff_is_saved_in_the_gp_review_data(self):
+        gray, notes, region = example()
+        region.update(expected_bars=1, right_may_be_cut=True)
+        data = {'manual_settings': {'tempo': 100, 'meter': [4,4], 'tuning': [64,59,55,50,45,40]},
+                'systems': [{'id': 'p1-s1', 'page': 1, 'region': region, 'notes': notes, 'unresolved': []}]}
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            Image.fromarray(gray).save(folder/'p1-s1.png')
+            bar = prepare_image_score(data, folder)['systems'][0]['bars'][0]
+            self.assertTrue(any('谱行右侧可能被截断' in issue for issue in bar['issues']))
+
     def test_counts_visible_beams_instead_of_dividing_bar_by_note_count(self):
         gray, notes, region = example((1, 2, 1, 2))
         result = read_beamed_notes(gray, notes, region)
@@ -65,6 +88,47 @@ class BeamRhythmTests(unittest.TestCase):
     def test_downward_beams_are_read(self):
         gray, notes, region = example(down=True)
         self.assertEqual([r['duration'] for r in read_beamed_notes(gray, notes, region)], [16]*4)
+
+    def test_plain_stem_proposes_reviewable_quarter_note(self):
+        gray, notes, region = plain_stem()
+        result = read_plain_stems(gray, notes, region, [{'duration':None}])[0]
+        self.assertEqual(result['duration'], 4)
+        self.assertEqual(result['source'], 'image-stem')
+        self.assertTrue(result['review_reason'])
+
+    def test_plain_stem_rejects_beam_dot_or_tuplet_bracket(self):
+        for mark in ('beam-left','beam-right','flag','dot','bracket'):
+            gray, notes, region = plain_stem()
+            if mark == 'beam-left':
+                cv2.rectangle(gray, (55,145), (80,150), 0, -1)
+            elif mark == 'beam-right':
+                cv2.rectangle(gray, (80,145), (105,150), 0, -1)
+            elif mark == 'flag':
+                cv2.ellipse(gray, (82,140), (7,9), 0, -75, 75, 0, 2)
+            elif mark == 'dot':
+                cv2.circle(gray, (88,148), 2, 0, -1)
+            else:
+                cv2.line(gray, (50,165), (120,165), 0, 1)
+            with self.subTest(mark=mark):
+                self.assertIsNone(read_plain_stems(gray, notes, region, [{'duration':None}])[0]['duration'])
+
+    def test_new_stem_evidence_does_not_shift_other_default_notes(self):
+        gray = np.full((220, 400), 255, np.uint8)
+        region = {'ys':[40,55,70,85,100,115], 'crop':[0,0,400,220],
+                  'bar_boundaries':[0,400], 'expected_bars':1}
+        notes = [{'bar':1, 'x':20+i*40, 'string':3, 'fret':i,
+                  'box':[[20+i*40,60],[25+i*40,60],[25+i*40,80],[20+i*40,80]]} for i in range(8)]
+        data = {'manual_settings': {'tempo':100,'meter':[4,4],'tuning':[64,59,55,50,45,40]},
+                'systems':[{'id':'p1-s1','page':1,'region':region,'notes':notes,'unresolved':[]}]}
+        old = [{'duration':None} for _ in notes]
+        proposed = [{'duration':4,'source':'image-stem','review_reason':'待核对'}] + old[1:]
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp); Image.fromarray(gray).save(folder/'p1-s1.png')
+            with patch('raster_beam_rhythm.read_beamed_notes',return_value=old), \
+                 patch('raster_beam_rhythm.read_plain_stems',return_value=proposed):
+                beats = prepare_image_score(data, folder)['systems'][0]['bars'][0]['beats']
+        self.assertEqual([b['duration'] for b in beats], [8]*8)
+        self.assertTrue(all(b['placeholder'] for b in beats))
 
     def test_unconnected_lines_are_not_rhythm_evidence(self):
         gray, notes, region = example(stems=False)

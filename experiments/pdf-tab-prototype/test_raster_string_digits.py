@@ -1,12 +1,43 @@
 import unittest
 from types import SimpleNamespace
 
+import cv2
 import numpy as np
 
-from raster_string_digits import group_characters, read_string_bands
+from raster_string_digits import group_characters, read_string_bands, recover_isolated_digits
 
 
 class StringDigitTests(unittest.TestCase):
+    def make_isolated_digit(self):
+        gray = np.full((200, 400), 255, np.uint8)
+        ys = [50, 65, 80, 95, 110, 125]
+        for y in ys:
+            cv2.line(gray, (10, y), (390, y), 0, 1)
+        cv2.rectangle(gray, (195, 86), (213, 104), 255, -1)
+        cv2.putText(gray, '9', (198, 102), cv2.FONT_HERSHEY_SIMPLEX, .5, 0, 1, cv2.LINE_AA)
+        region = {'ys': ys, 'left': 10, 'crop': [0, 0, 400, 200], 'bar_boundaries': [10, 390]}
+        return gray, region
+
+    def test_empty_band_can_recover_a_stable_isolated_digit_as_review_required(self):
+        gray, region = self.make_isolated_digit()
+        def recognizer(crop, **kwargs):
+            return SimpleNamespace(txts=['9'] if crop.shape[1] < 80 else [],
+                                   scores=[.99] if crop.shape[1] < 80 else [], word_results=[])
+        notes, unresolved, discarded, _ = read_string_bands(gray, region, recognizer)
+        self.assertEqual([(n['string'], n['fret']) for n in notes], [(4, 9)])
+        self.assertTrue(notes[0]['review'])
+        self.assertEqual(notes[0]['method'], 'isolated-digit-retry')
+        self.assertEqual(unresolved, [])
+        self.assertEqual(discarded, [])
+
+    def test_isolated_retry_rejects_disagreement_and_neighboring_string_overlap(self):
+        gray, region = self.make_isolated_digit()
+        rows = [{'row':'bar1-string4', 'bar':1, 'string':4, 'box':[10,85,390,105], 'text':''}]
+        readings = iter([SimpleNamespace(txts=['9'], scores=[.99]), SimpleNamespace(txts=['8'], scores=[.99])])
+        self.assertEqual(recover_isolated_digits(gray, region, [], rows, lambda *a, **k: next(readings)), [])
+        neighbor = [{'bar':1, 'string':3, 'fret':9, 'x':203}]
+        self.assertEqual(recover_isolated_digits(gray, region, neighbor, rows, lambda *a, **k: self.fail('overlap must not be guessed')), [])
+
     def test_character_spacing_separates_multi_digit_frets(self):
         chars = [{'char': c, 'x': x} for c, x in zip('710811', [10,30,39,60,80,89])]
         self.assertEqual([''.join(v['char'] for v in g) for g in group_characters(chars, 14)], ['7','10','8','11'])

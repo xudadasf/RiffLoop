@@ -1,14 +1,15 @@
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import cv2
 import numpy as np
 from PIL import Image
 
-from raster_tab import decode_proposal, deskew, gray_image, locate_systems, recognize_raster, validate_settings
+from raster_tab import decode_proposal, deskew, gray_image, locate_systems, parse_tuning, recognize_raster, validate_settings
 
 
 def staff(count=6):
@@ -24,6 +25,29 @@ def staff(count=6):
 
 
 class RasterTabTests(unittest.TestCase):
+    def test_tuning_input_uses_sixth_to_first_string_and_accepts_accidentals(self):
+        self.assertEqual(parse_tuning('E2 A2 D3 G3 B3 E4'), [64, 59, 55, 50, 45, 40])
+        self.assertEqual(parse_tuning('D2 A2 D3 G3 B3 E4'), [64, 59, 55, 50, 45, 38])
+        self.assertEqual(parse_tuning('Eb2, Ab2, Db3, Gb3, Bb3, Eb4'), [63, 58, 54, 49, 44, 39])
+        self.assertEqual(parse_tuning('D#2 G#2 C#3 F#3 A#3 D#4'), [63, 58, 54, 49, 44, 39])
+
+    def test_invalid_tuning_is_rejected_without_guessing(self):
+        for value in ('E A D G B E', 'E2 A2 D3 G3 B3', 'E2 A2 D3 G3 B3 E4 X4',
+                      'E2 A2 D3 G3 B3 H4', 'E2 A2 D3 G3 B3 E12'):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, '定弦'):
+                parse_tuning(value)
+
+    def test_desktop_settings_carry_the_selected_tuning(self):
+        from desktop_gui import TrialWindow
+        window = SimpleNamespace(image_tempo=Mock(), image_meter=Mock(), image_tuning=Mock())
+        window.image_tempo.get.return_value = '88'
+        window.image_meter.get.return_value = '6/8'
+        window.image_tuning.get.return_value = 'D2 A2 D3 G3 B3 E4'
+        settings = TrialWindow.image_settings(window)
+        self.assertEqual(settings['tempo'], 88)
+        self.assertEqual(settings['meter'], [6, 8])
+        self.assertEqual(settings['tuning'], [64, 59, 55, 50, 45, 38])
+
     def test_short_extra_stroke_does_not_erase_whole_tab_system(self):
         for y in (104, 216):
             with self.subTest(y=y):
@@ -85,6 +109,52 @@ class RasterTabTests(unittest.TestCase):
         gray = staff()
         cv2.line(gray, (356, 120), (356, 200), 0, 1)
         self.assertEqual(locate_systems(gray)[0]['expected_bars'], 3)
+
+    def test_connected_short_slur_does_not_hide_a_straight_barline(self):
+        gray = staff()
+        cv2.line(gray, (350, 120), (350, 200), 0, 2)
+        cv2.line(gray, (346, 144), (350, 144), 0, 1)
+        self.assertEqual(locate_systems(gray)[0]['expected_bars'], 3)
+
+    def test_arpeggio_wave_does_not_create_a_barline(self):
+        gray = staff()
+        points = np.array([[250 + round(4*np.sin((y-120)*np.pi/10)), y] for y in range(120, 201)], np.int32)
+        cv2.polylines(gray, [points], False, 0, 1)
+        self.assertEqual(locate_systems(gray)[0]['expected_bars'], 3)
+
+    def test_dense_note_glyphs_do_not_cut_off_a_closed_staff_end(self):
+        gray = staff()
+        for x in range(670, 940, 20):
+            for y in (168, 184, 200):
+                cv2.rectangle(gray, (x-3, y-5), (x+3, y+5), 255, -1)
+                cv2.line(gray, (x-3, y-4), (x+3, y+4), 0, 1)
+                cv2.line(gray, (x+3, y-4), (x-3, y+4), 0, 1)
+        region = locate_systems(gray)[0]
+        self.assertGreaterEqual(region['right'], 949)
+        self.assertEqual(region['expected_bars'], 3)
+
+    def test_unclosed_fragmented_lines_are_not_extended_without_a_barline(self):
+        gray = staff()
+        for x in range(670, 940, 20):
+            for y in (168, 184, 200):
+                cv2.rectangle(gray, (x-3, y-5), (x+3, y+5), 255, -1)
+                cv2.line(gray, (x-3, y-4), (x+3, y+4), 0, 1)
+                cv2.line(gray, (x+3, y-4), (x-3, y+4), 0, 1)
+        cv2.line(gray, (950, 120), (950, 200), 255, 2)
+        region = locate_systems(gray)[0]
+        self.assertLess(region['right'], 700)
+        self.assertTrue(region['right_may_be_cut'])
+
+    def test_long_fragmented_tail_does_not_discard_an_existing_staff(self):
+        gray = staff()
+        for x in range(330, 940, 20):
+            for y in (168, 184, 200):
+                cv2.rectangle(gray, (x-3, y-5), (x+3, y+5), 255, -1)
+                cv2.line(gray, (x-3, y-4), (x+3, y+4), 0, 1)
+                cv2.line(gray, (x+3, y-4), (x-3, y+4), 0, 1)
+        regions = locate_systems(gray)
+        self.assertEqual(len(regions), 1)
+        self.assertGreaterEqual(regions[0]['right'], 949)
 
     def test_final_double_barline_does_not_create_tiny_extra_measure(self):
         gray = staff()

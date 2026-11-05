@@ -7,6 +7,7 @@ import copy
 import json
 import math
 import os
+import re
 from pathlib import Path
 import subprocess
 
@@ -19,6 +20,31 @@ from evaluate_model_probe import parse_tokens
 ROOT = Path(__file__).resolve().parent
 DEFAULT_MODEL = Path('D:/RiffLoop-model-tests/pdf-tab-prototype/local-model-20261026')
 DEFAULT_SETTINGS = {'tempo': 100, 'meter': [4, 4], 'tuning': [64, 59, 55, 50, 45, 40]}
+CUT_OFF_WARNING = '谱行右侧可能被截断，请对照原图检查末尾是否漏音或漏小节'
+
+
+def parse_tuning(text):
+    """Read six pitches in the displayed sixth-to-first-string order."""
+    parts = text.replace('♯', '#').replace('♭', 'b').replace(',', ' ').split()
+    if len(parts) != 6:
+        raise ValueError('定弦需填写六个音名和八度，例如 E2 A2 D3 G3 B3 E4（6 弦到 1 弦）')
+    pitches = []
+    for part in parts:
+        match = re.fullmatch(r'([A-Ga-g])([#b]?)(-?\d+)', part)
+        if not match:
+            raise ValueError('定弦音名无效，请使用 E2、F#2 或 Bb2 等格式')
+        letter, accidental, octave = match.groups()
+        pitch = 12*(int(octave)+1) + {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}[letter.upper()]
+        pitch += 1 if accidental == '#' else -1 if accidental == 'b' else 0
+        if not 0 <= pitch <= 127:
+            raise ValueError('定弦音高超出支持范围')
+        pitches.append(pitch)
+    return list(reversed(pitches))
+
+
+def format_tuning(tuning):
+    names = ('C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B')
+    return ' '.join(f'{names[pitch % 12]}{pitch // 12 - 1}' for pitch in reversed(tuning))
 
 
 def validate_settings(settings):
@@ -93,7 +119,32 @@ def runs(indices):
     return groups
 
 
-def locate_systems(gray):
+def extend_fragmented_staff_right(ink, ys, right, gap):
+    """Recover a fragmented end only when a full-height closing line is visible."""
+    height, width = ink.shape
+    span = ink[ys[0]:ys[-1]+1, :] > 0
+    candidates = [round(float(np.mean(group))) for group in runs(np.flatnonzero(span.mean(axis=0) >= .98))
+                  if float(np.mean(group)) > right + gap]
+    short = cv2.morphologyEx(ink, cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_RECT, (max(8, round(gap*.65)), 1)))
+    support = np.zeros(width, dtype=np.uint8)
+    for y in ys:
+        support += (short[max(0, y-2):min(height, y+3)].max(axis=0) > 0)
+    block = max(1, round(gap*2))
+    for end in candidates:
+        below = ink[ys[-1]+round(gap*.3):min(height, ys[-1]+round(gap*1.7)), max(0,end-1):min(width,end+2)]
+        if below.size and (below.max(axis=1) > 0).mean() > .45:
+            continue
+        segments = [support[a:min(end, a+block)] >= 4 for a in range(right, end, block)]
+        if not segments or any(len(s) >= gap*.5 and s.mean() < .35 for s in segments):
+            break
+        right = end
+    tail = support[min(width, right+round(gap)):min(width, right+round(gap*7))] >= 4
+    may_be_cut = len(tail) >= gap*2 and float(tail.mean()) >= .35
+    return right, may_be_cut
+
+
+def locate_systems(gray, extend_fragments=True):
     """Find six evenly spaced long lines in pixels, excluding five-line staves."""
     ink = ink_mask(gray)
     h, w = ink.shape
@@ -140,8 +191,15 @@ def locate_systems(gray):
         if any((horizontal[max(0,y-2):y+3,left:right+1].max(axis=0)>0).mean() >= .5
                for y in neighbors):
             continue
+        original_right = right
+        right_may_be_cut = False
+        if extend_fragments:
+            right, right_may_be_cut = extend_fragmented_staff_right(ink, ys, right, gap)
         # Do not silently join side-by-side columns into one musical system.
         missing = runs(np.flatnonzero(coverage[left:right + 1] < 2))
+        if right > original_right and any(len(g) > gap * 6 for g in missing):
+            right, right_may_be_cut = original_right, True
+            missing = runs(np.flatnonzero(coverage[left:right + 1] < 2))
         if any(len(g) > gap * 6 for g in missing):
             raise ValueError('检测到并排谱区或较大断裂，请按一列/一行裁剪后分别加入')
         top, bottom = max(0, round(ys[0] - gap * 4)), min(h, round(ys[-1] + gap * 5.5))
@@ -176,7 +234,13 @@ def locate_systems(gray):
                 centers.append(float(np.mean(occupied)))
             # Arpeggio waves can have high vertical coverage too; require a
             # straight center across all five inter-string spaces.
-            if len(centers) == 5 and max(centers) - min(centers) <= max(1.2, gap * .08):
+            # A slur may touch one side of a real barline and shift the local
+            # midpoint mean. An almost continuous straight column across all
+            # six strings is stronger evidence than that disturbed midpoint.
+            local = center-left
+            columns = span[:, max(0, local-1):min(span.shape[1], local+2)]
+            straight_pair = columns.size and np.count_nonzero(columns.mean(axis=0) >= .98) >= 2
+            if len(centers) == 5 and (straight_pair or max(centers) - min(centers) <= max(1.2, gap * .08)):
                 straight.append(x)
         bounds = straight
         # Double/repeat bars are one boundary, not a narrow extra measure.
@@ -186,7 +250,7 @@ def locate_systems(gray):
                 merged[-1] = (merged[-1] + x) / 2
             else:
                 merged.append(x)
-        found.append({'ys': ys, 'left': left, 'right': right, 'crop': crop,
+        found.append({'ys': ys, 'left': left, 'right': right, 'right_may_be_cut': right_may_be_cut, 'crop': crop,
                       'bar_boundaries': [left] + merged + [right], 'expected_bars': len(merged) + 1})
         used.update(ys)
     return found

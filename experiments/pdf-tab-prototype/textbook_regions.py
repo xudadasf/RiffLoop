@@ -9,7 +9,7 @@ import numpy as np
 from raster_tab import deskew, gray_image, ink_mask, locate_systems, runs
 
 
-def locate_regions(gray):
+def locate_regions(gray, extend_fragments=False, merge=True):
     height, width = gray.shape
     ink = ink_mask(gray)
     horizontal = cv2.morphologyEx(ink, cv2.MORPH_OPEN,
@@ -31,7 +31,7 @@ def locate_regions(gray):
     candidates, errors = [], []
     for left, right in columns:
         try:
-            systems = locate_systems(gray[:, left:right])
+            systems = locate_systems(gray[:, left:right], extend_fragments=extend_fragments)
         except ValueError as error:
             errors.append(str(error))
             continue
@@ -88,7 +88,7 @@ def locate_regions(gray):
     regions = []
     for region in candidates:
         previous = regions[-1] if regions else None
-        if previous and previous['accepted'] and region['accepted']:
+        if merge and previous and previous['accepted'] and region['accepted']:
             a,b = previous['box'],region['box']
             overlap = min(a[2],b[2])-max(a[0],b[0])
             space = ink[a[3]:b[1],max(a[0],b[0]):min(a[2],b[2])]
@@ -102,6 +102,24 @@ def locate_regions(gray):
         a is not r and a['accepted'] and a['box'][0] <= r['box'][0] and a['box'][1] <= r['box'][1]
         and a['box'][2] >= r['box'][2] and a['box'][3] >= r['box'][3] for a in regions)]
     return {'regions': regions, 'column_errors': sorted(set(errors))}
+
+
+def add_extended_candidates(regions, extended):
+    """Offer newly completed staff bounds without changing selected regions."""
+    result = list(regions)
+    for candidate in extended:
+        if not candidate['accepted']:
+            continue
+        box = candidate['box']
+        tolerance = max(2, candidate.get('gap', 10)*.3)
+        if any(r['box'][0] <= box[0]+tolerance and r['box'][1] <= box[1]+tolerance
+               and r['box'][2] >= box[2]-tolerance and r['box'][3] >= box[3]-tolerance
+               and not (r['accepted'] and r.get('systems',1) > 1 and candidate.get('systems',1) == 1)
+               for r in result):
+            continue
+        result.append({**candidate, 'accepted':False, 'extended_candidate':True,
+                       'reason':'补充完整谱行候选；可能与已有框重叠，请对照原页选择'})
+    return sorted(result, key=lambda r:(r['box'][1],r['box'][0]))
 
 
 def extract_regions(source, folder, stop=None, progress=None):
@@ -129,6 +147,8 @@ def extract_regions(source, folder, stop=None, progress=None):
                 data = locate_regions(gray)
                 from textbook_recall import add_recall_candidates
                 data['regions'] = add_recall_candidates(gray, data['regions'])
+                extended = locate_regions(gray, extend_fragments=True, merge=False)
+                data['regions'] = add_extended_candidates(data['regions'], extended['regions'])
                 original = Image.fromarray(gray)
                 original_name = f'page-{number:03d}-source.png'
                 original.save(folder/original_name)

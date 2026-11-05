@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 import unittest
 
-from raster_beam_rhythm import read_beamed_notes
+from raster_beam_rhythm import read_beamed_notes, read_plain_stems
 from raster_image_quality import condition_page
-from raster_tab import deskew, raster_pages
+from raster_tab import deskew, locate_systems, raster_pages
 
 
 ROOT = Path(__file__).resolve().parent
@@ -39,8 +39,13 @@ class RasterBatchRhythmTests(unittest.TestCase):
                 page, _ = condition_page(page)
                 page, _ = deskew(page)
                 region = system['region']
+                detected = locate_systems(page)
+                self.assertEqual(len(detected), 1)
+                for key in ('ys', 'crop', 'bar_boundaries'):
+                    self.assertEqual(detected[0][key], region[key], f'{name}: {key} changed')
                 x0, y0, x1, y1 = region['crop']
                 readings = read_beamed_notes(page[y0:y1, x0:x1], system['notes'], region)
+                readings = read_plain_stems(page[y0:y1, x0:x1], system['notes'], region, readings)
                 self.assertEqual(len(readings), len(case['accepted']))
                 counts = {}
                 expected_bars = TRUTH[name.split('-')[0]]
@@ -49,6 +54,8 @@ class RasterBatchRhythmTests(unittest.TestCase):
                     counts[bar] = counts.get(bar, 0) + 1
                     expected = expected_bars[bar-1][counts[bar]-1]
                     actual = reading['duration']
+                    if reading.get('source') == 'image-stem':
+                        self.assertEqual(expected, 4, f'{name} falsely read a quarter in bar {bar}')
                     if actual is not None:
                         self.assertEqual(actual, expected, f'{name} bar {bar} note {counts[bar]}')
                     if accepted is not None:

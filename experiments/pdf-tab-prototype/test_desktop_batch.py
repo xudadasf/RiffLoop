@@ -50,7 +50,7 @@ class DesktopBatchTests(unittest.TestCase):
                 output.mkdir()
                 (output / 'prediction.json').write_text(json.dumps({
                     'errors': [], 'systems': [{'id': 'p1-s1', 'page': 1,
-                                               'notes': [{'bar': 1, 'string': 6, 'fret': 5, 'review': False}],
+                                               'notes': [{'bar': 1, 'string': 6, 'fret': 5, 'review': True}],
                                                'unresolved': [], 'region': {'expected_bars': 4}}]
                 }), encoding='utf-8')
                 (output / 'review.html').write_text('digit review', encoding='utf-8')
@@ -58,9 +58,11 @@ class DesktopBatchTests(unittest.TestCase):
             for name in ('python.exe', 'PP-OCRv6_det_small.onnx', 'PP-OCRv6_rec_small.onnx'):
                 (root / name).touch()
             with patch.dict(os.environ, RIFFLOOP_DIGIT_PYTHON=str(root / 'python.exe'), RIFFLOOP_DIGIT_MODELS=str(root)), patch('subprocess.run', side_effect=worker) as run:
-                result = process_file(source, root / 'out', {'tempo': 88, 'meter': [6, 8]})
+                result = process_file(source, root / 'out', {'tempo': 88, 'meter': [6, 8],
+                                                              'tuning': [64, 59, 55, 50, 45, 38]})
             self.assertEqual(run.call_count, 2)
             self.assertEqual(result['status'], '图片草稿已生成 · 含占位', result['message'])
+            self.assertIn('1 个音符需核对', result['message'])
             self.assertIsNotNone(result['draft'])
             self.assertTrue((root / 'out/score.draft.gp').exists())
             report = (root / 'out/review.html').read_text(encoding='utf-8')
@@ -70,8 +72,11 @@ class DesktopBatchTests(unittest.TestCase):
             saved = json.loads((root / 'out/recognized.json').read_text(encoding='utf-8'))
             self.assertEqual(saved['manual_settings']['tempo'], 88)
             self.assertEqual(saved['manual_settings']['meter'], [6, 8])
+            self.assertEqual(saved['manual_settings']['tuning'], [64, 59, 55, 50, 45, 38])
             review = json.loads((root / 'out/score.draft.gp.review.json').read_text(encoding='utf-8'))
             self.assertEqual(review['note_count'], 1)
+            self.assertEqual(review['manual_settings']['tuning'], [64, 59, 55, 50, 45, 38])
+            self.assertIn('D2 A2 D3 G3 B3 E4', report)
             self.assertTrue(all(b['placeholder_beats'] for b in review['bars']))
 
     def test_same_name_and_repeated_runs_keep_separate_results(self):

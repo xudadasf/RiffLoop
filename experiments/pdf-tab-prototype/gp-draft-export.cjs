@@ -20,7 +20,7 @@ if (!Array.isArray(data.tuning) || data.tuning.length!==6 || data.tuning.some(n=
 const score = new alpha.model.Score();
 score.title = joined ? data.title : raster ? 'IMAGE TAB - editable draft' : 'DRAFT - PDF notes for manual correction';
 score.instructions = 'Unverified draft. Rhythm may be wrong. Ties and playing techniques are omitted. Review sidecar before playback.';
-if (raster) score.instructions += ' Notes from digit OCR; supported rhythms from image beams. Question marks indicate defaults or weak rhythm evidence; see review file. Meter, tempo and tuning are manual settings.';
+if (raster) score.instructions += ' Notes from digit OCR; rhythms may use image beams or stems. Question marks indicate defaults or weak rhythm evidence; see review file. Meter, tempo and tuning are manual settings.';
 const track = new alpha.model.Track(); score.addTrack(track); track.name = 'DRAFT notes'; track.playbackInfo.program = 25;
 const staff = new alpha.model.Staff(); track.addStaff(staff); staff.stringTuning.tunings = data.tuning;
 const review = {draft:true,playback_verified:false,source_sha256:crypto.createHash('sha256').update(raw).digest('hex'),
@@ -41,8 +41,8 @@ for (const source of bars) {
     if (imageBar) {
         if (source.beats.some(b=>![1,2,4,8,16,32,64].includes(b.duration) || ![0,1,2].includes(b.dots) ||
             b.grace || JSON.stringify(b.tuplet)!=='[1,1]' ||
-            !['image-beams','manual-default','manual-rest-default'].includes(b.rhythm_source) ||
-            (b.rhythm_source!=='image-beams' && b.placeholder!==true)))
+            !['image-beams','image-stem','manual-default','manual-rest-default'].includes(b.rhythm_source) ||
+            (!['image-beams','image-stem'].includes(b.rhythm_source) && b.placeholder!==true)))
             throw Error('Image draft needs explicit durations and placeholder provenance');
         const total=source.beats.reduce((sum,b)=>sum+4/b.duration*(2-Math.pow(2,-b.dots)),0);
         if (Math.abs(total-source.meter[0]*4/source.meter[1])>1e-9)

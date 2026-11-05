@@ -64,7 +64,13 @@ class ReviewPageTests(unittest.TestCase):
         report = self.render()
         self.assertIn('data-issue="1"', report)
         self.assertIn('1/4 ?', report)
-        self.assertIn('符干较弱', report)
+        self.assertIn('时值证据不完整', report)
+
+    def test_possible_cutoff_is_marked_for_review(self):
+        self.data['systems'][0]['region']['right_may_be_cut'] = True
+        report = self.render()
+        self.assertIn('data-issue="1"', report)
+        self.assertIn('谱行右侧可能被截断', report)
 
     def test_weak_evidence_only_flags_its_own_bar(self):
         system = self.data['systems'][0]
