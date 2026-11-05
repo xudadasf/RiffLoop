@@ -4,6 +4,8 @@ import queue
 import subprocess
 import tempfile
 import threading
+import tkinter as tk
+from tkinter import ttk
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -12,6 +14,31 @@ from desktop_gui import TrialWindow
 
 
 class DesktopGuiStateTests(unittest.TestCase):
+    def test_long_detail_keeps_result_buttons_visible(self):
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest('GUI display unavailable')
+        try:
+            root.attributes('-alpha', 0.0)
+            window = TrialWindow(root)
+            root.geometry('940x760')
+            window.detail.set('很长的文件路径和处理说明。' * 100)
+            root.update()
+            buttons = {}
+            def collect(parent):
+                for child in parent.winfo_children():
+                    if isinstance(child, ttk.Button):
+                        buttons[child.cget('text')] = child
+                    collect(child)
+            collect(root)
+            for label in ('打开 GP 草稿', '查看分区 / 结果', '打开结果目录', '清理中间文件'):
+                button = buttons[label]
+                self.assertGreaterEqual(button.winfo_width(), button.winfo_reqwidth(), label)
+                self.assertGreaterEqual(button.winfo_height(), button.winfo_reqheight(), label)
+        finally:
+            root.destroy()
+
     def test_completed_gp_is_available_if_worker_fails_after_export(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
