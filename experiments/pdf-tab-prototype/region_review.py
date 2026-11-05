@@ -58,13 +58,15 @@ def validate_plan(plan, manifest):
         raise ValueError('方案页数与分区记录不一致')
     selected=[]
     for entry, original in zip(pages,manifest['pages']):
-        if entry.get('page')!=original['page'] or type(entry.get('confirmed')) is not bool:
+        if not isinstance(entry,dict) or entry.get('page')!=original['page'] or type(entry.get('confirmed')) is not bool:
             raise ValueError('方案页码或确认状态无效')
         regions=entry.get('regions')
         if not isinstance(regions,list) or len(regions)>1000:
             raise ValueError('方案区域列表无效')
         adopted=[]
         for index,r in enumerate(regions,1):
+            if not isinstance(r,dict):
+                raise ValueError('方案区域内容无效')
             box=r.get('box')
             if not isinstance(box,list) or len(box)!=4 or any(type(v) not in (int,float) or not math.isfinite(v) for v in box):
                 raise ValueError('分区坐标无效')

@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import numpy as np
 from PIL import Image
@@ -52,6 +54,34 @@ class RegionPlanTests(unittest.TestCase):
                 p=copy.deepcopy(plan);p['pages'][0]['regions'][0]['box']=box;bad.append(p)
             for p in bad:
                 with self.assertRaises(ValueError):validate_plan(p,manifest)
+
+    def test_malformed_page_or_region_shows_validation_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            _,manifest,plan=fixtures(Path(temp))
+            for path in ('page','region'):
+                broken=copy.deepcopy(plan)
+                if path=='page':
+                    broken['pages'][0]=None
+                else:
+                    broken['pages'][0]['regions'][0]=None
+                with self.subTest(path=path),self.assertRaises(ValueError):
+                    validate_plan(broken,manifest)
+
+    def test_malformed_plan_produces_desktop_error_without_starting_a_job(self):
+        from desktop_gui import TrialWindow
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);_,_,plan=fixtures(root)
+            plan['review_folder']=str(root)
+            plan['pages'][0]=None
+            path=root/'plan.json';path.write_text(json.dumps(plan),encoding='utf-8')
+            tree=Mock();tree.selection.return_value=()
+            window=SimpleNamespace(running=False,tree=tree,items={})
+            with patch('desktop_gui.filedialog.askopenfilename',return_value=str(path)), \
+                 patch('desktop_gui.messagebox.showerror') as alert:
+                TrialWindow.import_region_plan(window)
+            alert.assert_called_once()
+            tree.insert.assert_not_called()
+            self.assertFalse(window.running)
 
     def test_reordered_regions_keep_their_gaps_across_pages(self):
         with tempfile.TemporaryDirectory() as temp:

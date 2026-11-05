@@ -58,6 +58,14 @@ class ReviewPageTests(unittest.TestCase):
         self.assertIn('data-issue="1"', self.render())
         self.assertIn('音符待确认：第 1 个（6弦/5品）', self.render())
 
+    def test_weak_rhythm_is_flagged_without_becoming_a_placeholder(self):
+        beat = self.data['systems'][0]['rhythm_bars'][0]['beats'][0]
+        beat['rhythm_review'] = True
+        report = self.render()
+        self.assertIn('data-issue="1"', report)
+        self.assertIn('1/4 ?', report)
+        self.assertIn('符干较弱', report)
+
     def test_weak_evidence_only_flags_its_own_bar(self):
         system = self.data['systems'][0]
         system['region']['expected_bars'] = 2

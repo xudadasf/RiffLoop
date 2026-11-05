@@ -45,16 +45,19 @@ class CleanupTests(unittest.TestCase):
             self.assertIn('digit-ocr/page-1.png',result['kept_modified_or_unowned'])
             self.assertEqual((cache/'page-1.png').read_bytes(),b'user changed this image')
 
-    def test_older_result_without_manifest_keeps_source_even_with_cache_filename(self):
+    def test_older_result_without_manifest_does_not_delete_unverifiable_files(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp).resolve();cache=self.setup_folder(root)
             result=json.loads((root/'result.json').read_text(encoding='utf-8'))
             result['source']=str(cache/'page-1.png')
             (root/'result.json').write_text(json.dumps(result),encoding='utf-8')
-            clean_intermediates(root)
+            (root/'worker.log').write_text('user edited this file')
+            with self.assertRaisesRegex(ValueError,'清理记录'):
+                clean_intermediates(root)
             self.assertTrue((cache/'page-1.png').exists())
             self.assertTrue((root/'score.draft.gp').exists())
-            self.assertFalse((root/'worker.log').exists())
+            self.assertEqual((root/'worker.log').read_text(),'user edited this file')
+            self.assertFalse((root/'cleanup-manifest.json').exists())
 
     def test_record_must_match_directory_and_manifest_cannot_escape(self):
         with tempfile.TemporaryDirectory() as temp:

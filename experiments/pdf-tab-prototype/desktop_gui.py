@@ -30,7 +30,7 @@ class TrialWindow:
         outer.pack(fill='both', expand=True)
         ttk.Label(outer, text='图片 / PDF → 可人工修改的 GP 草稿', font=('Microsoft YaHei UI', 19, 'bold')).pack(anchor='w')
         ttk.Label(outer, text='批量选择 PDF、截图或照片；可单独处理，也可选中多份拼接为一份 GP。', foreground='#46576b').pack(anchor='w', pady=(8, 4))
-        ttk.Label(outer, text='图片识别数字与横梁；不确定时值按默认值占位并标 ?。完成后可打开 GP 和待修改清单。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
+        ttk.Label(outer, text='图片识别数字与横梁；默认占位及证据较弱的时值标 ?。完成后可打开 GP 和待修改清单。', foreground='#92520a').pack(anchor='w', pady=(0, 12))
         controls = ttk.Frame(outer)
         controls.pack(fill='x')
         self.add_button = ttk.Button(controls, text='添加 PDF / 截图', command=self.choose_files)
@@ -90,7 +90,7 @@ class TrialWindow:
             ttk.Button(actions, text=label, command=lambda a=action: self.open_selected(a)).pack(side='left', padx=(0, 8))
         self.cleanup_button = ttk.Button(actions, text='清理中间文件', command=self.clean_selected)
         self.cleanup_button.pack(side='left')
-        ttk.Label(outer, text='保存修正后的 GP 后，可选中结果清理中间文件；未选中时可选择以前的结果目录。原文件和所有 GP 均保留。',
+        ttk.Label(outer, text='保存修正后的 GP 后，可清理中间文件；缺少清理记录的旧结果不会自动清理。原文件和所有 GP 均保留。',
                   foreground='#46576b', wraplength=880).pack(anchor='w', pady=(8, 0))
         self.progress = ttk.Progressbar(outer, mode='indeterminate')
         self.progress.pack(fill='x', pady=(16, 8))

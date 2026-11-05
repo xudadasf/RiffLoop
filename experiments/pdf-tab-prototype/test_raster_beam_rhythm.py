@@ -29,6 +29,21 @@ def example(beam_counts=(2, 2, 2, 2), stems=True, down=False):
     return gray, notes, region
 
 
+def shared_beams():
+    gray = np.full((180, 240), 255, np.uint8)
+    for y in range(60, 131, 14):
+        cv2.line(gray, (10, y), (230, y), 0, 1)
+    notes = []
+    for x in (40, 70, 100):
+        notes.append({'bar': 1, 'x': x, 'y': 130, 'string': 6, 'fret': 7,
+                      'box': [[x-5,122],[x+5,122],[x+5,138],[x-5,138]]})
+        cv2.line(gray, (x, 87), (x, 121), 0, 2)
+    for y in (87, 99):
+        cv2.rectangle(gray, (40, y), (105, y+5), 0, -1)
+    gray[106:115, 68:73] = 255  # A lightly broken middle stem.
+    return gray, notes, {'ys': list(range(60, 131, 14)), 'crop': [0, 0, 240, 180]}
+
+
 class BeamRhythmTests(unittest.TestCase):
     def test_chinese_output_path_does_not_silently_replace_readable_beams(self):
         gray, notes, region = example()
@@ -54,6 +69,42 @@ class BeamRhythmTests(unittest.TestCase):
     def test_unconnected_lines_are_not_rhythm_evidence(self):
         gray, notes, region = example(stems=False)
         self.assertTrue(all(r['duration'] is None for r in read_beamed_notes(gray, notes, region)))
+
+    def test_note_position_slightly_outside_beam_is_matched_to_its_stem(self):
+        gray, notes, region = example()
+        notes[0]['x'] -= 5
+        self.assertEqual(read_beamed_notes(gray, notes, region)[0]['duration'], 16)
+
+    def test_weak_stem_requires_same_bar_and_same_beam_group(self):
+        gray, notes, region = shared_beams()
+        readings = read_beamed_notes(gray, notes, region)
+        self.assertEqual([r['duration'] for r in readings], [16, 16, 16])
+        self.assertTrue(readings[1]['review_reason'])
+        self.assertIsNone(read_beamed_notes(gray, [notes[1]], region)[0]['duration'])
+        other_bar = [{**notes[0], 'bar': 2}, notes[1], {**notes[2], 'bar': 2}]
+        self.assertIsNone(read_beamed_notes(gray, other_bar, region)[1]['duration'])
+
+    def test_adjacent_partial_beam_is_not_attributed_to_an_unconnected_stem(self):
+        gray = np.full((180, 240), 255, np.uint8)
+        for y in range(60, 131, 14):
+            cv2.line(gray, (10, y), (230, y), 0, 1)
+        notes = []
+        for x in (40, 70, 100):
+            notes.append({'bar': 1, 'x': x, 'y': 130, 'string': 6, 'fret': 7,
+                          'box': [[x-5,122],[x+5,122],[x+5,138],[x-5,138]]})
+            cv2.line(gray, (x, 87), (x, 121), 0, 2)
+        cv2.rectangle(gray, (40, 87), (105, 92), 0, -1)
+        cv2.rectangle(gray, (40, 99), (65, 104), 0, -1)
+        region = {'ys': list(range(60, 131, 14)), 'crop': [0, 0, 240, 180]}
+        readings = read_beamed_notes(gray, notes, region)
+        self.assertEqual([r['duration'] for r in readings], [16, None, 8])
+
+    def test_weak_reading_stays_marked_for_review(self):
+        gray, notes, region = shared_beams()
+        beats, issues = fill_bar(notes, read_beamed_notes(gray, notes, region), [4, 4])
+        self.assertFalse(beats[1]['placeholder'])
+        self.assertTrue(beats[1]['rhythm_review'])
+        self.assertTrue(any('第 2 项' in issue and '符干' in issue for issue in issues))
 
     def test_incomplete_recognition_is_not_reported_as_confirmed_meter(self):
         self.assertEqual(validate_bar_timing([16]*16, [4, 4]), None)

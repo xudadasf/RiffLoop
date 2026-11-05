@@ -66,9 +66,11 @@ def clean_intermediates(folder):
         raise ValueError('分区图片是后续识别的输入文件，本操作保留分区图与裁剪图片')
     source=Path(result['source']).resolve()
     manifest_path=root/'cleanup-manifest.json'
-    # Older results predate ownership manifests. Only the strict generated-file
-    # allowlist is adopted; GP files and arbitrary user filenames never qualify.
-    manifest=json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.exists() else register_intermediates(root)
+    # Without the original hashes, a file bearing a cache name may have been
+    # edited or replaced by the user. Never register it just before deletion.
+    if not manifest_path.is_file():
+        raise ValueError('此旧结果缺少清理记录，无法判断文件是否被修改；未删除任何文件')
+    manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
     removed,kept,errors,freed=[],[],[],0
     for item in manifest['files']:
         relative=Path(item['path'])

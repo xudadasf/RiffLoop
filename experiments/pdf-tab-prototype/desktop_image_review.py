@@ -76,8 +76,9 @@ def write_image_review(source, folder, outcome, data):
                 token = ('休止 ' if not beat['notes'] else '') + f'1/{beat["duration"]}' + '.'*beat['dots']
                 if beat.get('tuplet', [1, 1])[0] > 1:
                     token += f'（{beat["tuplet"][0]}连音）'
-                token += ' ?' if beat['placeholder'] else ''
-                timing.append(f'<span class="timing-token{ " needs-review" if beat["placeholder"] else ""}" title="第 {beat_index} 项时值">{esc(token)}</span>')
+                needs_review = beat['placeholder'] or beat.get('rhythm_review', False)
+                token += ' ?' if needs_review else ''
+                timing.append(f'<span class="timing-token{ " needs-review" if needs_review else ""}" title="第 {beat_index} 项时值">{esc(token)}</span>')
             issues = list(rhythm['issues']) if rhythm else ['未得到可用时值']
             placeholders = sum(bool(b.get('placeholder')) for b in rhythm['beats']) if rhythm else 0
             if placeholders and not issues:
@@ -88,7 +89,10 @@ def write_image_review(source, folder, outcome, data):
                 issues.append('音符待确认：' + '、'.join(uncertain_notes))
             if placeholders:
                 positions = '、'.join(str(i) for i, b in enumerate(rhythm['beats'], 1) if b.get('placeholder'))
-                issues.append(f'时值待确认：第 {positions} 项（含休止；橙色 ? 为占位）')
+                issues.append(f'时值待确认：第 {positions} 项为默认占位（含休止）')
+            weak_positions = '、'.join(str(i) for i, b in enumerate(rhythm['beats'], 1) if b.get('rhythm_review')) if rhythm else ''
+            if weak_positions and not any('符干较弱' in issue for issue in issues):
+                issues.append(f'第 {weak_positions} 项符干较弱；? 为待核对的识别值，不是默认占位')
             unlocated = False
             for evidence in unresolved + discarded:
                 match = re.fullmatch(r'bar(\d+)-string(\d+)', str(evidence.get('row', '')))
@@ -128,7 +132,7 @@ def write_image_review(source, folder, outcome, data):
     if not sections:
         body += '<div class="empty-state">没有可核对的谱行。请先查看上方说明，或换用更清晰、保留六条谱线的图片。</div>'
     guidance = ('<p>先对照谱图检查弦号、品位和顺序，再在 GP 编辑软件中修改时值。小节位置由竖线检测得到，不能证明完整性。</p>'
-                '<p>明确连接的横梁用于识别时值；不确定处使用默认占位，谱中标 ?。默认四分音符，空间不足时统一缩短，余量用休止占位。</p>'
+                '<p>横梁用于识别时值；默认占位和证据较弱的识别值均标 ?，具体原因见下方。余量在小节末尾使用休止占位，需核对原谱的休止位置。</p>'
                 '<p>BPM 决定播放速度，拍号决定小节拍数；两者不能替代每个音符的时值。和弦同时起音、技巧、X 闷音尚未支持；没有报错也不代表没有漏音。</p>'
                 '<p>“仅重点检查”筛选的是程序已标出的疑点；未标出的音符也需要人工核对。</p>')
     content = render_review(source, folder, outcome, body, notes=total_notes, bars=total_bars,

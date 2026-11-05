@@ -79,6 +79,27 @@ class JoinTests(unittest.TestCase):
             self.assertIn('?', actual['bars'][0][0]['text'])
             self.assertIn('空白分隔', actual['bars'][1][0]['text'])
 
+    def test_weak_recognized_timing_is_distinct_from_a_default_in_gp_review(self):
+        score = part('A', 3)['score']
+        first = score['systems'][0]['bars'][0]['beats'][0]
+        first.update(placeholder=False, rhythm_source='image-beams', rhythm_review=True)
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            source, target = folder/'score.json', folder/'score.draft.gp'
+            source.write_text(json.dumps(score), encoding='utf-8')
+            run = subprocess.run(['node', str(ROOT/'gp-draft-export.cjs'), str(source), str(target)],
+                                 capture_output=True, text=True, encoding='utf-8')
+            self.assertEqual(run.returncode, 0, run.stderr)
+            review = json.loads(Path(str(target)+'.review.json').read_text(encoding='utf-8'))
+            self.assertEqual(review['bars'][0]['rhythm_review_beats'], [1])
+            self.assertNotIn(1, review['bars'][0]['placeholder_beats'])
+            script = folder/'inspect.cjs'
+            script.write_text("const a=require(process.argv[2]),fs=require('fs');const s=a.importer.ScoreLoader.loadScoreFromBytes(fs.readFileSync(process.argv[3]));console.log(s.tracks[0].staves[0].bars[0].voices[0].beats[0].text);", encoding='utf-8')
+            read = subprocess.run(['node', str(script), str(ROOT.parents[1]/'RiffLoop/Resources/GpWeb/alphaTab.min.js'), str(target)],
+                                  capture_output=True, text=True, encoding='utf-8')
+            self.assertEqual(read.returncode, 0, read.stderr)
+            self.assertIn('?', read.stdout)
+
     def test_failed_or_stopped_part_never_creates_partial_join(self):
         for stopped in (False, True):
             with self.subTest(stopped=stopped), tempfile.TemporaryDirectory() as temp:

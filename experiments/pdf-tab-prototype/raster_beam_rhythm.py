@@ -27,7 +27,7 @@ def read_beamed_notes(gray, notes, region):
         top, bottom = float(box[:, 1].min()), float(box[:, 1].max())
         matches = []
         for direction in ('up', 'down'):
-            eligible = [s for s in segments if s['x']-gap*.25 <= x <= s['x']+s['w']-1+gap*.25
+            eligible = [s for s in segments if s['x']-gap*.4 <= x <= s['x']+s['w']-1+gap*.4
                         and ((top-gap*4 <= s['y'] and s['y']+s['h'] <= top+gap*.15) if direction == 'up'
                              else (s['y'] >= bottom-gap*.15 and s['y']+s['h'] <= bottom+gap*4))]
             eligible.sort(key=lambda s: s['y'], reverse=direction == 'up')
@@ -52,12 +52,30 @@ def read_beamed_notes(gray, notes, region):
                 coverage = float(column.mean()) if len(column) else 0
                 if coverage > best[0]:
                     best = coverage, stem_x
-            if best[0] >= .72:
+            if best[0] >= .68 and all(s['x']-gap*.2 <= best[1] <= s['x']+s['w']-1+gap*.2 for s in group):
                 matches.append({'duration': 4 * 2**len(group),
                                 'evidence': {'beam_count': len(group), 'direction': direction,
-                                             'beam_boxes': group, 'stem_x': best[1], 'stem_coverage': round(best[0], 3)}})
+                                             'beam_boxes': group, 'stem_x': best[1], 'stem_coverage': round(best[0], 6)}})
         result.append(matches[0] if len(matches) == 1 else
                       {'duration': None, 'reason': '符干/横梁证据不足或方向存在歧义'})
+    # A partly broken stem is accepted only if another distinct note in the
+    # same bar has a strong stem connected to precisely the same beam group.
+    for index, reading in enumerate(result):
+        evidence = reading.get('evidence')
+        if not evidence or evidence['stem_coverage'] >= .72:
+            continue
+        supported = any(
+            other != index and notes[other]['bar'] == notes[index]['bar']
+            and abs(notes[other]['x']-notes[index]['x']) >= gap*.7
+            and candidate.get('duration') == reading['duration']
+            and candidate.get('evidence', {}).get('stem_coverage', 0) >= .72
+            and candidate['evidence']['direction'] == evidence['direction']
+            and candidate['evidence']['beam_boxes'] == evidence['beam_boxes']
+            for other, candidate in enumerate(result))
+        if supported:
+            reading['review_reason'] = '符干较弱，依据同组横梁辅助识别，需对照原谱'
+        else:
+            result[index] = {'duration': None, 'reason': '符干较弱且缺少同组横梁的可靠佐证'}
     return result
 
 
@@ -98,11 +116,15 @@ def fill_bar(notes, readings, meter):
                       'notes': [{'string': note['string'], 'fret': note['fret'], 'dead': False}],
                       'rhythm_source': 'image-beams' if value else 'manual-default',
                       'placeholder': not bool(value), 'note_review': bool(note.get('review')),
-                      'rhythm_reason': None if value else reading.get('reason', '未知时值或小节时值冲突'),
+                      'rhythm_review': bool(value and reading.get('review_reason')),
+                      'rhythm_reason': reading.get('review_reason') if value else reading.get('reason', '未知时值或小节时值冲突'),
                       'rhythm_evidence': reading.get('evidence') if value else None})
+    weak = [str(i) for i, beat in enumerate(beats, 1) if beat['rhythm_review']]
+    if weak:
+        issues.append(f'第 {"、".join(weak)} 项符干较弱，时值由同组横梁辅助识别；? 表示待核对，不是默认占位')
     remaining = expected - sum((Fraction(4, b['duration']) for b in beats), Fraction())
     if remaining:
-        issues.append(f'余下 {remaining} 拍使用休止占位，需核对是否漏音或漏识别节奏')
+        issues.append(f'余下 {remaining} 拍使用休止占位并放在小节末尾；需核对是否漏音以及原谱的休止位置')
     options = sorted(((Fraction(4, d)*sum((Fraction(1, 2**i) for i in range(dots+1)), Fraction()), d, dots)
                       for d in (1, 2, 4, 8, 16, 32, 64) for dots in (0, 1, 2)), reverse=True)
     while remaining:

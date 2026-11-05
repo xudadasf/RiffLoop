@@ -20,7 +20,7 @@ if (!Array.isArray(data.tuning) || data.tuning.length!==6 || data.tuning.some(n=
 const score = new alpha.model.Score();
 score.title = joined ? data.title : raster ? 'IMAGE TAB - editable draft' : 'DRAFT - PDF notes for manual correction';
 score.instructions = 'Unverified draft. Rhythm may be wrong. Ties and playing techniques are omitted. Review sidecar before playback.';
-if (raster) score.instructions += ' Notes from digit OCR; supported rhythms from image beams. Question marks indicate explicit timing defaults; see review file. Meter, tempo and tuning are manual settings.';
+if (raster) score.instructions += ' Notes from digit OCR; supported rhythms from image beams. Question marks indicate defaults or weak rhythm evidence; see review file. Meter, tempo and tuning are manual settings.';
 const track = new alpha.model.Track(); score.addTrack(track); track.name = 'DRAFT notes'; track.playbackInfo.program = 25;
 const staff = new alpha.model.Staff(); track.addStaff(staff); staff.stringTuning.tunings = data.tuning;
 const review = {draft:true,playback_verified:false,source_sha256:crypto.createHash('sha256').update(raw).digest('hex'),
@@ -56,7 +56,7 @@ for (const source of bars) {
         master.tempoAutomations.push(alpha.model.Automation.buildTempoAutomation(false,0,tempo,2));
     const bar = new alpha.model.Bar(); staff.addBar(bar); const voice = new alpha.model.Voice(); bar.addVoice(voice);
     const row = {page:source.page,source_bar:source.number,issues:source.issues??[],placeholder_beats:[],review_required:true};
-    if (imageBar) { row.note_review_beats=[]; row.rhythm_evidence=[]; }
+    if (imageBar) { row.note_review_beats=[]; row.rhythm_review_beats=[]; row.rhythm_evidence=[]; }
     const beats = [];
     for (const [index,item] of source.beats.entries()) {
         if (item.voice && item.voice!==0) throw Error('Multiple voices need separate review');
@@ -71,11 +71,13 @@ for (const source of bars) {
         if (imageBar) {
             row.rhythm_evidence.push({beat:index+1,source:item.rhythm_source,evidence:item.rhythm_evidence??null,reason:item.rhythm_reason??null});
             if (item.note_review) row.note_review_beats.push(index+1);
+            if (item.rhythm_review) row.rhythm_review_beats.push(index+1);
         }
         if (!valid || (imageBar && item.placeholder)) {
             row.placeholder_beats.push(index+1);
             beat.text = imageBar ? '?' : (beat.text?beat.text+'; ':'')+'UNKNOWN RHYTHM: quarter placeholder';
         }
+        if (imageBar && item.rhythm_review) beat.text = '?';
         if (joined && index === 0) {
             const label = source.separator ? '空白分隔' : source.segment_label;
             if (label) beat.text = label + (beat.text ? '; ' + beat.text : '');
@@ -121,12 +123,12 @@ for (let i=0;i<actual.length;i++) {
 }
 review.roundtrip = 'passed; serialized content only, not PDF or playback accuracy';
 const lines = ['# 待人工校正草稿','',
-    joined ? '多份原文件按指定顺序拼接；空白分隔是用户主动插入的休止小节。疑点按拼接后的小节号列出，图片未知时值保留 ? 标记。' : raster ? '音符来自图片数字识别，仍需人工核对。明确连接的横梁用于识别时值；其余按默认值占位，并在谱内用 ? 标记。默认四分音符，剩余空间不足时统一缩短；剩余拍数补休止占位。BPM、拍号、定弦为人工设置。小节号为检测顺序号。' : '音符来自 PDF 识别结果，未经整曲验收。节奏保留识别值；未知时值用四分音符占位，并在谱内标记 placeholder。',
+    joined ? '多份原文件按指定顺序拼接；空白分隔是用户主动插入的休止小节。疑点按拼接后的小节号列出，图片占位及证据较弱的时值保留 ? 标记。' : raster ? '音符来自图片数字识别，仍需人工核对。横梁用于识别时值；默认占位和证据较弱的时值均在谱内用 ? 标记，详见问题清单。默认四分音符，剩余空间不足时统一缩短；剩余拍数在小节末尾补休止占位，需核对原谱位置。BPM、拍号、定弦为人工设置。小节号为检测顺序号。' : '音符来自 PDF 识别结果，未经整曲验收。节奏保留识别值；未知时值用四分音符占位，并在谱内标记 placeholder。',
     '本草稿未导出延音线、泛音、滑音、推弦、掌根闷音、顿音等技巧及反复结构，播放前请对照原谱修改。X 闷音记号本身保留。',
     `音符数：${review.note_count}；小节数：${bars.length}。所有小节均需复核，下面列出识别器已知的问题。`,
     ...review.tempo_issues.map(x=>'速度待核对：'+JSON.stringify(x)),...(review.warnings??[]),'',
     '| 来源页 | 小节 | 已知问题 | 占位时值的拍序号 |','| --- | --- | --- | --- |',
-    ...review.bars.filter(b=>b.issues.length || b.placeholder_beats.length || b.note_review_beats?.length).map(b=>
+    ...review.bars.filter(b=>b.issues.length || b.placeholder_beats.length || b.note_review_beats?.length || b.rhythm_review_beats?.length).map(b=>
         `| ${b.page} | ${b.source_bar} | ${[...b.issues,...(b.note_review_beats?.length?['数字/弦位待核对音符序号（低分或位置重试）：'+b.note_review_beats.join(', ')]:[])].join('; ').replaceAll('|','/').replaceAll('\n',' ')} | ${b.placeholder_beats.join(', ')} |`)];
 fs.writeFileSync(output,bytes);
 fs.writeFileSync(output+'.review.json',JSON.stringify(review,null,2)+'\n');
