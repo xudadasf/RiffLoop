@@ -4,6 +4,41 @@ import XCTest
 
 @MainActor
 final class GpLoadingStateTests: XCTestCase {
+    func testDelayedScoreAndBackingFromPreviousFileAreRejected() throws {
+        let suite = "GpLoadingStateTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = GpWebViewModel(settingsStore: FilePracticeSettingsStore(defaults: defaults))
+        model.loadScore(data: Data(), fileName: "first.gp")
+        let firstID = try XCTUnwrap(model.scoreLoadID)
+        model.loadScore(data: Data(), fileName: "second.gp")
+        let secondID = try XCTUnwrap(model.scoreLoadID)
+        XCTAssertNotEqual(firstID, secondID)
+        let oldScore = GpScoreMetadata(title: "First", artist: "", bars: 1,
+                                       hasBackingTrack: true, tracks: [])
+        let newScore = GpScoreMetadata(title: "Second", artist: "", bars: 1,
+                                       hasBackingTrack: false, tracks: [])
+        let invalidAudio = GpBackingAudio(mimeType: "audio/wav", data: Data([0, 1]), syncPoints: [])
+
+        // These messages were created for First before the user selected Second,
+        // but their delivery to the main actor was delayed until after the switch.
+        model.receiveFromWeb(.scoreLoaded(oldScore), scoreLoadID: firstID)
+        model.receiveFromWeb(.backingAudioLoaded(invalidAudio), scoreLoadID: firstID)
+        XCTAssertNil(model.score)
+        XCTAssertNil(model.errorMessage, "Old backing must not reach the native audio loader")
+        model.receiveWebMessage(["event": "backingAudioLoaded", "scoreLoadID": firstID,
+                                 "payload": ["mimeType": "audio/wav", "data": "invalid-base64", "syncPoints": []]])
+        XCTAssertNil(model.errorMessage, "Old backing must be discarded before decoding")
+
+        model.receiveFromWeb(.scoreLoaded(newScore), scoreLoadID: secondID)
+        XCTAssertEqual(model.score?.title, "Second")
+        // An in-place timbre reload belongs to the same score and remains valid.
+        model.receiveFromWeb(.scoreLoaded(newScore), scoreLoadID: secondID)
+        XCTAssertEqual(model.score?.title, "Second")
+        model.receiveFromWeb(.backingAudioLoaded(invalidAudio), scoreLoadID: secondID)
+        XCTAssertNotNil(model.errorMessage, "Current backing must still reach the native audio loader")
+    }
+
     func testLeavingOrBackgroundingDuringLoadPreservesSavedProfile() throws {
         let suite = "GpLoadingStateTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

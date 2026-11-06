@@ -7,10 +7,11 @@
     const LONG_PRESS_MILLISECONDS = 600;
     const POSITION_POST_INTERVAL_MILLISECONDS = 50;
     let reproductionGeneration = 0;
+    let scoreLoadID = null;
     const post = (event, payload) => {
         const handler = window.webkit?.messageHandlers?.riffloop;
         if (handler) {
-            handler.postMessage({ event, ...(payload === undefined ? {} : { payload }), observedLoadGeneration: reproductionGeneration, javascriptMilliseconds: performance.now() });
+            handler.postMessage({ event, ...(payload === undefined ? {} : { payload }), scoreLoadID, observedLoadGeneration: reproductionGeneration, javascriptMilliseconds: performance.now() });
         }
     };
     window.addEventListener("error", (event) => {
@@ -270,6 +271,9 @@
             masterVolume = clampVolume(volume);
             for (const track of tracks.values()) applyVolume(track);
         };
+        const restoreVolumes = () => {
+            for (const track of tracks.values()) applyVolume(track);
+        };
         const setEnabled = (value) => {
             enabled = Boolean(value);
             for (const track of tracks.values()) applyMute(track);
@@ -284,7 +288,7 @@
             const track = tracks.get(Number(index));
             if (track) applyTrack(track);
         };
-        return { reset, setMasterVolume, setEnabled, setTrackVolume, setTrackMute };
+        return { reset, setMasterVolume, restoreVolumes, setEnabled, setTrackVolume, setTrackMute };
     };
     const synthOutput = createSynthOutputController(api);
     let backingEnabled = true;
@@ -1055,6 +1059,9 @@
     });
     api.playerReady.on(() => {
         configureAudioOutput();
+        // alphaTab restores displayed tracks' score volume on every ready event,
+        // including events after Swift has already applied the user's settings.
+        synthOutput.restoreVolumes();
         mainPlayerReadyForScore = true;
         notifyPlayerReady();
     });
@@ -1416,7 +1423,8 @@
                 post("error", { message: `音色加载失败：${errorMessage(error)}` });
             }
         },
-        loadScore(base64) {
+        loadScore(base64, loadID) {
+            scoreLoadID = typeof loadID === "string" ? loadID : null;
             reproductionGeneration += 1;
             pendingPausedSeek = null;
             trackTimbres = preparedTrackTimbres;

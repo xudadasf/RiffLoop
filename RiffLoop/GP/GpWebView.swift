@@ -74,15 +74,9 @@ struct GpWebView: UIViewRepresentable {
                 }
                 if name.hasPrefix("reproduction") { return }
             }
-            do {
-                let event = try GpBridgeEvent.decode(messageBody: message.body)
-                Task { @MainActor [viewModel] in
-                    viewModel.receive(event)
-                }
-            } catch {
-                Task { @MainActor [viewModel] in
-                    viewModel.receiveBridgeFailure(error)
-                }
+            let body = message.body
+            Task { @MainActor [viewModel] in
+                viewModel.receiveWebMessage(body)
             }
         }
 

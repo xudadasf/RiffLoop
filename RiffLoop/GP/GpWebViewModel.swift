@@ -112,6 +112,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private var reproductionLoad: String?
+    private(set) var scoreLoadID: String?
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
     private var didSendSoundFont = false
@@ -211,6 +212,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        scoreLoadID = UUID().uuidString
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
         recoveryTask?.cancel()
@@ -391,6 +393,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func leaveMode() {
+        scoreLoadID = nil
         recoveryTask?.cancel()
         recoveryTask = nil
         pendingScoreData = nil
@@ -877,6 +880,32 @@ final class GpWebViewModel: ObservableObject {
         errorMessage = "GP 导入失败：\(error.localizedDescription)"
     }
 
+    func receiveWebMessage(_ body: Any) {
+        let envelope = body as? [String: Any]
+        let messageID = envelope?["scoreLoadID"] as? String
+        if let name = envelope?["event"] as? String, name == "scoreLoaded" || name == "backingAudioLoaded" {
+            // Reject superseded scores before decoding potentially huge embedded audio.
+            guard let messageID, messageID == scoreLoadID else { return }
+        }
+        do {
+            receiveFromWeb(try GpBridgeEvent.decode(messageBody: body), scoreLoadID: messageID)
+        } catch {
+            receiveBridgeFailure(error)
+        }
+    }
+
+    func receiveFromWeb(_ event: GpBridgeEvent, scoreLoadID messageID: String?) {
+        switch event {
+        case .scoreLoaded, .backingAudioLoaded:
+            // These are emitted synchronously while parsing the particular score.
+            // A delayed bridge message must not restore a previous file's audio.
+            guard let messageID, messageID == scoreLoadID else { return }
+        default:
+            break
+        }
+        receive(event)
+    }
+
     func receive(_ event: GpBridgeEvent) {
         switch event {
         case .ready:
@@ -1104,10 +1133,11 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func sendScore(_ data: Data) {
+        guard let scoreLoadID else { return }
         call("prepareMetronomeSubdivision", arguments: [metronomeSubdivisionFactor])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
         call("prepareTrackTimbres", arguments: [pendingProfile.trackTimbres.map { [$0.key, $0.value] }])
-        call("loadScore", arguments: [data.base64EncodedString()])
+        call("loadScore", arguments: [data.base64EncodedString(), scoreLoadID])
     }
 
     @discardableResult
