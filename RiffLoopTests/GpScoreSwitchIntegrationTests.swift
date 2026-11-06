@@ -77,6 +77,7 @@ final class GpScoreSwitchIntegrationTests: XCTestCase {
                 payload:{mimeType:'audio/wav', data:'AAE=', syncPoints:[]}});
             window.webkit.messageHandlers.riffloop.postMessage({event:'backingAudioLoaded', scoreLoadID:'\(firstID)',
                 payload:{mimeType:'audio/wav', data:'invalid-base64', syncPoints:[]}});
+            true;
             """)
         try await Task.sleep(for: .milliseconds(500))
         XCTAssertEqual(model.score?.title, "Second test score")
