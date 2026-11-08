@@ -102,7 +102,8 @@ struct ScoreWorkspaceView: View {
         .task { await model.refresh() }
         .fileImporter(
             isPresented: $isImporterPresented,
-            allowedContentTypes: [.pdf, .image],
+            allowedContentTypes: ["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff"]
+                .compactMap { UTType(filenameExtension: $0) },
             allowsMultipleSelection: true
         ) { result in
             switch result {
@@ -127,7 +128,7 @@ struct ScoreWorkspaceView: View {
             }
             Button("取消", role: .cancel) { filePendingDeletion = nil }
         } message: {
-            Text("只删除工作区中的副本，不会删除原文件。")
+            Text("将删除工作区中的素材副本及其已保存的区域，不会删除原文件。")
         }
         .alert("识别与编辑", isPresented: Binding(
             get: { model.message != nil },

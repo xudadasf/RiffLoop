@@ -1,6 +1,80 @@
 import PDFKit
 import SwiftUI
 import UIKit
+import ImageIO
+
+/// A preview is passed back to the main actor only after background rendering finishes.
+private struct ScorePagePreview: @unchecked Sendable {
+    let image: UIImage?
+    let pageCount: Int
+    let orientation: Int
+    let error: String?
+}
+
+private enum ScorePageRenderer {
+    static func render(source: URL, index: Int) -> ScorePagePreview {
+        autoreleasepool {
+            if source.pathExtension.lowercased() == "pdf" {
+                guard let document = PDFDocument(url: source), document.pageCount > 0 else {
+                    return failure("无法打开 PDF，请检查文件是否损坏或需要密码。")
+                }
+                let count = document.pageCount
+                guard let page = document.page(at: index) else {
+                    return failure("无法读取此 PDF 页面。", pageCount: count)
+                }
+                let rotation = ((page.rotation % 360) + 360) % 360
+                guard rotation == 0 else {
+                    return failure("此 PDF 页面带有旋转，当前暂不支持框选，以免保存错误位置。请先将页面旋转后另存，或使用截图。", pageCount: count)
+                }
+                let bounds = page.bounds(for: .cropBox)
+                guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0 else {
+                    return failure("此 PDF 页面的尺寸无效。", pageCount: count)
+                }
+                let factor = min(1, 2048 / max(bounds.width, bounds.height))
+                let size = CGSize(width: max(1, bounds.width * factor), height: max(1, bounds.height * factor))
+                return ScorePagePreview(image: page.thumbnail(of: size, for: .cropBox), pageCount: count,
+                                        orientation: rotation, error: nil)
+            }
+
+            guard index == 0,
+                  let imageSource = CGImageSourceCreateWithURL(source as CFURL, nil) else {
+                return failure("无法打开此图片。")
+            }
+            let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any]
+            let exifOrientation = (properties?[kCGImagePropertyOrientation as String] as? NSNumber)?.intValue ?? 1
+            // Preserve the previously stored UIImage orientation values for existing regions.
+            let orientation: UIImage.Orientation
+            switch exifOrientation {
+            case 1: orientation = .up
+            case 2: orientation = .upMirrored
+            case 3: orientation = .down
+            case 4: orientation = .downMirrored
+            case 5: orientation = .leftMirrored
+            case 6: orientation = .right
+            case 7: orientation = .rightMirrored
+            case 8: orientation = .left
+            default: return failure("此图片的方向暂不支持，无法安全框选。", pageCount: 1)
+            }
+            let options: [String: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways as String: true,
+                kCGImageSourceCreateThumbnailWithTransform as String: true,
+                kCGImageSourceThumbnailMaxPixelSize as String: 2048,
+                kCGImageSourceShouldCacheImmediately as String: true,
+            ]
+            guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else {
+                return failure("无法打开此图片。", pageCount: 1)
+            }
+            // ImageIO has already applied the orientation; the saved value remains
+            // the original orientation solely for region compatibility checks.
+            return ScorePagePreview(image: UIImage(cgImage: thumbnail), pageCount: 1,
+                                    orientation: orientation.rawValue, error: nil)
+        }
+    }
+
+    private static func failure(_ message: String, pageCount: Int = 0) -> ScorePagePreview {
+        ScorePagePreview(image: nil, pageCount: pageCount, orientation: 0, error: message)
+    }
+}
 
 @MainActor
 final class ScoreRegionEditorModel: ObservableObject {
@@ -13,8 +87,6 @@ final class ScoreRegionEditorModel: ObservableObject {
 
     private let source: URL
     private let store: ScoreRegionsStore
-    private var pdf: PDFDocument?
-    private var sourceImage: UIImage?
     private var orientation = 0
 
     init(source: URL) {
@@ -26,21 +98,6 @@ final class ScoreRegionEditorModel: ObservableObject {
         guard !busy else { return }
         busy = true
         defer { busy = false }
-        if source.pathExtension.lowercased() == "pdf" {
-            guard let document = PDFDocument(url: source), document.pageCount > 0 else {
-                message = "无法打开 PDF，请检查文件是否损坏或需要密码。"
-                return
-            }
-            pdf = document
-            pageCount = document.pageCount
-        } else {
-            guard let value = UIImage(contentsOfFile: source.path), value.cgImage != nil else {
-                message = "无法打开此图片。"
-                return
-            }
-            sourceImage = value
-            pageCount = 1
-        }
         await showPage(0)
     }
 
@@ -56,48 +113,18 @@ final class ScoreRegionEditorModel: ObservableObject {
         image = nil
         regions = []
         pageIndex = index
-        if let pdf {
-            guard let page = pdf.page(at: index) else {
-                message = "无法读取此 PDF 页面。"
-                return
-            }
-            let rotation = ((page.rotation % 360) + 360) % 360
-            guard rotation == 0 else {
-                message = "此 PDF 页面带有旋转，当前暂不支持框选，以免保存错误位置。请先将页面旋转后另存，或使用截图。"
-                return
-            }
-            let bounds = page.bounds(for: .cropBox)
-            guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0 else {
-                message = "此 PDF 页面的尺寸无效。"
-                return
-            }
-            let size = previewSize(width: bounds.width, height: bounds.height)
-            image = page.thumbnail(of: size, for: .cropBox)
-            orientation = rotation
-        } else if let sourceImage, let cgImage = sourceImage.cgImage {
-            let swapsDimensions: Bool
-            switch sourceImage.imageOrientation {
-            case .left, .right, .leftMirrored, .rightMirrored: swapsDimensions = true
-            case .up, .down, .upMirrored, .downMirrored: swapsDimensions = false
-            @unknown default:
-                message = "此图片的方向暂不支持，无法安全框选。"
-                return
-            }
-            let width = CGFloat(swapsDimensions ? cgImage.height : cgImage.width)
-            let height = CGFloat(swapsDimensions ? cgImage.width : cgImage.height)
-            guard width > 0, height > 0 else { message = "图片尺寸无效。"; return }
-            let size = previewSize(width: width, height: height)
-            let format = UIGraphicsImageRendererFormat()
-            format.scale = 1
-            // UIImage.draw applies all eight EXIF orientations before coordinates are taken.
-            image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-                sourceImage.draw(in: CGRect(origin: .zero, size: size))
-            }
-            orientation = sourceImage.imageOrientation.rawValue
-        } else {
-            message = "无法读取此页面。"
+        let source = self.source
+        let preview = await Task.detached(priority: .userInitiated) {
+            ScorePageRenderer.render(source: source, index: index)
+        }.value
+        guard !Task.isCancelled else { return }
+        pageCount = preview.pageCount
+        guard let renderedImage = preview.image else {
+            message = preview.error ?? "无法读取此页面。"
             return
         }
+        image = renderedImage
+        orientation = preview.orientation
         do {
             regions = try await store.loadPage(index: index, rotation: orientation)
         } catch {
@@ -107,7 +134,11 @@ final class ScoreRegionEditorModel: ObservableObject {
     }
 
     func addRegion(_ region: ScoreRegion, onPage index: Int) async {
-        guard !busy, pageIndex == index, image != nil, region.isValid else { return }
+        guard !busy else { message = "正在保存，请稍后重新画框。"; return }
+        guard pageIndex == index, image != nil, region.isValid else {
+            message = "页面已变化或区域无效，请重新画框。"
+            return
+        }
         await save(regions + [region])
     }
 
@@ -127,10 +158,6 @@ final class ScoreRegionEditorModel: ObservableObject {
         }
     }
 
-    private func previewSize(width: CGFloat, height: CGFloat) -> CGSize {
-        let factor = min(1, 2048 / max(width, height))
-        return CGSize(width: max(1, width * factor), height: max(1, height * factor))
-    }
 }
 
 /// Manual region selection only. Recognition and ordering are not implemented here.
@@ -189,7 +216,7 @@ struct ScoreRegionEditorView: View {
                         }
                         .frame(width: size.width, height: size.height)
                         .contentShape(Rectangle())
-                        .gesture(drawing ? drawGesture(size: size) : nil)
+                        .gesture(drawing && !model.busy ? drawGesture(size: size) : nil)
                     }
                     .scrollDisabled(drawing)
                 }
@@ -213,6 +240,9 @@ struct ScoreRegionEditorView: View {
         }
         .navigationTitle("手动框选")
         .task { await model.open() }
+        .onChange(of: model.busy) { _, busy in
+            if busy { dragStart = nil; dragEnd = nil }
+        }
         .alert("手动框选", isPresented: Binding(
             get: { model.message != nil },
             set: { if !$0 { model.message = nil } }
