@@ -27,6 +27,27 @@ struct HomeView: View {
                     }.accessibilityIdentifier("diagnostics.open")
                     continuePracticeCard
 
+                    NavigationLink {
+                        ScoreWorkspaceView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "doc.text.image")
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("识别与编辑").font(.headline)
+                                Text("准备谱面素材 · 识别和编辑功能开发中")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                        }
+                        .padding(18)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .cardSurface()
+
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: 16) {
                             startPracticeCard

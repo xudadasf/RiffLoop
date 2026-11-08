@@ -6,7 +6,11 @@ on:
     paths:
       - "RiffLoop/**"
       - "RiffLoopTests/**"
+      - "experiments/gp-draft-editor/**"
       - "project.yml"
+      - "scripts/gp-roundtrip-*"
+      - "scripts/test-gp-draft-editor.mjs"
+      - "scripts/test-gp-roundtrip-audit.py"
       - "scripts/test-gp-playback.mjs"
       - "scripts/test-gp-audio.mjs"
       - "scripts/test-gp-timbre.mjs"
@@ -28,7 +32,11 @@ on:
     paths:
       - "RiffLoop/**"
       - "RiffLoopTests/**"
+      - "experiments/gp-draft-editor/**"
       - "project.yml"
+      - "scripts/gp-roundtrip-*"
+      - "scripts/test-gp-draft-editor.mjs"
+      - "scripts/test-gp-roundtrip-audit.py"
       - "scripts/test-gp-playback.mjs"
       - "scripts/test-gp-audio.mjs"
       - "scripts/test-gp-timbre.mjs"
@@ -77,6 +85,8 @@ jobs:
           node scripts/test-reported-ios-issues.mjs
           node scripts/test-video-mode.mjs
           node scripts/test-pdf-mode.mjs
+          node scripts/test-gp-draft-editor.mjs
+          python3 scripts/test-gp-roundtrip-audit.py
 
       - name: Show tool versions
         run: |
