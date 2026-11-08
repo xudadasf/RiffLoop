@@ -4,14 +4,14 @@ import UIKit
 import ImageIO
 
 /// A preview is passed back to the main actor only after background rendering finishes.
-private struct ScorePagePreview: @unchecked Sendable {
+struct ScorePagePreview: @unchecked Sendable {
     let image: UIImage?
     let pageCount: Int
     let orientation: Int
     let error: String?
 }
 
-private enum ScorePageRenderer {
+enum ScorePageRenderer {
     static func render(source: URL, index: Int) -> ScorePagePreview {
         autoreleasepool {
             if source.pathExtension.lowercased() == "pdf" {
