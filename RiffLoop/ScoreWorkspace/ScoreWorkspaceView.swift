@@ -45,6 +45,11 @@ final class ScoreWorkspaceModel: ObservableObject {
         defer { isWorking = false }
         do {
             try await store.removeCopy(url)
+            do {
+                try await ScoreRegionsStore(source: url).removeSavedData()
+            } catch {
+                message = "素材副本已删除，但区域记录清理失败：\(error.localizedDescription)"
+            }
             await refresh()
         } catch {
             message = "删除素材副本失败：\(error.localizedDescription)"
@@ -63,7 +68,7 @@ struct ScoreWorkspaceView: View {
             Section {
                 Text("在这里准备 PDF、照片或截图。素材会复制到制谱工作区，原文件不会被修改。")
                     .foregroundStyle(.secondary)
-                Text("自动分区、识别和编辑正在开发，当前仅支持导入和管理素材。")
+                Text("可预览和手动画框。自动分区、识别和编辑正在开发。")
                     .foregroundStyle(.secondary)
             }
             Section("素材（按名称排列）") {
@@ -73,9 +78,11 @@ struct ScoreWorkspaceView: View {
                 }
                 ForEach(model.files, id: \.path) { url in
                     HStack {
-                        Image(systemName: url.pathExtension.lowercased() == "pdf" ? "doc.richtext" : "photo")
-                        Text(url.lastPathComponent)
-                        Spacer()
+                        NavigationLink {
+                            ScoreRegionEditorView(source: url)
+                        } label: {
+                            Label(url.lastPathComponent, systemImage: url.pathExtension.lowercased() == "pdf" ? "doc.richtext" : "photo")
+                        }
                         Button("删除副本", role: .destructive) { filePendingDeletion = url }
                             .disabled(model.isWorking)
                     }
