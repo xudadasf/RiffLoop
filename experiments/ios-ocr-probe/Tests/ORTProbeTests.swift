@@ -4,6 +4,12 @@ import XCTest
 
 private struct CPUReference: Decodable {
     struct Case: Decodable {
+        struct Run: Decodable {
+            let `class`: Int
+            let start: Int
+            let end: Int
+            let character: String
+        }
         let name: String
         let input_sha256_little_endian: String
         let output_shape: [Int]
@@ -11,6 +17,7 @@ private struct CPUReference: Decodable {
         let argmax: [Int]
         let argmax_scores: [Float]
         let ctc_text: String
+        let ctc_runs: [Run]
         let sample_times: [Int]
         let sample_classes: [Int]
         let sample_values: [[Float]]
@@ -30,6 +37,12 @@ final class ORTProbeTests: XCTestCase {
         let unknown = PartialCTC.decode([1, 0, 7], labels: labels)
         XCTAssertNil(unknown.text)
         XCTAssertEqual(unknown.unknownClasses, [7])
+        XCTAssertEqual(unknown.runs.map(\.classID), [1, 7])
+        XCTAssertNil(unknown.runs.last?.character)
+        let runs = PartialCTC.decode([0, 1, 1, 0, 1, 7, 7, 0], labels: labels).runs
+        XCTAssertEqual(runs.map(\.start), [1, 4, 5])
+        XCTAssertEqual(runs.map(\.end), [2, 4, 6])
+        XCTAssertTrue(PartialCTC.decode([0, 0], labels: labels).runs.isEmpty)
     }
 
     func testSyntheticInputsMatchCPUByteHashes() {
@@ -72,6 +85,13 @@ final class ORTProbeTests: XCTestCase {
             XCTAssertTrue(actual.partialCTC.unknownClasses.isEmpty,
                           "Unmapped classes: \(actual.partialCTC.unknownClasses)")
             XCTAssertEqual(actual.partialCTC.text, expected.ctc_text)
+            XCTAssertEqual(actual.partialCTC.runs.count, expected.ctc_runs.count)
+            for (actualRun, expectedRun) in zip(actual.partialCTC.runs, expected.ctc_runs) {
+                XCTAssertEqual(actualRun.classID, expectedRun.`class`)
+                XCTAssertEqual(actualRun.start, expectedRun.start)
+                XCTAssertEqual(actualRun.end, expectedRun.end)
+                XCTAssertEqual(actualRun.character, expectedRun.character)
+            }
             if expected.name == "glyphs" { XCTAssertEqual(expected.ctc_text, "0123456789") }
             XCTAssertEqual(actual.argmaxScores.count, expected.argmax_scores.count)
             for (actualScore, expectedScore) in zip(actual.argmaxScores, expected.argmax_scores) {
