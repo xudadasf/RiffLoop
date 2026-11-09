@@ -55,6 +55,11 @@ on:
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
+    inputs:
+      run_vision_comparison:
+        description: "Run the extended synthetic Vision comparison"
+        type: boolean
+        default: false
 
 concurrency:
   group: ios-ci-${{ github.ref }}
@@ -145,6 +150,7 @@ jobs:
           -sdk iphonesimulator
           -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
           -derivedDataPath DerivedData
+          ${{ inputs.run_vision_comparison != true && '-skip-testing:RiffLoopTests/SyntheticVisionTabPreprocessingBenchmarkTests/testIndependentSyntheticVisionPreprocessingComparison' || '' }}
           CODE_SIGNING_ALLOWED=NO
 
       - name: Capture iPad mini launch screenshot
