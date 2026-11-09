@@ -1,0 +1,74 @@
+name: iPad ONNX synthetic probe
+
+# Separate from application CI; only changes to this probe on its work branch run it.
+on:
+  push:
+    branches: ["codex/ipad-score-workspace"]
+    paths:
+      - "experiments/ios-ocr-probe/**"
+      - ".github/workflows/ios-ocr-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode and install XcodeGen
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          brew install xcodegen
+
+      - name: Download and verify the fixed model in temporary storage
+        run: |
+          set -euo pipefail
+          MODEL="$RUNNER_TEMP/PP-OCRv6_rec_small.onnx"
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 180 \
+            'https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx' \
+            --output "$MODEL"
+          echo "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884  $MODEL" | shasum -a 256 -c -
+          echo "ORT_PROBE_MODEL_PATH=$MODEL" >> "$GITHUB_ENV"
+
+      - name: Generate the independent probe project
+        working-directory: experiments/ios-ocr-probe
+        run: xcodegen generate --spec project.yml
+
+      - name: Prepare an iPad mini simulator
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(python3 - <<'PY'
+          import json
+          import subprocess
+
+          data = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j'], text=True))
+          for runtime, devices in data['devices'].items():
+              for device in devices:
+                  if runtime.endswith('iOS-18-5') and device['name'] == 'iPad mini (A17 Pro)':
+                      print(device['udid'])
+                      raise SystemExit(0)
+          runtimes = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'runtimes', 'available', '-j'], text=True))['runtimes']
+          types = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devicetypes', '-j'], text=True))['devicetypes']
+          runtime = next(item for item in runtimes if item['name'] == 'iOS 18.5')
+          device_type = next(item for item in types if item['name'] == 'iPad mini (A17 Pro)')
+          print(subprocess.check_output(['xcrun', 'simctl', 'create', 'RiffLoop OCR probe', device_type['identifier'], runtime['identifier']], text=True).strip())
+          PY
+          )"
+          echo "ORT_PROBE_DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
+            xcrun simctl bootstatus "$DEVICE_ID" -b
+
+      - name: Run independent synthetic inference tests
+        working-directory: experiments/ios-ocr-probe
+        run: |
+          set -euo pipefail
+          xcodebuild test -project RiffLoopOCRProbe.xcodeproj -scheme RiffLoopOCRProbe \
+            -sdk iphonesimulator -destination "platform=iOS Simulator,id=$ORT_PROBE_DEVICE_ID" \
+            -derivedDataPath "$RUNNER_TEMP/RiffLoopOCRProbeDerived" \
+            -resultBundlePath "$RUNNER_TEMP/RiffLoopOCRProbe.xcresult" CODE_SIGNING_ALLOWED=NO

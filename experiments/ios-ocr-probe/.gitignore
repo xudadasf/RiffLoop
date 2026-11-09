@@ -1,0 +1,7 @@
+*.onnx
+*.ort
+*.xcodeproj/
+*.xcresult/
+DerivedData/
+.venv/
+__pycache__/
