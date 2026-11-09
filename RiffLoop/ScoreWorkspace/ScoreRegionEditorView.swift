@@ -47,7 +47,8 @@ enum ScorePageRenderer {
                     cg.fill(CGRect(origin: .zero, size: size))
                     cg.translateBy(x: 0, y: size.height)
                     cg.scaleBy(x: size.width / bounds.width, y: -size.height / bounds.height)
-                    cg.translateBy(x: -bounds.minX, y: -bounds.minY)
+                    // PDFKit positions the crop box itself; translating its origin
+                    // again would shift nonzero crop boxes and their saved regions.
                     page.draw(with: .cropBox, to: cg)
                 }
                 return ScorePagePreview(image: image, pageCount: count,

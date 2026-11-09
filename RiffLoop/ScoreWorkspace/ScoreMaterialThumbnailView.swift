@@ -56,11 +56,17 @@ actor ScoreMaterialThumbnailLoader {
     }
 
     private func cacheKey(for url: URL) -> NSString? {
-        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey,
-                                         .creationDateKey, .fileResourceIdentifierKey]
-        guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true else { return nil }
-        let identifier = values.fileResourceIdentifier.map { String(describing: $0) } ?? ""
-        return "\(url.standardizedFileURL.absoluteString)|\(values.fileSize ?? 0)|\(values.contentModificationDate?.timeIntervalSinceReferenceDate ?? 0)|\(values.creationDate?.timeIntervalSinceReferenceDate ?? 0)|\(identifier)" as NSString
+        // URL.resourceValues may cache stale metadata on a reused URL after an
+        // atomic replace or deletion. Query the filesystem by path each time.
+        let path = url.standardizedFileURL.path
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              let type = attributes[.type] as? FileAttributeType, type == .typeRegular else { return nil }
+        let size = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
+        let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
+        let created = (attributes[.creationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
+        let device = (attributes[.systemNumber] as? NSNumber)?.uint64Value ?? 0
+        let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
+        return "\(url.standardizedFileURL.absoluteString)|\(size)|\(modified)|\(created)|\(device)|\(inode)" as NSString
     }
 }
 
