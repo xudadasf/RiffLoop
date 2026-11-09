@@ -70,19 +70,21 @@ enum SyntheticTensor {
         return result
     }
 
-    static func generatedBand(width: Int) -> [UInt8]? {
-        guard width == 200 || width == 560 else { return nil }
-        let height = 40
-        let step = width == 200 ? 19 : 55
+    static func generatedBand(width: Int, height: Int = 40) -> [UInt8]? {
+        guard (height == 40 && (width == 200 || width == 560)) ||
+                (height == 20 && (width == 200 || width == 531)) else { return nil }
+        let step = width == 200 ? 19 : (width == 560 ? 55 : 52)
+        let scale = height == 40 ? 3 : 2
+        let top = height == 40 ? 9 : 3
         var pixels = [UInt8](repeating: 255, count: width * height)
-        for x in 0..<width { pixels[20 * width + x] = 140 }
+        for x in 0..<width { pixels[(height / 2) * width + x] = 140 }
         for (number, glyph) in glyphs.enumerated() {
             for (row, line) in glyph.split(separator: "/").enumerated() {
                 for (column, bit) in line.enumerated() where bit == "1" {
-                    let x = 4 + number * step + column * 3
-                    let y = 9 + row * 3
-                    for dy in 0..<3 {
-                        for dx in 0..<3 { pixels[(y + dy) * width + x + dx] = 0 }
+                    let x = 4 + number * step + column * scale
+                    let y = top + row * scale
+                    for dy in 0..<scale {
+                        for dx in 0..<scale { pixels[(y + dy) * width + x + dx] = 0 }
                     }
                 }
             }

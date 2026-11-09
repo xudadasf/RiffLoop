@@ -14,18 +14,20 @@ from rapidocr import RapidOCR
 from cpu_reference import GLYPHS, MODEL_SHA256, file_sha256
 
 
-def generated_band(width):
-    if width not in (200, 560):
-        raise ValueError("Only the two frozen synthetic cases are supported")
-    image = np.full((40, width), 255, dtype=np.uint8)
-    image[20, :] = 140
-    step = 19 if width == 200 else 55
+def generated_band(width, height=40):
+    if (width, height) not in ((200, 40), (560, 40), (200, 20), (531, 20)):
+        raise ValueError("Only the frozen synthetic cases are supported")
+    image = np.full((height, width), 255, dtype=np.uint8)
+    image[height // 2, :] = 140
+    step = 19 if width == 200 else (55 if width == 560 else 52)
+    scale = 3 if height == 40 else 2
+    top = 9 if height == 40 else 3
     for number, glyph in enumerate(GLYPHS):
         for row, line in enumerate(glyph.split("/")):
             for column, bit in enumerate(line):
                 if bit == "1":
-                    x, y = 4 + number * step + column * 3, 9 + row * 3
-                    image[y:y + 3, x:x + 3] = 0
+                    x, y = 4 + number * step + column * scale, top + row * scale
+                    image[y:y + scale, x:x + scale] = 0
     return image
 
 
@@ -40,8 +42,8 @@ def measure(model_path):
     recognizer = engine._load_rec_model()
     session = ort.InferenceSession(str(model), providers=["CPUExecutionProvider"])
     results = []
-    for width in (200, 560):
-        gray = generated_band(width)
+    for width, source_height in ((200, 40), (560, 40), (200, 20), (531, 20)):
+        gray = generated_band(width, source_height)
         # Exact desktop path: LoadImage -> RapidOCR.preprocess_img -> recognizer.
         loaded = engine.load_img(gray)
         image, transforms = engine.preprocess_img(loaded)
@@ -63,7 +65,7 @@ def measure(model_path):
             raise RuntimeError("Stored grayscale would not reconstruct the desktop tensor")
         results.append({
             "source_width": width,
-            "source_height": 40,
+            "source_height": source_height,
             "source_sha256": hashlib.sha256(gray.tobytes()).hexdigest(),
             "post_bounds_shape": list(image.shape),
             "preprocess_ratios": transforms["preprocess"],

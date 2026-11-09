@@ -12,9 +12,10 @@ class ImageReferenceTests(unittest.TestCase):
         path = Path(__file__).with_name("image_reference_expected.json")
         data = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(data["rapidocr_version"], "3.10.0")
-        self.assertEqual([case["source_width"] for case in data["cases"]], [200, 560])
+        self.assertEqual([(case["source_width"], case["source_height"]) for case in data["cases"]],
+                         [(200, 40), (560, 40), (200, 20), (531, 20)])
         for case in data["cases"]:
-            source = generated_band(case["source_width"])
+            source = generated_band(case["source_width"], case["source_height"])
             self.assertEqual(source.shape, (case["source_height"], case["source_width"]))
             self.assertEqual(hashlib.sha256(source.tobytes()).hexdigest(), case["source_sha256"])
             gray = base64.b64decode(case["resized_gray_base64"], validate=True)
