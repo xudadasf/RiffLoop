@@ -44,6 +44,8 @@ targets:
         buildPhase: resources
       - path: cpu_reference_expected.json
         buildPhase: resources
+      - path: image_reference_expected.json
+        buildPhase: resources
     dependencies:
       - target: RiffLoopOCRProbe
     settings:

@@ -35,7 +35,7 @@ enum SyntheticTensor {
     static let count = shape.reduce(1, *)
     static let patternSHA256 = "49afe1d7d68e25e5a49d0cff47d15d54f1c37cb939a72c17b4daf031c421f9c4"
     static let glyphSHA256 = "c799e3dae03b67589e41846970041504c13d2d04e9a9b6cdbc9baa9dee8b58cf"
-    private static let glyphs = [
+    static let glyphs = [
         "01110/10001/10011/10101/11001/10001/01110",
         "00100/01100/00100/00100/00100/00100/01110",
         "01110/10001/00001/00010/00100/01000/11111",
@@ -70,6 +70,26 @@ enum SyntheticTensor {
         return result
     }
 
+    static func generatedBand(width: Int) -> [UInt8]? {
+        guard width == 200 || width == 560 else { return nil }
+        let height = 40
+        let step = width == 200 ? 19 : 55
+        var pixels = [UInt8](repeating: 255, count: width * height)
+        for x in 0..<width { pixels[20 * width + x] = 140 }
+        for (number, glyph) in glyphs.enumerated() {
+            for (row, line) in glyph.split(separator: "/").enumerated() {
+                for (column, bit) in line.enumerated() where bit == "1" {
+                    let x = 4 + number * step + column * 3
+                    let y = 9 + row * 3
+                    for dy in 0..<3 {
+                        for dx in 0..<3 { pixels[(y + dy) * width + x + dx] = 0 }
+                    }
+                }
+            }
+        }
+        return pixels
+    }
+
     static func data(_ values: [Float]) -> Data {
         values.withUnsafeBytes { Data($0) }
     }
@@ -97,7 +117,6 @@ final class ORTProbe {
     private let environment: ORTEnv
     private let session: ORTSession
     private let classes = 18_710
-    private let timeSteps = 40
 
     init(modelURL: URL) throws {
         guard SyntheticTensor.sha256(try Data(contentsOf: modelURL)) == Self.expectedModelSHA256 else {
@@ -114,20 +133,22 @@ final class ORTProbe {
         session = loaded
     }
 
-    func run(_ values: [Float], sampleTimes: [Int], sampleClasses: [Int]) throws -> ORTProbeObservation {
-        guard values.count == SyntheticTensor.count,
-              sampleTimes.allSatisfy({ (0..<timeSteps).contains($0) }),
+    func run(_ values: [Float], width: Int = 320, sampleTimes: [Int], sampleClasses: [Int]) throws -> ORTProbeObservation {
+        guard width > 0, width <= 3200, values.count == 3 * 48 * width,
               sampleClasses.allSatisfy({ (0..<classes).contains($0) }) else { throw ORTProbeError.invalidSample }
         let inputData = SyntheticTensor.data(values)
         let input = try ORTValue(tensorData: NSMutableData(data: inputData), elementType: .float,
-                                 shape: SyntheticTensor.shape.map { NSNumber(value: $0) })
+                                 shape: [1, 3, 48, width].map { NSNumber(value: $0) })
         let start = ProcessInfo.processInfo.systemUptime
         let outputs = try session.run(withInputs: ["x": input], outputNames: ["fetch_name_0"], runOptions: nil)
         let elapsed = ProcessInfo.processInfo.systemUptime - start
         guard let output = outputs["fetch_name_0"] else { throw ORTProbeError.unexpectedTensor }
         let info = try output.tensorTypeAndShapeInfo()
         let shape = info.shape.map(\.intValue)
-        guard info.elementType == .float, shape == [1, timeSteps, classes] else { throw ORTProbeError.unexpectedTensor }
+        guard info.elementType == .float, shape.count == 3, shape[0] == 1,
+              shape[1] > 0, shape[2] == classes else { throw ORTProbeError.unexpectedTensor }
+        let timeSteps = shape[1]
+        guard sampleTimes.allSatisfy({ (0..<timeSteps).contains($0) }) else { throw ORTProbeError.invalidSample }
         let raw = try output.tensorData()
         guard raw.length == timeSteps * classes * MemoryLayout<Float>.size else { throw ORTProbeError.unexpectedTensor }
         // ORT owns the tensor memory; copy it before the ORTValue leaves scope.
