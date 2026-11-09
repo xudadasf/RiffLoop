@@ -78,30 +78,59 @@ actor ScoreRegionsStore {
         doc.pages.append(ScoreRegionsPage(index: index, rotation: rotation, regions: regions))
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(doc)
-        try data.write(to: metadataURL, options: [.atomic])
+        try data.write(to: metadataURL(for: doc.sourceDigest), options: [.atomic])
     }
 
-    /// Call when deleting the workspace's source copy, not when leaving the editor.
-    func removeSavedData() throws {
-        if FileManager.default.fileExists(atPath: metadataURL.path) {
-            try FileManager.default.removeItem(at: metadataURL)
+    /// Call before deleting the source, while its content is still readable.
+    func prepareRemoval() throws -> String {
+        try readDocument().sourceDigest
+    }
+
+    /// Call only after the source is removed, using the fingerprint prepared above.
+    func removeSavedData(for sourceDigest: String) throws {
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: folder.path) else { return }
+        guard Self.isDigest(sourceDigest) else { throw ScoreRegionsError.invalidStoredData }
+        let url = metadataURL(for: sourceDigest)
+        if manager.fileExists(atPath: url.path) {
+            let doc = try decodeDocument(at: url)
+            guard doc.sourceDigest == sourceDigest else { throw ScoreRegionsError.invalidStoredData }
+            try manager.removeItem(at: url)
         }
     }
 
-    private var metadataURL: URL {
-        let pathHash = SHA256.hash(data: Data(source.standardizedFileURL.path.utf8))
-            .map { String(format: "%02x", $0) }.joined()
-        return folder.appendingPathComponent(pathHash + ".json")
+    private var materialNameHash: String {
+        Self.sha256(Data(source.lastPathComponent.precomposedStringWithCanonicalMapping.utf8))
+    }
+
+    private func metadataURL(for sourceDigest: String) -> URL {
+        folder.appendingPathComponent("v2-\(materialNameHash)-\(sourceDigest).json")
+    }
+
+    private static func sha256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func isDigest(_ value: String) -> Bool {
+        value.count == 64 && value.allSatisfy { "0123456789abcdef".contains($0) }
     }
 
     private func readDocument() throws -> ScoreRegionsDocument {
         let sourceDigest = try digestForSource()
-        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
-            return ScoreRegionsDocument(version: 1, sourceDigest: sourceDigest, pages: [])
+        let manager = FileManager.default
+        let currentURL = metadataURL(for: sourceDigest)
+        if manager.fileExists(atPath: currentURL.path) {
+            let doc = try decodeDocument(at: currentURL)
+            guard doc.sourceDigest == sourceDigest else { throw ScoreRegionsError.invalidStoredData }
+            return doc
         }
+        return ScoreRegionsDocument(version: 1, sourceDigest: sourceDigest, pages: [])
+    }
+
+    private func decodeDocument(at url: URL) throws -> ScoreRegionsDocument {
         let doc: ScoreRegionsDocument
         do {
-            doc = try JSONDecoder().decode(ScoreRegionsDocument.self, from: Data(contentsOf: metadataURL))
+            doc = try JSONDecoder().decode(ScoreRegionsDocument.self, from: Data(contentsOf: url))
         } catch {
             throw ScoreRegionsError.invalidStoredData
         }
@@ -109,9 +138,6 @@ actor ScoreRegionsStore {
               doc.pages.allSatisfy({ $0.index >= 0 && $0.regions.allSatisfy(\.isValid) }),
               Set(doc.pages.map(\.index)).count == doc.pages.count else {
             throw ScoreRegionsError.invalidStoredData
-        }
-        guard doc.sourceDigest == sourceDigest else {
-            return ScoreRegionsDocument(version: 1, sourceDigest: sourceDigest, pages: [])
         }
         return doc
     }

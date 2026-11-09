@@ -105,6 +105,106 @@ final class ScorePageRendererTests: XCTestCase {
         XCTAssertNotNil(rotated.error)
     }
 
+    func testSmallPdfPreviewIsSharpAndKeepsCropBoxCoordinates() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("cropped.pdf")
+        let document = PDFDocument()
+        let page = try XCTUnwrap(PDFPage(image: makeTestImage()))
+        // A nonzero crop origin exercises the mapping from saved normalized
+        // regions to the visible page, rather than only testing full pages.
+        page.setBounds(CGRect(x: 20, y: 10, width: 80, height: 60), for: .cropBox)
+        document.insert(page, at: 0)
+        XCTAssertTrue(document.write(to: url))
+        let savedDocument = try XCTUnwrap(PDFDocument(url: url))
+        let savedPage = try XCTUnwrap(savedDocument.page(at: 0))
+        let crop = savedPage.bounds(for: .cropBox)
+        XCTAssertEqual(crop.origin.x, 20, accuracy: 0.01)
+        XCTAssertEqual(crop.origin.y, 10, accuracy: 0.01)
+
+        let preview = await Task.detached {
+            ScorePageRenderer.render(source: url, index: 0)
+        }.value
+        XCTAssertNil(preview.error)
+        let image = try XCTUnwrap(preview.image)
+        let bitmap = try XCTUnwrap(image.cgImage)
+        XCTAssertEqual(bitmap.width, 2048)
+        XCTAssertEqual(bitmap.height, 1536)
+        XCTAssertLessThanOrEqual(max(bitmap.width, bitmap.height), 2048)
+
+        // Compare the new preview against PDFKit's established CropBox view.
+        // Rasterize both at a fixed scale to compare matching normalized points.
+        let sampleSize = CGSize(width: 80, height: 60)
+        let reference = savedPage.thumbnail(of: sampleSize, for: .cropBox)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        func resized(_ source: UIImage) -> UIImage {
+            UIGraphicsImageRenderer(size: sampleSize, format: format).image { _ in
+                source.draw(in: CGRect(origin: .zero, size: sampleSize))
+            }
+        }
+        try assertMatchingSamples(resized(reference), resized(image), label: "PDF CropBox")
+    }
+
+    func testLargePdfPagePreviewRemainsBounded() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("large-page.pdf")
+        let pageRect = CGRect(x: 0, y: 0, width: 4096, height: 2048)
+        let data = UIGraphicsPDFRenderer(bounds: pageRect).pdfData { context in
+            context.beginPage()
+            UIColor.black.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 4096, height: 2048))
+        }
+        try data.write(to: url)
+        let preview = await Task.detached {
+            ScorePageRenderer.render(source: url, index: 0)
+        }.value
+        XCTAssertNil(preview.error)
+        let bitmap = try XCTUnwrap(preview.image?.cgImage)
+        XCTAssertEqual(bitmap.width, 2048)
+        XCTAssertEqual(bitmap.height, 1024)
+    }
+
+    func testSmallPdfThinVectorLineSurvivesPreviewRendering() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 200, height: 100)).pdfData { context in
+            context.beginPage()
+            UIColor.black.setStroke()
+            let line = UIBezierPath()
+            line.lineWidth = 0.15
+            line.move(to: CGPoint(x: 50, y: 10))
+            line.addLine(to: CGPoint(x: 50, y: 90))
+            line.stroke()
+        }
+        try data.write(to: url)
+        let preview = await Task.detached {
+            ScorePageRenderer.render(source: url, index: 0)
+        }.value
+        let bitmap = try XCTUnwrap(preview.image?.cgImage)
+        XCTAssertEqual(bitmap.width, 2048)
+        XCTAssertEqual(bitmap.height, 1024)
+        var pixels = [UInt8](repeating: 255, count: bitmap.width * bitmap.height)
+        let rendered = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: bitmap.width, height: bitmap.height,
+                                          bitsPerComponent: 8, bytesPerRow: bitmap.width,
+                                          space: CGColorSpaceCreateDeviceGray(),
+                                          bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+            context.draw(bitmap, in: CGRect(x: 0, y: 0, width: CGFloat(bitmap.width), height: CGFloat(bitmap.height)))
+            return true
+        }
+        XCTAssertTrue(rendered)
+        let row = bitmap.height / 2 * bitmap.width
+        let expectedX = bitmap.width / 4
+        let linePixels = (expectedX - 4...expectedX + 4).map { pixels[row + $0] }
+        let clearPixels = (expectedX - 110...expectedX - 100).map { pixels[row + $0] }
+        XCTAssertLessThan(try XCTUnwrap(linePixels.min()), 220)
+        XCTAssertGreaterThan(try XCTUnwrap(clearPixels.min()), 245)
+    }
+
     private func makeTestImage() -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1

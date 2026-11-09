@@ -30,9 +30,27 @@ enum ScorePageRenderer {
                 guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0 else {
                     return failure("此 PDF 页面的尺寸无效。", pageCount: count)
                 }
-                let factor = min(1, 2048 / max(bounds.width, bounds.height))
-                let size = CGSize(width: max(1, bounds.width * factor), height: max(1, bounds.height * factor))
-                return ScorePagePreview(image: page.thumbnail(of: size, for: .cropBox), pageCount: count,
+                // PDF coordinates are points, not source pixels. Render the vector
+                // page at a useful preview resolution even when it is small in points.
+                // A scale of 1 caps the actual bitmap to 2048 pixels on every device.
+                let factor = 2048 / max(bounds.width, bounds.height)
+                guard factor.isFinite, factor > 0 else { return failure("此 PDF 页面的尺寸无效。", pageCount: count) }
+                let size = CGSize(width: max(1, floor(bounds.width * factor)),
+                                  height: max(1, floor(bounds.height * factor)))
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                format.opaque = true
+                format.preferredRange = .standard
+                let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+                    let cg = context.cgContext
+                    cg.setFillColor(UIColor.white.cgColor)
+                    cg.fill(CGRect(origin: .zero, size: size))
+                    cg.translateBy(x: 0, y: size.height)
+                    cg.scaleBy(x: size.width / bounds.width, y: -size.height / bounds.height)
+                    cg.translateBy(x: -bounds.minX, y: -bounds.minY)
+                    page.draw(with: .cropBox, to: cg)
+                }
+                return ScorePagePreview(image: image, pageCount: count,
                                         orientation: rotation, error: nil)
             }
 
@@ -167,6 +185,7 @@ struct ScoreRegionEditorView: View {
     @State private var drawing = false
     @State private var dragStart: CGPoint?
     @State private var dragEnd: CGPoint?
+    @State private var regionPendingDeletion: UUID?
 
     init(source: URL) {
         _model = StateObject(wrappedValue: ScoreRegionEditorModel(source: source))
@@ -225,7 +244,7 @@ struct ScoreRegionEditorView: View {
                         HStack {
                             ForEach(Array(model.regions.enumerated()), id: \.element.id) { index, region in
                                 Button("删除区域 \(index + 1)", role: .destructive) {
-                                    Task { await model.removeRegion(region.id) }
+                                    regionPendingDeletion = region.id
                                 }.disabled(model.busy)
                             }
                         }.padding(.horizontal)
@@ -242,6 +261,20 @@ struct ScoreRegionEditorView: View {
         .task { await model.open() }
         .onChange(of: model.busy) { _, busy in
             if busy { dragStart = nil; dragEnd = nil }
+        }
+        .confirmationDialog("删除这个区域？", isPresented: Binding(
+            get: { regionPendingDeletion != nil },
+            set: { if !$0 { regionPendingDeletion = nil } }
+        ), titleVisibility: .visible) {
+            if let id = regionPendingDeletion {
+                Button("删除区域", role: .destructive) {
+                    Task { await model.removeRegion(id) }
+                    regionPendingDeletion = nil
+                }
+            }
+            Button("取消", role: .cancel) { regionPendingDeletion = nil }
+        } message: {
+            Text("删除后需要重新画框。")
         }
         .alert("手动框选", isPresented: Binding(
             get: { model.message != nil },
