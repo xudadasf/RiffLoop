@@ -31,6 +31,11 @@ struct ScoreRegionsPage: Codable, Equatable {
     var regions: [ScoreRegion]
 }
 
+struct ScoreRegionsSnapshot: Equatable {
+    let sourceDigest: String
+    let pages: [ScoreRegionsPage]
+}
+
 private struct ScoreRegionsDocument: Codable {
     let version: Int
     let sourceDigest: String
@@ -67,6 +72,15 @@ actor ScoreRegionsStore {
         let doc = try readDocument()
         guard let page = doc.pages.first(where: { $0.index == index && $0.rotation == rotation }) else { return [] }
         return page.regions
+    }
+
+    /// Returns a validated view in page order, preserving each page's box order.
+    func snapshot() throws -> ScoreRegionsSnapshot {
+        let document = try readDocument()
+        return ScoreRegionsSnapshot(
+            sourceDigest: document.sourceDigest,
+            pages: document.pages.sorted { $0.index < $1.index }
+        )
     }
 
     func savePage(index: Int, rotation: Int, regions: [ScoreRegion]) throws {
@@ -135,7 +149,10 @@ actor ScoreRegionsStore {
             throw ScoreRegionsError.invalidStoredData
         }
         guard doc.version == 1,
-              doc.pages.allSatisfy({ $0.index >= 0 && $0.regions.allSatisfy(\.isValid) }),
+              doc.pages.allSatisfy({ page in
+                  page.index >= 0 && page.regions.allSatisfy(\.isValid) &&
+                      Set(page.regions.map(\.id)).count == page.regions.count
+              }),
               Set(doc.pages.map(\.index)).count == doc.pages.count else {
             throw ScoreRegionsError.invalidStoredData
         }

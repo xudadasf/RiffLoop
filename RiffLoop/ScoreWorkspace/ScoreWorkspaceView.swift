@@ -98,6 +98,11 @@ struct ScoreWorkspaceView: View {
                 Text("可预览和手动画框。自动分区、识别和编辑正在开发。")
                     .foregroundStyle(.secondary)
             }
+            Section {
+                NavigationLink("区域顺序与间隔") {
+                    ScoreSequenceLibraryView()
+                }
+            }
             Section("素材（按名称排列）") {
                 if model.files.isEmpty {
                     Text("还没有素材，请先从文件或照片中导入。")
@@ -108,7 +113,10 @@ struct ScoreWorkspaceView: View {
                         NavigationLink {
                             ScoreRegionEditorView(source: url)
                         } label: {
-                            Label(url.lastPathComponent, systemImage: url.pathExtension.lowercased() == "pdf" ? "doc.richtext" : "photo")
+                            HStack(spacing: 10) {
+                                ScoreMaterialThumbnailView(url: url)
+                                Text(url.lastPathComponent)
+                            }
                         }
                         Button("删除副本", role: .destructive) { filePendingDeletion = url }
                             .disabled(model.isWorking)

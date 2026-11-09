@@ -78,6 +78,47 @@ final class ScoreRegionsStoreTests: XCTestCase {
         XCTAssertEqual(restored, [region])
     }
 
+    func testSnapshotSortsPagesAndPreservesBoxOrderAndFingerprint() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("score.pdf")
+        try Data("source".utf8).write(to: source)
+        let store = ScoreRegionsStore(source: source, folder: root.appendingPathComponent("regions"))
+        let first = ScoreRegion(x: 0, y: 0, width: 0.5, height: 0.5)
+        let second = ScoreRegion(x: 0.5, y: 0.5, width: 0.5, height: 0.5)
+        try await store.savePage(index: 2, rotation: 0, regions: [second])
+        try await store.savePage(index: 0, rotation: 0, regions: [second, first])
+        let snapshot = try await store.snapshot()
+        XCTAssertEqual(snapshot.sourceDigest, "41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d")
+        XCTAssertEqual(snapshot.pages.map(\.index), [0, 2])
+        XCTAssertEqual(snapshot.pages[0].regions, [second, first])
+        XCTAssertEqual(snapshot.pages[1].regions, [second])
+    }
+
+    func testSnapshotRejectsDuplicateBoxIDsInStoredData() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("score.pdf")
+        try Data("source".utf8).write(to: source)
+        let folder = root.appendingPathComponent("regions")
+        let store = ScoreRegionsStore(source: source, folder: folder)
+        try await store.savePage(index: 0, rotation: 0, regions: [ScoreRegion(x: 0, y: 0, width: 1, height: 1)])
+        let url = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).first)
+        var document = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        var pages = try XCTUnwrap(document["pages"] as? [[String: Any]])
+        var regions = try XCTUnwrap(pages[0]["regions"] as? [[String: Any]])
+        regions.append(regions[0])
+        pages[0]["regions"] = regions
+        document["pages"] = pages
+        try JSONSerialization.data(withJSONObject: document).write(to: url)
+        do {
+            _ = try await store.snapshot()
+            XCTFail("A corrupted page must not produce ambiguous box references")
+        } catch ScoreRegionsError.invalidStoredData { }
+    }
+
     func testIdenticalContentsWithDifferentNamesKeepIndependentRegions() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
