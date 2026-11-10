@@ -1,6 +1,7 @@
 // Experimental local importer, stdin/stdout pipes only. Output may contain
 // score data and must remain in the local parent process, never in CI logs.
 const fs = require('node:fs');
+const { createHash } = require('node:crypto');
 const alpha = require('../../RiffLoop/Resources/GpWeb/alphaTab.min.js');
 const settings = new alpha.Settings();
 const pick = (object, keys) => Object.fromEntries(keys.map(key => [key, object[key] ?? null]));
@@ -9,9 +10,18 @@ const automation = value => ({
     syncPointValue: value.syncPointValue == null ? null :
         pick(value.syncPointValue, ['barOccurence', 'millisecondOffset'])
 });
+function backingTrack(score) {
+    if (score.backingTrack == null) return null;
+    const audio = score.backingTrack.rawAudioFile;
+    if (audio == null) return { audio: null };
+    if (!(audio instanceof Uint8Array)) throw new TypeError('Unexpected backing track data');
+    // The digest is local comparison data and must not be uploaded or logged.
+    return { audio: { length: audio.byteLength, sha256: createHash('sha256').update(audio).digest('hex') } };
+}
 function snapshot(score) {
     return {
         metadata: pick(score, ['title', 'artist', 'album', 'copyright', 'tempo']),
+        backingTrack: backingTrack(score),
         bars: score.masterBars.map(bar => ({
             ...pick(bar, ['start', 'timeSignatureNumerator', 'timeSignatureDenominator', 'isRepeatStart',
                 'repeatCount', 'alternateEndings', 'tripletFeel', 'isFreeTime']),
