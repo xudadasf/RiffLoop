@@ -10,6 +10,9 @@ on:
       - "experiments/gp-archive-safety/**"
       - "experiments/gp-safe-fixture/**"
       - "experiments/gp-fixture-layout/**"
+      - "experiments/gp-memory-surgery/**"
+      - "experiments/gp-semantic-probe/**"
+      - "experiments/gp-note-patch/**"
       - "RiffLoop/Resources/GpWeb/alphaTab.min.js"
       - "RiffLoopTests/Fixtures/transport.gp"
       - ".github/workflows/score-workspace-experiments.yml"
@@ -38,3 +41,9 @@ jobs:
         run: python3 -B -m unittest discover -s experiments/gp-safe-fixture -p 'test_*.py'
       - name: Check synthetic score archive layouts
         run: python3 -B -m unittest discover -s experiments/gp-fixture-layout -p 'test_*.py'
+      - name: Check in-memory GP archive surgery
+        run: python3 -B -m unittest discover -s experiments/gp-memory-surgery -p 'test_*.py'
+      - name: Check conservative score candidate selection
+        run: python3 -B -m unittest discover -s experiments/gp-semantic-probe -p 'test_*.py'
+      - name: Check fixture-only natural note edits
+        run: python3 -B -m unittest discover -s experiments/gp-note-patch -p 'test_*.py'

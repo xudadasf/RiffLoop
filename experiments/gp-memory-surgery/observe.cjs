@@ -1,0 +1,40 @@
+// Experimental local importer, stdin/stdout pipes only. Output may contain
+// score data and must remain in the local parent process, never in CI logs.
+const fs = require('node:fs');
+const alpha = require('../../RiffLoop/Resources/GpWeb/alphaTab.min.js');
+const settings = new alpha.Settings();
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const pick = (object, keys) => Object.fromEntries(keys.map(key => [key, object[key] ?? null]));
+function inspect(base64) {
+    const score = alpha.importer.ScoreLoader.loadScoreFromBytes(Buffer.from(base64, 'base64'), settings);
+    return {
+        metadata: pick(score, ['title', 'artist', 'album', 'copyright', 'tempo']),
+        bars: score.masterBars.map(bar => ({
+            ...pick(bar, ['start', 'timeSignatureNumerator', 'timeSignatureDenominator', 'isRepeatStart',
+                'repeatCount', 'alternateEndings', 'tripletFeel', 'isFreeTime']),
+            tempo: bar.tempoAutomations.map(value => pick(value, ['type', 'value', 'ratioPosition', 'isLinear']))
+        })),
+        tracks: score.tracks.map(track => ({
+            ...pick(track, ['name']),
+            playback: pick(track.playbackInfo, ['program', 'volume', 'balance', 'isMute', 'isSolo']),
+            staves: track.staves.map(staff => ({
+                tuning: Array.from(staff.stringTuning.tunings),
+                ...pick(staff, ['capo', 'transpositionPitch', 'displayTranspositionPitch', 'isPercussion']),
+                bars: staff.bars.map(bar => bar.voices.map(voice => voice.beats.map(beat => ({
+                    ...pick(beat, ['duration', 'dots', 'tupletNumerator', 'tupletDenominator', 'graceType',
+                        'displayStart', 'displayDuration', 'playbackStart', 'playbackDuration',
+                        'isLetRing', 'isPalmMute', 'text', 'pickStroke', 'tremoloPicking', 'vibrato', 'dynamics']),
+                    notes: beat.notes.map(note => ({
+                        ...pick(note, ['string', 'fret', 'realValue', 'octave', 'tone', 'accidentalMode',
+                            'isDead', 'isGhost', 'isStaccato', 'isPalmMute', 'isLetRing', 'isHammerPullOrigin',
+                            'isTieDestination', 'isSlurDestination', 'slideInType', 'slideOutType',
+                            'harmonicType', 'harmonicValue', 'vibrato', 'trillValue', 'trillSpeed',
+                            'leftHandFinger', 'rightHandFinger', 'accentuated', 'bendType']),
+                        bendPoints: note.bendPoints?.map(point => pick(point, ['offset', 'value'])) ?? [],
+                    }))
+                }))))
+            }))
+        }))
+    };
+}
+process.stdout.write(JSON.stringify(input.map(inspect)));
