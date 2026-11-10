@@ -27,6 +27,18 @@ class ImportedNote:
 
 
 @dataclass(frozen=True)
+class ImportedTempo:
+    bar_index: int
+    bpm: int
+    ratio_position: float
+    is_linear: bool
+    is_visible: bool
+    text: str
+    type_id: int
+    sync_point_value: object
+
+
+@dataclass(frozen=True)
 class ImporterObservation:
     track_count: int
     staff_count: int
@@ -39,6 +51,8 @@ class ImporterObservation:
     # Supplied by the caller from the same GPIF bytes used by its importer.
     # A matching digest does not authenticate that the caller actually did so.
     gpif_sha256: str
+    # None means the caller has not supplied an independent tempo observation.
+    tempos: tuple[ImportedTempo, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +112,68 @@ def _integer(text):
         return result
     except (TypeError, ValueError):
         raise Unsupported('invalid integer') from None
+
+
+def _master_tempos(master_track, observation, bar_count):
+    """Compare a restricted set of Tempo nodes against importer observations.
+
+    Without an explicit zero-position Tempo on bar zero, alphaTab can insert a
+    hidden default. Reject this subset rather than mistake it for GPIF data.
+    """
+    if not isinstance(observation.tempos, tuple):
+        raise Unsupported('missing importer tempo evidence')
+    containers = master_track.findall('Automations')
+    if len(containers) > 1:
+        raise Unsupported('duplicate master automation container')
+    expected = {}
+    if containers:
+        container = containers[0]
+        if container.attrib or (container.text or '').strip() or (container.tail or '').strip():
+            raise Unsupported('unsupported automation container')
+        for automation in container:
+            names = ('Type', 'Linear', 'Bar', 'Position', 'Visible', 'Value')
+            if (automation.tag != 'Automation' or automation.attrib or
+                    (automation.text or '').strip() or
+                    tuple(child.tag for child in automation) != names or
+                    any((child.tail or '').strip() for child in automation)):
+                raise Unsupported('unsupported automation structure')
+            if _text(automation, 'Type') != 'Tempo' or _text(automation, 'Linear') != 'false':
+                raise Unsupported('unsupported automation type or interpolation')
+            bar = _integer(_text(automation, 'Bar'))
+            position_text = _text(automation, 'Position')
+            if not re.fullmatch(r'(?:0(?:\.\d{1,6})?|\.\d{1,6})', position_text):
+                raise Unsupported('unsupported tempo position')
+            position = float(position_text)
+            if not 0 <= bar < bar_count or not 0 <= position < 1 or bar in expected:
+                raise Unsupported('invalid or repeated tempo location')
+            visible_text = _text(automation, 'Visible')
+            if visible_text not in ('true', 'false'):
+                raise Unsupported('invalid tempo visibility')
+            value = _text(automation, 'Value').split()
+            if len(value) != 2 or value[1] != '2':
+                raise Unsupported('unsupported tempo unit')
+            bpm = _integer(value[0])
+            if not 1 <= bpm <= 999:
+                raise Unsupported('invalid tempo value')
+            expected[bar] = ImportedTempo(bar, bpm, position, False, visible_text == 'true', '', 0, None)
+    if not expected:
+        if observation.tempos != ():
+            raise Unsupported('unexpected observed tempo')
+        return
+    if 0 not in expected or expected[0].ratio_position != 0:
+        raise Unsupported('implicit importer tempo cannot be verified')
+    observed = {}
+    for tempo in observation.tempos:
+        if (not isinstance(tempo, ImportedTempo) or type(tempo.bar_index) is not int or
+                type(tempo.bpm) not in (int, float) or not math.isfinite(tempo.bpm) or
+                type(tempo.ratio_position) not in (int, float) or not math.isfinite(tempo.ratio_position) or
+                type(tempo.is_linear) is not bool or type(tempo.is_visible) is not bool or
+                not isinstance(tempo.text, str) or type(tempo.type_id) is not int or tempo.type_id != 0 or
+                tempo.sync_point_value is not None or tempo.bar_index in observed):
+            raise Unsupported('invalid importer tempo evidence')
+        observed[tempo.bar_index] = tempo
+    if observed != expected:
+        raise Unsupported('tempo does not match importer')
 
 
 def _table(root, section, tag):
@@ -240,12 +316,6 @@ def candidates(xml: bytes, observation: ImporterObservation) -> tuple[Candidate,
     master_track = _one(root, 'MasterTrack')
     if master_track.attrib or any(child.tag not in ('Tracks', 'Automations', 'RSE') for child in master_track):
         raise Unsupported('unknown master track field')
-    # Automation semantics are not yet understood. An unknown automation can
-    # affect pitch even if a note itself looks ordinary.
-    for owner in (master_track, track):
-        for automation in owner.findall('Automations'):
-            if automation.attrib or len(automation) or (automation.text or '').strip():
-                raise Unsupported('unsupported automation')
     for rse in master_track.findall('RSE'):
         if rse.attrib or len(rse) or (rse.text or '').strip():
             raise Unsupported('unsupported master audio state')
@@ -292,6 +362,7 @@ def candidates(xml: bytes, observation: ImporterObservation) -> tuple[Candidate,
     master_bars = list(_one(root, 'MasterBars'))
     if any(m.tag != 'MasterBar' for m in master_bars):
         raise Unsupported('unknown master bar')
+    _master_tempos(master_track, observation, len(master_bars))
     if any(any(child.tag not in ('Key', 'Time', 'Bars') for child in master) for master in master_bars):
         raise Unsupported('unsupported master bar feature')
     if any(master.attrib for master in master_bars):

@@ -46,7 +46,7 @@ def observed():
     return ImporterObservation(1, 1, (64, 59, 55, 50, 45, 40), 0, 0, -12,
                                {(0, 0, 0): (ImportedNote(4, 5, 60),),
                                 (0, 0, 1): (ImportedNote(4, 7, 62),)},
-                               hashlib.sha256(ET.tostring(synthetic())).hexdigest())
+                               hashlib.sha256(ET.tostring(synthetic())).hexdigest(), tempos=())
 
 
 class SemanticTests(unittest.TestCase):

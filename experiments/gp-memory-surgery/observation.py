@@ -36,11 +36,19 @@ def semantic_observation(view, semantic, gpif_sha256):
                 beats[(bar_index, voice_index, beat_index)] = tuple(
                     semantic.ImportedNote(note['string'], note['fret'], note['realValue'])
                     for note in beat['notes'])
+    tempos = tuple(
+        semantic.ImportedTempo(bar_index=bar_index, bpm=tempo['value'],
+                               ratio_position=tempo['ratioPosition'], is_linear=tempo['isLinear'],
+                               is_visible=tempo['isVisible'], text=tempo['text'],
+                               type_id=tempo['type'], sync_point_value=tempo['syncPointValue'])
+        for bar_index, bar in enumerate(view['bars']) for tempo in bar['tempo']
+    )
     return semantic.ImporterObservation(gpif_sha256=gpif_sha256,
                                         track_count=len(tracks), staff_count=len(tracks[0]['staves']),
                                         tuning_high_to_low=tuple(staff['tuning']), capo=staff['capo'],
                                         actual_transposition=staff['transpositionPitch'],
-                                        display_transposition=staff['displayTranspositionPitch'], beats=beats)
+                                        display_transposition=staff['displayTranspositionPitch'], beats=beats,
+                                        tempos=tempos)
 
 
 def observe_semantic(archive, semantic, *, allow_reversed_descriptor=False):
