@@ -9,6 +9,7 @@ on:
       - "experiments/gpif-safety-probe/**"
       - "experiments/gp-archive-safety/**"
       - "experiments/gp-safe-fixture/**"
+      - "experiments/gp-fixture-layout/**"
       - "RiffLoop/Resources/GpWeb/alphaTab.min.js"
       - "RiffLoopTests/Fixtures/transport.gp"
       - ".github/workflows/score-workspace-experiments.yml"
@@ -35,3 +36,5 @@ jobs:
         run: python3 -B -m unittest discover -s experiments/gp-archive-safety -p 'test_*.py'
       - name: Check isolated fixture edit and resources
         run: python3 -B -m unittest discover -s experiments/gp-safe-fixture -p 'test_*.py'
+      - name: Check synthetic score archive layouts
+        run: python3 -B -m unittest discover -s experiments/gp-fixture-layout -p 'test_*.py'
