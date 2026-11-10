@@ -25,5 +25,7 @@ jobs:
         run: python3 -B -m unittest discover -s experiments/score-region-probe -p 'test_*.py'
       - name: Check edited GP round trip on the repository fixture
         run: node experiments/gp-edit-roundtrip/test.cjs
+      - name: Document known accidental preservation issue
+        run: python3 -B -m unittest discover -s experiments/gp-edit-roundtrip -p 'test_accidental_regression.py'
       - name: Check synthetic shared-reference handling
         run: python3 -B -m unittest discover -s experiments/gpif-safety-probe -p 'test_*.py'
