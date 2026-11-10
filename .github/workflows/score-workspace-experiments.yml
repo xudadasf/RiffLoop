@@ -1,0 +1,26 @@
+name: Score workspace independent experiments
+
+on:
+  push:
+    branches: ["codex/ipad-score-workspace"]
+    paths:
+      - "experiments/score-region-probe/**"
+      - "experiments/gp-edit-roundtrip/**"
+      - "RiffLoop/Resources/GpWeb/alphaTab.min.js"
+      - "RiffLoopTests/Fixtures/transport.gp"
+      - ".github/workflows/score-workspace-experiments.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experiments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check region evaluation and synthetic pages
+        run: python3 -B -m unittest discover -s experiments/score-region-probe -p 'test_*.py'
+      - name: Check edited GP round trip on the repository fixture
+        run: node experiments/gp-edit-roundtrip/test.cjs
