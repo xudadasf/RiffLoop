@@ -45,6 +45,7 @@ class AccidentalReferenceTests(unittest.TestCase):
         result = subprocess.run(["node", "experiments/gp-edit-roundtrip/accidental_reference.cjs"],
                                 cwd=ROOT, check=True, capture_output=True, text=True, timeout=30)
         cls.cases = json.loads(result.stdout)
+        cls.observations = cls.cases.pop("observations")
         cls.fixture_hash_after = sha(FIXTURE)
         cls.notes = {name: gpif_note(case) for name, case in cls.cases.items()}
 
@@ -70,6 +71,32 @@ class AccidentalReferenceTests(unittest.TestCase):
             self.assertEqual(pitch(self.notes["fromNatural"], key), pitch(self.notes["fresh"], key))
         self.assertEqual(pitch(self.notes["fresh"], "ConcertPitch"), ("B", "", "4"))
         self.assertEqual(pitch(self.notes["fresh"], "TransposedPitch"), ("B", "", "5"))
+
+    def test_resetting_flat_preserves_midi_but_changes_enharmonic_spelling(self):
+        cases = self.observations["flatReset"]
+        before, after = cases["before"], cases["after"]
+        self.assertEqual((before["mode"], after["mode"]), (5, 0))
+        self.assertEqual((before["realValue"], after["realValue"]), (58, 58))
+        old, new = gpif_note(before), gpif_note(after)
+        self.assertEqual(old.findtext("./Properties/Property[@name='Midi']/Number"), "58")
+        self.assertEqual(new.findtext("./Properties/Property[@name='Midi']/Number"), "58")
+        self.assertEqual(pitch(old, "ConcertPitch"), ("B", "b", "4"))
+        self.assertEqual(pitch(new, "ConcertPitch"), ("A", "#", "4"))
+        self.assertEqual(pitch(old, "TransposedPitch"), ("B", "b", "5"))
+        self.assertEqual(pitch(new, "TransposedPitch"), ("A", "#", "5"))
+        self.assertEqual((before["reread"]["realValue"], after["reread"]["realValue"]), (58, 58))
+
+    def test_display_transposition_changes_written_pitch(self):
+        for name, expected_octave in (("transposeMinus", "5"), ("transposeZero", "4"),
+                                      ("transposePlus", "3")):
+            with self.subTest(name=name):
+                case = self.observations[name]
+                note = gpif_note(case)
+                self.assertEqual(case["edited"]["realValue"], 58)
+                self.assertEqual(case["reread"]["realValue"], 58)
+                self.assertEqual(note.findtext("./Properties/Property[@name='Midi']/Number"), "58")
+                self.assertEqual(pitch(note, "ConcertPitch"), ("A", "#", "4"))
+                self.assertEqual(pitch(note, "TransposedPitch"), ("A", "#", expected_octave))
 
     @unittest.expectedFailure
     def test_fret_edit_should_not_retain_old_sharp(self):

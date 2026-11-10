@@ -25,25 +25,45 @@ function fromFixture(beatIndex) {
     return { beatIndex, before, edited, ...roundtrip(score, beatIndex) };
 }
 
-function fromNewScore() {
+function newScore(fret = 4, accidentalMode = 0, displayTransposition = -12) {
     const m = alpha.model;
     const score = new m.Score();
     const master = new m.MasterBar(); score.addMasterBar(master);
     const track = new m.Track(); score.addTrack(track);
     const staff = new m.Staff(); track.addStaff(staff);
     staff.stringTuning.tunings = [64, 59, 55, 50, 45, 40];
-    staff.displayTranspositionPitch = -12;
+    staff.displayTranspositionPitch = displayTransposition;
     const bar = new m.Bar(); staff.addBar(bar);
     const voice = new m.Voice(); bar.addVoice(voice);
     const beat = new m.Beat(); voice.addBeat(beat);
-    const note = new m.Note(); note.string = 4; note.fret = 4; beat.addNote(note);
+    const note = new m.Note(); note.string = 4; note.fret = fret;
+    note.accidentalMode = accidentalMode; beat.addNote(note);
     score.finish(settings);
+    return { score, note };
+}
+
+function fromNewScore(fret = 4, accidentalMode = 0, displayTransposition = -12) {
+    const { score, note } = newScore(fret, accidentalMode, displayTransposition);
     const edited = { fret: note.fret, realValue: note.realValue, accidentalMode: note.accidentalMode };
     return { beatIndex: 0, edited, ...roundtrip(score, 0) };
+}
+
+function flatThenReset() {
+    const { score, note } = newScore(3, alpha.model.NoteAccidentalMode.ForceFlat);
+    const before = { beatIndex: 0, mode: note.accidentalMode, realValue: note.realValue, ...roundtrip(score, 0) };
+    note.accidentalMode = alpha.model.NoteAccidentalMode.Default;
+    const after = { beatIndex: 0, mode: note.accidentalMode, realValue: note.realValue, ...roundtrip(score, 0) };
+    return { before, after };
 }
 
 process.stdout.write(JSON.stringify({
     fromSharp: fromFixture(0),
     fromNatural: fromFixture(1),
     fresh: fromNewScore(),
+    observations: {
+        flatReset: flatThenReset(),
+        transposeMinus: fromNewScore(3, 0, -12),
+        transposeZero: fromNewScore(3, 0, 0),
+        transposePlus: fromNewScore(3, 0, 12),
+    },
 }));
