@@ -61,7 +61,6 @@ def replace_score(original, new_score, *, allow_reversed_descriptor=False, limit
         local = info.header_offset
         name_len, extra_len = struct.unpack_from('<HH', original, local + 26)
         data_start = local + 30 + name_len + extra_len
-        data_end = data_start + info.compress_size
         ordered = sorted(entries, key=lambda entry: entry.header_offset)
         index = ordered.index(info)
         member_end = ordered[index + 1].header_offset if index + 1 < len(ordered) else source.start_dir
