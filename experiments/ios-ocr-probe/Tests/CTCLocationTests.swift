@@ -59,4 +59,13 @@ final class CTCLocationTests: XCTestCase {
         XCTAssertEqual(try CTCLocation.locate([], timeSteps: 5, boundedWidth: 200, boundedHeight: 40,
                                                sourceLeft: 0, sourceRight: 200), [])
     }
+
+    func testFullWidthSpaceIsOmittedWithoutLosingAdjacentCharacters() throws {
+        let decoded = PartialCTC.decode([1, 2, 1], labels: [1: "1", 2: "\u{3000}"])
+        let located = try CTCLocation.locate(decoded.runs, timeSteps: 3, boundedWidth: 320,
+                                              boundedHeight: 48, sourceLeft: 0, sourceRight: 300)
+        XCTAssertEqual(located.map(\.run.character), ["1", "1"])
+        XCTAssertEqual(located.map(\.run.start), [0, 2])
+        XCTAssertEqual(located.map(\.x), [0, 200])
+    }
 }
