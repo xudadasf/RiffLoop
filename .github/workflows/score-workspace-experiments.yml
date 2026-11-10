@@ -7,6 +7,8 @@ on:
       - "experiments/score-region-probe/**"
       - "experiments/gp-edit-roundtrip/**"
       - "experiments/gpif-safety-probe/**"
+      - "experiments/gp-archive-safety/**"
+      - "experiments/gp-safe-fixture/**"
       - "RiffLoop/Resources/GpWeb/alphaTab.min.js"
       - "RiffLoopTests/Fixtures/transport.gp"
       - ".github/workflows/score-workspace-experiments.yml"
@@ -29,3 +31,7 @@ jobs:
         run: python3 -B -m unittest discover -s experiments/gp-edit-roundtrip -p 'test_accidental_regression.py'
       - name: Check synthetic shared-reference handling
         run: python3 -B -m unittest discover -s experiments/gpif-safety-probe -p 'test_*.py'
+      - name: Check GP archive resource preservation
+        run: python3 -B -m unittest discover -s experiments/gp-archive-safety -p 'test_*.py'
+      - name: Check isolated fixture edit and resources
+        run: python3 -B -m unittest discover -s experiments/gp-safe-fixture -p 'test_*.py'
