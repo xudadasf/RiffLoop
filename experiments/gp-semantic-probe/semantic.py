@@ -39,6 +39,12 @@ class ImportedTempo:
 
 
 @dataclass(frozen=True)
+class ImportedPlayback:
+    program: int
+    bank: int
+
+
+@dataclass(frozen=True)
 class ImporterObservation:
     track_count: int
     staff_count: int
@@ -53,6 +59,8 @@ class ImporterObservation:
     gpif_sha256: str
     # None means the caller has not supplied an independent tempo observation.
     tempos: tuple[ImportedTempo, ...] | None = None
+    # Only the initial program/bank; not a full sound or effects description.
+    playback: ImportedPlayback | None = None
 
 
 @dataclass(frozen=True)
@@ -72,9 +80,8 @@ BEAT_PROPERTIES = {'PrimaryPickupVolume', 'PrimaryPickupTone'}
 STEPS = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 ROOT_TAGS = {'GPVersion', 'GPRevision', 'Encoding', 'Score', 'ScoreViews', 'AudioTracks',
              'MasterTrack', 'Tracks', 'MasterBars', 'Bars', 'Voices', 'Beats', 'Notes', 'Rhythms'}
-# Uninspected sound, effect and diagram blocks may affect playback or reference
-# a note. Exclude them entirely until their semantics are verified.
-TRACK_TAGS = {'Name', 'ShortName', 'Transpose', 'Staves'}
+# Effects, diagrams and sound changes remain outside this narrow experiment.
+TRACK_TAGS = {'Name', 'ShortName', 'Transpose', 'Staves', 'Sounds'}
 STAFF_PROPERTIES = {'Tuning', 'CapoFret', 'PartialCapoFret', 'PartialCapoStringFlags'}
 
 
@@ -174,6 +181,42 @@ def _master_tempos(master_track, observation, bar_count):
         observed[tempo.bar_index] = tempo
     if observed != expected:
         raise Unsupported('tempo does not match importer')
+
+
+def _track_sound(track, observation):
+    """Validate one simple initial MIDI sound against the importer snapshot.
+
+    This is not validation of effects, sound changes or the full GP format.
+    """
+    containers = track.findall('Sounds')
+    if not containers:
+        return
+    if len(containers) != 1:
+        raise Unsupported('duplicate sounds container')
+    container = containers[0]
+    if (container.attrib or (container.text or '').strip() or (container.tail or '').strip() or
+            len(container) != 1 or container[0].tag != 'Sound'):
+        raise Unsupported('unsupported sounds container')
+    sound = container[0]
+    names = tuple(child.tag for child in sound)
+    if (sound.attrib or (sound.text or '').strip() or (sound.tail or '').strip() or
+            names not in (('Name', 'Path', 'Role', 'MIDI'), ('Name', 'Label', 'Path', 'Role', 'MIDI')) or
+            any((child.tail or '').strip() for child in sound)):
+        raise Unsupported('unsupported sound structure')
+    for name in names[:-1]:
+        _text(sound, name)
+    midi = _one(sound, 'MIDI')
+    if (midi.attrib or (midi.text or '').strip() or
+            tuple(child.tag for child in midi) != ('LSB', 'MSB', 'Program') or
+            any((child.tail or '').strip() for child in midi)):
+        raise Unsupported('unsupported sound MIDI structure')
+    lsb, msb, program = (_integer(_text(midi, name)) for name in ('LSB', 'MSB', 'Program'))
+    if any(not 0 <= value <= 127 for value in (lsb, msb, program)):
+        raise Unsupported('invalid sound MIDI value')
+    playback = observation.playback
+    if (not isinstance(playback, ImportedPlayback) or type(playback.program) is not int or
+            type(playback.bank) is not int or playback != ImportedPlayback(program, (msb << 7) | lsb)):
+        raise Unsupported('initial sound does not match importer')
 
 
 def _table(root, section, tag):
@@ -311,6 +354,7 @@ def candidates(xml: bytes, observation: ImporterObservation) -> tuple[Candidate,
     track_id, track = next(iter(tracks.items()))
     if any(child.tag not in TRACK_TAGS for child in track):
         raise Unsupported('unknown track field')
+    _track_sound(track, observation)
     if any(child.attrib or len(child) for child in track if child.tag in ('Name', 'ShortName')):
         raise Unsupported('unknown track name structure')
     master_track = _one(root, 'MasterTrack')

@@ -48,7 +48,9 @@ def semantic_observation(view, semantic, gpif_sha256):
                                         tuning_high_to_low=tuple(staff['tuning']), capo=staff['capo'],
                                         actual_transposition=staff['transpositionPitch'],
                                         display_transposition=staff['displayTranspositionPitch'], beats=beats,
-                                        tempos=tempos)
+                                        tempos=tempos,
+                                        playback=semantic.ImportedPlayback(program=tracks[0]['playback']['program'],
+                                                                           bank=tracks[0]['playback']['bank']))
 
 
 def observe_semantic(archive, semantic, *, allow_reversed_descriptor=False):

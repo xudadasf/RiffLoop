@@ -43,6 +43,7 @@ class ImporterObservationTests(unittest.TestCase):
         self.assertEqual(len(result.beats), 16)
         self.assertEqual(result.beats[(0, 0, 0)], (semantic.ImportedNote(string=4, fret=3, real_value=58),))
         self.assertEqual(result.tempos, (semantic.ImportedTempo(0, 120, 0, False, True, '', 0, None),))
+        self.assertEqual(result.playback, semantic.ImportedPlayback(program=25, bank=0))
 
     def test_multiple_tracks_or_staves_are_not_silently_discarded(self):
         extra_track = deepcopy(self.first)
