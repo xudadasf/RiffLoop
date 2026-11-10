@@ -3,16 +3,21 @@
 const fs = require('node:fs');
 const alpha = require('../../RiffLoop/Resources/GpWeb/alphaTab.min.js');
 const settings = new alpha.Settings();
-const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const pick = (object, keys) => Object.fromEntries(keys.map(key => [key, object[key] ?? null]));
-function inspect(base64) {
-    const score = alpha.importer.ScoreLoader.loadScoreFromBytes(Buffer.from(base64, 'base64'), settings);
+const automation = value => ({
+    ...pick(value, ['type', 'value', 'ratioPosition', 'isLinear', 'isVisible', 'text']),
+    syncPointValue: value.syncPointValue == null ? null :
+        pick(value.syncPointValue, ['barOccurence', 'millisecondOffset'])
+});
+function snapshot(score) {
     return {
         metadata: pick(score, ['title', 'artist', 'album', 'copyright', 'tempo']),
         bars: score.masterBars.map(bar => ({
             ...pick(bar, ['start', 'timeSignatureNumerator', 'timeSignatureDenominator', 'isRepeatStart',
                 'repeatCount', 'alternateEndings', 'tripletFeel', 'isFreeTime']),
-            tempo: bar.tempoAutomations.map(value => pick(value, ['type', 'value', 'ratioPosition', 'isLinear']))
+            tempo: bar.tempoAutomations.map(automation),
+            // A missing list and a present empty list remain distinguishable.
+            syncPoints: bar.syncPoints == null ? null : bar.syncPoints.map(automation)
         })),
         tracks: score.tracks.map(track => ({
             ...pick(track, ['name']),
@@ -24,6 +29,9 @@ function inspect(base64) {
                     ...pick(beat, ['duration', 'dots', 'tupletNumerator', 'tupletDenominator', 'graceType',
                         'displayStart', 'displayDuration', 'playbackStart', 'playbackDuration',
                         'isLetRing', 'isPalmMute', 'text', 'pickStroke', 'tremoloPicking', 'vibrato', 'dynamics']),
+                    // Bank and SyncPoint share a numeric type; keep beat and
+                    // master-bar automations in separate locations.
+                    automations: beat.automations.map(automation),
                     notes: beat.notes.map(note => ({
                         ...pick(note, ['string', 'fret', 'realValue', 'octave', 'tone', 'accidentalMode',
                             'isDead', 'isGhost', 'isStaccato', 'isPalmMute', 'isLetRing', 'isHammerPullOrigin',
@@ -37,4 +45,11 @@ function inspect(base64) {
         }))
     };
 }
-process.stdout.write(JSON.stringify(input.map(inspect)));
+
+if (require.main === module) {
+    const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+    process.stdout.write(JSON.stringify(input.map(base64 => snapshot(
+        alpha.importer.ScoreLoader.loadScoreFromBytes(Buffer.from(base64, 'base64'), settings)
+    ))));
+}
+module.exports = { snapshot };
