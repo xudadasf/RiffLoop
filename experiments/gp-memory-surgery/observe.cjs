@@ -31,7 +31,8 @@ function snapshot(score) {
         })),
         tracks: score.tracks.map(track => ({
             ...pick(track, ['name']),
-            playback: pick(track.playbackInfo, ['program', 'volume', 'balance', 'isMute', 'isSolo']),
+            playback: pick(track.playbackInfo, ['program', 'bank', 'port', 'primaryChannel',
+                'secondaryChannel', 'volume', 'balance', 'isMute', 'isSolo']),
             staves: track.staves.map(staff => ({
                 tuning: Array.from(staff.stringTuning.tunings),
                 ...pick(staff, ['capo', 'transpositionPitch', 'displayTranspositionPitch', 'isPercussion']),
