@@ -79,6 +79,42 @@ assert.throws(() => createDraft(alphaTab, { title: 'x', tempo: 100, bars: [[note
 assert.throws(() => createDraft(alphaTab, { title: 'x', tempo: 100, bars: [] }));
 assert.throws(() => createDraft(alphaTab, { title: 'x', tempo: 100, bars: [[note(1, 1)]], originalGp: new Uint8Array() }), /不支持/);
 
+// Rests must survive GP export as silence with the intended timeline; a full
+// bar rest is also the representation used for an empty separation measure.
+const rest = duration => ({ rest: true, duration });
+const restDraft = createDraft(alphaTab, { title: '休止测试', tempo: 100, bars: [
+    [note(6, 0), rest(4), note(5, 3, 2)], [rest(1)],
+] });
+const readTimeline = draft => alphaTab.importer.ScoreLoader.loadScoreFromBytes(
+    draft.exportGp(), new alphaTab.Settings()
+).tracks[0].staves[0].bars.map(bar => bar.voices[0].beats.map(beat => ({
+    rest: beat.isRest, duration: beat.duration, start: beat.playbackStart,
+    length: beat.playbackDuration, notes: beat.notes.map(n => ({ string: 7 - n.string, fret: n.fret })),
+})));
+assert.deepEqual(readTimeline(restDraft), [
+    [{ rest: false, duration: 4, start: 0, length: 960, notes: [{ string: 6, fret: 0 }] },
+     { rest: true, duration: 4, start: 960, length: 960, notes: [] },
+     { rest: false, duration: 2, start: 1920, length: 1920, notes: [{ string: 5, fret: 3 }] }],
+    [{ rest: true, duration: 1, start: 0, length: 3840, notes: [] }],
+]);
+assert.throws(() => restDraft.setFret(0, 1, 4), /休止符/);
+restDraft.setRest(0, 0);
+assert.deepEqual(restDraft.notes()[0][0], rest(4));
+assert.equal(readTimeline(restDraft)[0][0].rest, true);
+restDraft.setNote(0, 1, 4, 2);
+assert.deepEqual(restDraft.notes()[0][1], note(4, 2));
+assert.deepEqual(readTimeline(restDraft)[0][1].notes, [{ string: 4, fret: 2 }]);
+const beforeInvalidRestEdit = restDraft.notes();
+assert.throws(() => restDraft.setNote(0, 0, 7, 2));
+assert.throws(() => restDraft.setNote(0, 0, 2, 37));
+assert.deepEqual(restDraft.notes(), beforeInvalidRestEdit);
+for (const invalidRest of [{ rest: false, duration: 4 }, { rest: true, duration: 3 },
+    { rest: true, duration: 4, string: 1 }, { rest: true, duration: 4, fret: 0 }]) {
+    assert.throws(() => createDraft(alphaTab, { title: 'x', tempo: 100, bars: [[invalidRest]] }));
+}
+restDraft.setDuration(1, 0, 2);
+assert.throws(() => restDraft.exportGp(), /每小节时值之和/);
+
 // The same experimental core can be loaded as an offline script in WebKit.
 const source = readFileSync(new URL('../experiments/gp-draft-editor/draft-core.js', import.meta.url), 'utf8');
 const browser = vm.createContext({ alphaTab });

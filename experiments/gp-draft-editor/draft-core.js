@@ -18,6 +18,12 @@ function integer(value, min, max, label) {
 }
 
 function checkedNote(note) {
+    if (note && typeof note === "object" && Object.hasOwn(note, "rest")) {
+        objectWithKeys(note, ["rest", "duration"], "休止符");
+        if (note.rest !== true) throw new Error("休止符格式错误");
+        if (!DURATIONS.has(note.duration)) throw new Error("时值不受支持");
+        return { rest: true, duration: note.duration };
+    }
     objectWithKeys(note, ["string", "fret", "duration"], "音符");
     integer(note.string, 1, 6, "弦号");
     integer(note.fret, 0, 36, "品位");
@@ -48,20 +54,32 @@ function createDraft(alphaTab, input) {
         },
         setFret(barIndex, noteIndex, fret) {
             integer(fret, 0, 36, "品位");
-            noteAt(barIndex, noteIndex).fret = fret;
+            const note = noteAt(barIndex, noteIndex);
+            if (note.rest) throw new Error("休止符不能设置品位");
+            note.fret = fret;
         },
         setDuration(barIndex, noteIndex, duration) {
             if (!DURATIONS.has(duration)) throw new Error("时值不受支持");
             noteAt(barIndex, noteIndex).duration = duration;
         },
+        setRest(barIndex, noteIndex) {
+            const previous = noteAt(barIndex, noteIndex);
+            bars[barIndex][noteIndex] = { rest: true, duration: previous.duration };
+        },
+        setNote(barIndex, noteIndex, string, fret) {
+            integer(string, 1, 6, "弦号");
+            integer(fret, 0, 36, "品位");
+            const previous = noteAt(barIndex, noteIndex);
+            bars[barIndex][noteIndex] = { string, fret, duration: previous.duration };
+        },
         exportGp() {
-            // This experiment only creates 4/4 bars of plain notes. An incomplete
+            // This experiment only creates 4/4 bars of plain notes and rests. An incomplete
             // edit is allowed in memory, but never written as a misleading GP.
             if (bars.some(bar => bar.reduce((total, note) => total + 64 / note.duration, 0) !== 64)) {
                 throw new Error("每小节时值之和必须为 4/4");
             }
             const source = `\\tempo ${tempo} . ` + bars.map(bar =>
-                bar.map(note => `:${note.duration} ${note.fret}.${note.string}`).join(" ")
+                bar.map(note => `:${note.duration} ${note.rest ? "r" : `${note.fret}.${note.string}`}`).join(" ")
             ).join(" | ");
             const settings = new alphaTab.Settings();
             const importer = new alphaTab.importer.AlphaTexImporter();
