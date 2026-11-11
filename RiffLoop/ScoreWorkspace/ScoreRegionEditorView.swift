@@ -107,13 +107,16 @@ final class ScoreRegionEditorModel: ObservableObject {
 
     private let source: URL
     private let store: ScoreRegionsStore
+    private let renderer: @Sendable (URL, Int) -> ScorePagePreview
     private var orientation = 0
     private enum Change { case add(ScoreRegion), remove(ScoreRegion) }
     private var pendingChange: Change?
 
-    init(source: URL, store: ScoreRegionsStore? = nil) {
+    init(source: URL, store: ScoreRegionsStore? = nil,
+         renderer: @escaping @Sendable (URL, Int) -> ScorePagePreview = { ScorePageRenderer.render(source: $0, index: $1) }) {
         self.source = source
         self.store = store ?? ScoreRegionsStore(source: source)
+        self.renderer = renderer
     }
 
     var pendingAddedRegion: ScoreRegion? {
@@ -140,9 +143,16 @@ final class ScoreRegionEditorModel: ObservableObject {
         image = nil
         regions = []
         pageIndex = index
+        do {
+            try await store.bindSource()
+        } catch {
+            message = "无法打开素材：\(error.localizedDescription)"
+            return
+        }
         let source = self.source
+        let renderer = self.renderer
         let preview = await Task.detached(priority: .userInitiated) {
-            ScorePageRenderer.render(source: source, index: index)
+            renderer(source, index)
         }.value
         guard !Task.isCancelled else { return }
         pageCount = preview.pageCount
@@ -150,10 +160,10 @@ final class ScoreRegionEditorModel: ObservableObject {
             message = preview.error ?? "无法读取此页面。"
             return
         }
-        image = renderedImage
         orientation = preview.orientation
         do {
             regions = try await store.loadPage(index: index, rotation: orientation)
+            image = renderedImage
         } catch {
             image = nil
             message = "读取已保存区域失败：\(error.localizedDescription)"

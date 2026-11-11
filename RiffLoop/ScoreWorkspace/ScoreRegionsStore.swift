@@ -36,6 +36,12 @@ struct ScoreRegionsSnapshot: Equatable {
     let pages: [ScoreRegionsPage]
 }
 
+struct ScoreRegionsRemoval {
+    let generation: UUID
+    let source: URL
+    let metadata: URL
+}
+
 private struct ScoreRegionsDocument: Codable {
     let version: Int
     let sourceDigest: String
@@ -47,6 +53,7 @@ enum ScoreRegionsError: LocalizedError {
     case unreadableSource
     case invalidStoredData
     case conflict
+    case sourceChanged
 
     var errorDescription: String? {
         switch self {
@@ -54,15 +61,16 @@ enum ScoreRegionsError: LocalizedError {
         case .unreadableSource: "无法读取素材，不能保存区域。"
         case .invalidStoredData: "已保存的区域数据无法读取。"
         case .conflict: "其他窗口已修改此页，请重新读取后保存。"
+        case .sourceChanged: "素材已被删除或重新导入，请重新打开素材。"
         }
     }
 }
 
 actor ScoreRegionsStore {
-    private static let writeLock = NSLock()
     private let source: URL
     private let folder: URL
     private var digest: String?
+    private var generation: UUID?
 
     init(source: URL, folder: URL? = nil) {
         self.source = source
@@ -72,56 +80,56 @@ actor ScoreRegionsStore {
 
     func loadPage(index: Int, rotation: Int) throws -> [ScoreRegion] {
         guard index >= 0 else { throw ScoreRegionsError.invalidPage }
-        let doc = try readDocument()
-        guard let page = doc.pages.first(where: { $0.index == index && $0.rotation == rotation }) else { return [] }
-        return page.regions
+        return try ScoreMaterialAccess.synchronized {
+            let doc = try readDocument()
+            guard let page = doc.pages.first(where: { $0.index == index && $0.rotation == rotation }) else { return [] }
+            return page.regions
+        }
+    }
+
+    /// Bind before rendering so a replacement during rendering invalidates the preview.
+    func bindSource() throws {
+        try ScoreMaterialAccess.synchronized { _ = try readDocument() }
     }
 
     /// Returns a validated view in page order, preserving each page's box order.
     func snapshot() throws -> ScoreRegionsSnapshot {
-        let document = try readDocument()
-        return ScoreRegionsSnapshot(
-            sourceDigest: document.sourceDigest,
-            pages: document.pages.sorted { $0.index < $1.index }
-        )
+        try ScoreMaterialAccess.synchronized {
+            let document = try readDocument()
+            return ScoreRegionsSnapshot(
+                sourceDigest: document.sourceDigest,
+                pages: document.pages.sorted { $0.index < $1.index }
+            )
+        }
     }
 
     func savePage(index: Int, rotation: Int, regions: [ScoreRegion], replacing expected: [ScoreRegion]? = nil) throws {
         guard index >= 0, regions.allSatisfy(\.isValid), Set(regions.map(\.id)).count == regions.count else {
             throw ScoreRegionsError.invalidPage
         }
-        Self.writeLock.lock()
-        defer { Self.writeLock.unlock() }
-        var doc = try readDocument()
-        if let expected {
-            let current = doc.pages.first { $0.index == index }
-            guard (current == nil || current?.rotation == rotation),
-                  (current?.regions ?? []) == expected else { throw ScoreRegionsError.conflict }
+        try ScoreMaterialAccess.synchronized {
+            var doc = try readDocument()
+            if let expected {
+                let current = doc.pages.first { $0.index == index }
+                guard (current == nil || current?.rotation == rotation),
+                      (current?.regions ?? []) == expected else { throw ScoreRegionsError.conflict }
+            }
+            doc.pages.removeAll { $0.index == index }
+            doc.pages.append(ScoreRegionsPage(index: index, rotation: rotation, regions: regions))
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let data = try JSONEncoder().encode(doc)
+            try data.write(to: metadataURL(for: doc.sourceDigest), options: [.atomic])
         }
-        doc.pages.removeAll { $0.index == index }
-        doc.pages.append(ScoreRegionsPage(index: index, rotation: rotation, regions: regions))
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let data = try JSONEncoder().encode(doc)
-        try data.write(to: metadataURL(for: doc.sourceDigest), options: [.atomic])
     }
 
     /// Call before deleting the source, while its content is still readable.
-    func prepareRemoval() throws -> String {
-        try readDocument().sourceDigest
-    }
-
-    /// Call only after the source is removed, using the fingerprint prepared above.
-    func removeSavedData(for sourceDigest: String) throws {
-        Self.writeLock.lock()
-        defer { Self.writeLock.unlock() }
-        let manager = FileManager.default
-        guard manager.fileExists(atPath: folder.path) else { return }
-        guard Self.isDigest(sourceDigest) else { throw ScoreRegionsError.invalidStoredData }
-        let url = metadataURL(for: sourceDigest)
-        if manager.fileExists(atPath: url.path) {
-            let doc = try decodeDocument(at: url)
-            guard doc.sourceDigest == sourceDigest else { throw ScoreRegionsError.invalidStoredData }
-            try manager.removeItem(at: url)
+    func prepareRemoval() throws -> ScoreRegionsRemoval {
+        try ScoreMaterialAccess.synchronized {
+            let document = try readDocument()
+            guard let generation else { throw ScoreRegionsError.unreadableSource }
+            return ScoreRegionsRemoval(generation: generation,
+                                       source: source.standardizedFileURL,
+                                       metadata: metadataURL(for: document.sourceDigest))
         }
     }
 
@@ -137,11 +145,14 @@ actor ScoreRegionsStore {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func isDigest(_ value: String) -> Bool {
-        value.count == 64 && value.allSatisfy { "0123456789abcdef".contains($0) }
-    }
-
     private func readDocument() throws -> ScoreRegionsDocument {
+        let currentGeneration = ScoreMaterialAccess.current(source)
+        if let generation, generation != currentGeneration { throw ScoreRegionsError.sourceChanged }
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: source.path),
+              attributes[.type] as? FileAttributeType == .typeRegular else {
+            throw generation == nil ? ScoreRegionsError.unreadableSource : ScoreRegionsError.sourceChanged
+        }
+        if generation == nil { generation = currentGeneration }
         let sourceDigest = try digestForSource()
         let manager = FileManager.default
         let currentURL = metadataURL(for: sourceDigest)

@@ -69,12 +69,10 @@ final class ScoreWorkspaceModel: ObservableObject {
         defer { isWorking = false }
         do {
             let regions = ScoreRegionsStore(source: url)
-            let digest = try await regions.prepareRemoval()
-            try await store.removeCopy(url)
-            do {
-                try await regions.removeSavedData(for: digest)
-            } catch {
-                message = "素材副本已删除，但区域记录清理失败：\(error.localizedDescription)"
+            let removal = try await regions.prepareRemoval()
+            let result = try await store.removeCopy(url, removal: removal)
+            if let error = result.cleanupError {
+                message = "素材副本已删除，但区域记录清理失败：\(error)。若重新导入同名且内容相同的素材，请检查并删除不需要的旧区域。"
             }
             await refresh()
         } catch {

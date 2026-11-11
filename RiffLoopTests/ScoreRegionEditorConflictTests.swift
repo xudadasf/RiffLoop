@@ -4,6 +4,38 @@ import XCTest
 
 @MainActor
 final class ScoreRegionEditorConflictTests: XCTestCase {
+    func testReplacementDuringRenderingDoesNotShowEditableStalePreview() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let input = root.appendingPathComponent("score.png")
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16)).image { _ in }
+        try XCTUnwrap(image.pngData()).write(to: input)
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"))
+        let source = try await workspace.importCopy(from: input)
+        let folder = root.appendingPathComponent("regions")
+        let oldStore = ScoreRegionsStore(source: source, folder: folder)
+        let started = expectation(description: "Preview rendering started")
+        let finish = DispatchSemaphore(value: 0)
+        defer { finish.signal() }
+        let model = ScoreRegionEditorModel(source: source, store: oldStore) { url, page in
+            started.fulfill()
+            finish.wait()
+            return ScorePageRenderer.render(source: url, index: page)
+        }
+        let opening = Task { await model.open() }
+        await fulfillment(of: [started], timeout: 10)
+        let removal = try await oldStore.prepareRemoval()
+        _ = try await workspace.removeCopy(source, removal: removal)
+        let replacement = try await workspace.importCopy(from: input)
+        XCTAssertEqual(source, replacement)
+        finish.signal()
+        await opening.value
+        XCTAssertNil(model.image)
+        XCTAssertTrue(model.regions.isEmpty)
+        XCTAssertNotNil(model.message)
+    }
+
     func testConflictingDrawingIsRetainedAndCanBeRetried() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
