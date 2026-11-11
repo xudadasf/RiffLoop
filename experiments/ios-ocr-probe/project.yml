@@ -46,6 +46,8 @@ targets:
         buildPhase: resources
       - path: image_reference_expected.json
         buildPhase: resources
+      - path: digit_group_reference.json
+        buildPhase: resources
     dependencies:
       - target: RiffLoopOCRProbe
     settings:

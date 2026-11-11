@@ -1,0 +1,420 @@
+{
+  "scope": "Synthetic grouping only; not real note accuracy",
+  "cases": [
+    {
+      "name": "single_and_double",
+      "gap": 14,
+      "input": [
+        {
+          "char": "7",
+          "x": 10,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 30,
+          "isWithinSource": true
+        },
+        {
+          "char": "0",
+          "x": 39,
+          "isWithinSource": true
+        },
+        {
+          "char": "8",
+          "x": 60,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 80,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 89,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0
+          ],
+          "text": "7",
+          "fret": 7
+        },
+        {
+          "inputIndices": [
+            1,
+            2
+          ],
+          "text": "10",
+          "fret": 10
+        },
+        {
+          "inputIndices": [
+            3
+          ],
+          "text": "8",
+          "fret": 8
+        },
+        {
+          "inputIndices": [
+            4,
+            5
+          ],
+          "text": "11",
+          "fret": 11
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "symbol_barrier",
+      "gap": 14,
+      "input": [
+        {
+          "char": "1",
+          "x": 10,
+          "isWithinSource": true
+        },
+        {
+          "char": "h",
+          "x": 14,
+          "isWithinSource": true
+        },
+        {
+          "char": "0",
+          "x": 18,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0
+          ],
+          "text": "1",
+          "fret": 1
+        },
+        {
+          "inputIndices": [
+            2
+          ],
+          "text": "0",
+          "fret": 0
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "unknown_barrier",
+      "gap": 14,
+      "input": [
+        {
+          "char": "1",
+          "x": 10,
+          "isWithinSource": true
+        },
+        {
+          "char": null,
+          "x": 14,
+          "isWithinSource": true
+        },
+        {
+          "char": "0",
+          "x": 18,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0
+          ],
+          "text": "1",
+          "fret": 1
+        },
+        {
+          "inputIndices": [
+            2
+          ],
+          "text": "0",
+          "fret": 0
+        }
+      ],
+      "unresolved": [
+        {
+          "inputIndex": 1,
+          "reason": "unknownCharacter"
+        }
+      ]
+    },
+    {
+      "name": "outside_barrier",
+      "gap": 14,
+      "input": [
+        {
+          "char": "1",
+          "x": 10,
+          "isWithinSource": true
+        },
+        {
+          "char": "7",
+          "x": 14,
+          "isWithinSource": false
+        },
+        {
+          "char": "0",
+          "x": 18,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0
+          ],
+          "text": "1",
+          "fret": 1
+        },
+        {
+          "inputIndices": [
+            2
+          ],
+          "text": "0",
+          "fret": 0
+        }
+      ],
+      "unresolved": [
+        {
+          "inputIndex": 1,
+          "reason": "outsideSource"
+        }
+      ]
+    },
+    {
+      "name": "dense_distinct",
+      "gap": 16,
+      "input": [
+        {
+          "char": "1",
+          "x": 0,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 10.66,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 24.87,
+          "isWithinSource": true
+        },
+        {
+          "char": "3",
+          "x": 35.53,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0,
+            1
+          ],
+          "text": "11",
+          "fret": 11
+        },
+        {
+          "inputIndices": [
+            2,
+            3
+          ],
+          "text": "13",
+          "fret": 13
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "dense_ambiguous",
+      "gap": 16,
+      "input": [
+        {
+          "char": "1",
+          "x": 0,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 10,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 20,
+          "isWithinSource": true
+        },
+        {
+          "char": "3",
+          "x": 30,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "text": "1113",
+          "fret": null
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "leading_zero",
+      "gap": 20,
+      "input": [
+        {
+          "char": "0",
+          "x": 4,
+          "isWithinSource": true
+        },
+        {
+          "char": "1",
+          "x": 10,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0,
+            1
+          ],
+          "text": "01",
+          "fret": null
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "over_fret_limit",
+      "gap": 20,
+      "input": [
+        {
+          "char": "3",
+          "x": 4,
+          "isWithinSource": true
+        },
+        {
+          "char": "7",
+          "x": 10,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0,
+            1
+          ],
+          "text": "37",
+          "fret": null
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "join_threshold",
+      "gap": 20,
+      "input": [
+        {
+          "char": "1",
+          "x": 0,
+          "isWithinSource": true
+        },
+        {
+          "char": "0",
+          "x": 19,
+          "isWithinSource": true
+        },
+        {
+          "char": "2",
+          "x": 38.001,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0,
+            1
+          ],
+          "text": "10",
+          "fret": 10
+        },
+        {
+          "inputIndices": [
+            2
+          ],
+          "text": "2",
+          "fret": 2
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "non_ascii_digit",
+      "gap": 14,
+      "input": [
+        {
+          "char": "1",
+          "x": 0,
+          "isWithinSource": true
+        },
+        {
+          "char": "٣",
+          "x": 5,
+          "isWithinSource": true
+        },
+        {
+          "char": "2",
+          "x": 10,
+          "isWithinSource": true
+        }
+      ],
+      "groups": [
+        {
+          "inputIndices": [
+            0
+          ],
+          "text": "1",
+          "fret": 1
+        },
+        {
+          "inputIndices": [
+            2
+          ],
+          "text": "2",
+          "fret": 2
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "empty",
+      "gap": 14,
+      "input": [],
+      "groups": [],
+      "unresolved": []
+    }
+  ]
+}
