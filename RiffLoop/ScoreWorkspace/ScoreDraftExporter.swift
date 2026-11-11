@@ -30,7 +30,9 @@ enum ScoreDraftExporter {
               FileManager.default.fileExists(atPath: root.appendingPathComponent("GpWeb/alphaTab.min.js").path) else {
             throw ScoreDraftExportError.missingResources
         }
-        let payload = try JSONSerialization.jsonObject(with: JSONEncoder().encode(draft))
+        // Base64 contains only ASCII alphabet characters, so the user's title
+        // and other draft data cannot become executable JavaScript.
+        let payload = try JSONEncoder().encode(draft).base64EncodedString()
         let web = WKWebView(frame: .zero)
         defer { web.stopLoading() }
         web.loadFileURL(page, allowingReadAccessTo: root)
@@ -38,7 +40,7 @@ enum ScoreDraftExporter {
         var ready = false
         while Date() < deadline {
             try Task.checkCancellation()
-            if let result = try? await web.evaluateJavaScript("typeof alphaTab !== 'undefined' && typeof RiffLoopDraftEditor !== 'undefined'"),
+            if let result = try? await evaluate("typeof alphaTab !== 'undefined' && typeof RiffLoopDraftEditor !== 'undefined'", in: web),
                result as? Bool == true {
                 ready = true
                 break
@@ -46,7 +48,10 @@ enum ScoreDraftExporter {
             try await Task.sleep(for: .milliseconds(100))
         }
         guard ready else { throw ScoreDraftExportError.unavailable }
-        let result = try await web.callAsyncJavaScript("""
+        let result = try await evaluate("""
+            (() => {
+            const jsonBytes = Uint8Array.from(atob('\(payload)'), c => c.charCodeAt(0));
+            const draft = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(jsonBytes));
             const bytes = RiffLoopDraftEditor.exportStoredDraft(alphaTab, draft);
             if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > 8 * 1024 * 1024) {
                 throw new Error('Invalid GP output');
@@ -56,12 +61,25 @@ enum ScoreDraftExporter {
                 pieces.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
             }
             return btoa(pieces.join(''));
-            """, arguments: ["draft": payload], in: nil, contentWorld: .page)
+            })()
+            """, in: web)
         try Task.checkCancellation()
         guard let encoded = result as? String, let data = Data(base64Encoded: encoded),
               data.count <= 8 * 1024 * 1024, data.starts(with: [0x50, 0x4b, 0x03, 0x04]) else {
             throw ScoreDraftExportError.invalidOutput
         }
         return data
+    }
+
+    // Use the completion-handler API: the WebKit native async overlay is not
+    // available in every iPadOS runtime supported by this application.
+    @MainActor
+    private static func evaluate(_ script: String, in web: WKWebView) async throws -> Any? {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
+            web.evaluateJavaScript(script, completionHandler: { value, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: value) }
+            })
+        }
     }
 }

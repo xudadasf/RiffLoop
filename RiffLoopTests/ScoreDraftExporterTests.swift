@@ -31,7 +31,7 @@ final class ScoreDraftExporterTests: XCTestCase {
         let deadline = Date().addingTimeInterval(60)
         var ready = false
         while Date() < deadline {
-            if let value = try? await verifier.evaluateJavaScript("typeof alphaTab !== 'undefined'"), value as? Bool == true {
+            if let value = try? await evaluate("typeof alphaTab !== 'undefined'", in: verifier), value as? Bool == true {
                 ready = true
                 break
             }
@@ -39,7 +39,11 @@ final class ScoreDraftExporterTests: XCTestCase {
         }
         XCTAssertTrue(ready, "Offline GP reader did not load")
         guard ready else { return }
-        let verified = try await verifier.callAsyncJavaScript("""
+        let verified = try await evaluate("""
+            (() => {
+            const encoded = '\(bytes.base64EncodedString())';
+            const titleBytes = Uint8Array.from(atob('\(Data(draft.title.utf8).base64EncodedString())'), c => c.charCodeAt(0));
+            const expectedTitle = new TextDecoder('utf-8', { fatal: true }).decode(titleBytes);
             const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
             const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes, new alphaTab.Settings());
             const staff = score.tracks[0].staves[0];
@@ -56,8 +60,8 @@ final class ScoreDraftExporterTests: XCTestCase {
                 first[2].notes.length === 1 && first[2].notes[0].string === 1 && first[2].notes[0].fret === 0 &&
                 first[2].playbackStart === 1920 && first[2].playbackDuration === 1920 &&
                 second.length === 1 && second[0].isRest && second[0].playbackDuration === 3840;
-            """, arguments: ["encoded": bytes.base64EncodedString(), "expectedTitle": draft.title],
-            in: nil, contentWorld: .page)
+            })()
+            """, in: verifier)
         XCTAssertEqual(verified as? Bool, true)
     }
 
@@ -71,6 +75,15 @@ final class ScoreDraftExporterTests: XCTestCase {
                 _ = try await ScoreDraftExporter.export(draft)
                 XCTFail("Incomplete or invalid draft must not yield GP data")
             } catch ScoreDraftExportError.incomplete { }
+        }
+    }
+
+    private func evaluate(_ script: String, in web: WKWebView) async throws -> Any? {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
+            web.evaluateJavaScript(script, completionHandler: { value, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: value) }
+            })
         }
     }
 }
