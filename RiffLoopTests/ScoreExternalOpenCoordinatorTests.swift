@@ -34,7 +34,7 @@ final class ScoreExternalOpenCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.pending.isEmpty)
     }
 
-    func testNewDocumentCannotJumpAheadOfQueuedDocuments() {
+    func testNewDocumentOpensAfterLeavingEditorWithoutDiscardingQueue() {
         let coordinator = ScoreExternalOpenCoordinator()
         let first = ExternalDocument(kind: .pdf, url: URL(fileURLWithPath: "/first.pdf"))
         let second = ExternalDocument(kind: .guitarPro, url: URL(fileURLWithPath: "/second.gp"))
@@ -42,7 +42,10 @@ final class ScoreExternalOpenCoordinatorTests: XCTestCase {
         coordinator.receive(first)
         coordinator.endRegionEditing()
         coordinator.receive(second)
-        XCTAssertEqual(coordinator.pending, [first, second])
-        XCTAssertTrue(coordinator.path.isEmpty)
+        XCTAssertEqual(coordinator.pending, [first])
+        XCTAssertEqual(coordinator.path, [second])
+        coordinator.openNext()
+        XCTAssertEqual(coordinator.path, [first])
+        XCTAssertTrue(coordinator.pending.isEmpty)
     }
 }

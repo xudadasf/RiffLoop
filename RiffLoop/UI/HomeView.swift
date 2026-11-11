@@ -15,7 +15,7 @@ final class ScoreExternalOpenCoordinator: ObservableObject {
     func endRegionEditing() { regionEditorOpen = false }
 
     func receive(_ document: ExternalDocument) {
-        if regionEditorOpen || !pending.isEmpty {
+        if regionEditorOpen {
             pending.append(document)
         } else {
             path = [document]
