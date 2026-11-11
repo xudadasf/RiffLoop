@@ -3,6 +3,32 @@ import PDFKit
 import SwiftUI
 import UIKit
 
+/// Each window keeps its own external-open queue. Once imported, documents
+/// wait until the user chooses to leave the region editor and open them.
+@MainActor
+final class ScoreExternalOpenCoordinator: ObservableObject {
+    @Published var path: [ExternalDocument] = []
+    @Published private(set) var pending: [ExternalDocument] = []
+    private var regionEditorOpen = false
+
+    func beginRegionEditing() { regionEditorOpen = true }
+    func endRegionEditing() { regionEditorOpen = false }
+
+    func receive(_ document: ExternalDocument) {
+        if regionEditorOpen || !pending.isEmpty {
+            pending.append(document)
+        } else {
+            path = [document]
+        }
+    }
+
+    func openNext() {
+        guard !regionEditorOpen, !pending.isEmpty else { return }
+        let document = pending.removeFirst()
+        path = [document]
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject private var recentProjects: RecentProjectsStore
     @EnvironmentObject private var displayNames: DocumentDisplayNameStore
@@ -10,18 +36,23 @@ struct HomeView: View {
     @State private var signingStatus = SigningStatusSnapshot.current()
     @State private var diagnosticsPresented = false
     @State private var isSigningHelpPresented = false
-    @State private var externalDocuments: [ExternalDocument] = []
+    @StateObject private var externalOpen = ScoreExternalOpenCoordinator()
     @State private var importError: String?
     @State private var recentSearch = ""
     @State private var recentKind: PracticeKind?
     @State private var selectedPracticeDay: PracticeDay?
 
     var body: some View {
-        NavigationStack(path: $externalDocuments) {
+        NavigationStack(path: $externalOpen.path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     welcomeHeader
                     signingStatusCard
+                    if !externalOpen.pending.isEmpty {
+                        Button("打开待处理文件（\(externalOpen.pending.count)）") {
+                            externalOpen.openNext()
+                        }
+                    }
                     Button { diagnosticsPresented = true } label: {
                         Label("异常复现记录", systemImage: "waveform.path.ecg")
                     }.accessibilityIdentifier("diagnostics.open")
@@ -89,11 +120,12 @@ struct HomeView: View {
                 signingHelp
             }
         }
+        .environmentObject(externalOpen)
         .onOpenURL { url in
             do {
                 let document = try ExternalDocument.receive(url)
                 isSigningHelpPresented = false
-                externalDocuments = [document]
+                externalOpen.receive(document)
             } catch { importError = error.localizedDescription }
         }
         .alert("文件打开失败", isPresented: Binding(

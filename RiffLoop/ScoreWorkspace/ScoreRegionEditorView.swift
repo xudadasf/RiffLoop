@@ -243,6 +243,7 @@ final class ScoreRegionEditorModel: ObservableObject {
 /// Manual region selection only. Recognition and ordering are not implemented here.
 struct ScoreRegionEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var externalOpen: ScoreExternalOpenCoordinator
     @StateObject private var model: ScoreRegionEditorModel
     @State private var zoom = 1.0
     @State private var drawing = false
@@ -272,6 +273,16 @@ struct ScoreRegionEditorView: View {
             .padding(.horizontal)
             Text("打开画框后拖动画出区域；关闭画框可滚动。区域仅用于保存，自动识别尚未完成。")
                 .font(.caption).foregroundStyle(.secondary)
+            if !externalOpen.pending.isEmpty {
+                HStack {
+                    Text("有 \(externalOpen.pending.count) 个外部文件待打开")
+                    Button("打开待处理文件") {
+                        externalOpen.endRegionEditing()
+                        externalOpen.openNext()
+                    }
+                    .disabled(model.busy || model.hasPendingChange || dragStart != nil)
+                }
+            }
             if model.hasPendingChange {
                 HStack {
                     Text("操作尚未保存")
@@ -338,10 +349,12 @@ struct ScoreRegionEditorView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("返回") {
-                    if model.hasPendingChange { confirmDiscard = true } else { dismiss() }
+                    if model.hasPendingChange { confirmDiscard = true } else { leaveEditor() }
                 }.disabled(model.busy)
             }
         }
+        .onAppear { externalOpen.beginRegionEditing() }
+        .onDisappear { externalOpen.endRegionEditing() }
         .task { await model.open() }
         .onChange(of: model.busy) { _, busy in
             if busy { dragStart = nil; dragEnd = nil }
@@ -361,13 +374,18 @@ struct ScoreRegionEditorView: View {
             Text("删除后需要重新画框。")
         }
         .confirmationDialog("放弃未保存的区域操作？", isPresented: $confirmDiscard, titleVisibility: .visible) {
-            Button("放弃并返回", role: .destructive) { dismiss() }
+            Button("放弃并返回", role: .destructive) { leaveEditor() }
             Button("继续处理", role: .cancel) { }
         }
         .alert("手动框选", isPresented: Binding(
             get: { model.message != nil },
             set: { if !$0 { model.message = nil } }
         )) { Button("好") { model.message = nil } } message: { Text(model.message ?? "") }
+    }
+
+    private func leaveEditor() {
+        externalOpen.endRegionEditing()
+        dismiss()
     }
 
     private func drawGesture(size: CGSize) -> some Gesture {
