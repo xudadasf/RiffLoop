@@ -23,6 +23,10 @@ targets:
       - path: RiffLoop/Resources/GpWeb
         type: folder
         buildPhase: resources
+      - path: RiffLoop/Resources/ScoreDraft.html
+        buildPhase: resources
+      - path: experiments/gp-draft-editor/draft-core.js
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.prototype
