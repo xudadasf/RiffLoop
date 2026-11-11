@@ -48,6 +48,8 @@ targets:
         buildPhase: resources
       - path: digit_group_reference.json
         buildPhase: resources
+      - path: confidence_reference.json
+        buildPhase: resources
     dependencies:
       - target: RiffLoopOCRProbe
     settings:

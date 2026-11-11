@@ -1,0 +1,218 @@
+{
+  "scope": "Synthetic RapidOCR CTC confidence behavior only; not an accuracy benchmark",
+  "cases": [
+    {
+      "name": "repeat_and_blank",
+      "indices": [
+        0,
+        1,
+        1,
+        0,
+        1,
+        2,
+        2,
+        0
+      ],
+      "scores": [
+        0.9900000095367432,
+        0.7099999785423279,
+        0.9900000095367432,
+        0.9900000095367432,
+        0.9599999785423279,
+        0.9800000190734863,
+        0.9900000095367432,
+        0.9900000095367432
+      ],
+      "lineScore": 0.88333,
+      "items": [
+        {
+          "classID": 1,
+          "start": 1,
+          "end": 2,
+          "rawFirstScore": 0.7099999785423279,
+          "roundedScore": 0.71
+        },
+        {
+          "classID": 1,
+          "start": 4,
+          "end": 4,
+          "rawFirstScore": 0.9599999785423279,
+          "roundedScore": 0.96
+        },
+        {
+          "classID": 2,
+          "start": 5,
+          "end": 6,
+          "rawFirstScore": 0.9800000190734863,
+          "roundedScore": 0.98
+        }
+      ]
+    },
+    {
+      "name": "unknown_and_space",
+      "indices": [
+        1,
+        4,
+        5,
+        2,
+        0
+      ],
+      "scores": [
+        0.9700000286102295,
+        0.9900000095367432,
+        0.9800000190734863,
+        0.9599999785423279,
+        0.9900000095367432
+      ],
+      "lineScore": 0.975,
+      "items": [
+        {
+          "classID": 1,
+          "start": 0,
+          "end": 0,
+          "rawFirstScore": 0.9700000286102295,
+          "roundedScore": 0.97
+        },
+        {
+          "classID": 4,
+          "start": 1,
+          "end": 1,
+          "rawFirstScore": 0.9900000095367432,
+          "roundedScore": 0.99
+        },
+        {
+          "classID": 5,
+          "start": 2,
+          "end": 2,
+          "rawFirstScore": 0.9800000190734863,
+          "roundedScore": 0.98
+        },
+        {
+          "classID": 2,
+          "start": 3,
+          "end": 3,
+          "rawFirstScore": 0.9599999785423279,
+          "roundedScore": 0.96
+        }
+      ]
+    },
+    {
+      "name": "decimal_ties",
+      "indices": [
+        1,
+        0,
+        2,
+        0
+      ],
+      "scores": [
+        0.015625,
+        0.9900000095367432,
+        0.046875,
+        0.9900000095367432
+      ],
+      "lineScore": 0.03125,
+      "items": [
+        {
+          "classID": 1,
+          "start": 0,
+          "end": 0,
+          "rawFirstScore": 0.015625,
+          "roundedScore": 0.01562
+        },
+        {
+          "classID": 2,
+          "start": 2,
+          "end": 2,
+          "rawFirstScore": 0.046875,
+          "roundedScore": 0.04688
+        }
+      ]
+    },
+    {
+      "name": "threshold_neighbors",
+      "indices": [
+        1,
+        0,
+        2,
+        0,
+        1
+      ],
+      "scores": [
+        0.7999939918518066,
+        0.9900000095367432,
+        0.9499940276145935,
+        0.9900000095367432,
+        0.9500060081481934
+      ],
+      "lineScore": 0.9,
+      "items": [
+        {
+          "classID": 1,
+          "start": 0,
+          "end": 0,
+          "rawFirstScore": 0.7999939918518066,
+          "roundedScore": 0.79999
+        },
+        {
+          "classID": 2,
+          "start": 2,
+          "end": 2,
+          "rawFirstScore": 0.9499940276145935,
+          "roundedScore": 0.94999
+        },
+        {
+          "classID": 1,
+          "start": 4,
+          "end": 4,
+          "rawFirstScore": 0.9500060081481934,
+          "roundedScore": 0.95001
+        }
+      ]
+    },
+    {
+      "name": "numpy_mean_tie",
+      "indices": [
+        1,
+        0,
+        2
+      ],
+      "scores": [
+        0.800000011920929,
+        0.9900000095367432,
+        0.999970018863678
+      ],
+      "lineScore": 0.89998,
+      "items": [
+        {
+          "classID": 1,
+          "start": 0,
+          "end": 0,
+          "rawFirstScore": 0.800000011920929,
+          "roundedScore": 0.8
+        },
+        {
+          "classID": 2,
+          "start": 2,
+          "end": 2,
+          "rawFirstScore": 0.999970018863678,
+          "roundedScore": 0.99997
+        }
+      ]
+    },
+    {
+      "name": "empty_line",
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "scores": [
+        0.8999999761581421,
+        0.800000011920929,
+        0.699999988079071
+      ],
+      "lineScore": 0.0,
+      "items": []
+    }
+  ]
+}

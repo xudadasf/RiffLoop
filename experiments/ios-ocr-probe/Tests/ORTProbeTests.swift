@@ -86,11 +86,19 @@ final class ORTProbeTests: XCTestCase {
                           "Unmapped classes: \(actual.partialCTC.unknownClasses)")
             XCTAssertEqual(actual.partialCTC.text, expected.ctc_text)
             XCTAssertEqual(actual.partialCTC.runs.count, expected.ctc_runs.count)
+            let digitLabels = Dictionary(uniqueKeysWithValues: (0...9).map { ($0 + 33, String($0)) })
+            let confidence = try CTCConfidence.evaluate(indices: actual.argmax, scores: actual.argmaxScores,
+                                                        labels: digitLabels)
+            XCTAssertEqual(confidence.items.map(\.run), actual.partialCTC.runs)
+            XCTAssertTrue(confidence.items.allSatisfy { $0.reviewReasons.contains(.uncalibrated) })
             for (actualRun, expectedRun) in zip(actual.partialCTC.runs, expected.ctc_runs) {
                 XCTAssertEqual(actualRun.classID, expectedRun.`class`)
                 XCTAssertEqual(actualRun.start, expectedRun.start)
                 XCTAssertEqual(actualRun.end, expectedRun.end)
                 XCTAssertEqual(actualRun.character, expectedRun.character)
+            }
+            for item in confidence.items {
+                XCTAssertEqual(item.rawFirstScore, expected.argmax_scores[item.run.start], accuracy: 0.001)
             }
             if expected.name == "glyphs" { XCTAssertEqual(expected.ctc_text, "0123456789") }
             XCTAssertEqual(actual.argmaxScores.count, expected.argmax_scores.count)
