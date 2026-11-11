@@ -78,6 +78,52 @@ final class ScoreDraftExporterTests: XCTestCase {
         }
     }
 
+    func testLargeDraftIsRejectedWithoutTruncatingIt() async throws {
+        let bar = Array(repeating: ScoreDraftEvent.note(string: 1, fret: 0, duration: 64), count: 64)
+        let draft = ScoreDraft(title: "较长草稿", tempo: 100, bars: Array(repeating: bar, count: 9))
+        XCTAssertTrue(draft.isComplete)
+        do {
+            _ = try await ScoreDraftExporter.export(draft)
+            XCTFail("Oversized draft must not be partially exported")
+        } catch ScoreDraftExportError.tooLarge { }
+        XCTAssertEqual(draft.bars.count, 9)
+        XCTAssertEqual(draft.bars.flatMap { $0 }.count, 576)
+    }
+
+    func testOnlyOneExportCanRunAtATime() async throws {
+        let draft = ScoreDraft(title: "并发", tempo: 100, bars: [[.rest(duration: 1)]])
+        let first = Task { try await ScoreDraftExporter.export(draft) }
+        let second = Task { try await ScoreDraftExporter.export(draft) }
+        var successes = 0
+        var busy = 0
+        for task in [first, second] {
+            do {
+                let data = try await task.value
+                XCTAssertFalse(data.isEmpty)
+                successes += 1
+            } catch ScoreDraftExportError.busy {
+                busy += 1
+            }
+        }
+        XCTAssertEqual(successes, 1)
+        XCTAssertEqual(busy, 1)
+    }
+
+    func testMissingOrRepeatedWebReplyCannotHangOrResumeTwice() async throws {
+        var lateReply: ((Any?, Error?) -> Void)?
+        do {
+            _ = try await ScoreDraftWebReply.wait(timeout: 0.05) { lateReply = $0 }
+            XCTFail("A missing reply must time out")
+        } catch ScoreDraftExportError.unavailable { }
+        lateReply?("late", nil)
+        let value = try await ScoreDraftWebReply.wait(timeout: 1) { reply in
+            reply("first", nil)
+            reply("second", nil)
+        }
+        XCTAssertEqual(value as? String, "first")
+        try await Task.sleep(for: .milliseconds(100))
+    }
+
     private func evaluate(_ script: String, in web: WKWebView) async throws -> Any? {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
             web.evaluateJavaScript(script, completionHandler: { value, error in

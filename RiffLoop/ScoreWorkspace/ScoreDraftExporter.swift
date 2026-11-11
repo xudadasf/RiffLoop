@@ -6,6 +6,8 @@ enum ScoreDraftExportError: LocalizedError {
     case missingResources
     case unavailable
     case invalidOutput
+    case tooLarge
+    case busy
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +15,38 @@ enum ScoreDraftExportError: LocalizedError {
         case .missingResources: "离线草稿导出资源缺失。"
         case .unavailable: "离线草稿导出暂不可用，请重试。"
         case .invalidOutput: "生成的 GP 数据无效。"
+        case .tooLarge: "草稿较大，当前暂不能安全导出。"
+        case .busy: "正在导出另一份草稿，请稍后重试。"
+        }
+    }
+}
+
+/// Completes at most once, even if WebKit replies after the timeout.
+@MainActor
+final class ScoreDraftWebReply {
+    private var continuation: CheckedContinuation<Any?, Error>?
+
+    init(_ continuation: CheckedContinuation<Any?, Error>) {
+        self.continuation = continuation
+    }
+
+    func finish(value: Any?, error: Error?) {
+        guard let continuation else { return }
+        self.continuation = nil
+        if let error { continuation.resume(throwing: error) }
+        else { continuation.resume(returning: value) }
+    }
+
+    static func wait(timeout: TimeInterval,
+                     start: (@escaping (Any?, Error?) -> Void) -> Void) async throws -> Any? {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
+            let reply = ScoreDraftWebReply(continuation)
+            start { value, error in
+                DispatchQueue.main.async { reply.finish(value: value, error: error) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+                reply.finish(value: nil, error: ScoreDraftExportError.unavailable)
+            }
         }
     }
 }
@@ -21,9 +55,19 @@ enum ScoreDraftExportError: LocalizedError {
 /// to the practice library. The JS exporter reads the resulting GP back and
 /// rejects it if the supported notes, rests or playback timing changed.
 enum ScoreDraftExporter {
+    // Temporary conservative limit, not a measurement of iPad mini 6 capacity.
+    private static let maximumEvents = 512
+    @MainActor private static var exporting = false
+
     @MainActor
     static func export(_ draft: ScoreDraft) async throws -> Data {
         guard draft.isComplete else { throw ScoreDraftExportError.incomplete }
+        guard draft.bars.reduce(0, { $0 + $1.count }) <= maximumEvents else {
+            throw ScoreDraftExportError.tooLarge
+        }
+        guard !exporting else { throw ScoreDraftExportError.busy }
+        exporting = true
+        defer { exporting = false }
         guard let root = Bundle.main.resourceURL,
               let page = Bundle.main.url(forResource: "ScoreDraft", withExtension: "html"),
               Bundle.main.url(forResource: "draft-core", withExtension: "js") != nil,
@@ -40,7 +84,10 @@ enum ScoreDraftExporter {
         var ready = false
         while Date() < deadline {
             try Task.checkCancellation()
-            if let result = try? await evaluate("typeof alphaTab !== 'undefined' && typeof RiffLoopDraftEditor !== 'undefined'", in: web),
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining > 0 else { break }
+            if let result = try? await evaluate("typeof alphaTab !== 'undefined' && typeof RiffLoopDraftEditor !== 'undefined'",
+                                                in: web, timeout: min(30, remaining)),
                result as? Bool == true {
                 ready = true
                 break
@@ -74,12 +121,9 @@ enum ScoreDraftExporter {
     // Use the completion-handler API: the WebKit native async overlay is not
     // available in every iPadOS runtime supported by this application.
     @MainActor
-    private static func evaluate(_ script: String, in web: WKWebView) async throws -> Any? {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any?, Error>) in
-            web.evaluateJavaScript(script, completionHandler: { value, error in
-                if let error { continuation.resume(throwing: error) }
-                else { continuation.resume(returning: value) }
-            })
+    private static func evaluate(_ script: String, in web: WKWebView, timeout: TimeInterval = 30) async throws -> Any? {
+        try await ScoreDraftWebReply.wait(timeout: timeout) { completion in
+            web.evaluateJavaScript(script, completionHandler: completion)
         }
     }
 }
