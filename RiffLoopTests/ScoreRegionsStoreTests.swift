@@ -2,6 +2,25 @@ import XCTest
 @testable import RiffLoop
 
 final class ScoreRegionsStoreTests: XCTestCase {
+    func testDeletionCannotRemoveSourceIfMarkerCannotBeWritten() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let input = root.appendingPathComponent("score.png")
+        try Data("source".utf8).write(to: input)
+        let folder = root.appendingPathComponent("regions")
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: folder)
+        let source = try await workspace.importCopy(from: input)
+        let store = ScoreRegionsStore(source: source, folder: folder)
+        let removal = try await store.prepareRemoval()
+        try Data("not a directory".utf8).write(to: folder)
+        do {
+            _ = try await workspace.removeCopy(source, removal: removal)
+            XCTFail("Deletion must stop if its marker cannot be written")
+        } catch { }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+    }
+
     func testInvalidDeletionMarkerDoesNotAllowImport() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
