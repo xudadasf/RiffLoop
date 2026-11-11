@@ -25,16 +25,65 @@ struct ScoreSequenceEntry: Codable, Equatable {
     var gapAfter: Int
 }
 
+/// User-provided settings for a future recognition draft, not inferred values.
+struct ScoreRecognitionSettings: Codable, Equatable {
+    let tempo: Int
+    let numerator: Int
+    let denominator: Int
+    /// MIDI pitches from the sixth string to the first string.
+    let tuning: [Int]
+
+    static let standard = ScoreRecognitionSettings(tempo: 100, numerator: 4, denominator: 4,
+                                                   tuning: [40, 45, 50, 55, 59, 64])
+
+    var isValid: Bool {
+        (1...999).contains(tempo) && (1...32).contains(numerator) &&
+            [1, 2, 4, 8, 16, 32].contains(denominator) &&
+            tuning.count == 6 && tuning.allSatisfy { (0...127).contains($0) }
+    }
+
+    var tuningText: String {
+        guard tuning.allSatisfy({ (0...127).contains($0) }) else { return "" }
+        let names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        return tuning.map { "\(names[$0 % 12])\($0 / 12 - 1)" }.joined(separator: " ")
+    }
+
+    static func parseTuning(_ text: String) -> [Int]? {
+        let parts = text.split(whereSeparator: \.isWhitespace)
+        guard parts.count == 6 else { return nil }
+        let semitones: [Character: Int] = ["C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11]
+        var pitches: [Int] = []
+        for part in parts {
+            let token = Array(part.uppercased())
+            guard let first = token.first, let base = semitones[first], token.count >= 2 else { return nil }
+            var offset = 0
+            var octaveStart = 1
+            if token[1] == "#" || token[1] == "B" {
+                offset = token[1] == "#" ? 1 : -1
+                octaveStart = 2
+            }
+            guard octaveStart < token.count, let octave = Int(String(token[octaveStart...])),
+                  (-1...9).contains(octave) else { return nil }
+            let midi = (octave + 1) * 12 + base + offset
+            guard (0...127).contains(midi) else { return nil }
+            pitches.append(midi)
+        }
+        return pitches
+    }
+}
+
 struct ScoreRecognitionOrder: Equatable {
     let regions: [ScoreSequenceRegionReference]
     /// One gap between each pair; the final region never adds a trailing gap.
     let gaps: [Int]
+    let settings: ScoreRecognitionSettings
 }
 
 enum ScoreSequenceError: Error, Equatable {
     case invalidPlan
     case invalidNumber
     case invalidGap
+    case invalidSettings
     case duplicateReference
     case noSelectedRegions
     case unreviewedMaterials([String])
@@ -47,10 +96,13 @@ struct ScoreSequencePlan: Codable, Equatable {
     let version: Int
     let materials: [ScoreSequenceMaterial]
     private(set) var entries: [ScoreSequenceEntry]
+    /// Missing from older plans; use standard values without rewriting them.
+    private(set) var recognitionSettings: ScoreRecognitionSettings?
 
     init(materials: [ScoreSequenceMaterial], regions: [ScoreSequenceRegionReference]) throws {
         self.version = 1
         self.materials = materials
+        self.recognitionSettings = nil
         self.entries = regions.enumerated().map { index, reference in
             ScoreSequenceEntry(number: index + 1, reference: reference, isSelected: true, gapAfter: 1)
         }
@@ -58,9 +110,11 @@ struct ScoreSequencePlan: Codable, Equatable {
     }
 
     var selectedEntries: [ScoreSequenceEntry] { entries.filter(\.isSelected) }
+    var effectiveSettings: ScoreRecognitionSettings { recognitionSettings ?? .standard }
 
     func validate() throws {
-        guard version == 1, !materials.isEmpty, materials.allSatisfy(\.isValid),
+        guard version == 1, recognitionSettings?.isValid != false,
+              !materials.isEmpty, materials.allSatisfy(\.isValid),
               Set(materials).count == materials.count,
               Set(materials.map(\.name)).count == materials.count,
               Set(entries.map(\.number)).count == entries.count,
@@ -69,6 +123,11 @@ struct ScoreSequencePlan: Codable, Equatable {
                   entry.number > 0 && (0...99).contains(entry.gapAfter) &&
                       entry.reference.pageIndex >= 0 && materials.contains(entry.reference.material)
               }) else { throw ScoreSequenceError.invalidPlan }
+    }
+
+    mutating func setRecognitionSettings(_ settings: ScoreRecognitionSettings) throws {
+        guard settings.isValid else { throw ScoreSequenceError.invalidSettings }
+        recognitionSettings = settings
     }
 
     /// Entering an existing box number at a writing position swaps the two boxes.
@@ -139,7 +198,8 @@ struct ScoreSequencePlan: Codable, Equatable {
             return $0.regionID.uuidString < $1.regionID.uuidString
         }
         guard newRegions.isEmpty else { throw ScoreSequenceError.unregisteredRegions(newRegions) }
-        return ScoreRecognitionOrder(regions: selected.map(\.reference), gaps: selected.dropLast().map(\.gapAfter))
+        return ScoreRecognitionOrder(regions: selected.map(\.reference), gaps: selected.dropLast().map(\.gapAfter),
+                                     settings: effectiveSettings)
     }
 }
 

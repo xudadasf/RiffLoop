@@ -8,6 +8,10 @@ final class ScoreSequenceEditorModel: ObservableObject {
     @Published var message: String?
     @Published var numberInputs: [Int: String]
     @Published var gapInputs: [Int: String]
+    @Published var tempoInput: String
+    @Published var numeratorInput: String
+    @Published var denominatorInput: String
+    @Published var tuningInput: String
     private var savedPlan: ScoreSequencePlan?
     private let saveAction: (ScoreSequencePlan) async throws -> Void
     private let offeredRegions: [ScoreSequenceRegionReference]
@@ -21,6 +25,11 @@ final class ScoreSequenceEditorModel: ObservableObject {
         self.offeredRegions = newRegions.filter { seen.insert($0).inserted }
         self.numberInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.enumerated().map { ($0.offset, String($0.element.number)) })
         self.gapInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.map { ($0.number, String($0.gapAfter)) })
+        let settings = plan.effectiveSettings
+        self.tempoInput = String(settings.tempo)
+        self.numeratorInput = String(settings.numerator)
+        self.denominatorInput = String(settings.denominator)
+        self.tuningInput = settings.tuningText
     }
 
     private var pendingNumbers: Set<Int> {
@@ -31,7 +40,15 @@ final class ScoreSequenceEditorModel: ObservableObject {
         Set(plan.selectedEntries.compactMap { gapInputs[$0.number] == String($0.gapAfter) ? nil : $0.number })
     }
 
-    var hasUnsavedChanges: Bool { savedPlan != plan || !pendingNumbers.isEmpty || !pendingGaps.isEmpty }
+    private var pendingSettings: Bool {
+        let settings = plan.effectiveSettings
+        return tempoInput != String(settings.tempo) || numeratorInput != String(settings.numerator) ||
+            denominatorInput != String(settings.denominator) || tuningInput != settings.tuningText
+    }
+
+    var hasUnsavedChanges: Bool {
+        savedPlan != plan || !pendingNumbers.isEmpty || !pendingGaps.isEmpty || pendingSettings
+    }
 
     var newRegions: [ScoreSequenceRegionReference] {
         let existing = Set(plan.entries.map(\.reference))
@@ -41,15 +58,42 @@ final class ScoreSequenceEditorModel: ObservableObject {
     private func syncInputs() {
         numberInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.enumerated().map { ($0.offset, String($0.element.number)) })
         gapInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.map { ($0.number, String($0.gapAfter)) })
+        let settings = plan.effectiveSettings
+        tempoInput = String(settings.tempo)
+        numeratorInput = String(settings.numerator)
+        denominatorInput = String(settings.denominator)
+        tuningInput = settings.tuningText
     }
 
-    private func canApply(exceptNumber position: Int? = nil, exceptGap number: Int? = nil) -> Bool {
+    private func canApply(exceptNumber position: Int? = nil, exceptGap number: Int? = nil,
+                          exceptSettings: Bool = false) -> Bool {
         guard pendingNumbers.subtracting(position.map { [$0] } ?? []).isEmpty,
-              pendingGaps.subtracting(number.map { [$0] } ?? []).isEmpty else {
+              pendingGaps.subtracting(number.map { [$0] } ?? []).isEmpty,
+              exceptSettings || !pendingSettings else {
             message = "请先调整或恢复其他尚未应用的输入。"
             return false
         }
         return true
+    }
+
+    func applySettings() {
+        guard !isSaving, canApply(exceptSettings: true) else { return }
+        guard let tempo = Int(tempoInput.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let numerator = Int(numeratorInput.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let denominator = Int(denominatorInput.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let tuning = ScoreRecognitionSettings.parseTuning(tuningInput) else {
+            message = "请输入速度、拍号和六根弦的音名，例如 E2 A2 D3 G3 B3 E4。"
+            return
+        }
+        let settings = ScoreRecognitionSettings(tempo: tempo, numerator: numerator,
+                                                denominator: denominator, tuning: tuning)
+        guard settings.isValid else {
+            message = "速度请输入 1 到 999，拍号分子请输入 1 到 32，分母使用 1、2、4、8、16 或 32。"
+            return
+        }
+        if change({ try $0.setRecognitionSettings(settings) }) {
+            message = "识别设置已应用，请保存任务。"
+        }
     }
 
     func assign(position: Int) {
@@ -113,7 +157,7 @@ final class ScoreSequenceEditorModel: ObservableObject {
             try snapshot.validate()
             try await saveAction(snapshot)
             savedPlan = snapshot
-            message = "顺序和间隔已保存。"
+            message = "任务设置已保存。"
         } catch {
             message = "保存失败：\(error.localizedDescription)"
         }
@@ -146,8 +190,29 @@ struct ScoreSequenceEditorView: View {
                 Text("顺序表框编号是本任务内的编号，可能与画框页面的页内编号不同。")
                 Text("0 表示连续，默认在区域之间插入 1 个空白小节；最后一个区域后不会插入。")
                 Text("PDF 缩略图显示首页；区域页码以文字为准。")
-                Text("自动分区与识别仍在开发，当前只能保存顺序和间隔。")
+                Text("自动分区与识别仍在开发，当前可保存任务设置。")
                     .foregroundStyle(.secondary)
+            }
+            Section("识别设置") {
+                Text("这些值由你设置，并非从谱面识别；完成后点“应用设置”，再保存任务。")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("速度 BPM")
+                    TextField("100", text: $model.tempoInput).keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder).frame(maxWidth: 90)
+                    Text("拍号")
+                    TextField("4", text: $model.numeratorInput).keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder).frame(maxWidth: 65)
+                    Text("/")
+                    TextField("4", text: $model.denominatorInput).keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder).frame(maxWidth: 65)
+                }
+                TextField("E2 A2 D3 G3 B3 E4", text: $model.tuningInput)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+                Text("调弦顺序：第 6 弦到第 1 弦；音名之间用空格分开。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("应用设置") { model.applySettings() }
             }
             if !model.newRegions.isEmpty {
                 Section("新增区域") {

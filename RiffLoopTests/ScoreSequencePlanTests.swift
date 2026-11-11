@@ -9,6 +9,33 @@ final class ScoreSequencePlanTests: XCTestCase {
         ScoreSequenceRegionReference(material: material, pageIndex: page, rotation: 0, regionID: UUID())
     }
 
+    func testRecognitionSettingsValidateAndOldPlansUseStandardDefaults() throws {
+        let a = region(first, page: 0)
+        var plan = try ScoreSequencePlan(materials: [first], regions: [a])
+        let legacy = try JSONEncoder().encode(plan)
+        let restored = try JSONDecoder().decode(ScoreSequencePlan.self, from: legacy)
+        try restored.validate()
+        XCTAssertNil(restored.recognitionSettings)
+        XCTAssertEqual(restored.effectiveSettings, .standard)
+        XCTAssertEqual(ScoreRecognitionSettings.standard.tuningText, "E2 A2 D3 G3 B3 E4")
+        XCTAssertEqual(ScoreRecognitionSettings.parseTuning("Eb2 A2 D3 G3 Bb3 E4"), [39, 45, 50, 55, 58, 64])
+        XCTAssertNil(ScoreRecognitionSettings.parseTuning("E2 A2 D3 G3 B3"))
+        XCTAssertNil(ScoreRecognitionSettings.parseTuning("E2 A2 D3 G3 B3 X4"))
+        XCTAssertNil(ScoreRecognitionSettings.parseTuning("E2 A2 D3 G3 B3 C10"))
+
+        let settings = ScoreRecognitionSettings(tempo: 123, numerator: 3, denominator: 8,
+                                                tuning: [38, 45, 50, 55, 59, 64])
+        try plan.setRecognitionSettings(settings)
+        let reopened = try JSONDecoder().decode(ScoreSequencePlan.self, from: JSONEncoder().encode(plan))
+        try reopened.validate()
+        XCTAssertEqual(reopened.effectiveSettings, settings)
+        XCTAssertEqual(try reopened.recognitionOrder(available: [a]).settings, settings)
+        let invalid = ScoreRecognitionSettings(tempo: 0, numerator: 4, denominator: 3,
+                                               tuning: [40, 45, 50, 55, 59, 64])
+        XCTAssertThrowsError(try plan.setRecognitionSettings(invalid))
+        XCTAssertEqual(plan.effectiveSettings, settings)
+    }
+
     func testAcrossFilesAndPagesNumberAssignmentSwapsBoxesAndGapsFollowThem() throws {
         let a = region(first, page: 0), b = region(second, page: 0), c = region(first, page: 2)
         var plan = try ScoreSequencePlan(materials: [first, second], regions: [a, b, c])

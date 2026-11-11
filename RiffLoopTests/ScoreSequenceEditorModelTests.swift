@@ -11,6 +11,32 @@ final class ScoreSequenceEditorModelTests: XCTestCase {
         return try ScoreSequencePlan(materials: [material], regions: regions)
     }
 
+    func testSettingsCannotBeLostAndAreSavedWithThePlan() async throws {
+        let plan = try samplePlan()
+        var saved: ScoreSequencePlan?
+        let model = ScoreSequenceEditorModel(plan: plan, isSaved: true) { saved = $0 }
+        XCTAssertFalse(model.hasUnsavedChanges)
+        model.tempoInput = "120"
+        model.numeratorInput = "3"
+        model.denominatorInput = "8"
+        model.tuningInput = "D2 A2 D3 G3 B3 E4"
+        XCTAssertTrue(model.hasUnsavedChanges)
+        await model.save()
+        XCTAssertNil(saved, "Unapplied input must never be silently discarded")
+        model.applySettings()
+        XCTAssertEqual(model.plan.effectiveSettings.tempo, 120)
+        XCTAssertEqual(model.plan.effectiveSettings.tuning, [38, 45, 50, 55, 59, 64])
+        await model.save()
+        XCTAssertEqual(saved?.effectiveSettings, model.plan.effectiveSettings)
+        XCTAssertFalse(model.hasUnsavedChanges)
+
+        model.tuningInput = "not a tuning"
+        model.applySettings()
+        XCTAssertEqual(model.plan.effectiveSettings.tempo, 120)
+        XCTAssertTrue(model.hasUnsavedChanges)
+        XCTAssertNotNil(model.message)
+    }
+
     func testPendingInputsCannotBeSilentlyDroppedBySaveOrSelection() async throws {
         let plan = try samplePlan()
         var saved: [ScoreSequencePlan] = []
