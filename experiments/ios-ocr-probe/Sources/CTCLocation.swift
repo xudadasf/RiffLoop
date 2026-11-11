@@ -26,14 +26,12 @@ enum CTCLocation {
         let lineLength = Double(timeSteps) * ratio / maxRatio
         guard lineLength.isFinite, lineLength > 0 else { throw CTCLocationError.invalidGeometry }
 
-        return try runs.compactMap { run in
+        return try runs.map { run in
             guard run.start >= 0, run.start <= run.end, run.end < timeSteps else {
                 throw CTCLocationError.invalidRun
             }
-            // Desktop word positions omit spaces, but retain punctuation.
-            // Unknown classes stay in the result to avoid silently joining digits.
-            if let character = run.character, !character.isEmpty,
-               character.allSatisfy(\.isWhitespace) { return nil }
+            // Preserve all CTC runs, including whitespace, so a separator
+            // never disappears before grouping and can be reviewed with its score.
             let x = sourceLeft + Double(run.start) * (sourceRight - sourceLeft) / lineLength
             guard x.isFinite else { throw CTCLocationError.invalidGeometry }
             // Source crop follows the desktop's half-open [x0, x1) convention.

@@ -73,7 +73,7 @@ final class CTCConfidenceTests: XCTestCase {
         XCTAssertEqual(review.groups.map(\.value.fret), [12, 1])
         XCTAssertTrue(review.groups[0].reasons.contains(.lowCharacterScore))
         XCTAssertTrue(review.groups.allSatisfy { $0.reasons.contains(.uncalibrated) })
-        XCTAssertEqual(review.unresolved, [.init(inputIndex: 2, reason: .unknownCharacter)])
+        XCTAssertEqual(review.unresolved.map(\.issue), [.init(inputIndex: 2, reason: .unknownCharacter)])
         XCTAssertThrowsError(try CTCGroupReview.combine(grouping: grouping, locations: [], confidence: confidence))
         let missing = DigitGroupingResult(groups: [], unresolved: [])
         XCTAssertThrowsError(try CTCGroupReview.combine(grouping: missing, locations: locations, confidence: confidence))
@@ -86,6 +86,34 @@ final class CTCConfidenceTests: XCTestCase {
         XCTAssertThrowsError(try CTCGroupReview.combine(grouping: grouping,
                                                        locations: [locations[0], locations[0]],
                                                        confidence: confidence))
+    }
+
+    func testNonDigitsSpacesAndUnknownsKeepLocationsAndScores() throws {
+        let confidence = try CTCConfidence.evaluate(indices: [1, 3, 2, 5, 9, 1],
+                                                    scores: [0.9, 0.7, 0.99, 0.8, 0.6, 0.99],
+                                                    labels: [1: "1", 2: "2", 3: ",", 5: " "])
+        let locations = try CTCLocation.locate(confidence.items.map(\.run), timeSteps: 6,
+                                                boundedWidth: 320, boundedHeight: 48,
+                                                sourceLeft: 0, sourceRight: 60)
+        let inputs = locations.map { DigitGroupingInput(character: $0.run.character, x: $0.x,
+                                                        isWithinSource: $0.isWithinSource) }
+        let grouping = try DigitGrouping.group(inputs, stringGap: 100)
+        let review = try CTCGroupReview.combine(grouping: grouping, locations: locations, confidence: confidence)
+        XCTAssertEqual(review.groups.map(\.value.fret), [1, 2, 1])
+        XCTAssertEqual(review.unresolved.map(\.issue), [
+            .init(inputIndex: 1, reason: .nonDigitCharacter),
+            .init(inputIndex: 3, reason: .nonDigitCharacter),
+            .init(inputIndex: 4, reason: .unknownCharacter)
+        ])
+        XCTAssertEqual(review.unresolved.map(\.location.x), [10, 30, 40])
+        XCTAssertEqual(review.unresolved.map(\.location.run.character), [",", " ", nil])
+        XCTAssertEqual(review.unresolved.map(\.confidence.rawFirstScore), [0.7, 0.8, 0.6])
+        XCTAssertTrue(review.unresolved.allSatisfy { $0.confidence.reviewReasons.contains(.uncalibrated) })
+        XCTAssertTrue(review.unresolved.last!.confidence.reviewReasons.contains(.unmappedClass))
+        let droppedSymbol = DigitGroupingResult(groups: grouping.groups, unresolved: Array(grouping.unresolved.dropFirst()))
+        XCTAssertThrowsError(try CTCGroupReview.combine(grouping: droppedSymbol, locations: locations, confidence: confidence))
+        XCTAssertThrowsError(try CTCGroupReview.combine(grouping: grouping,
+                                                        locations: Array(locations.dropFirst()), confidence: confidence))
     }
 
     func testAmbiguousFretIsNotTreatedAsVerified() throws {

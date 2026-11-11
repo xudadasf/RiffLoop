@@ -26,9 +26,12 @@ final class CTCLocationTests: XCTestCase {
             sequence.replaceSubrange(0..<10, with: [1, 1, 0, 1, 3, 2, 5, 4, 0, 2])
             sequence[timeSteps - 1] = 1
             let decoded = PartialCTC.decode(sequence, labels: labels)
-            let located = try CTCLocation.locate(decoded.runs, timeSteps: timeSteps,
+            let all = try CTCLocation.locate(decoded.runs, timeSteps: timeSteps,
                                                   boundedWidth: width, boundedHeight: height,
                                                   sourceLeft: 10, sourceRight: 210)
+            // The desktop's word positions omit spaces, whereas the probe
+            // keeps them separately so they can be inspected as separators.
+            let located = all.filter { $0.run.character != " " }
             XCTAssertEqual(located.map(\.run.start), [0, 3, 4, 5, 7, 9, timeSteps - 1])
             XCTAssertEqual(located.map(\.run.character), ["1", "1", ",", "2", "X", "2", "1"])
             XCTAssertEqual(located.count, expected.count)
@@ -60,12 +63,12 @@ final class CTCLocationTests: XCTestCase {
                                                sourceLeft: 0, sourceRight: 200), [])
     }
 
-    func testFullWidthSpaceIsOmittedWithoutLosingAdjacentCharacters() throws {
+    func testFullWidthSpaceKeepsItsLocationBetweenAdjacentCharacters() throws {
         let decoded = PartialCTC.decode([1, 2, 1], labels: [1: "1", 2: "\u{3000}"])
         let located = try CTCLocation.locate(decoded.runs, timeSteps: 3, boundedWidth: 320,
                                               boundedHeight: 48, sourceLeft: 0, sourceRight: 300)
-        XCTAssertEqual(located.map(\.run.character), ["1", "1"])
-        XCTAssertEqual(located.map(\.run.start), [0, 2])
-        XCTAssertEqual(located.map(\.x), [0, 200])
+        XCTAssertEqual(located.map(\.run.character), ["1", "\u{3000}", "1"])
+        XCTAssertEqual(located.map(\.run.start), [0, 1, 2])
+        XCTAssertEqual(located.map(\.x), [0, 100, 200])
     }
 }

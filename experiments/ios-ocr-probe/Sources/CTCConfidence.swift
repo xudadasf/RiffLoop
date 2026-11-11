@@ -27,12 +27,18 @@ struct CTCGroupReview: Equatable {
         let value: DigitGroupingResult.Group
         let reasons: [CTCConfidenceResult.ReviewReason]
     }
+    struct Unresolved: Equatable {
+        let issue: DigitGroupingResult.Unresolved
+        let location: CTCLocatedRun
+        let confidence: CTCConfidenceResult.Item
+    }
     let groups: [Group]
-    let unresolved: [DigitGroupingResult.Unresolved]
+    let unresolved: [Unresolved]
 
     static func combine(grouping: DigitGroupingResult, locations: [CTCLocatedRun],
                         confidence: CTCConfidenceResult) throws -> CTCGroupReview {
-        guard zip(locations, locations.dropFirst()).allSatisfy({ $0.0.run.start < $0.1.run.start }) else {
+        guard locations.count == confidence.items.count,
+              zip(locations, locations.dropFirst()).allSatisfy({ $0.0.run.start < $0.1.run.start }) else {
             throw CTCConfidenceError.invalidInput
         }
         var byStart: [Int: CTCConfidenceResult.Item] = [:]
@@ -75,40 +81,38 @@ struct CTCGroupReview: Equatable {
             if group.fret == nil { reasons.insert(CTCConfidenceResult.ReviewReason.ambiguousFret.rawValue) }
             return Group(value: group, reasons: reasonOrder.filter { reasons.contains($0.rawValue) })
         }
-        for issue in grouping.unresolved {
+        let unresolved = try grouping.unresolved.map { issue -> Unresolved in
             guard locations.indices.contains(issue.inputIndex), seen.insert(issue.inputIndex).inserted,
                   let item = byStart[locations[issue.inputIndex].run.start],
                   item.run == locations[issue.inputIndex].run else {
                 throw CTCConfidenceError.invalidInput
             }
             let location = locations[issue.inputIndex]
-            if issue.reason == .outsideSource {
+            switch issue.reason {
+            case .outsideSource:
                 guard !location.isWithinSource else { throw CTCConfidenceError.invalidInput }
-            } else {
+            case .unknownCharacter:
                 guard location.isWithinSource,
                       location.run.character == nil || location.run.character?.unicodeScalars.count != 1 else {
                     throw CTCConfidenceError.invalidInput
                 }
+            case .nonDigitCharacter:
+                guard location.isWithinSource, let character = location.run.character,
+                      character.unicodeScalars.count == 1,
+                      !(character.utf8.count == 1 && character.utf8.first.map { (48...57).contains($0) } == true) else {
+                    throw CTCConfidenceError.invalidInput
+                }
             }
+            return Unresolved(issue: issue, location: location, confidence: item)
         }
-        // Known punctuation is an intentional separator. All digits and all
-        // unrecognized or out-of-range inputs must be represented explicitly.
+        // Every decoded character must appear either in a group or as an issue.
         for (index, location) in locations.enumerated() {
             guard let item = byStart[location.run.start], item.run == location.run else {
                 throw CTCConfidenceError.invalidInput
             }
-            let character = item.run.character
-            let asciiDigit: Bool
-            if let character, character.utf8.count == 1, let value = character.utf8.first {
-                asciiDigit = (48...57).contains(value)
-            } else {
-                asciiDigit = false
-            }
-            let requiresReview = !location.isWithinSource || character == nil ||
-                character?.unicodeScalars.count != 1 || asciiDigit
-            guard !requiresReview || seen.contains(index) else { throw CTCConfidenceError.invalidInput }
+            guard seen.contains(index) else { throw CTCConfidenceError.invalidInput }
         }
-        return CTCGroupReview(groups: results, unresolved: grouping.unresolved)
+        return CTCGroupReview(groups: results, unresolved: unresolved)
     }
 }
 

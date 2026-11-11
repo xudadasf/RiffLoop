@@ -17,6 +17,7 @@ struct DigitGroupingResult: Equatable {
     enum Issue: String, Equatable {
         case unknownCharacter
         case outsideSource
+        case nonDigitCharacter
     }
     struct Unresolved: Equatable {
         let inputIndex: Int
@@ -54,6 +55,7 @@ enum DigitGrouping {
                 continue
             }
             guard char.utf8.count == 1, let digit = char.utf8.first, (48...57).contains(digit) else {
+                unresolved.append(.init(inputIndex: index, reason: .nonDigitCharacter))
                 mayJoin = false
                 continue
             }

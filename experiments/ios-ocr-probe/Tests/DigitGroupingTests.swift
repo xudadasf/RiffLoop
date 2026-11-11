@@ -40,8 +40,14 @@ final class DigitGroupingTests: XCTestCase {
             XCTAssertEqual(actual.groups.map(\.inputIndices), sample.groups.map(\.inputIndices), sample.name)
             XCTAssertEqual(actual.groups.map(\.text), sample.groups.map(\.text), sample.name)
             XCTAssertEqual(actual.groups.map(\.fret), sample.groups.map(\.fret), sample.name)
-            XCTAssertEqual(actual.unresolved.map(\.inputIndex), sample.unresolved.map(\.inputIndex), sample.name)
-            XCTAssertEqual(actual.unresolved.map { $0.reason.rawValue }, sample.unresolved.map(\.reason), sample.name)
+            // Desktop reference omits known non-digits, but this probe keeps
+            // them for review without changing the numeric groups.
+            let baselineIssues = actual.unresolved.filter { $0.reason != .nonDigitCharacter }
+            XCTAssertEqual(baselineIssues.map(\.inputIndex), sample.unresolved.map(\.inputIndex), sample.name)
+            XCTAssertEqual(baselineIssues.map { $0.reason.rawValue }, sample.unresolved.map(\.reason), sample.name)
+            let knownSymbols = actual.unresolved.filter { $0.reason == .nonDigitCharacter }.map(\.inputIndex)
+            let expectedSymbols: [String: [Int]] = ["symbol_barrier": [1], "non_ascii_digit": [1]]
+            XCTAssertEqual(knownSymbols, expectedSymbols[sample.name] ?? [], sample.name)
         }
     }
 
