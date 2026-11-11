@@ -102,26 +102,34 @@ final class ScoreRegionEditorModel: ObservableObject {
     @Published private(set) var pageIndex = 0
     @Published private(set) var pageCount = 0
     @Published private(set) var busy = false
+    @Published private(set) var hasPendingChange = false
     @Published var message: String?
 
     private let source: URL
     private let store: ScoreRegionsStore
     private var orientation = 0
+    private enum Change { case add(ScoreRegion), remove(ScoreRegion) }
+    private var pendingChange: Change?
 
-    init(source: URL) {
+    init(source: URL, store: ScoreRegionsStore? = nil) {
         self.source = source
-        self.store = ScoreRegionsStore(source: source)
+        self.store = store ?? ScoreRegionsStore(source: source)
+    }
+
+    var pendingAddedRegion: ScoreRegion? {
+        if case let .add(region) = pendingChange { return region }
+        return nil
     }
 
     func open() async {
-        guard !busy else { return }
+        guard !busy, !hasPendingChange else { return }
         busy = true
         defer { busy = false }
         await showPage(0)
     }
 
     func changePage(_ index: Int) async {
-        guard !busy, index >= 0, index < pageCount else { return }
+        guard !busy, !hasPendingChange, index >= 0, index < pageCount else { return }
         busy = true
         defer { busy = false }
         await showPage(index)
@@ -153,27 +161,70 @@ final class ScoreRegionEditorModel: ObservableObject {
     }
 
     func addRegion(_ region: ScoreRegion, onPage index: Int) async {
-        guard !busy else { message = "正在保存，请稍后重新画框。"; return }
+        guard !busy, !hasPendingChange else { message = "请先处理尚未保存的区域。"; return }
         guard pageIndex == index, image != nil, region.isValid else {
             message = "页面已变化或区域无效，请重新画框。"
             return
         }
-        await save(regions + [region])
+        await save(.add(region), basedOn: regions)
     }
 
     func removeRegion(_ id: UUID) async {
-        guard !busy, image != nil else { return }
-        await save(regions.filter { $0.id != id })
+        guard !busy, !hasPendingChange, image != nil,
+              let region = regions.first(where: { $0.id == id }) else { return }
+        await save(.remove(region), basedOn: regions)
     }
 
-    private func save(_ updated: [ScoreRegion]) async {
+    private func save(_ change: Change, basedOn current: [ScoreRegion]) async {
         busy = true
         defer { busy = false }
         do {
-            try await store.savePage(index: pageIndex, rotation: orientation, regions: updated)
+            let updated: [ScoreRegion]
+            switch change {
+            case let .add(region):
+                guard !current.contains(where: { $0.id == region.id }) else { throw ScoreRegionsError.conflict }
+                updated = current + [region]
+            case let .remove(region):
+                guard let existing = current.first(where: { $0.id == region.id }) else {
+                    throw ScoreRegionsError.conflict
+                }
+                guard existing == region else { throw ScoreRegionsError.conflict }
+                updated = current.filter { $0.id != region.id }
+            }
+            try await store.savePage(index: pageIndex, rotation: orientation, regions: updated, replacing: current)
             regions = updated
+            pendingChange = nil
+            hasPendingChange = false
         } catch {
-            message = "保存区域失败：\(error.localizedDescription)"
+            pendingChange = change
+            hasPendingChange = true
+            message = "区域尚未保存：\(error.localizedDescription)\n已保留本次操作，可重试保存或放弃。"
+        }
+    }
+
+    func retryPendingChange() async {
+        guard !busy, let change = pendingChange else { return }
+        busy = true
+        do {
+            let latest = try await store.loadPage(index: pageIndex, rotation: orientation)
+            busy = false
+            await save(change, basedOn: latest)
+        } catch {
+            busy = false
+            message = "无法读取最新区域：\(error.localizedDescription)\n本次操作仍保留。"
+        }
+    }
+
+    func discardPendingChange() async {
+        guard !busy, hasPendingChange else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            regions = try await store.loadPage(index: pageIndex, rotation: orientation)
+            pendingChange = nil
+            hasPendingChange = false
+        } catch {
+            message = "无法读取最新区域：\(error.localizedDescription)\n本次操作仍保留。"
         }
     }
 
@@ -181,12 +232,14 @@ final class ScoreRegionEditorModel: ObservableObject {
 
 /// Manual region selection only. Recognition and ordering are not implemented here.
 struct ScoreRegionEditorView: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var model: ScoreRegionEditorModel
     @State private var zoom = 1.0
     @State private var drawing = false
     @State private var dragStart: CGPoint?
     @State private var dragEnd: CGPoint?
     @State private var regionPendingDeletion: UUID?
+    @State private var confirmDiscard = false
 
     init(source: URL) {
         _model = StateObject(wrappedValue: ScoreRegionEditorModel(source: source))
@@ -196,19 +249,26 @@ struct ScoreRegionEditorView: View {
         VStack(spacing: 8) {
             HStack {
                 Button("上一页") { Task { await model.changePage(model.pageIndex - 1) } }
-                    .disabled(model.busy || model.pageIndex <= 0)
+                    .disabled(model.busy || model.hasPendingChange || model.pageIndex <= 0)
                 Text("\(model.pageCount == 0 ? 0 : model.pageIndex + 1) / \(model.pageCount)")
                 Button("下一页") { Task { await model.changePage(model.pageIndex + 1) } }
-                    .disabled(model.busy || model.pageIndex + 1 >= model.pageCount)
+                    .disabled(model.busy || model.hasPendingChange || model.pageIndex + 1 >= model.pageCount)
                 Spacer()
                 Button("缩小") { zoom = max(1, zoom / 1.25) }.disabled(zoom <= 1)
                 Text("\(Int(zoom * 100))%")
                 Button("放大") { zoom = min(4, zoom * 1.25) }.disabled(zoom >= 4)
-                Toggle("画框", isOn: $drawing).fixedSize().disabled(model.image == nil || model.busy)
+                Toggle("画框", isOn: $drawing).fixedSize().disabled(model.image == nil || model.busy || model.hasPendingChange)
             }
             .padding(.horizontal)
             Text("打开画框后拖动画出区域；关闭画框可滚动。区域仅用于保存，自动识别尚未完成。")
                 .font(.caption).foregroundStyle(.secondary)
+            if model.hasPendingChange {
+                HStack {
+                    Text("操作尚未保存")
+                    Button("重试保存") { Task { await model.retryPendingChange() } }
+                    Button("放弃操作", role: .destructive) { Task { await model.discardPendingChange() } }
+                }.disabled(model.busy)
+            }
             if let image = model.image {
                 GeometryReader { geometry in
                     let fit = min(geometry.size.width / image.size.width, geometry.size.height / image.size.height)
@@ -228,6 +288,11 @@ struct ScoreRegionEditorView: View {
                                     }
                                     .offset(x: size.width * region.x, y: size.height * region.y)
                             }
+                            if let region = model.pendingAddedRegion {
+                                Rectangle().stroke(.orange, lineWidth: 3)
+                                    .frame(width: size.width * region.width, height: size.height * region.height)
+                                    .offset(x: size.width * region.x, y: size.height * region.y)
+                            }
                             if let rect = dragRectangle(size: size) {
                                 Rectangle().stroke(.orange, lineWidth: 2)
                                     .frame(width: rect.width, height: rect.height)
@@ -236,9 +301,9 @@ struct ScoreRegionEditorView: View {
                         }
                         .frame(width: size.width, height: size.height)
                         .contentShape(Rectangle())
-                        .gesture(drawing && !model.busy ? drawGesture(size: size) : nil)
+                        .gesture(drawing && !model.busy && !model.hasPendingChange ? drawGesture(size: size) : nil)
                     }
-                    .scrollDisabled(drawing)
+                    .scrollDisabled(drawing && !model.hasPendingChange)
                 }
                 if !model.regions.isEmpty {
                     ScrollView(.horizontal) {
@@ -246,7 +311,7 @@ struct ScoreRegionEditorView: View {
                             ForEach(Array(model.regions.enumerated()), id: \.element.id) { index, region in
                                 Button("删除区域 \(index + 1)", role: .destructive) {
                                     regionPendingDeletion = region.id
-                                }.disabled(model.busy)
+                                }.disabled(model.busy || model.hasPendingChange)
                             }
                         }.padding(.horizontal)
                     }
@@ -259,6 +324,14 @@ struct ScoreRegionEditorView: View {
             }
         }
         .navigationTitle("手动框选")
+        .navigationBarBackButtonHidden()
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("返回") {
+                    if model.hasPendingChange { confirmDiscard = true } else { dismiss() }
+                }.disabled(model.busy)
+            }
+        }
         .task { await model.open() }
         .onChange(of: model.busy) { _, busy in
             if busy { dragStart = nil; dragEnd = nil }
@@ -276,6 +349,10 @@ struct ScoreRegionEditorView: View {
             Button("取消", role: .cancel) { regionPendingDeletion = nil }
         } message: {
             Text("删除后需要重新画框。")
+        }
+        .confirmationDialog("放弃未保存的区域操作？", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("放弃并返回", role: .destructive) { dismiss() }
+            Button("继续处理", role: .cancel) { }
         }
         .alert("手动框选", isPresented: Binding(
             get: { model.message != nil },

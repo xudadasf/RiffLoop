@@ -2,6 +2,47 @@ import XCTest
 @testable import RiffLoop
 
 final class ScoreRegionsStoreTests: XCTestCase {
+    func testStaleWindowCannotReplaceSamePage() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("score.png")
+        try Data("source".utf8).write(to: source)
+        let first = ScoreRegionsStore(source: source, folder: root.appendingPathComponent("regions"))
+        let second = ScoreRegionsStore(source: source, folder: root.appendingPathComponent("regions"))
+        let a = ScoreRegion(x: 0, y: 0, width: 0.5, height: 0.5)
+        let b = ScoreRegion(x: 0.5, y: 0.5, width: 0.5, height: 0.5)
+        let firstSnapshot = try await first.loadPage(index: 0, rotation: 0)
+        let staleSnapshot = try await second.loadPage(index: 0, rotation: 0)
+        try await first.savePage(index: 0, rotation: 0, regions: [a], replacing: firstSnapshot)
+        do {
+            try await second.savePage(index: 0, rotation: 0, regions: [b], replacing: staleSnapshot)
+            XCTFail("An outdated page must not overwrite a newer one")
+        } catch ScoreRegionsError.conflict { }
+        let saved = try await second.loadPage(index: 0, rotation: 0)
+        XCTAssertEqual(saved, [a])
+    }
+
+    func testSimultaneousWritesOnDifferentPagesPreserveBoth() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("score.pdf")
+        try Data("source".utf8).write(to: source)
+        let folder = root.appendingPathComponent("regions")
+        let first = ScoreRegionsStore(source: source, folder: folder)
+        let second = ScoreRegionsStore(source: source, folder: folder)
+        let a = ScoreRegion(x: 0, y: 0, width: 0.5, height: 0.5)
+        let b = ScoreRegion(x: 0.5, y: 0.5, width: 0.5, height: 0.5)
+        async let writeA: Void = first.savePage(index: 0, rotation: 0, regions: [a], replacing: [])
+        async let writeB: Void = second.savePage(index: 1, rotation: 0, regions: [b], replacing: [])
+        _ = try await (writeA, writeB)
+        let page0 = try await first.loadPage(index: 0, rotation: 0)
+        let page1 = try await first.loadPage(index: 1, rotation: 0)
+        XCTAssertEqual(page0, [a])
+        XCTAssertEqual(page1, [b])
+    }
+
     func testRegionsPersistPerPageAndRotation() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

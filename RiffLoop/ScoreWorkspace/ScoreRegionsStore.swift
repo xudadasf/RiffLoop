@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 /// Coordinates use the top-left origin of the orientation-corrected page as displayed.
-struct ScoreRegion: Codable, Identifiable, Equatable {
+struct ScoreRegion: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     let x: Double
     let y: Double
@@ -46,17 +46,20 @@ enum ScoreRegionsError: LocalizedError {
     case invalidPage
     case unreadableSource
     case invalidStoredData
+    case conflict
 
     var errorDescription: String? {
         switch self {
         case .invalidPage: "区域坐标无效，未保存。"
         case .unreadableSource: "无法读取素材，不能保存区域。"
         case .invalidStoredData: "已保存的区域数据无法读取。"
+        case .conflict: "其他窗口已修改此页，请重新读取后保存。"
         }
     }
 }
 
 actor ScoreRegionsStore {
+    private static let writeLock = NSLock()
     private let source: URL
     private let folder: URL
     private var digest: String?
@@ -83,11 +86,18 @@ actor ScoreRegionsStore {
         )
     }
 
-    func savePage(index: Int, rotation: Int, regions: [ScoreRegion]) throws {
+    func savePage(index: Int, rotation: Int, regions: [ScoreRegion], replacing expected: [ScoreRegion]? = nil) throws {
         guard index >= 0, regions.allSatisfy(\.isValid), Set(regions.map(\.id)).count == regions.count else {
             throw ScoreRegionsError.invalidPage
         }
+        Self.writeLock.lock()
+        defer { Self.writeLock.unlock() }
         var doc = try readDocument()
+        if let expected {
+            let current = doc.pages.first { $0.index == index }
+            guard (current == nil || current?.rotation == rotation),
+                  (current?.regions ?? []) == expected else { throw ScoreRegionsError.conflict }
+        }
         doc.pages.removeAll { $0.index == index }
         doc.pages.append(ScoreRegionsPage(index: index, rotation: rotation, regions: regions))
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -102,6 +112,8 @@ actor ScoreRegionsStore {
 
     /// Call only after the source is removed, using the fingerprint prepared above.
     func removeSavedData(for sourceDigest: String) throws {
+        Self.writeLock.lock()
+        defer { Self.writeLock.unlock() }
         let manager = FileManager.default
         guard manager.fileExists(atPath: folder.path) else { return }
         guard Self.isDigest(sourceDigest) else { throw ScoreRegionsError.invalidStoredData }
