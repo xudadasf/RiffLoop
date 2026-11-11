@@ -40,6 +40,7 @@ struct ScoreRegionsRemoval {
     let generation: UUID
     let source: URL
     let metadata: URL
+    let sourceDigest: String
 }
 
 private struct ScoreRegionsDocument: Codable {
@@ -129,7 +130,8 @@ actor ScoreRegionsStore {
             guard let generation else { throw ScoreRegionsError.unreadableSource }
             return ScoreRegionsRemoval(generation: generation,
                                        source: source.standardizedFileURL,
-                                       metadata: metadataURL(for: document.sourceDigest))
+                                       metadata: metadataURL(for: document.sourceDigest),
+                                       sourceDigest: document.sourceDigest)
         }
     }
 
@@ -153,6 +155,7 @@ actor ScoreRegionsStore {
             throw generation == nil ? ScoreRegionsError.unreadableSource : ScoreRegionsError.sourceChanged
         }
         if generation == nil { generation = currentGeneration }
+        try ScoreRegionDeletionMarker.cancelIfSourceExists(source: source, regions: folder)
         let sourceDigest = try digestForSource()
         let manager = FileManager.default
         let currentURL = metadataURL(for: sourceDigest)

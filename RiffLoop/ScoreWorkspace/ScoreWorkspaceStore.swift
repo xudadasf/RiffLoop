@@ -7,13 +7,16 @@ struct ScoreMaterialRemovalResult {
 /// Imported source copies are private to the score workspace, not the practice library.
 actor ScoreWorkspaceStore {
     private let folder: URL
+    private let regionsFolder: URL
     private let fileManager: FileManager
     private let supportedExtensions: Set<String> = ["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff"]
 
-    init(folder: URL? = nil, fileManager: FileManager = .default) {
+    init(folder: URL? = nil, regionsFolder: URL? = nil, fileManager: FileManager = .default) {
         self.fileManager = fileManager
         self.folder = folder ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ScoreWorkspace/Imports", isDirectory: true)
+        self.regionsFolder = regionsFolder ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ScoreWorkspace/Regions", isDirectory: true)
     }
 
     func files() throws -> [URL] {
@@ -59,6 +62,7 @@ actor ScoreWorkspaceStore {
         guard fileManager.fileExists(atPath: staging.path) else { throw ScoreWorkspaceError.importFailed }
         return try ScoreMaterialAccess.synchronized {
             let destination = availableDestination(for: source.lastPathComponent)
+            try ScoreRegionDeletionMarker.finishBeforeImport(source: destination, regions: regionsFolder, fileManager: fileManager)
             try fileManager.moveItem(at: staging, to: destination)
             ScoreMaterialAccess.advance(destination)
             return destination
@@ -79,10 +83,15 @@ actor ScoreWorkspaceStore {
             if let removal, (removal.source != target || ScoreMaterialAccess.current(target) != removal.generation) {
                 throw ScoreWorkspaceError.sourceChanged
             }
+            if let removal {
+                try ScoreRegionDeletionMarker.cancelIfSourceExists(source: target, regions: regionsFolder)
+                try ScoreRegionDeletionMarker.begin(source: target, digest: removal.sourceDigest,
+                                                    metadata: removal.metadata, regions: regionsFolder)
+            }
             try fileManager.removeItem(at: target)
             ScoreMaterialAccess.advance(target)
-            if let removal, fileManager.fileExists(atPath: removal.metadata.path) {
-                do { try fileManager.removeItem(at: removal.metadata) }
+            if removal != nil {
+                do { try ScoreRegionDeletionMarker.finishBeforeImport(source: target, regions: regionsFolder, fileManager: fileManager) }
                 catch { return ScoreMaterialRemovalResult(cleanupError: error.localizedDescription) }
             }
             return ScoreMaterialRemovalResult(cleanupError: nil)

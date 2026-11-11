@@ -11,7 +11,7 @@ final class ScoreRegionEditorConflictTests: XCTestCase {
         let input = root.appendingPathComponent("score.png")
         let image = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16)).image { _ in }
         try XCTUnwrap(image.pngData()).write(to: input)
-        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"))
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: root.appendingPathComponent("regions"))
         let source = try await workspace.importCopy(from: input)
         let folder = root.appendingPathComponent("regions")
         let oldStore = ScoreRegionsStore(source: source, folder: folder)

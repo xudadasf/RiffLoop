@@ -2,13 +2,82 @@ import XCTest
 @testable import RiffLoop
 
 final class ScoreRegionsStoreTests: XCTestCase {
+    func testInvalidDeletionMarkerDoesNotAllowImport() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let input = root.appendingPathComponent("score.png")
+        try Data("source".utf8).write(to: input)
+        let folder = root.appendingPathComponent("regions")
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: folder)
+        let source = try await workspace.importCopy(from: input)
+        let store = ScoreRegionsStore(source: source, folder: folder)
+        let removal = try await store.prepareRemoval()
+        try ScoreMaterialAccess.synchronized {
+            try ScoreRegionDeletionMarker.begin(source: source, digest: removal.sourceDigest,
+                                                metadata: removal.metadata, regions: folder)
+            try FileManager.default.removeItem(at: source)
+        }
+        let marker = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.hasPrefix(".deleting-") })
+        try Data("invalid".utf8).write(to: marker)
+        do {
+            _ = try await workspace.importCopy(from: input)
+            XCTFail("An invalid deletion marker must not be ignored")
+        } catch ScoreRegionsError.invalidStoredData { }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    func testInterruptedDeletionKeepsRegionsIfSourceStillExists() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("score.png")
+        try Data("source".utf8).write(to: source)
+        let folder = root.appendingPathComponent("regions")
+        let store = ScoreRegionsStore(source: source, folder: folder)
+        let region = ScoreRegion(x: 0, y: 0, width: 1, height: 1)
+        try await store.savePage(index: 0, rotation: 0, regions: [region])
+        let removal = try await store.prepareRemoval()
+        try ScoreMaterialAccess.synchronized {
+            try ScoreRegionDeletionMarker.begin(source: source, digest: removal.sourceDigest,
+                                                metadata: removal.metadata, regions: folder)
+        }
+        let reopened = try await ScoreRegionsStore(source: source, folder: folder).loadPage(index: 0, rotation: 0)
+        XCTAssertEqual(reopened, [region])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).count, 1)
+    }
+
+    func testInterruptedDeletionIsFinishedBeforeSameNameReimport() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let input = root.appendingPathComponent("score.png")
+        try Data("source".utf8).write(to: input)
+        let folder = root.appendingPathComponent("regions")
+        let imports = root.appendingPathComponent("imports")
+        let workspace = ScoreWorkspaceStore(folder: imports, regionsFolder: folder)
+        let source = try await workspace.importCopy(from: input)
+        let store = ScoreRegionsStore(source: source, folder: folder)
+        try await store.savePage(index: 0, rotation: 0, regions: [ScoreRegion(x: 0, y: 0, width: 1, height: 1)])
+        let removal = try await store.prepareRemoval()
+        try ScoreMaterialAccess.synchronized {
+            try ScoreRegionDeletionMarker.begin(source: source, digest: removal.sourceDigest,
+                                                metadata: removal.metadata, regions: folder)
+            try FileManager.default.removeItem(at: source)
+        }
+        let reopened = try await ScoreWorkspaceStore(folder: imports, regionsFolder: folder).importCopy(from: input)
+        let restored = try await ScoreRegionsStore(source: reopened, folder: folder).loadPage(index: 0, rotation: 0)
+        XCTAssertTrue(restored.isEmpty)
+    }
+
     func testRemovalReportsRegionCleanupFailureAfterDeletingSource() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let input = root.appendingPathComponent("score.png")
         try Data("source".utf8).write(to: input)
-        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), fileManager: FailRegionCleanupFileManager())
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: root.appendingPathComponent("regions"), fileManager: FailRegionCleanupFileManager())
         let source = try await workspace.importCopy(from: input)
         let folder = root.appendingPathComponent("regions")
         let regions = ScoreRegionsStore(source: source, folder: folder)
@@ -17,11 +86,16 @@ final class ScoreRegionsStoreTests: XCTestCase {
         let result = try await workspace.removeCopy(source, removal: removal)
         XCTAssertNotNil(result.cleanupError)
         XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).count, 1)
-        let reimported = try await workspace.importCopy(from: input)
+        do {
+            _ = try await workspace.importCopy(from: input)
+            XCTFail("A failed cleanup must prevent replacement")
+        } catch { }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        let recovered = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: folder)
+        let reimported = try await recovered.importCopy(from: input)
         XCTAssertEqual(reimported, source)
         let restored = try await ScoreRegionsStore(source: reimported, folder: folder).loadPage(index: 0, rotation: 0)
-        XCTAssertEqual(restored.count, 1, "Failed cleanup can leave regions for a same-name, same-content import")
+        XCTAssertTrue(restored.isEmpty)
     }
 
     func testRemovedMaterialCannotBeSavedByAnOpenEditor() async throws {
@@ -30,7 +104,7 @@ final class ScoreRegionsStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let input = root.appendingPathComponent("score.png")
         try Data("source".utf8).write(to: input)
-        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"))
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: root.appendingPathComponent("regions"))
         let source = try await workspace.importCopy(from: input)
         let regions = ScoreRegionsStore(source: source, folder: root.appendingPathComponent("regions"))
         let original = ScoreRegion(x: 0, y: 0, width: 0.5, height: 0.5)
@@ -51,7 +125,7 @@ final class ScoreRegionsStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let input = root.appendingPathComponent("score.png")
         try Data("same bytes".utf8).write(to: input)
-        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"))
+        let workspace = ScoreWorkspaceStore(folder: root.appendingPathComponent("imports"), regionsFolder: root.appendingPathComponent("regions"))
         let source = try await workspace.importCopy(from: input)
         let folder = root.appendingPathComponent("regions")
         let old = ScoreRegionsStore(source: source, folder: folder)
@@ -265,7 +339,7 @@ final class ScoreRegionsStoreTests: XCTestCase {
         let store = ScoreRegionsStore(source: source, folder: folder)
         try await store.savePage(index: 0, rotation: 0, regions: [ScoreRegion(x: 0, y: 0, width: 1, height: 1)])
         let removal = try await store.prepareRemoval()
-        let result = try await ScoreWorkspaceStore(folder: root).removeCopy(source, removal: removal)
+        let result = try await ScoreWorkspaceStore(folder: root, regionsFolder: folder).removeCopy(source, removal: removal)
         XCTAssertNil(result.cleanupError)
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
     }
@@ -285,7 +359,7 @@ final class ScoreRegionsStoreTests: XCTestCase {
         try await replacementStore.savePage(index: 0, rotation: 0,
                                             regions: [ScoreRegion(x: 0.5, y: 0.5, width: 0.5, height: 0.5)])
         let removal = try await replacementStore.prepareRemoval()
-        let result = try await ScoreWorkspaceStore(folder: root).removeCopy(source, removal: removal)
+        let result = try await ScoreWorkspaceStore(folder: root, regionsFolder: folder).removeCopy(source, removal: removal)
         XCTAssertNil(result.cleanupError)
         try Data("first version".utf8).write(to: source)
         let restored = try await ScoreRegionsStore(source: source, folder: folder).loadPage(index: 0, rotation: 0)
