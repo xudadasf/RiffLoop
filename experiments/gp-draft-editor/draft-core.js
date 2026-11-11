@@ -91,8 +91,54 @@ function createDraft(alphaTab, input) {
     });
 }
 
+// Bridge only our new versioned draft format. This is not an existing GP
+// importer: any unknown field must be rejected rather than discarded.
+function exportStoredDraft(alphaTab, input) {
+    objectWithKeys(input, ["version", "title", "tempo", "bars"], "已保存的草稿");
+    if (input.version !== 1) throw new Error("草稿版本不受支持");
+    if (!Array.isArray(input.bars) || input.bars.length > 512 ||
+        input.bars.some(bar => !Array.isArray(bar) || bar.length > 128)) {
+        throw new Error("草稿小节数量不受支持");
+    }
+    const draft = createDraft(alphaTab, { title: input.title, tempo: input.tempo, bars: input.bars });
+    const expected = draft.notes();
+    const bytes = draft.exportGp();
+
+    // Never return an apparently successful export if the GP writer dropped or
+    // changed an event. This compares the actual re-imported playback timeline.
+    const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes, new alphaTab.Settings());
+    const mismatch = () => { throw new Error("导出校验失败，未返回 GP 文件"); };
+    if (score.title !== input.title || score.tempo !== input.tempo || score.tracks.length !== 1 ||
+        score.masterBars.length !== expected.length || score.tracks[0].staves.length !== 1) mismatch();
+    const staff = score.tracks[0].staves[0];
+    const tuning = staff.stringTuning.tunings;
+    if (JSON.stringify(tuning) !== JSON.stringify([64, 59, 55, 50, 45, 40]) ||
+        staff.bars.length !== expected.length) mismatch();
+    for (let barIndex = 0; barIndex < expected.length; barIndex++) {
+        const master = score.masterBars[barIndex];
+        const bar = staff.bars[barIndex];
+        if (master.timeSignatureNumerator !== 4 || master.timeSignatureDenominator !== 4 ||
+            bar.voices.length !== 1 || bar.voices[0].beats.length !== expected[barIndex].length) mismatch();
+        let start = 0;
+        for (let eventIndex = 0; eventIndex < expected[barIndex].length; eventIndex++) {
+            const event = expected[barIndex][eventIndex];
+            const beat = bar.voices[0].beats[eventIndex];
+            const duration = 3840 / event.duration;
+            if (beat.duration !== event.duration || beat.playbackStart !== start ||
+                beat.playbackDuration !== duration) mismatch();
+            if (event.rest) {
+                if (!beat.isRest || beat.notes.length !== 0) mismatch();
+            } else if (beat.isRest || beat.notes.length !== 1 ||
+                       7 - beat.notes[0].string !== event.string || beat.notes[0].fret !== event.fret ||
+                       beat.notes[0].realValue !== tuning[event.string - 1] + event.fret) mismatch();
+            start += duration;
+        }
+    }
+    return bytes;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = { createDraft };
+    module.exports = { createDraft, exportStoredDraft };
 } else {
-    globalThis.RiffLoopDraftEditor = Object.freeze({ createDraft });
+    globalThis.RiffLoopDraftEditor = Object.freeze({ createDraft, exportStoredDraft });
 }

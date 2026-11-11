@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const alphaTab = require('../RiffLoop/Resources/GpWeb/alphaTab.min.js');
-const { createDraft } = require('../experiments/gp-draft-editor/draft-core.js');
+const { createDraft, exportStoredDraft } = require('../experiments/gp-draft-editor/draft-core.js');
 const note = (string, fret, duration = 4) => ({ string, fret, duration });
 const input = {
     title: '草稿示例',
@@ -115,6 +115,58 @@ for (const invalidRest of [{ rest: false, duration: 4 }, { rest: true, duration:
 restDraft.setDuration(1, 0, 2);
 assert.throws(() => restDraft.exportGp(), /每小节时值之和/);
 
+// The persisted Swift draft has a version field. Test the bridge with multiple
+// durations, silence, edge strings/frets and a full separator measure.
+const stored = { version: 1, title: '已保存草稿', tempo: 123, bars: [
+    [note(1, 36, 8), note(6, 0, 8), rest(4), note(4, 12, 2)],
+    [rest(1)],
+] };
+const storedBefore = structuredClone(stored);
+const storedScore = alphaTab.importer.ScoreLoader.loadScoreFromBytes(exportStoredDraft(alphaTab, stored), new alphaTab.Settings());
+assert.deepEqual(stored, storedBefore);
+assert.equal(storedScore.title, stored.title);
+assert.equal(storedScore.tempo, stored.tempo);
+assert.deepEqual(storedScore.tracks[0].staves[0].bars.map(bar => bar.voices[0].beats.map(beat => ({
+    duration: beat.duration, notes: beat.notes.map(n => ({ string: 7 - n.string, fret: n.fret })),
+}))), [
+    [{ duration: 8, notes: [{ string: 1, fret: 36 }] }, { duration: 8, notes: [{ string: 6, fret: 0 }] },
+     { duration: 4, notes: [] }, { duration: 2, notes: [{ string: 4, fret: 12 }] }],
+    [{ duration: 1, notes: [] }],
+]);
+for (const invalid of [
+    { ...stored, version: 2 }, { ...stored, originalGp: true },
+    { ...stored, bars: [[{ ...note(1, 0, 1), slide: true }]] },
+    { ...stored, bars: [[note(1, 0, 4)]] },
+    { ...stored, bars: Array.from({ length: 513 }, () => [rest(1)]) },
+]) assert.throws(() => exportStoredDraft(alphaTab, invalid));
+for (const tempo of [1, 999]) {
+    for (const duration of [1, 2, 4, 8, 16, 32, 64]) {
+        const bar = Array.from({ length: duration }, (_, index) =>
+            note(index % 6 + 1, index % 37, duration));
+        assert.doesNotThrow(() => exportStoredDraft(alphaTab, { version: 1, title: '边界', tempo, bars: [bar] }));
+    }
+}
+
+// Simulate a writer/importer mismatch so a lossy export cannot succeed merely
+// because it produced readable bytes.
+for (const corrupt of [
+    score => { score.tracks[0].staves[0].bars[0].voices[0].beats[0].notes[0].fret = 35; },
+    score => { score.tracks[0].staves[0].bars[0].voices[0].beats.pop(); },
+    score => { score.tracks[0].staves[0].stringTuning.tunings[0] = 63; },
+    score => { score.masterBars[0].timeSignatureNumerator = 3; },
+    score => { score.tracks[0].staves[0].bars[0].voices[0].beats[1].playbackStart += 1; },
+]) {
+    const alteredAlphaTab = {
+        ...alphaTab,
+        importer: { ...alphaTab.importer, ScoreLoader: { loadScoreFromBytes(...args) {
+            const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(...args);
+            corrupt(score);
+            return score;
+        } } },
+    };
+    assert.throws(() => exportStoredDraft(alteredAlphaTab, stored), /导出校验失败/);
+}
+
 // The same experimental core can be loaded as an offline script in WebKit.
 const source = readFileSync(new URL('../experiments/gp-draft-editor/draft-core.js', import.meta.url), 'utf8');
 const browser = vm.createContext({ alphaTab });
@@ -123,5 +175,8 @@ const browserGp = browser.RiffLoopDraftEditor.createDraft(alphaTab, {
     title: 'single note', tempo: 90, bars: [[note(1, 7, 1)]],
 }).exportGp();
 assert.deepEqual(readBack(browserGp), { title: 'single note', tempo: 90, bars: [[note(1, 7, 1)]] });
+assert.deepEqual(readBack(browser.RiffLoopDraftEditor.exportStoredDraft(alphaTab, {
+    version: 1, title: 'offline saved', tempo: 90, bars: [[note(1, 7, 1)]],
+})), { title: 'offline saved', tempo: 90, bars: [[note(1, 7, 1)]] });
 
 console.log('GP draft editor experiment: all tests passed');
