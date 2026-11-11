@@ -20,7 +20,10 @@ final class ScoreRegionEditorConflictTests: XCTestCase {
         defer { finish.signal() }
         let model = ScoreRegionEditorModel(source: source, store: oldStore) { url, page in
             started.fulfill()
-            finish.wait()
+            guard finish.wait(timeout: .now() + 15) == .success else {
+                XCTFail("Preview rendering was not released in time")
+                return ScorePagePreview(image: nil, pageCount: 0, orientation: 0, error: "Preview test timed out")
+            }
             return ScorePageRenderer.render(source: url, index: page)
         }
         let opening = Task { await model.open() }
