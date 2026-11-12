@@ -14,6 +14,7 @@ on:
       - "experiments/gp-semantic-probe/**"
       - "experiments/gp-note-patch/**"
       - "experiments/gp-draft-editor/**"
+      - "experiments/gp-draft-v2/**"
       - "scripts/test-gp-draft-editor.mjs"
       - "RiffLoop/Resources/GpWeb/alphaTab.min.js"
       - "RiffLoopTests/Fixtures/transport.gp"
@@ -51,3 +52,5 @@ jobs:
         run: python3 -B -m unittest discover -s experiments/gp-note-patch -p 'test_*.py'
       - name: Check limited draft GP export and read-back
         run: node scripts/test-gp-draft-editor.mjs
+      - name: Check experimental dotted, triplet and chord round trips
+        run: node experiments/gp-draft-v2/test.cjs
