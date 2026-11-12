@@ -56,13 +56,15 @@ final class ScoreDraftWebReply {
 /// rejects it if the supported notes, rests or playback timing changed.
 enum ScoreDraftExporter {
     // Temporary conservative limit, not a measurement of iPad mini 6 capacity.
-    private static let maximumEvents = 512
+    static let maximumEvents = 512
+    static let maximumBars = 64
     @MainActor private static var exporting = false
 
     @MainActor
     static func export(_ draft: ScoreDraft) async throws -> Data {
         guard draft.isComplete else { throw ScoreDraftExportError.incomplete }
-        guard draft.bars.reduce(0, { $0 + $1.count }) <= maximumEvents else {
+        guard draft.bars.count <= maximumBars,
+              draft.bars.reduce(0, { $0 + $1.count }) <= maximumEvents else {
             throw ScoreDraftExportError.tooLarge
         }
         guard !exporting else { throw ScoreDraftExportError.busy }

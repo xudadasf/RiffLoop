@@ -88,6 +88,15 @@ final class ScoreDraftExporterTests: XCTestCase {
         } catch ScoreDraftExportError.tooLarge { }
         XCTAssertEqual(draft.bars.count, 9)
         XCTAssertEqual(draft.bars.flatMap { $0 }.count, 576)
+
+        let manyBars = ScoreDraft(title: "较多小节", tempo: 100,
+                                  bars: Array(repeating: [.rest(duration: 1)], count: 65))
+        XCTAssertTrue(manyBars.isComplete)
+        do {
+            _ = try await ScoreDraftExporter.export(manyBars)
+            XCTFail("Oversized bar count must not be partially exported")
+        } catch ScoreDraftExportError.tooLarge { }
+        XCTAssertEqual(manyBars.bars.count, 65)
     }
 
     func testOnlyOneExportCanRunAtATime() async throws {
