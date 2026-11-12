@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "title": "合成草稿：附点与三连音",
+  "tempo": 123,
+  "meter": { "numerator": 4, "denominator": 4 },
+  "tuning": [40, 45, 50, 55, 59, 64],
+  "bars": [
+    [
+      { "duration": 4, "dots": 1, "notes": [{ "string": 1, "fret": 0 }, { "string": 2, "fret": 1 }] },
+      { "duration": 8, "dots": 0, "notes": [{ "string": 6, "fret": 3 }] },
+      { "duration": 2, "dots": 0, "notes": [] }
+    ],
+    [
+      {
+        "tuplet": { "numerator": 3, "denominator": 2 },
+        "beats": [
+          { "duration": 8, "dots": 0, "notes": [{ "string": 1, "fret": 12 }, { "string": 2, "fret": 13 }] },
+          { "duration": 8, "dots": 0, "notes": [] },
+          { "duration": 8, "dots": 0, "notes": [{ "string": 1, "fret": 15 }] }
+        ]
+      },
+      { "duration": 2, "dots": 1, "notes": [] }
+    ]
+  ]
+}

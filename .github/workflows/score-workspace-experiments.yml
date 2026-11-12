@@ -18,6 +18,7 @@ on:
       - "scripts/test-gp-draft-editor.mjs"
       - "RiffLoop/Resources/GpWeb/alphaTab.min.js"
       - "RiffLoopTests/Fixtures/transport.gp"
+      - "RiffLoopTests/Fixtures/score-draft-v2.json"
       - ".github/workflows/score-workspace-experiments.yml"
   workflow_dispatch:
 

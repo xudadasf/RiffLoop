@@ -1,5 +1,8 @@
 "use strict";
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 const alphaTab = require("../../RiffLoop/Resources/GpWeb/alphaTab.min.js");
 const { exportDraft, validate } = require("./draft-v2.cjs");
 const v1 = require("../gp-draft-editor/draft-core.js");
@@ -17,6 +20,10 @@ const draft = {
          triplet(beat(8, [note(3, 3)]), beat(8, [note(3, 4)]), beat(8, [note(3, 5)])), beat(2)],
     ],
 };
+const sharedFixture = JSON.parse(fs.readFileSync(path.join(__dirname, "../../RiffLoopTests/Fixtures/score-draft-v2.json"), "utf8"));
+const fixtureScore = alphaTab.importer.ScoreLoader.loadScoreFromBytes(exportDraft(alphaTab, sharedFixture), new alphaTab.Settings());
+assert.equal(fixtureScore.masterBars.length, 2);
+assert.equal(fixtureScore.tracks[0].staves[0].bars[1].voices[0].beats[0].playbackDuration, 320);
 const original = structuredClone(draft);
 const bytes = exportDraft(alphaTab, draft);
 assert.deepEqual(draft, original, "Export must not mutate the caller's draft");
@@ -165,6 +172,18 @@ const oldDraft = { version: 1, title: "旧草稿", tempo: 100, bars: [[{ rest: t
 assert.throws(() => validate(oldDraft), /draft/);
 assert.throws(() => v1.exportStoredDraft(alphaTab, draft));
 assert.ok(v1.exportStoredDraft(alphaTab, oldDraft).length > 0);
+
+// The iPad bridge injects the same bundled CommonJS source into a private
+// module scope after loading v1. It must not replace v1's globals.
+const browser = vm.createContext({ alphaTab });
+const v1Source = fs.readFileSync(path.join(__dirname, "../gp-draft-editor/draft-core.js"), "utf8");
+const v2Source = fs.readFileSync(path.join(__dirname, "draft-v2.cjs"), "utf8");
+vm.runInContext(v1Source, browser);
+const previousV1 = browser.RiffLoopDraftEditor;
+vm.runInContext(`(() => { const module = { exports: {} }; (function(module) {\n${v2Source}\n})(module); globalThis.RiffLoopDraftV2 = module.exports; })()`, browser);
+assert.equal(browser.RiffLoopDraftEditor, previousV1);
+assert.ok(browser.RiffLoopDraftEditor.exportStoredDraft(alphaTab, oldDraft).length > 0);
+assert.ok(browser.RiffLoopDraftV2.exportDraft(alphaTab, sharedFixture).length > 0);
 
 // Simulate exporter/importer corruption to verify failures do not return data.
 for (const corrupt of [
