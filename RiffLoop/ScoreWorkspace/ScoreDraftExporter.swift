@@ -67,6 +67,22 @@ enum ScoreDraftExporter {
               draft.bars.reduce(0, { $0 + $1.count }) <= maximumEvents else {
             throw ScoreDraftExportError.tooLarge
         }
+        return try await exportPayload(JSONEncoder().encode(draft).base64EncodedString(), version: .v1)
+    }
+
+    @MainActor
+    static func export(_ draft: ScoreDraftV2) async throws -> Data {
+        guard draft.isValidForStorage, draft.barTimings?.allSatisfy({ $0 == .complete }) == true else {
+            throw ScoreDraftExportError.incomplete
+        }
+        guard draft.canExport else { throw ScoreDraftExportError.tooLarge }
+        return try await exportPayload(JSONEncoder().encode(draft).base64EncodedString(), version: .v2)
+    }
+
+    private enum Version { case v1, v2 }
+
+    @MainActor
+    private static func exportPayload(_ payload: String, version: Version) async throws -> Data {
         guard !exporting else { throw ScoreDraftExportError.busy }
         exporting = true
         defer { exporting = false }
@@ -76,9 +92,15 @@ enum ScoreDraftExporter {
               FileManager.default.fileExists(atPath: root.appendingPathComponent("GpWeb/alphaTab.min.js").path) else {
             throw ScoreDraftExportError.missingResources
         }
-        // Base64 contains only ASCII alphabet characters, so the user's title
-        // and other draft data cannot become executable JavaScript.
-        let payload = try JSONEncoder().encode(draft).base64EncodedString()
+        let v2Source: String?
+        switch version {
+        case .v1: v2Source = nil
+        case .v2:
+            guard let url = Bundle.main.url(forResource: "draft-v2", withExtension: "cjs") else {
+                throw ScoreDraftExportError.missingResources
+            }
+            v2Source = try String(contentsOf: url, encoding: .utf8)
+        }
         let web = WKWebView(frame: .zero)
         defer { web.stopLoading() }
         web.loadFileURL(page, allowingReadAccessTo: root)
@@ -97,11 +119,32 @@ enum ScoreDraftExporter {
             try await Task.sleep(for: .milliseconds(100))
         }
         guard ready else { throw ScoreDraftExportError.unavailable }
+        let exportExpression: String
+        if let v2Source {
+            // Use the app-bundled experiment itself, scoped as CommonJS so it
+            // cannot replace the v1 editor's globals. No user text is injected.
+            let loaded = try await evaluate("""
+                (() => {
+                const module = { exports: {} };
+                (function(module) {
+                \(v2Source)
+                })(module);
+                globalThis.RiffLoopDraftV2 = module.exports;
+                return typeof globalThis.RiffLoopDraftV2.exportDraft === 'function';
+                })()
+                """, in: web)
+            guard loaded as? Bool == true else { throw ScoreDraftExportError.unavailable }
+            exportExpression = "RiffLoopDraftV2.exportDraft(alphaTab, draft)"
+        } else {
+            exportExpression = "RiffLoopDraftEditor.exportStoredDraft(alphaTab, draft)"
+        }
+        // Base64 contains only ASCII alphabet characters, so the user's title
+        // and other draft data cannot become executable JavaScript.
         let result = try await evaluate("""
             (() => {
             const jsonBytes = Uint8Array.from(atob('\(payload)'), c => c.charCodeAt(0));
             const draft = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(jsonBytes));
-            const bytes = RiffLoopDraftEditor.exportStoredDraft(alphaTab, draft);
+            const bytes = \(exportExpression);
             if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length > 8 * 1024 * 1024) {
                 throw new Error('Invalid GP output');
             }

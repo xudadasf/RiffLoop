@@ -27,6 +27,8 @@ targets:
         buildPhase: resources
       - path: experiments/gp-draft-editor/draft-core.js
         buildPhase: resources
+      - path: experiments/gp-draft-v2/draft-v2.cjs
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.prototype
