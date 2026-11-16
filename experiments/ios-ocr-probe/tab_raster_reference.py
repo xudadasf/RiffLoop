@@ -56,7 +56,8 @@ def systems(gray):
         xs=np.flatnonzero(support>=4)
         if not len(xs):continue
         left,right=int(xs[0]),int(xs[-1])
-        if right-left<max(70,int(gap*8)) or any(horizontal[max(0,y-2):min(h,y+3),left:right+1].any(0).sum()<=(right-left)//2 for y in ys):continue
+        line_support=[horizontal[max(0,y-2):min(h,y+3),left:right+1].any(0).sum() for y in ys]
+        if right-left<max(70,int(gap*8)) or min(line_support)<=(right-left)//4 or sum(n>(right-left)//2 for n in line_support)<4:continue
         neighbors=[y for y in rows if abs(y-ys[0]+gap)<gap*.18 or abs(y-ys[-1]-gap)<gap*.18]
         if any(horizontal[y,left:right+1].sum()>(right-left)//2 for y in neighbors):continue
         if any(len(g)>gap*6 for g in groups(np.flatnonzero(support[left:right+1]<2))):continue

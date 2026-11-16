@@ -4,6 +4,18 @@ import PDFKit
 @testable import RiffLoop
 
 final class TabRecognitionTests: XCTestCase {
+    func testDenseFretLabelsMayInterruptOneString() throws {
+        let original=synthetic(strings:6)
+        let format=UIGraphicsImageRendererFormat();format.scale=1;format.opaque=true
+        let image=UIGraphicsImageRenderer(size:original.size,format:format).image { context in
+            original.draw(at:.zero)
+            UIColor.white.setFill()
+            for x in stride(from:80,through:800,by:80) { context.fill(CGRect(x:x,y:87,width:52,height:6)) }
+        }
+        let systems=try TabRaster(image:XCTUnwrap(image.cgImage)).systems()
+        XCTAssertEqual(systems.count,1)
+        XCTAssertEqual(systems.first?.boundaries.count,5)
+    }
     func testStemEndingAtStringIsNotFretOne() throws {
         let width=100,height=100,row=50,gap=20.0
         var pixels=[UInt8](repeating:255,count:width*height)

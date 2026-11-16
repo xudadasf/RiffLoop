@@ -134,7 +134,7 @@ struct TabRaster {
             for y in ys { for x in 0..<width { if (max(0,y-3)...min(height-1,y+3)).contains(where: { horizontal[$0*width+x] == 1 }) { support[x] += 1 } } }
             let xs = (0..<width).filter { support[$0] >= 4 }
             guard let left = xs.first, let right = xs.last, right-left >= max(70,Int(gap*8)) else { continue }
-            var allSupported = true
+            var allSupported = true, strongLines = 0
             for y in ys {
                 var supported = 0
                 for x in left...right {
@@ -142,9 +142,12 @@ struct TabRaster {
                         if horizontal[localY*width+x] == 1 { supported += 1; break }
                     }
                 }
-                if supported <= (right-left)/2 { allSupported = false; break }
+                if supported <= (right-left)/4 { allSupported = false; break }
+                if supported > (right-left)/2 { strongLines += 1 }
             }
-            guard allSupported else { continue }
+            // Dense fret labels erase much of one or two strings. The remaining
+            // four strong lines still establish the same six-line geometry.
+            guard allSupported, strongLines >= 4 else { continue }
             let neighbors = rows.filter { abs(Double($0-ys[0])+gap)<gap*0.18 || abs(Double($0-ys[5])-gap)<gap*0.18 }
             if neighbors.contains(where: { y in (left...right).filter { horizontal[y*width+$0] == 1 }.count > (right-left)/2 }) { continue }
             if Self.groups((left...right).filter { support[$0] < 2 }).contains(where: { Double($0.count)>gap*6 }) { continue }
