@@ -99,7 +99,7 @@ final class PracticeExperienceTests: XCTestCase {
             controller.endAppearanceTransition()
             window.isHidden = true
             window.rootViewController = nil
-            previousKeyWindow?.makeKeyWindow()
+            previousKeyWindow?.makeKey()
         }
         try await Task.sleep(for: .seconds(delay))
         if waitForGpScore {

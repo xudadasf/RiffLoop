@@ -15,7 +15,7 @@ final class GuitarDraftWebTests: XCTestCase {
         let previousKeyWindow=scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene:scene)
         window.rootViewController = host; window.makeKeyAndVisible()
-        defer { window.isHidden = true; window.rootViewController = nil; previousKeyWindow?.makeKeyWindow() }
+        defer { window.isHidden = true; window.rootViewController = nil; previousKeyWindow?.makeKey() }
         func find(_ view: UIView) -> WKWebView? {
             if let web = view as? WKWebView { return web }
             return view.subviews.compactMap { find($0) }.first
