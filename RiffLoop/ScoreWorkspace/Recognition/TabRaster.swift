@@ -133,10 +133,18 @@ struct TabRaster {
             var support = [Int](repeating: 0, count: width)
             for y in ys { for x in 0..<width { if (max(0,y-3)...min(height-1,y+3)).contains(where: { horizontal[$0*width+x] == 1 }) { support[x] += 1 } } }
             let xs = (0..<width).filter { support[$0] >= 4 }
-            guard let left = xs.first, let right = xs.last, right-left >= max(70,Int(gap*8)),
-                  ys.allSatisfy({ y in (left...right).filter { x in
-                      (max(0,y-2)...min(height-1,y+2)).contains { horizontal[$0*width+x] == 1 }
-                  }.count > (right-left)/2 }) else { continue }
+            guard let left = xs.first, let right = xs.last, right-left >= max(70,Int(gap*8)) else { continue }
+            var allSupported = true
+            for y in ys {
+                var supported = 0
+                for x in left...right {
+                    for localY in max(0,y-2)...min(height-1,y+2) {
+                        if horizontal[localY*width+x] == 1 { supported += 1; break }
+                    }
+                }
+                if supported <= (right-left)/2 { allSupported = false; break }
+            }
+            guard allSupported else { continue }
             let neighbors = rows.filter { abs(Double($0-ys[0])+gap)<gap*0.18 || abs(Double($0-ys[5])-gap)<gap*0.18 }
             if neighbors.contains(where: { y in (left...right).filter { horizontal[y*width+$0] == 1 }.count > (right-left)/2 }) { continue }
             if Self.groups((left...right).filter { support[$0] < 2 }).contains(where: { Double($0.count)>gap*6 }) { continue }
@@ -144,21 +152,33 @@ struct TabRaster {
                 let count = (ys[0]...ys[5]).reduce(0) { $0 + Int(ink[$1*width+x]) }
                 return Double(count) > Double(ys[5]-ys[0]+1)*0.88
             }
-            let candidates = Self.groups(vertical).map { $0.reduce(0,+)/$0.count }.filter { x in
-                guard Double(x-left)>gap*1.5, Double(right-x)>gap*0.8 else { return false }
+            var candidates: [Int] = []
+            for group in Self.groups(vertical) {
+                let x = group.reduce(0,+)/group.count
+                guard Double(x-left)>gap*1.5, Double(right-x)>gap*0.8 else { continue }
                 let bottom = min(height-1,ys[5]+Int(gap*1.7)), top = min(bottom,ys[5]+max(1,Int(gap*0.3)))
-                let below = (top...bottom).filter { y in (max(0,x-1)...min(width-1,x+1)).contains { ink[y*width+$0] == 1 } }.count
-                guard Double(below) < Double(bottom-top+1)*0.45 else { return false }
-                let radius = max(2,Int((gap*0.25).rounded()))
-                let centers = zip(ys,ys.dropFirst()).compactMap { pair -> Double? in
-                    let y = Int((Double(pair.0+pair.1)/2).rounded())
-                    let occupied = (max(0,x-radius)...min(width-1,x+radius)).filter { ink[y*width+$0] == 1 }
-                    return occupied.isEmpty ? nil : Double(occupied.reduce(0,+))/Double(occupied.count)
+                var below = 0
+                for y in top...bottom {
+                    for column in max(0,x-1)...min(width-1,x+1) {
+                        if ink[y*width+column] == 1 { below += 1; break }
+                    }
                 }
-                let straightPair = (max(0,x-1)...min(width-1,x+1)).filter { column in
-                    Double((ys[0]...ys[5]).reduce(0) { $0+Int(ink[$1*width+column]) }) >= Double(ys[5]-ys[0]+1)*0.98
-                }.count >= 2
-                return centers.count == 5 && (straightPair || (centers.max()! - centers.min()! <= max(1.2,gap*0.08)))
+                guard Double(below) < Double(bottom-top+1)*0.45 else { continue }
+                let radius = max(2,Int((gap*0.25).rounded()))
+                var centers: [Double] = []
+                for pair in zip(ys,ys.dropFirst()) {
+                    let y = Int((Double(pair.0+pair.1)/2).rounded())
+                    var sum = 0, count = 0
+                    for column in max(0,x-radius)...min(width-1,x+radius) where ink[y*width+column] == 1 { sum += column; count += 1 }
+                    if count > 0 { centers.append(Double(sum)/Double(count)) }
+                }
+                var straightColumns = 0
+                for column in max(0,x-1)...min(width-1,x+1) {
+                    var count = 0
+                    for y in ys[0]...ys[5] { count += Int(ink[y*width+column]) }
+                    if Double(count) >= Double(ys[5]-ys[0]+1)*0.98 { straightColumns += 1 }
+                }
+                if centers.count == 5 && (straightColumns >= 2 || centers.max()! - centers.min()! <= max(1.2,gap*0.08)) { candidates.append(x) }
             }
             var boundaries = [left]
             for x in candidates { if Double(x-(boundaries.last ?? left)) > gap*0.8 { boundaries.append(x) } }
@@ -210,7 +230,9 @@ struct TabRaster {
         let top = max(0,row-Int(gap*0.85)), bottom = min(height-1,row+Int(gap*0.85))
         let centeredRadius = max(3,Int(gap*0.4)), margin = max(2,Int(gap*0.16)), half = max(margin+1,Int(gap*0.45))
         func mass(_ rows: ClosedRange<Int>) -> Int {
-            rows.reduce(0) { sum,y in sum + (max(0,Int(x)-centeredRadius)...min(width-1,Int(x)+centeredRadius)).reduce(0) { $0+Int(ink[y*width+$1]) } }
+            var count = 0
+            for y in rows { for column in max(0,Int(x)-centeredRadius)...min(width-1,Int(x)+centeredRadius) { count += Int(ink[y*width+column]) } }
+            return count
         }
         let above = mass(max(0,row-half)...max(0,row-margin))
         let below = mass(min(height-1,row+margin)...min(height-1,row+half))
@@ -218,6 +240,27 @@ struct TabRaster {
         return (max(0,Int(x)-radius)...min(width-1,Int(x)+radius)).contains { column in
             Double((top...bottom).reduce(0) { $0+Int(ink[$1*width+column]) }) >= Double(bottom-top+1)*0.88
         }
+    }
+
+    func glyphSpans(left: Int, right: Int, row: Int, gap: Double) -> [ClosedRange<Int>] {
+        let ink = mask(), half = Int(gap*0.45), margin = max(2,Int(gap*0.16))
+        let columns = (max(0,left)..<min(width,right)).filter { x in
+            (max(0,row-half)...min(height-1,row+half)).filter { abs($0-row)>margin && ink[$0*width+x] == 1 }.count >= 2
+        }
+        var spans: [ClosedRange<Int>] = []
+        for group in Self.groups(columns) {
+            guard let first = group.first, let last = group.last else { continue }
+            if let prior = spans.last, Double(first-prior.upperBound) <= gap*0.6 {
+                spans[spans.count-1] = prior.lowerBound...last
+            } else { spans.append(first...last) }
+        }
+        return spans.filter { $0.count >= max(3,Int(gap*0.25)) && Double($0.count)<=gap*2.2 }
+    }
+
+    func glyph(left: Int, right: Int, row: Int, gap: Double) -> (pixels: [UInt8], width: Int, height: Int, left: Int)? {
+        let l=max(0,left),r=min(width,right),top=max(0,row-Int((gap*0.5).rounded())),bottom=min(height,row+Int((gap*0.5).rounded())+1)
+        guard r>l,bottom>top else { return nil }
+        return ((top..<bottom).flatMap { Array(pixels[($0*width+l)..<($0*width+r)]) },r-l,bottom-top,l)
     }
 
     func band(left: Int, right: Int, center: Int, gap: Double) -> (pixels: [UInt8], width: Int, height: Int, left: Int)? {

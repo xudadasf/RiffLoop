@@ -131,14 +131,21 @@ def transcribe(gray,session):
                 if image is None:continue
                 digits=decode(image[0],gap,session)
                 for d in digits:d['x']+=image[1]
-                if not digits or any(d['score']<.65 for d in digits):
+                if not digits or any(d['score']<.9 for d in digits):
                     for shift in [-1,1]:
-                        retry=band(left,right,y+int(shift*gap*.13),gap*.85)
+                        retry=band(left,right,y+shift*max(1,math.floor(gap*.15+.5)),gap)
                         if retry is None:continue
                         other=decode(retry[0],gap,session)
                         for d in other:d['x']+=retry[1]
                         old=sum(d['score'] for d in digits)/max(1,len(digits));new=sum(d['score'] for d in other)/max(1,len(other))
                         if other and new>old+.1 and (not digits or len(other)==len(digits)):digits=other
+                        for candidate in other:
+                            if candidate['score']<.9 or candidate['fret'] is None:continue
+                            matches=[j for j,d in enumerate(digits) if abs(d['x']-candidate['x'])<gap*.65]
+                            if matches:
+                                j=matches[0]
+                                if candidate['score']>digits[j]['score']+.08:digits[j]=candidate
+                            elif candidate['score']>=.95:digits.append(candidate)
                 if image[0].shape[1]>max(96,int(gap*12)) or any(d['score']<.65 for d in digits):
                     im,offset=image;size=max(96,int(gap*12));step=max(1,size-int(gap*3))
                     for start in range(0,im.shape[1],step):
@@ -153,13 +160,39 @@ def transcribe(gray,session):
                                 j=matches[0]
                                 if other['score']>digits[j]['score']+.08:digits[j]=other
                             else:digits.append(other)
+                if any(d['score']>=.85 for d in digits):
+                    known=[d['x'] for d in digits if d['score']>=.85]
+                    half=int(gap*.45);margin=max(2,int(gap*.16));rr=np.arange(max(0,y-half),min(h-1,y+half)+1);cov=ink[rr[np.abs(rr-y)>margin],left:right].sum(0);spans=[]
+                    for g in groups(np.flatnonzero(cov>=2)+left):
+                        if spans and g[0]-spans[-1][-1]<=gap*.6:spans[-1]=list(range(spans[-1][0],g[-1]+1))
+                        else:spans.append(g)
+                    for span in spans:
+                        if not max(3,int(gap*.25))<=span[-1]-span[0]+1<=gap*2.2:continue
+                        center=(span[0]+span[-1])/2;matches=[j for j,d in enumerate(digits) if abs(d['x']-center)<gap*.8]
+                        if matches and digits[matches[0]]['score']>=.9:continue
+                        if not matches and not min(known)<center<max(known):continue
+                        votes={}
+                        for pad in set([max(3,int(gap*.3)),max(3,int(gap*.75))]):
+                            for shift in [-2,0,2]:
+                                crop=gray[max(0,y+shift-math.floor(gap*.5+.5)):min(h,y+shift+math.floor(gap*.5+.5)+1),max(0,span[0]-pad):min(w,span[-1]+pad+1)]
+                                isolated=decode(crop,gap,session)
+                                if len(isolated)!=1 or isolated[0]['score']<.5 or isolated[0]['fret'] is None:continue
+                                votes.setdefault(isolated[0]['fret'],[]).append(isolated[0])
+                        agreeing=[v for v in votes.values() if len(v)>=2 and max(d['score'] for d in v)>=.9]
+                        if len(agreeing)!=1:continue
+                        value=max(agreeing[0],key=lambda d:d['score']);value['x']=center;matches=[j for j,d in enumerate(digits) if abs(d['x']-center)<gap*.8]
+                        if matches:
+                            j=matches[0]
+                            if value['score']>digits[j]['score']+.08:digits[j]=value
+                        elif value['score']>=.95:digits.append(value)
                 def stem(d):
                     if d['fret']!=1:return False
                     radius=max(2,int(gap*.25));x=int(d['x']);top=max(0,y-int(gap*.85));bottom=min(h-1,y+int(gap*.85))
                     rr=max(3,int(gap*.4));margin=max(2,int(gap*.16));half=max(margin+1,int(gap*.45));above=ink[max(0,y-half):max(0,y-margin)+1,max(0,x-rr):min(w,x+rr+1)].sum();below=ink[min(h-1,y+margin):min(h-1,y+half)+1,max(0,x-rr):min(w,x+rr+1)].sum()
                     if min(above,below)<max(4,int(gap*.25)):return True
                     return (ink[top:bottom+1,max(0,x-radius):min(w,x+radius+1)].mean(0)>=.88).any()
-                notes.extend(dict(string=i+1,x=d['x'],fret=d['fret'],score=round(d['score'],3)) for d in digits if d['score']>=.5 and not stem(d))
+                notes.extend(dict(string=i+1,x=d['x'],fret=d['fret'],score=round(d['score'],3)) for d in digits if d['score']>=.5 and not stem(d) and min(d['x']-a,b-d['x'])>=gap*.75)
+            notes=[n for n in notes if not(n['score']<.85 and any(abs(other['string']-n['string'])==1 and other['score']>=.9 and abs(other['x']-n['x'])<gap*.65 for other in notes))]
             bars.append(sorted(notes,key=lambda n:n['x']))
     return dict(angle=angle,systems=found,bars=bars)
 

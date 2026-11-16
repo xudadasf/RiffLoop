@@ -75,7 +75,7 @@ actor TabRecognitionPipeline {
         for system in systems {
             for pair in zip(system.boundaries, system.boundaries.dropFirst()) {
                 try Task.checkCancellation()
-                var candidates: [(x: Double, note: GuitarNote)] = []
+                var candidates: [(x: Double, note: GuitarNote, score: Float)] = []
                 var problems = ["数字、弦位及技巧请对照原图核对"]
                 for (stringIndex, row) in raster.localRows(system, left: pair.0, right: pair.1).enumerated() {
                     let left = pair.0 + max(2,Int(system.gap*0.18)), right = pair.1 - 1
@@ -84,14 +84,19 @@ actor TabRecognitionPipeline {
                         var digits = try model.recognize(band.pixels, width: band.width, height: band.height, gap: system.gap)
                         for i in digits.indices { digits[i].x += Double(band.left) }
                         // A small vertical retry is confined to this string's band.
-                        if digits.isEmpty || digits.contains(where: { $0.score < 0.65 }) {
+                        if digits.isEmpty || digits.contains(where: { $0.score < 0.9 }) {
                             for shift in [-1,1] {
-                                guard let retry = raster.band(left: left, right: right, center: row + Int(Double(shift)*system.gap*0.13), gap: system.gap*0.85) else { continue }
+                                guard let retry = raster.band(left: left, right: right, center: row + shift*max(1,Int((system.gap*0.15).rounded())), gap: system.gap) else { continue }
                                 var other = try model.recognize(retry.pixels, width: retry.width, height: retry.height, gap: system.gap)
                                 for i in other.indices { other[i].x += Double(retry.left) }
                                 let oldScore = digits.map(\.score).reduce(0,+) / Float(max(1,digits.count))
                                 let newScore = other.map(\.score).reduce(0,+) / Float(max(1,other.count))
                                 if !other.isEmpty && newScore > oldScore+0.1 && (digits.isEmpty || other.count == digits.count) { digits = other }
+                                for candidate in other where candidate.score >= 0.9 && candidate.fret != nil {
+                                    if let match = digits.firstIndex(where: { abs($0.x-candidate.x) < system.gap*0.65 }) {
+                                        if candidate.score > digits[match].score+0.08 { digits[match] = candidate }
+                                    } else if candidate.score >= 0.95 { digits.append(candidate) }
+                                }
                             }
                         }
                         if band.width > max(96,Int(system.gap*12)) || digits.contains(where: { $0.score < 0.65 }) {
@@ -114,8 +119,36 @@ actor TabRecognitionPipeline {
                                 }
                             }
                         }
+                        if digits.contains(where: { $0.score >= 0.85 }) {
+                            let knownPositions=digits.filter { $0.score>=0.85 }.map(\.x)
+                            for span in raster.glyphSpans(left: left, right: right, row: row, gap: system.gap) {
+                                let center=Double(span.lowerBound+span.upperBound)/2
+                                let existing=digits.firstIndex { abs($0.x-center)<system.gap*0.8 }
+                                if let existing, digits[existing].score >= 0.9 { continue }
+                                if existing == nil && !(center > (knownPositions.min() ?? center) && center < (knownPositions.max() ?? center)) { continue }
+                                var votes:[TabDigitCandidate]=[]
+                                for padding in Set([max(3,Int(system.gap*0.3)),max(3,Int(system.gap*0.75))]) {
+                                for shift in [-2,0,2] {
+                                    guard let crop=raster.glyph(left:span.lowerBound-padding,right:span.upperBound+padding+1,row:row+shift,gap:system.gap) else { continue }
+                                    let isolated=try model.recognize(crop.pixels,width:crop.width,height:crop.height,gap:system.gap)
+                                    guard isolated.count==1,let value=isolated.first,value.score>=0.5,value.fret != nil else { continue }
+                                    votes.append(value)
+                                }
+                                }
+                                let agreeing=Dictionary(grouping:votes,by:{$0.fret ?? -1}).values.filter { $0.count>=2 && ($0.map(\.score).max() ?? 0)>=0.9 }
+                                guard agreeing.count==1,var value=agreeing.first?.max(by:{$0.score<$1.score}) else { continue }
+                                value.x=center
+                                if let match=digits.firstIndex(where:{abs($0.x-center)<system.gap*0.8}) {
+                                    if value.score>digits[match].score+0.08 { digits[match]=value }
+                                } else if value.score>=0.95 { digits.append(value) }
+                            }
+                        }
                         if digits.isEmpty { problems.append("第 \(stringIndex+1) 弦有图形但未读出数字，请补录") }
                         for value in digits {
+                            if min(value.x-Double(pair.0),Double(pair.1)-value.x)<system.gap*0.75 {
+                                problems.append("小节线附近的字符待核对，未自动写成音符")
+                                continue
+                            }
                             if value.fret == 1 && raster.isCrossingStem(x: value.x, row: row, gap: system.gap) {
                                 problems.append("第 \(stringIndex+1) 弦有符干状字符，未当作数字 1 写入")
                                 continue
@@ -125,11 +158,21 @@ actor TabRecognitionPipeline {
                                 continue
                             }
                             let warnings = value.fret == nil ? ["数字 \(value.text) 未确定"] : value.score < 0.8 ? ["数字较模糊，请核对"] : []
-                            candidates.append((value.x, GuitarNote(string: stringIndex+1, fret: value.fret, review: warnings)))
+                            candidates.append((value.x, GuitarNote(string: stringIndex+1, fret: value.fret, review: warnings), value.score))
                         }
                     } catch {
                         problems.append("第 \(stringIndex+1) 弦未读出，请手动补录")
                     }
+                }
+                // A faint fragment of a neighboring glyph/beam is not a second
+                // played string. Keep the ambiguous position in the review notes.
+                let allCandidates = candidates
+                candidates = allCandidates.filter { item in
+                    let neighbor = item.score < 0.85 && allCandidates.contains {
+                        abs($0.note.string-item.note.string) == 1 && $0.score >= 0.9 && abs($0.x-item.x) < system.gap*0.65
+                    }
+                    if neighbor { problems.append("第 \(item.note.string) 弦约 \(Int((item.x-Double(pair.0))/Double(pair.1-pair.0)*100))% 位置可能是邻弦残影，请对照补录") }
+                    return !neighbor
                 }
                 candidates.sort { $0.x < $1.x }
                 var groups: [(x: Double, notes: [GuitarNote])] = []

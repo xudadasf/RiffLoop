@@ -3,8 +3,8 @@ let session,schema,api,busy=false,digitTime=0,digitText='',revision=0;
 const $=id=>document.getElementById(id),core=GuitarDraftCore;
 const send=(action,payload={})=>window.webkit?.messageHandlers.guitarEditor.postMessage({action,...payload});
 const status=text=>{$('status').textContent=text;};
-function perform(fn){if(busy)return;try{fn();revision++;render();}catch(e){status(e.message);}}
-function button(text,action,parent){const el=document.createElement('button');el.textContent=text;el.onclick=()=>perform(action);parent.append(el);return el;}
+function perform(fn,keepDigits=false){if(busy)return;if(!keepDigits)digitTime=0;try{fn();revision++;render();}catch(e){status(e.message);}}
+function button(text,action,parent){const el=document.createElement('button');el.textContent=text;el.onclick=()=>perform(action,parent.id==='keypad'&&/^\d$/.test(text));parent.append(el);return el;}
 function field(label,value,change,options){const row=document.createElement('label');row.append(document.createTextNode(label));const input=document.createElement(options?'select':'input');input.setAttribute('aria-label',label);if(options){for(const [name,val] of options){const o=document.createElement('option');o.value=val;o.textContent=name;input.append(o);}}else input.type=typeof value==='number'?'number':'text';input.value=value;input.onchange=()=>perform(()=>change(options||input.type==='number'?Number(input.value):input.value));row.append(input);$('panelBody').append(row);return input;}
 function panel(title){$('panelTitle').textContent=title;$('panelBody').replaceChildren();$('panel').showModal();}
 function heading(text){const h=document.createElement('h3');h.textContent=text;$('panelBody').append(h);}
