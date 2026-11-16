@@ -79,6 +79,7 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$APP/Info.plist")" = "iPhoneOS"
           test "$(lipo -archs "$EXECUTABLE")" = "arm64"
           test ! -e "$APP/embedded.mobileprovision"
+          python3 scripts/verify-score-resources.py "$APP"
 
           mkdir -p "$PACKAGE/Payload"
           ditto "$APP" "$PACKAGE/Payload/RiffLoop.app"

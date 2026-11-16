@@ -11,6 +11,9 @@ on:
       - "project.yml"
       - "scripts/gp-roundtrip-*"
       - "scripts/test-gp-draft-editor.mjs"
+      - "scripts/test-guitar*"
+      - "scripts/prepare-score-ocr.py"
+      - "scripts/verify-score-resources.py"
       - "scripts/test-gp-roundtrip-audit.py"
       - "scripts/test-gp-playback.mjs"
       - "scripts/test-gp-audio.mjs"
@@ -38,6 +41,9 @@ on:
       - "project.yml"
       - "scripts/gp-roundtrip-*"
       - "scripts/test-gp-draft-editor.mjs"
+      - "scripts/test-guitar*"
+      - "scripts/prepare-score-ocr.py"
+      - "scripts/verify-score-resources.py"
       - "scripts/test-gp-roundtrip-audit.py"
       - "scripts/test-gp-playback.mjs"
       - "scripts/test-gp-audio.mjs"
@@ -164,6 +170,7 @@ jobs:
           set -euo pipefail
           APP="$(find DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 1 -name RiffLoop.app -print -quit)"
           test -d "$APP"
+          python3 scripts/verify-score-resources.py "$APP"
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \
             xcrun simctl install "$IPAD_DEVICE_ID" "$APP"
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=60)' \

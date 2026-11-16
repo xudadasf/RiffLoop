@@ -22,6 +22,7 @@ function render(){if(!session)return;session.clamp();const d=session.draft,bar=s
   const review=[...bar.review,...session.currentBeat.review,...session.currentBeat.notes.flatMap(n=>n.review)];status(review.length?review.join('；'):`已选第 ${session.bar+1} 小节、第 ${session.beat+1} 拍位、第 ${session.string} 弦`);
   $('fretValue').value=session.currentNote?.fret??'';for(const el of $('rhythm').querySelectorAll('[data-duration]'))el.classList.toggle('active',Number(el.dataset.duration)===session.currentBeat.duration);$('dots').textContent=`附点 ${session.currentBeat.dots}`;
   $('engraving').hidden=true;grid.hidden=false;
+  grid.querySelector('.cell.selected')?.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 window.loadGuitarDraft=(draft,techniques)=>{schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>core.validate(d,schema,false));render();};
 window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved){session.saved=JSON.stringify(session.draft);render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
@@ -32,7 +33,7 @@ $('undo').onclick=()=>perform(()=>session.undo());$('redo').onclick=()=>perform(
 $('save').onclick=()=>{if(busy)return;busy=true;document.body.inert=true;send('save',{draft:session.draft});};
 $('export').onclick=()=>{if(busy)return;try{core.validate(session.draft,schema,true);busy=true;document.body.inert=true;status('正在生成 GP 副本…');send('export',{draft:session.draft});}catch(e){status(e.message);}};
 $('prev').onclick=()=>perform(()=>{session.bar--;session.beat=0;});$('next').onclick=()=>perform(()=>{session.bar++;session.beat=0;});$('barChoice').onchange=e=>perform(()=>{session.bar=Number(e.target.value);session.beat=0;});
-$('source').onclick=()=>{if(session.currentBar.source)send('source',{source:session.currentBar.source});};$('hideSource').onclick=()=>{$('reference').hidden=true;};
+$('source').onclick=()=>{if(!busy&&session.currentBar.source){busy=true;document.body.inert=true;send('source',{source:session.currentBar.source});}};$('hideSource').onclick=()=>{$('reference').hidden=true;};
 $('preview').onclick=()=>{try{const score=core.makeScore(alphaTab,session.draft,schema,false);$('grid').hidden=true;$('engraving').hidden=false;if(!api)api=new alphaTab.AlphaTabApi($('engraving'),{core:{fontDirectory:'../GpWeb/font/',useWorkers:false},display:{scale:.9},player:{enablePlayer:false}});api.renderScore(score,[0]);}catch(e){status(e.message);}};
 for(const [id,fn] of Object.entries({rest:()=>session.rest(),insertBefore:()=>session.insertBeat(),insertAfter:()=>session.insertBeat(true),deleteNote:()=>session.deleteNote(),deleteBeat:()=>session.deleteBeat(),fill:()=>session.fill(core),review:()=>session.change(()=>{session.currentBar.review=[];session.currentBar.beats.forEach(b=>{b.review=[];b.notes.forEach(n=>{if(n.fret!=null)n.review=[];});});})}))$(id).onclick=()=>perform(fn);
 for(const n of [1,2,4,8,16,32,64]){const b=button(`1/${n}`,()=>session.change(()=>{session.currentBeat.duration=n;session.currentBeat.review=session.currentBeat.review.filter(x=>!x.includes('时值'));}),$('rhythm'));b.dataset.duration=n;}

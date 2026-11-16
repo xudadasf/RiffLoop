@@ -46,8 +46,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.prototype
         PRODUCT_NAME: RiffLoop
-        MARKETING_VERSION: 0.25.71
-        CURRENT_PROJECT_VERSION: 115
+        MARKETING_VERSION: 0.25.72
+        CURRENT_PROJECT_VERSION: 116
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: RiffLoop/App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -4,6 +4,34 @@ import PDFKit
 @testable import RiffLoop
 
 final class TabRecognitionTests: XCTestCase {
+    func testStemEndingAtStringIsNotFretOne() throws {
+        let width=100,height=100,row=50,gap=20.0
+        var pixels=[UInt8](repeating:255,count:width*height)
+        for x in 0..<width { pixels[row*width+x]=0 }
+        // Short centred digit 1, versus a long stem that ends at the line.
+        for y in 43...57 { pixels[y*width+25]=0 }
+        for y in 28...50 { pixels[y*width+65]=0 }
+        // Ink from a lower-string digit must not make the stem valid.
+        for y in 57...73 { for x in 61...69 { pixels[y*width+x]=0 } }
+        let raster=try TabRaster(width:width,height:height,pixels:pixels)
+        XCTAssertFalse(raster.isCrossingStem(x:25,row:row,gap:gap))
+        XCTAssertTrue(raster.isCrossingStem(x:65,row:row,gap:gap))
+    }
+    func testUniformBeamsNeedBothEvidenceAndCorrectTotalDuration() throws {
+        let width=800,height=260
+        var pixels=[UInt8](repeating:255,count:width*height)
+        let positions=(0..<16).map { Double(100+$0*40) }
+        for group in 0..<4 {
+            let left=100+group*160,right=left+120
+            for top in [24,32] { for y in top...top+2 { for x in left...right { pixels[y*width+x]=0 } } }
+        }
+        let raster=try TabRaster(width:width,height:height,pixels:pixels)
+        let system=TabSystem(rows:[80,100,120,140,160,180],left:20,right:780,boundaries:[20,780])
+        XCTAssertEqual(raster.uniformBeamDuration(system,positions:positions,expectedTicks:3840),16)
+        XCTAssertNil(raster.uniformBeamDuration(system,positions:positions,expectedTicks:2880))
+        let blank=try TabRaster(width:width,height:height,pixels:[UInt8](repeating:255,count:width*height))
+        XCTAssertNil(blank.uniformBeamDuration(system,positions:positions,expectedTicks:3840))
+    }
     func testImageAndPDFRegionsOrderGapsAndEditableOutput() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

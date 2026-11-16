@@ -1,0 +1,18 @@
+RiffLoop offline TAB recognition
+
+OCR weights: PP-OCRv6_rec_small.onnx, distributed by RapidAI/RapidOCR,
+release v3.9.2, based on PaddleOCR. Apache License 2.0.
+https://www.modelscope.cn/models/RapidAI/RapidOCR
+https://github.com/RapidAI/RapidOCR
+https://github.com/PaddlePaddle/PaddleOCR
+SHA256: 6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884
+See RapidOCR-LICENSE.txt and PaddleOCR-LICENSE.txt.
+
+Runtime: Microsoft ONNX Runtime 1.24.2. MIT License.
+https://github.com/microsoft/onnxruntime
+See ONNXRuntime-LICENSE.txt.
+
+Fixed-point resize preprocessing follows OpenCV's interpolation arithmetic.
+See OPENCV_RESIZE_LICENSE.txt.
+
+Recognition runs locally. User scores are not sent to these projects or servers.

@@ -48,6 +48,15 @@ function validate(draft,schema,complete=true){
     const actual=bar.beats.reduce((s,b)=>s+ticks(b),0),expected=numerator*3840/denominator;
     if(complete&&Math.abs(actual-expected)>0.01)fail(`第 ${i+1} 小节有 ${actual/960} 拍，应为 ${expected/960} 拍，请先调整时值或补休止。`);
   }
+  if(complete){
+    const beats=draft.bars.flatMap(b=>b.beats);
+    for(let i=0;i<beats.length;i++)for(const note of beats[i].notes){
+      const previous=beats.slice(0,i).reverse().flatMap(b=>b.notes).find(n=>n.string===note.string);
+      const next=beats.slice(i+1).flatMap(b=>b.notes).find(n=>n.string===note.string);
+      if(note.effects.isTieDestination&&(!previous||previous.fret==null||note.fret!==previous.fret))fail('延音需要前面已有同弦同品音符，请检查连接目标。');
+      if((note.effects.isHammerPullOrigin||[1,2].includes(note.effects.slideOutType))&&(!next||next.fret==null||note.fret==null))fail('击勾弦或连接滑音需要后面已有同弦音符，请检查连接目标。');
+    }
+  }
 }
 function applyEffects(target,effects,scope,schema){
   for(const spec of schema.filter(s=>s.scope===scope)){

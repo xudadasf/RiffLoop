@@ -57,3 +57,12 @@ for(const spec of schema){
   }
 }
 console.log(`Guitar editor: chord input, insert/delete, undo/redo, copy/paste, 6 string pitches and ${techniques} technique settings passed`);
+assert.throws(()=>reopen(draft([[beat(1,[note(1,8,{isTieDestination:1})])]])),/延音/);
+assert.throws(()=>reopen(draft([[beat(1,[note(1,8,{isHammerPullOrigin:1})])]])),/同弦/);
+const tied=draft([[beat(1,[note(1,8)])],[beat(1,[note(1,8,{isTieDestination:1})])]]);
+const tiedScore=reopen(tied);assert.equal(tiedScore.tracks[0].staves[0].bars[1].voices[0].beats[0].notes[0].isTieDestination,true);
+const sections=draft([[beat(1,[note(1,7)])],[beat(1,[note(1,9)])]]);
+sections.bars[0].repeatStart=true;sections.bars[0].section='A';sections.bars[1].repeatCount=2;sections.bars[1].tempo=80;
+const sectionScore=reopen(sections);assert.equal(sectionScore.masterBars[1].repeatCount,2);assert.equal(sectionScore.masterBars[1].tempoAutomations[0].value,80);
+for(const bend of [[{offset:0,value:0},{offset:30,value:4},{offset:60,value:0}],[{offset:0,value:4},{offset:60,value:0}]])reopen(draft([[beat(1,[note(1,7,{},bend)])]]));
+console.log('Guitar connections: cross-bar tie, invalid target rejection, repeat/section/tempo and bend curves passed');

@@ -51,7 +51,7 @@ def systems(gray):
     used=set();found=[]
     for start in range(len(rows)-5):
         ys=rows[start:start+6];gap=(ys[-1]-ys[0])/5
-        if not 4<=gap<=90 or used.intersection(ys) or max(abs(np.diff(ys)-gap))>max(2,gap*.18):continue
+        if not 4<=gap<=180 or used.intersection(ys) or max(abs(np.diff(ys)-gap))>max(2,gap*.18):continue
         support=sum(horizontal[max(0,y-3):min(h,y+4)].any(0).astype(int) for y in ys)
         xs=np.flatnonzero(support>=4)
         if not len(xs):continue
@@ -60,7 +60,9 @@ def systems(gray):
         neighbors=[y for y in rows if abs(y-ys[0]+gap)<gap*.18 or abs(y-ys[-1]-gap)<gap*.18]
         if any(horizontal[y,left:right+1].sum()>(right-left)//2 for y in neighbors):continue
         if any(len(g)>gap*6 for g in groups(np.flatnonzero(support[left:right+1]<2))):continue
-        vertical=np.flatnonzero(ink[ys[0]:ys[-1]+1,left:right+1].mean(0)>.88)+left
+        radius=max(1,int(gap*.12));paths=cv2.dilate(ink.astype(np.uint8),np.ones((1,radius*2+1),np.uint8))
+        midpoints=[(a+b)//2 for a,b in zip(ys,ys[1:])]
+        vertical=np.flatnonzero((paths[ys[0]:ys[-1]+1,left:right+1].mean(0)>.88)&paths[midpoints,left:right+1].all(0))+left
         boundaries=[left]
         for group in groups(vertical):
             x=sum(group)//len(group)
@@ -72,7 +74,8 @@ def systems(gray):
                 occupied=np.flatnonzero(ink[math.floor((y0+y1)/2+.5),max(0,x-radius):min(w,x+radius+1)])
                 if len(occupied):centers.append(float(occupied.mean()))
             straight=(ink[ys[0]:ys[-1]+1,max(0,x-1):min(w,x+2)].mean(0)>=.98).sum()>=2
-            if len(centers)!=5 or not(straight or max(centers)-min(centers)<=max(1.2,gap*.08)):continue
+            linear=len(centers)==5 and max(centers)-min(centers)<=gap*.5 and max(abs(centers[i]-(centers[0]+i*(centers[4]-centers[0])/4)) for i in range(5))<=max(1.2,gap*.08)
+            if len(centers)!=5 or not(straight or linear):continue
             if x-boundaries[-1]>gap*.8:boundaries.append(x)
         boundaries.append(right);found.append(dict(rows=ys,left=left,right=right,boundaries=boundaries,gap=gap));used.update(ys)
     return found
@@ -190,7 +193,7 @@ def transcribe(gray,session):
                     radius=max(2,int(gap*.25));x=int(d['x']);top=max(0,y-int(gap*.85));bottom=min(h-1,y+int(gap*.85))
                     rr=max(3,int(gap*.4));margin=max(2,int(gap*.16));half=max(margin+1,int(gap*.45));above=ink[max(0,y-half):max(0,y-margin)+1,max(0,x-rr):min(w,x+rr+1)].sum();below=ink[min(h-1,y+margin):min(h-1,y+half)+1,max(0,x-rr):min(w,x+rr+1)].sum()
                     if min(above,below)<max(4,int(gap*.25)):return True
-                    return (ink[top:bottom+1,max(0,x-radius):min(w,x+radius+1)].mean(0)>=.88).any()
+                    return (ink[top:y+1,max(0,x-radius):min(w,x+radius+1)].mean(0)>=.92).any() or (ink[y:bottom+1,max(0,x-radius):min(w,x+radius+1)].mean(0)>=.92).any()
                 notes.extend(dict(string=i+1,x=d['x'],fret=d['fret'],score=round(d['score'],3)) for d in digits if d['score']>=.5 and not stem(d) and min(d['x']-a,b-d['x'])>=gap*.75)
             notes=[n for n in notes if not(n['score']<.85 and any(abs(other['string']-n['string'])==1 and other['score']>=.9 and abs(other['x']-n['x'])<gap*.65 for other in notes))]
             bars.append(sorted(notes,key=lambda n:n['x']))

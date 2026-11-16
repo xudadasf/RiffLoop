@@ -128,7 +128,7 @@ struct TabRaster {
         var result: [TabSystem] = [], used = Set<Int>()
         for start in 0...(rows.count-6) {
             let ys = Array(rows[start..<start+6]), gap = Double(ys[5]-ys[0])/5
-            guard gap >= 4, gap <= 90, !ys.contains(where: used.contains),
+            guard gap >= 4, gap <= 180, !ys.contains(where: used.contains),
                   zip(ys,ys.dropFirst()).allSatisfy({ abs(Double($0.1-$0.0)-gap) <= max(2,gap*0.18) }) else { continue }
             var support = [Int](repeating: 0, count: width)
             for y in ys { for x in 0..<width { if (max(0,y-3)...min(height-1,y+3)).contains(where: { horizontal[$0*width+x] == 1 }) { support[x] += 1 } } }
@@ -148,9 +148,22 @@ struct TabRaster {
             let neighbors = rows.filter { abs(Double($0-ys[0])+gap)<gap*0.18 || abs(Double($0-ys[5])-gap)<gap*0.18 }
             if neighbors.contains(where: { y in (left...right).filter { horizontal[y*width+$0] == 1 }.count > (right-left)/2 }) { continue }
             if Self.groups((left...right).filter { support[$0] < 2 }).contains(where: { Double($0.count)>gap*6 }) { continue }
-            let vertical = (left...right).filter { x in
-                let count = (ys[0]...ys[5]).reduce(0) { $0 + Int(ink[$1*width+x]) }
-                return Double(count) > Double(ys[5]-ys[0]+1)*0.88
+            // Perspective can leave barlines slightly slanted after the six
+            // strings are level. Require a continuous narrow path, not one column.
+            let pathRadius=max(1,Int(gap*0.12))
+            var vertical:[Int]=[]
+            for x in left...right {
+                let l=max(0,x-pathRadius),r=min(width-1,x+pathRadius)
+                func occupied(_ y:Int)->Bool {
+                    for column in l...r where ink[y*width+column] == 1 { return true }
+                    return false
+                }
+                var midpoints=0
+                for pair in zip(ys,ys.dropFirst()) { if occupied((pair.0+pair.1)/2) { midpoints += 1 } }
+                guard midpoints==5 else { continue }
+                var count=0
+                for y in ys[0]...ys[5] { if occupied(y) { count += 1 } }
+                if Double(count)>Double(ys[5]-ys[0]+1)*0.88 { vertical.append(x) }
             }
             var candidates: [Int] = []
             for group in Self.groups(vertical) {
@@ -178,7 +191,12 @@ struct TabRaster {
                     for y in ys[0]...ys[5] { count += Int(ink[y*width+column]) }
                     if Double(count) >= Double(ys[5]-ys[0]+1)*0.98 { straightColumns += 1 }
                 }
-                if centers.count == 5 && (straightColumns >= 2 || centers.max()! - centers.min()! <= max(1.2,gap*0.08)) { candidates.append(x) }
+                if centers.count == 5 {
+                    var deviation=0.0
+                    for i in 0..<5 { deviation=max(deviation,abs(centers[i]-(centers[0]+Double(i)*(centers[4]-centers[0])/4))) }
+                    let linear=centers.max()! - centers.min()! <= gap*0.5 && deviation<=max(1.2,gap*0.08)
+                    if straightColumns>=2 || linear { candidates.append(x) }
+                }
             }
             var boundaries = [left]
             for x in candidates { if Double(x-(boundaries.last ?? left)) > gap*0.8 { boundaries.append(x) } }
@@ -237,9 +255,15 @@ struct TabRaster {
         let above = mass(max(0,row-half)...max(0,row-margin))
         let below = mass(min(height-1,row+margin)...min(height-1,row+half))
         if min(above,below) < max(4,Int(gap*0.25)) { return true }
-        return (max(0,Int(x)-radius)...min(width-1,Int(x)+radius)).contains { column in
-            Double((top...bottom).reduce(0) { $0+Int(ink[$1*width+column]) }) >= Double(bottom-top+1)*0.88
+        for column in max(0,Int(x)-radius)...min(width-1,Int(x)+radius) {
+            var upper=0,lower=0
+            for y in top...row { upper += Int(ink[y*width+column]) }
+            for y in row...bottom { lower += Int(ink[y*width+column]) }
+            // A stem can end at this string, with a real digit on the next
+            // string providing unrelated lower ink. Test each half separately.
+            if Double(upper)>=Double(row-top+1)*0.92 || Double(lower)>=Double(bottom-row+1)*0.92 { return true }
         }
+        return false
     }
 
     func glyphSpans(left: Int, right: Int, row: Int, gap: Double) -> [ClosedRange<Int>] {
