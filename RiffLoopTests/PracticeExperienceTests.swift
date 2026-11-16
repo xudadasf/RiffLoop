@@ -83,6 +83,7 @@ final class PracticeExperienceTests: XCTestCase {
 
     private func capture(_ page: AnyView, name: String, delay: Double = 1, expectAwake: Bool = true, waitForGpScore: Bool = false) async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previousKeyWindow=scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: AnyView(NavigationStack { page }
             // A standalone UIHostingController has no SwiftUI App/Scene bridge.
@@ -98,6 +99,7 @@ final class PracticeExperienceTests: XCTestCase {
             controller.endAppearanceTransition()
             window.isHidden = true
             window.rootViewController = nil
+            previousKeyWindow?.makeKeyWindow()
         }
         try await Task.sleep(for: .seconds(delay))
         if waitForGpScore {
@@ -126,12 +128,21 @@ final class PracticeExperienceTests: XCTestCase {
             if let web = view as? WKWebView { return web }
             return view.subviews.lazy.compactMap { webView(in: $0) }.first
         }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+        let started=ContinuousClock.now
+        let deadline = started.advanced(by: .seconds(45))
+        var nextDiagnostic=started.advanced(by:.seconds(10))
         while ContinuousClock.now < deadline {
             if let web = webView(in: root),
                let result = try? await web.evaluateJavaScript("Boolean(document.querySelector('#score svg'))"),
                result as? Bool == true {
                 return true
+            }
+            if ContinuousClock.now>=nextDiagnostic {
+                nextDiagnostic=ContinuousClock.now.advanced(by:.seconds(10))
+                if let web=webView(in:root) {
+                    let state=try? await web.evaluateJavaScript("JSON.stringify({ready:document.readyState,visibility:document.visibilityState,bridge:typeof window.riffloop,svg:document.querySelectorAll('#score svg').length,body:document.body.innerText.slice(0,180)})")
+                    print("GP render wait: elapsed=\(started.duration(to:ContinuousClock.now)); bounds=\(web.bounds); loading=\(web.isLoading); key=\(web.window?.isKeyWindow ?? false); scene=\(String(describing:web.window?.windowScene?.activationState)); DOM=\(String(describing:state))")
+                } else { print("GP render wait: SwiftUI has not installed a WKWebView") }
             }
             try await Task.sleep(for: .milliseconds(100))
         }

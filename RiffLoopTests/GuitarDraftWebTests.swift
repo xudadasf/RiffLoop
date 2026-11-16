@@ -12,9 +12,10 @@ final class GuitarDraftWebTests: XCTestCase {
         let id = try await store.create(draft)
         let host = UIHostingController(rootView: GuitarDraftEditorView(document: .init(id: id, draft: draft)).environmentObject(ScoreExternalOpenCoordinator()))
         let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previousKeyWindow=scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene:scene)
         window.rootViewController = host; window.makeKeyAndVisible()
-        defer { window.isHidden = true; window.rootViewController = nil }
+        defer { window.isHidden = true; window.rootViewController = nil; previousKeyWindow?.makeKeyWindow() }
         func find(_ view: UIView) -> WKWebView? {
             if let web = view as? WKWebView { return web }
             return view.subviews.compactMap { find($0) }.first
