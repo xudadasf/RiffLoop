@@ -11,7 +11,8 @@ final class GuitarDraftWebTests: XCTestCase {
         draft.bars[0].beats = (0..<4).map { _ in GuitarBeat() }
         let id = try await store.create(draft)
         let host = UIHostingController(rootView: GuitarDraftEditorView(document: .init(id: id, draft: draft)).environmentObject(ScoreExternalOpenCoordinator()))
-        let window = UIWindow(frame: CGRect(x: 0,y: 0,width: 1133,height: 744))
+        let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene:scene)
         window.rootViewController = host; window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil }
         func find(_ view: UIView) -> WKWebView? {
@@ -45,7 +46,17 @@ final class GuitarDraftWebTests: XCTestCase {
         XCTAssertEqual(saved.bars[0].beats.count,6)
         XCTAssertEqual(saved.bars[0].beats[2].notes.map(\.fret),[13,11])
         XCTAssertEqual(saved.bars[0].beats[2].notes[0].effects["isPalmMute"],1)
-        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true) }
+        host.view.layoutIfNeeded()
+        let layout=try await eval("innerWidth >= 700 && document.documentElement.scrollWidth <= innerWidth && document.querySelector('.cell').getBoundingClientRect().height >= 44",editor)
+        XCTAssertEqual(layout as? Bool,true,"Native iPad editor must retain touch targets and fit the viewport")
+        let image:UIImage = try await withCheckedThrowingContinuation { continuation in
+            editor.takeSnapshot(with:nil) { image,error in
+                if let image { continuation.resume(returning:image) }
+                else { continuation.resume(throwing:error ?? NSError(domain:"EditorSnapshot",code:1)) }
+            }
+        }
+        let pixels=try XCTUnwrap(image.cgImage?.dataProvider?.data) as Data
+        XCTAssertGreaterThan(pixels.filter { $0 > 32 }.count,pixels.count/8,"A blank native snapshot is not visual validation")
         let attachment = XCTAttachment(image: image); attachment.name = "Electric-guitar-editor-mini"; attachment.lifetime = .keepAlways; add(attachment)
         try await store.remove(id, matching: saved)
     }
