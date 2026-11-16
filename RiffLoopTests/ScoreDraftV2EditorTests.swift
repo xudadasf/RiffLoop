@@ -82,6 +82,7 @@ final class ScoreDraftV2EditorModelTests: XCTestCase {
         XCTAssertEqual(model.closeDecision, .confirmDiscard)
         model.restoreMetadataInput()
         XCTAssertTrue(model.replaceEvent(bar: 0, index: 0, with: .beat(.init(duration: 4, dots: 1))))
+        XCTAssertNil(model.message, "A corrected edit must not leave a stale failure alert")
         await model.save()
         XCTAssertEqual(model.exportAvailability, .incomplete)
         let id = try XCTUnwrap(model.persistedID)

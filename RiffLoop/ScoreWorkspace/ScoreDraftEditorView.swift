@@ -57,6 +57,7 @@ struct ScoreDraftEditorView: View {
         .buttonStyle(.borderless)
         .disabled(model.isBusy)
         .navigationTitle(model.editor.draft.title)
+        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -225,9 +226,11 @@ struct ScoreDraftEntryForm: View {
                     .foregroundStyle(.secondary)
                 if triplet {
                     Text("三个等时值的位置组成一组 3:2 三连音，组内可分别填写音符、和弦或休止。")
-                    Picker("整组时值", selection: Binding(get: { inputs[0].duration }, set: { duration in
+                    Picker("每个位置的时值", selection: Binding(get: { inputs[0].duration }, set: { duration in
                         for i in inputs.indices { inputs[i].duration = duration }
                     })) { durations }
+                    Text("本组三连音共 \(String(format: "%.3g", 8.0 / Double(inputs[0].duration))) 拍（四分音符为一拍）。")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
             ForEach(inputs.indices, id: \.self) { index in
@@ -249,6 +252,7 @@ struct ScoreDraftEntryForm: View {
             }
         }
         .navigationTitle(triplet ? "三连音" : "音符与时值")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("取消") { if inputs == original { dismiss() } else { discard = true } }

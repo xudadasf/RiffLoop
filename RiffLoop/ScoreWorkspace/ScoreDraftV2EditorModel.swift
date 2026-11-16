@@ -139,6 +139,7 @@ final class ScoreDraftV2EditorModel: ObservableObject {
         do {
             try operation(&updated)
             editor = updated
+            message = nil
             return true
         } catch {
             message = error.localizedDescription
