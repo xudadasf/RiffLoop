@@ -93,10 +93,11 @@ struct ScoreWorkspaceView: View {
             Section {
                 Text("在这里准备 PDF、照片或截图。素材会复制到制谱工作区，原文件不会被修改。")
                     .foregroundStyle(.secondary)
-                Text("可预览和手动画框。自动分区、识别和编辑正在开发。")
+                Text("可预览和手动画框，也可独立新建草稿。自动分区与图片识别尚未接入。")
                     .foregroundStyle(.secondary)
             }
             Section {
+                NavigationLink("新建与编辑草稿") { ScoreDraftLibraryView() }
                 NavigationLink("区域顺序与间隔") {
                     ScoreSequenceLibraryView()
                 }

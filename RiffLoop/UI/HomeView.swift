@@ -66,7 +66,7 @@ struct HomeView: View {
                                 .font(.title2)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("识别与编辑").font(.headline)
-                                Text("准备谱面素材 · 识别和编辑功能开发中")
+                                Text("素材框选 · 手动草稿编辑")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

@@ -90,9 +90,12 @@ final class ScoreDraftV2ExporterTests: XCTestCase {
         let tooManyBars = ScoreDraftV2(title: "65 bars", tempo: 100, bars: Array(repeating: [whole], count: 65))
         let eighth = ScoreDraftV2Entry.beat(.init(duration: 8))
         let sixteenth = ScoreDraftV2Entry.beat(.init(duration: 16))
-        let eightBeats = Array(repeating: eighth, count: 8)
-        let tooManyBeats = ScoreDraftV2(title: "513 beats", tempo: 100,
-            bars: [(Array(repeating: eighth, count: 7) + [sixteenth, sixteenth])] + Array(repeating: eightBeats, count: 63))
+        let eightBeats: [ScoreDraftV2Entry] = Array(repeating: eighth, count: 8)
+        var nineBeats: [ScoreDraftV2Entry] = Array(repeating: eighth, count: 7)
+        nineBeats.append(contentsOf: [sixteenth, sixteenth])
+        var oversizedBars: [[ScoreDraftV2Entry]] = Array(repeating: eightBeats, count: 63)
+        oversizedBars.insert(nineBeats, at: 0)
+        let tooManyBeats = ScoreDraftV2(title: "513 beats", tempo: 100, bars: oversizedBars)
         let four = (1...4).map { ScoreDraftV2Note(string: $0, fret: 0) }
         let noteBar: [ScoreDraftV2Entry] = [.beat(.init(duration: 2, notes: four)), .beat(.init(duration: 2, notes: four))]
         let extra: [ScoreDraftV2Entry] = [.beat(.init(duration: 2, notes: four + [.init(string: 5, fret: 0)])),

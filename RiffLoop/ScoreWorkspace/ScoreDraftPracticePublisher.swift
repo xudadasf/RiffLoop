@@ -18,6 +18,32 @@ enum ScoreDraftPracticePublisher {
         displayNames: DocumentDisplayNameStore? = nil,
         newIdentifier: () -> UUID = { UUID() }
     ) async throws -> URL {
+        try await publishCopy(documents: documents, settings: settings, recent: recent,
+                              displayNames: displayNames, newIdentifier: newIdentifier) { store, name in
+            try await store.create(draft, fileName: name)
+        }
+    }
+
+    static func publish(
+        _ draft: ScoreDraftV2,
+        documents: RiffLoopDocumentStore = RiffLoopDocumentStore(),
+        settings: FilePracticeSettingsStore = FilePracticeSettingsStore(),
+        recent: RecentProjectsStore? = nil,
+        displayNames: DocumentDisplayNameStore? = nil,
+        newIdentifier: () -> UUID = { UUID() }
+    ) async throws -> URL {
+        try await publishCopy(documents: documents, settings: settings, recent: recent,
+                              displayNames: displayNames, newIdentifier: newIdentifier) { store, name in
+            try await store.create(draft, fileName: name)
+        }
+    }
+
+    private static func publishCopy(
+        documents: RiffLoopDocumentStore, settings: FilePracticeSettingsStore,
+        recent: RecentProjectsStore?, displayNames: DocumentDisplayNameStore?,
+        newIdentifier: () -> UUID,
+        create: (ScoreDraftGPFileStore, String) async throws -> URL
+    ) async throws -> URL {
         let recent = recent ?? RecentProjectsStore()
         let displayNames = displayNames ?? DocumentDisplayNameStore()
         let folder = documents.folderURL(for: .guitarPro)
@@ -34,7 +60,7 @@ enum ScoreDraftPracticePublisher {
                   !recent.projects.contains(where: { $0.kind == .guitarPro && $0.fileName == name }),
                   recent.mostRecent(kind: .guitarPro)?.fileName != name else { continue }
             do {
-                return try await store.create(draft, fileName: name)
+                return try await create(store, name)
             } catch let error as POSIXError where error.code == .EEXIST {
                 // Another writer may have claimed the name since the check.
                 continue
