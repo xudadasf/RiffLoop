@@ -56,7 +56,7 @@ final class GuitarDraftWebTests: XCTestCase {
             }
         }
         let pixels=try XCTUnwrap(image.cgImage?.dataProvider?.data) as Data
-        XCTAssertGreaterThan(pixels.filter { $0 > 32 }.count,pixels.count/8,"A blank native snapshot is not visual validation")
+        XCTAssertGreaterThan(pixels.filter { $0 > 32 }.count,pixels.count/3,"A blank native snapshot is not visual validation")
         let attachment = XCTAttachment(image: image); attachment.name = "Electric-guitar-editor-mini"; attachment.lifetime = .keepAlways; add(attachment)
         try await store.remove(id, matching: saved)
     }
