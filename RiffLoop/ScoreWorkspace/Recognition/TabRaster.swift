@@ -85,12 +85,15 @@ struct TabRaster {
         // Rotate both axes. A shear levels strings but leaves tilted bar lines,
         // causing multiple real measures to be merged into one.
         let angle = best * .pi / 180, c = cos(angle), s = sin(angle)
-        let w = Int(ceil(Double(width)*c+Double(height)*abs(s)))
-        let h = Int(ceil(Double(height)*c+Double(width)*abs(s)))
-        guard w <= 4096, h <= 4096 else { return self }
+        let expandedWidth = ceil(Double(width)*c+Double(height)*abs(s))
+        let expandedHeight = ceil(Double(height)*c+Double(width)*abs(s))
+        // Full-size photos already touch the pixel limit. Fit the expanded
+        // rotation inside that limit instead of silently skipping correction.
+        let scale=min(1,4096/max(expandedWidth,expandedHeight))
+        let w=max(1,Int(floor(expandedWidth*scale))),h=max(1,Int(floor(expandedHeight*scale)))
         var out = [UInt8](repeating: 255, count: w * h)
         for y in 0..<h { for x in 0..<w {
-            let dx = Double(x)-Double(w)/2, dy = Double(y)-Double(h)/2
+            let dx = (Double(x)-Double(w)/2)/scale, dy = (Double(y)-Double(h)/2)/scale
             let sx = c*dx-s*dy+Double(width)/2, sy = s*dx+c*dy+Double(height)/2
             let ix = Int(floor(sx)), iy = Int(floor(sy)), fx = sx-floor(sx), fy = sy-floor(sy)
             if ix >= 0 && ix+1 < width && iy >= 0 && iy+1 < height {

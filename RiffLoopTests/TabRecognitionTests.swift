@@ -4,6 +4,20 @@ import PDFKit
 @testable import RiffLoop
 
 final class TabRecognitionTests: XCTestCase {
+    func testFullResolutionPhotoStillGetsDeskewed() throws {
+        let format=UIGraphicsImageRendererFormat();format.scale=1;format.opaque=true
+        let image=UIGraphicsImageRenderer(size:CGSize(width:4096,height:450),format:format).image { context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:4096,height:450))
+            let c=context.cgContext;c.rotate(by:0.035);c.setStrokeColor(UIColor.black.cgColor);c.setLineWidth(2)
+            for y in stride(from:80,through:180,by:20) { c.move(to:CGPoint(x:80,y:y));c.addLine(to:CGPoint(x:4000,y:y));c.strokePath() }
+            for x in [80,1060,2040,3020,4000] { c.move(to:CGPoint(x:x,y:80));c.addLine(to:CGPoint(x:x,y:180));c.strokePath() }
+        }
+        let corrected=try TabRaster(image:XCTUnwrap(image.cgImage)).deskewed()
+        XCTAssertLessThanOrEqual(max(corrected.width,corrected.height),4096)
+        XCTAssertGreaterThan(corrected.height,450)
+        let systems=corrected.systems()
+        XCTAssertEqual(systems.count,1);XCTAssertEqual(systems.first?.boundaries.count,5)
+    }
     func testDenseFretLabelsMayInterruptOneString() throws {
         let original=synthetic(strings:6)
         let format=UIGraphicsImageRendererFormat();format.scale=1;format.opaque=true

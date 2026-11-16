@@ -34,8 +34,8 @@ def deskew(gray):
         return float((bins*bins).sum())
     base=score(0);angle=max(np.arange(-8,8.001,.25),key=score);angle=max([angle]+[angle+step/40 for step in range(-10,11)],key=score)
     if abs(angle)<.2 or score(angle)<=base*1.12:return gray,0
-    c=np.cos(angle*np.pi/180);s=np.sin(angle*np.pi/180);ww=math.ceil(w*c+h*abs(s));hh=math.ceil(h*c+w*abs(s));yy,xx=np.mgrid[:hh,:ww]
-    dx=xx-ww/2;dy=yy-hh/2;sx=c*dx-s*dy+w/2;sy=s*dx+c*dy+h/2;ix=np.floor(sx).astype(int);iy=np.floor(sy).astype(int);fx=sx-ix;fy=sy-iy
+    c=np.cos(angle*np.pi/180);s=np.sin(angle*np.pi/180);ww=math.ceil(w*c+h*abs(s));hh=math.ceil(h*c+w*abs(s));scale=min(1,4096/max(ww,hh));ww=max(1,math.floor(ww*scale));hh=max(1,math.floor(hh*scale));yy,xx=np.mgrid[:hh,:ww]
+    dx=(xx-ww/2)/scale;dy=(yy-hh/2)/scale;sx=c*dx-s*dy+w/2;sy=s*dx+c*dy+h/2;ix=np.floor(sx).astype(int);iy=np.floor(sy).astype(int);fx=sx-ix;fy=sy-iy
     valid=(ix>=0)&(ix+1<w)&(iy>=0)&(iy+1<h);out=np.full(yy.shape,255,np.uint8);x=ix[valid];y=iy[valid];f=fx[valid];g=fy[valid]
     top=gray[y,x]*(1-f)+gray[y,x+1]*f;bottom=gray[y+1,x]*(1-f)+gray[y+1,x+1]*f;out[valid]=np.floor(top*(1-g)+bottom*g+.5).astype(np.uint8)
     return out,float(angle)
