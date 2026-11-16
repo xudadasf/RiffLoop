@@ -79,7 +79,16 @@ enum ScoreDraftExporter {
         return try await exportPayload(JSONEncoder().encode(draft).base64EncodedString(), version: .v2)
     }
 
-    private enum Version { case v1, v2 }
+    @MainActor
+    static func export(_ draft: GuitarDraft) async throws -> Data {
+        guard draft.isComplete else { throw ScoreDraftExportError.incomplete }
+        guard draft.bars.count <= 128, draft.bars.reduce(0, { $0 + $1.beats.count }) <= 4096 else {
+            throw ScoreDraftExportError.tooLarge
+        }
+        return try await exportPayload(JSONEncoder().encode(draft).base64EncodedString(), version: .v3)
+    }
+
+    private enum Version { case v1, v2, v3 }
 
     @MainActor
     private static func exportPayload(_ payload: String, version: Version) async throws -> Data {
@@ -94,7 +103,7 @@ enum ScoreDraftExporter {
         }
         let v2Source: String?
         switch version {
-        case .v1: v2Source = nil
+        case .v1, .v3: v2Source = nil
         case .v2:
             guard let url = Bundle.main.url(forResource: "draft-v2", withExtension: "cjs") else {
                 throw ScoreDraftExportError.missingResources
@@ -120,7 +129,15 @@ enum ScoreDraftExporter {
         }
         guard ready else { throw ScoreDraftExportError.unavailable }
         let exportExpression: String
-        if let v2Source {
+        if case .v3 = version {
+            let sourceURL = root.appendingPathComponent("ScoreEditor/guitar-draft.js")
+            let schemaURL = root.appendingPathComponent("ScoreEditor/techniques.json")
+            let source = try String(contentsOf: sourceURL, encoding: .utf8)
+            let schema = try Data(contentsOf: schemaURL).base64EncodedString()
+            _ = try await evaluate(source, in: web)
+            _ = try await evaluate("globalThis.GuitarTechniques = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(schema)'), c => c.charCodeAt(0))))", in: web)
+            exportExpression = "GuitarDraftCore.exportDraft(alphaTab, draft, GuitarTechniques)"
+        } else if let v2Source {
             // Use the app-bundled experiment itself, scoped as CommonJS so it
             // cannot replace the v1 editor's globals. No user text is injected.
             let loaded = try await evaluate("""

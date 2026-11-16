@@ -20,7 +20,9 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          python3 scripts/prepare-score-ocr.py
+          xcodegen generate
 
       - name: Install signing assets
         env:

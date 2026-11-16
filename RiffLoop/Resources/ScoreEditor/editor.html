@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>电吉他编辑</title>
+<link rel="stylesheet" href="editor.css"></head><body>
+<header><button id="close">返回</button><input id="title" aria-label="曲名" maxlength="256"><button id="undo">撤销</button><button id="redo">重做</button><button id="save">保存草稿</button><button id="export">生成 GP 副本</button></header>
+<div id="status" role="status" aria-live="polite">正在打开草稿…</div>
+<nav><button id="prev">上一节</button><select id="barChoice" aria-label="选择小节"></select><button id="next">下一节</button><span id="timing"></span><button id="source">原图</button><button id="preview">谱面预览</button><button id="settings">曲谱设置</button></nav>
+<main><section id="reference" hidden><img id="sourceImage" alt="当前小节来源区域"><button id="hideSource">收起原图</button></section><div id="grid" aria-label="六线谱编辑区"></div><div id="engraving" hidden></div></main>
+<footer><div class="row" id="rhythm"></div><div class="row"><button id="rest">改为休止</button><button id="insertBefore">前插休止</button><button id="insertAfter">后插休止</button><button id="deleteNote">删除音符</button><button id="deleteBeat">删除拍位</button><button id="fill">补齐休止</button><button id="techniques">技巧</button><button id="bars">小节 / 复制</button><button id="review">标记已核对</button></div><div class="row" id="keypad"></div></footer>
+<dialog id="panel"><div class="panelHeading"><h2 id="panelTitle"></h2><button id="panelClose">完成</button></div><div id="panelBody"></div></dialog>
+<script src="../GpWeb/alphaTab.min.js"></script><script src="guitar-draft.js"></script><script src="editor-state.js"></script><script src="editor.js"></script></body></html>

@@ -83,7 +83,9 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          python3 scripts/prepare-score-ocr.py
+          xcodegen generate
 
       - name: Test playback policies
         run: |
@@ -94,6 +96,7 @@ jobs:
           node scripts/test-pdf-mode.mjs
           node scripts/test-gp-draft-editor.mjs
           node experiments/gp-draft-v2/test.cjs
+          node scripts/test-guitar-draft.cjs
           python3 scripts/test-gp-roundtrip-audit.py
 
       - name: Show tool versions

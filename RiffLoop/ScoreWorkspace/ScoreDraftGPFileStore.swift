@@ -49,6 +49,12 @@ actor ScoreDraftGPFileStore {
         return try publish(data, fileName: fileName)
     }
 
+    func create(_ draft: GuitarDraft, fileName: String) async throws -> URL {
+        guard Self.validFileName(fileName) else { throw ScoreDraftGPFileStoreError.invalidName }
+        let data = try await ScoreDraftExporter.export(draft)
+        return try publish(data, fileName: fileName)
+    }
+
     private func publish(_ data: Data, fileName: String) throws -> URL {
         try Task.checkCancellation()
         guard data.count <= maxBytes, data.starts(with: [0x50, 0x4b, 0x03, 0x04]) else {

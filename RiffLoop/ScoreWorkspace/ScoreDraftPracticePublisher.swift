@@ -38,6 +38,13 @@ enum ScoreDraftPracticePublisher {
         }
     }
 
+    static func publish(_ draft: GuitarDraft) async throws -> URL {
+        try await publishCopy(documents: RiffLoopDocumentStore(), settings: FilePracticeSettingsStore(),
+                              recent: nil, displayNames: nil, newIdentifier: { UUID() }) { store, name in
+            try await store.create(draft, fileName: name)
+        }
+    }
+
     private static func publishCopy(
         documents: RiffLoopDocumentStore, settings: FilePracticeSettingsStore,
         recent: RecentProjectsStore?, displayNames: DocumentDisplayNameStore?,

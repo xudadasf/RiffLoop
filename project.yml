@@ -12,10 +12,18 @@ settings:
     TARGETED_DEVICE_FAMILY: "2"
     SUPPORTS_MACCATALYST: NO
 
+packages:
+  ONNXRuntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    exactVersion: 1.24.2
+
 targets:
   RiffLoop:
     type: application
     platform: iOS
+    dependencies:
+      - package: ONNXRuntime
+        product: onnxruntime
     sources:
       - path: RiffLoop
         excludes:
@@ -24,6 +32,11 @@ targets:
         type: folder
         buildPhase: resources
       - path: RiffLoop/Resources/ScoreDraft.html
+        buildPhase: resources
+      - path: RiffLoop/Resources/ScoreEditor
+        type: folder
+        buildPhase: resources
+      - path: .cache/score-ocr/PP-OCRv6_rec_small.onnx
         buildPhase: resources
       - path: experiments/gp-draft-editor/draft-core.js
         buildPhase: resources

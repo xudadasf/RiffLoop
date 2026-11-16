@@ -12,6 +12,7 @@ android/artifacts/
 output/
 .playwright-cli/
 node_modules/
+.cache/
 .env
 .env.*
 !.env.example

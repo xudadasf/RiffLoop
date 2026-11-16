@@ -93,11 +93,12 @@ struct ScoreWorkspaceView: View {
             Section {
                 Text("在这里准备 PDF、照片或截图。素材会复制到制谱工作区，原文件不会被修改。")
                     .foregroundStyle(.secondary)
-                Text("可预览和手动画框，也可独立新建草稿。自动分区与图片识别尚未接入。")
+                Text("先打开素材框选六线谱，再在“区域顺序与间隔”中设置顺序、BPM 和拍号并识别。识别后进入编辑页核对。")
                     .foregroundStyle(.secondary)
             }
             Section {
-                NavigationLink("新建与编辑草稿") { ScoreDraftLibraryView() }
+                NavigationLink("电吉他识别草稿与编辑") { GuitarDraftLibraryView() }
+                NavigationLink("旧版节奏草稿") { ScoreDraftLibraryView() }
                 NavigationLink("区域顺序与间隔") {
                     ScoreSequenceLibraryView()
                 }

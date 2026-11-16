@@ -12,8 +12,9 @@ struct ScorePagePreview: @unchecked Sendable {
 }
 
 enum ScorePageRenderer {
-    static func render(source: URL, index: Int) -> ScorePagePreview {
+    static func render(source: URL, index: Int, maximumPixelSize: Int = 2048) -> ScorePagePreview {
         autoreleasepool {
+            let pixelLimit = min(4096, max(256, maximumPixelSize))
             if source.pathExtension.lowercased() == "pdf" {
                 guard let document = PDFDocument(url: source), document.pageCount > 0 else {
                     return failure("无法打开 PDF，请检查文件是否损坏或需要密码。")
@@ -23,9 +24,6 @@ enum ScorePageRenderer {
                     return failure("无法读取此 PDF 页面。", pageCount: count)
                 }
                 let rotation = ((page.rotation % 360) + 360) % 360
-                guard rotation == 0 else {
-                    return failure("此 PDF 页面带有旋转，当前暂不支持框选，以免保存错误位置。请先将页面旋转后另存，或使用截图。", pageCount: count)
-                }
                 let bounds = page.bounds(for: .cropBox)
                 guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0 else {
                     return failure("此 PDF 页面的尺寸无效。", pageCount: count)
@@ -33,10 +31,16 @@ enum ScorePageRenderer {
                 // PDF coordinates are points, not source pixels. Render the vector
                 // page at a useful preview resolution even when it is small in points.
                 // A scale of 1 caps the actual bitmap to 2048 pixels on every device.
-                let factor = 2048 / max(bounds.width, bounds.height)
+                let factor = CGFloat(pixelLimit) / max(bounds.width, bounds.height)
                 guard factor.isFinite, factor > 0 else { return failure("此 PDF 页面的尺寸无效。", pageCount: count) }
                 let size = CGSize(width: max(1, floor(bounds.width * factor)),
                                   height: max(1, floor(bounds.height * factor)))
+                if rotation != 0 {
+                    // PDFKit thumbnails apply the page rotation and crop box together.
+                    // Keep the same normalized, displayed coordinates for drawing and OCR.
+                    let image = page.thumbnail(of: size, for: .cropBox)
+                    return ScorePagePreview(image: image, pageCount: count, orientation: rotation, error: nil)
+                }
                 let format = UIGraphicsImageRendererFormat()
                 format.scale = 1
                 format.opaque = true
@@ -77,7 +81,7 @@ enum ScorePageRenderer {
             let options: [String: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways as String: true,
                 kCGImageSourceCreateThumbnailWithTransform as String: true,
-                kCGImageSourceThumbnailMaxPixelSize as String: 2048,
+                kCGImageSourceThumbnailMaxPixelSize as String: pixelLimit,
                 kCGImageSourceShouldCacheImmediately as String: true,
             ]
             guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else {

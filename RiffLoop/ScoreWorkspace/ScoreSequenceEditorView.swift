@@ -168,6 +168,10 @@ struct ScoreSequenceEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: ScoreSequenceEditorModel
     @State private var confirmDiscard = false
+    @State private var recognizing = false
+    @State private var recognitionProgress = ""
+    @State private var recognitionTask: Task<Void, Never>?
+    @State private var generated: GuitarDraftDocument?
     private let pageNumbers: [ScoreSequenceRegionReference: Int]
     private let materialURLs: [String: URL]
 
@@ -190,8 +194,13 @@ struct ScoreSequenceEditorView: View {
                 Text("顺序表框编号是本任务内的编号，可能与画框页面的页内编号不同。")
                 Text("0 表示连续，默认在区域之间插入 1 个空白小节；最后一个区域后不会插入。")
                 Text("PDF 缩略图显示首页；区域页码以文字为准。")
-                Text("自动分区与识别仍在开发，当前可保存任务设置。")
+                Text("请尽量每框一行完整六线谱。识别优先读取品位与弦位；未知内容和默认时值会保留待核对标记。")
                     .foregroundStyle(.secondary)
+            }
+            Section {
+                Button("识别并进入编辑") { startRecognition() }
+                    .disabled(model.hasUnsavedChanges || model.isSaving || recognizing || model.plan.selectedEntries.isEmpty)
+                if model.hasUnsavedChanges { Text("请先应用输入并保存任务，再开始识别。").font(.caption) }
             }
             Section("识别设置") {
                 Text("这些值由你设置，并非从谱面识别；完成后点“应用设置”，再保存任务。")
@@ -273,12 +282,21 @@ struct ScoreSequenceEditorView: View {
                     .disabled(model.isSaving)
             }
         }
+        .disabled(recognizing)
         .overlay {
-            if model.isSaving {
+            if recognizing {
+                VStack(spacing: 12) {
+                    ProgressView(recognitionProgress)
+                    Button("停止识别并保留草稿") { recognitionTask?.cancel() }
+                }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .disabled(false)
+            } else if model.isSaving {
                 ProgressView("正在保存…").padding()
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
         }
+        .fullScreenCover(item: $generated) { GuitarDraftEditorView(document: $0) }
+        .interactiveDismissDisabled(recognizing || model.hasUnsavedChanges)
         .confirmationDialog("放弃未保存的修改？", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("放弃修改", role: .destructive) { dismiss() }
             Button("继续编辑", role: .cancel) { }
@@ -289,6 +307,25 @@ struct ScoreSequenceEditorView: View {
             Button("好") { model.message = nil }
         } message: {
             Text(model.message ?? "")
+        }
+    }
+
+    private func startRecognition() {
+        guard !recognizing, !model.hasUnsavedChanges else { return }
+        recognizing = true
+        recognitionProgress = "正在核对素材和区域…"
+        let plan = model.plan
+        recognitionTask = Task {
+            defer { recognizing = false; recognitionTask = nil }
+            do {
+                let regions = try await TabRecognitionPipeline.regions(plan: plan, materialURLs: materialURLs)
+                let draft = try await TabRecognitionPipeline.shared.recognize(regions: regions, settings: plan.effectiveSettings) { current, total in
+                    await MainActor.run { recognitionProgress = "正在识别第 \(current) / \(total) 个区域…" }
+                }
+                // A cancellation requests a partial editable result, not loss of the work.
+                let id = try await GuitarDraftStore().create(draft)
+                generated = .init(id: id, draft: draft)
+            } catch { model.message = "识别未完成：\(error.localizedDescription)" }
         }
     }
 }

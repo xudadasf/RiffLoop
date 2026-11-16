@@ -1,0 +1,719 @@
+[
+  {
+    "id": "isTieDestination",
+    "scope": "note",
+    "category": "连接",
+    "label": "从前一同弦同品延音",
+    "kind": "toggle"
+  },
+  {
+    "id": "isHammerPullOrigin",
+    "scope": "note",
+    "category": "连接",
+    "label": "击弦 / 勾弦到下一音",
+    "kind": "toggle"
+  },
+  {
+    "id": "slideInType",
+    "scope": "note",
+    "category": "连接",
+    "label": "滑入",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "从低音滑入",
+        1
+      ],
+      [
+        "从高音滑入",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "slideOutType",
+    "scope": "note",
+    "category": "连接",
+    "label": "滑音 / 拨片刮弦",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "换把滑音",
+        1
+      ],
+      [
+        "连奏滑音",
+        2
+      ],
+      [
+        "向上滑出",
+        3
+      ],
+      [
+        "向下滑出",
+        4
+      ],
+      [
+        "拨片向下刮弦",
+        5
+      ],
+      [
+        "拨片向上刮弦",
+        6
+      ]
+    ]
+  },
+  {
+    "id": "vibrato",
+    "scope": "note",
+    "category": "推弦与揉弦",
+    "label": "手指揉弦",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "轻揉弦",
+        1
+      ],
+      [
+        "宽揉弦",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "bendStyle",
+    "scope": "note",
+    "category": "推弦与揉弦",
+    "label": "推弦方式",
+    "kind": "choice",
+    "choices": [
+      [
+        "默认",
+        0
+      ],
+      [
+        "渐进",
+        1
+      ],
+      [
+        "快速",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "isPalmMute",
+    "scope": "note",
+    "category": "奏法",
+    "label": "掌根闷音 P.M.",
+    "kind": "toggle"
+  },
+  {
+    "id": "isDead",
+    "scope": "note",
+    "category": "奏法",
+    "label": "死音 X",
+    "kind": "toggle"
+  },
+  {
+    "id": "isGhost",
+    "scope": "note",
+    "category": "奏法",
+    "label": "幽灵音（括号）",
+    "kind": "toggle"
+  },
+  {
+    "id": "isStaccato",
+    "scope": "note",
+    "category": "奏法",
+    "label": "顿音",
+    "kind": "toggle"
+  },
+  {
+    "id": "isLetRing",
+    "scope": "note",
+    "category": "奏法",
+    "label": "持续发声 let ring",
+    "kind": "toggle"
+  },
+  {
+    "id": "isLeftHandTapped",
+    "scope": "note",
+    "category": "奏法",
+    "label": "左手点弦",
+    "kind": "toggle"
+  },
+  {
+    "id": "accentuated",
+    "scope": "note",
+    "category": "力度与指法",
+    "label": "重音 / 保持音",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "重音",
+        1
+      ],
+      [
+        "强重音",
+        2
+      ],
+      [
+        "保持音",
+        3
+      ]
+    ]
+  },
+  {
+    "id": "harmonicType",
+    "scope": "note",
+    "category": "泛音",
+    "label": "泛音类型",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "自然泛音",
+        1
+      ],
+      [
+        "人工泛音",
+        2
+      ],
+      [
+        "拨片泛音",
+        3
+      ],
+      [
+        "点弦泛音",
+        4
+      ],
+      [
+        "半泛音",
+        5
+      ],
+      [
+        "反馈泛音",
+        6
+      ]
+    ]
+  },
+  {
+    "id": "harmonicValue",
+    "scope": "note",
+    "category": "泛音",
+    "label": "泛音节点 / 音程参数",
+    "kind": "number",
+    "min": 0,
+    "max": 36,
+    "step": 0.5
+  },
+  {
+    "id": "trillValue",
+    "scope": "note",
+    "category": "奏法",
+    "label": "颤音目标品（-1 关闭）",
+    "kind": "number",
+    "min": -1,
+    "max": 36,
+    "step": 1,
+    "default": -1
+  },
+  {
+    "id": "trillSpeed",
+    "scope": "note",
+    "category": "奏法",
+    "label": "颤音时值",
+    "kind": "choice",
+    "choices": [
+      [
+        "1/16",
+        16
+      ],
+      [
+        "1/32",
+        32
+      ],
+      [
+        "1/64",
+        64
+      ]
+    ],
+    "default": 16
+  },
+  {
+    "id": "leftHandFinger",
+    "scope": "note",
+    "category": "力度与指法",
+    "label": "左手指法",
+    "kind": "choice",
+    "choices": [
+      [
+        "未指定",
+        -2
+      ],
+      [
+        "拇指",
+        0
+      ],
+      [
+        "食指",
+        1
+      ],
+      [
+        "中指",
+        2
+      ],
+      [
+        "无名指",
+        3
+      ],
+      [
+        "小指",
+        4
+      ]
+    ],
+    "default": -2
+  },
+  {
+    "id": "rightHandFinger",
+    "scope": "note",
+    "category": "力度与指法",
+    "label": "右手指法",
+    "kind": "choice",
+    "choices": [
+      [
+        "未指定",
+        -2
+      ],
+      [
+        "拇指",
+        0
+      ],
+      [
+        "食指",
+        1
+      ],
+      [
+        "中指",
+        2
+      ],
+      [
+        "无名指",
+        3
+      ],
+      [
+        "小指",
+        4
+      ]
+    ],
+    "default": -2
+  },
+  {
+    "id": "showStringNumber",
+    "scope": "note",
+    "category": "力度与指法",
+    "label": "显示弦号",
+    "kind": "toggle"
+  },
+  {
+    "id": "ornament",
+    "scope": "note",
+    "category": "装饰音",
+    "label": "回音 / 波音",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "逆回音",
+        1
+      ],
+      [
+        "回音",
+        2
+      ],
+      [
+        "上波音",
+        3
+      ],
+      [
+        "下波音",
+        4
+      ]
+    ]
+  },
+  {
+    "id": "dynamics",
+    "scope": "beat",
+    "category": "力度与指法",
+    "label": "力度",
+    "kind": "choice",
+    "choices": [
+      [
+        "ppp",
+        0
+      ],
+      [
+        "pp",
+        1
+      ],
+      [
+        "p",
+        2
+      ],
+      [
+        "mp",
+        3
+      ],
+      [
+        "mf",
+        4
+      ],
+      [
+        "f",
+        5
+      ],
+      [
+        "ff",
+        6
+      ],
+      [
+        "fff",
+        7
+      ]
+    ],
+    "default": 5
+  },
+  {
+    "id": "pickStroke",
+    "scope": "beat",
+    "category": "奏法",
+    "label": "拨弦方向",
+    "kind": "choice",
+    "choices": [
+      [
+        "未指定",
+        0
+      ],
+      [
+        "上拨",
+        1
+      ],
+      [
+        "下拨",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "tap",
+    "scope": "beat",
+    "category": "奏法",
+    "label": "点弦 T",
+    "kind": "toggle"
+  },
+  {
+    "id": "slap",
+    "scope": "beat",
+    "category": "奏法",
+    "label": "拍弦 slap",
+    "kind": "toggle"
+  },
+  {
+    "id": "pop",
+    "scope": "beat",
+    "category": "奏法",
+    "label": "勾拍 pop",
+    "kind": "toggle"
+  },
+  {
+    "id": "deadSlapped",
+    "scope": "beat",
+    "category": "奏法",
+    "label": "拍击闷音",
+    "kind": "toggle"
+  },
+  {
+    "id": "isLegatoOrigin",
+    "scope": "beat",
+    "category": "连接",
+    "label": "连奏到下一拍",
+    "kind": "toggle"
+  },
+  {
+    "id": "graceType",
+    "scope": "beat",
+    "category": "节奏",
+    "label": "装饰音",
+    "kind": "choice",
+    "choices": [
+      [
+        "普通音符",
+        0
+      ],
+      [
+        "拍内装饰音",
+        1
+      ],
+      [
+        "拍前装饰音",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "fade",
+    "scope": "beat",
+    "category": "力度与指法",
+    "label": "音量渐变",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "渐入",
+        1
+      ],
+      [
+        "渐出",
+        2
+      ],
+      [
+        "渐强后渐弱",
+        3
+      ]
+    ]
+  },
+  {
+    "id": "crescendo",
+    "scope": "beat",
+    "category": "力度与指法",
+    "label": "渐强 / 渐弱",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "渐强",
+        1
+      ],
+      [
+        "渐弱",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "brushType",
+    "scope": "beat",
+    "category": "扫弦",
+    "label": "扫弦 / 琶音",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "向上扫弦",
+        1
+      ],
+      [
+        "向下扫弦",
+        2
+      ],
+      [
+        "向上琶音",
+        3
+      ],
+      [
+        "向下琶音",
+        4
+      ]
+    ]
+  },
+  {
+    "id": "brushDuration",
+    "scope": "beat",
+    "category": "扫弦",
+    "label": "扫弦间隔（tick，960=一拍）",
+    "kind": "number",
+    "min": 0,
+    "max": 960,
+    "step": 10
+  },
+  {
+    "id": "vibrato",
+    "scope": "beat",
+    "category": "推弦与揉弦",
+    "label": "摇把揉弦",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "轻揉弦",
+        1
+      ],
+      [
+        "宽揉弦",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "whammyStyle",
+    "scope": "beat",
+    "category": "推弦与揉弦",
+    "label": "摇把方式",
+    "kind": "choice",
+    "choices": [
+      [
+        "默认",
+        0
+      ],
+      [
+        "渐进",
+        1
+      ],
+      [
+        "快速",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "wahPedal",
+    "scope": "beat",
+    "category": "奏法",
+    "label": "哇音踏板",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "打开",
+        1
+      ],
+      [
+        "关闭",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "rasgueado",
+    "scope": "beat",
+    "category": "扫弦",
+    "label": "轮扫 rasgueado",
+    "kind": "choice",
+    "choices": [
+      [
+        "无",
+        0
+      ],
+      [
+        "ii",
+        1
+      ],
+      [
+        "mi",
+        2
+      ],
+      [
+        "mii 三连",
+        3
+      ],
+      [
+        "mii 长短",
+        4
+      ],
+      [
+        "pmp 三连",
+        5
+      ],
+      [
+        "pmp 长短",
+        6
+      ],
+      [
+        "pei 三连",
+        7
+      ],
+      [
+        "pei 长短",
+        8
+      ],
+      [
+        "pai 三连",
+        9
+      ],
+      [
+        "pai 长短",
+        10
+      ],
+      [
+        "ami 三连",
+        11
+      ],
+      [
+        "ami 长短",
+        12
+      ],
+      [
+        "ppp",
+        13
+      ],
+      [
+        "amii",
+        14
+      ],
+      [
+        "amip",
+        15
+      ],
+      [
+        "eami",
+        16
+      ],
+      [
+        "eamii",
+        17
+      ],
+      [
+        "peami",
+        18
+      ]
+    ]
+  }
+]

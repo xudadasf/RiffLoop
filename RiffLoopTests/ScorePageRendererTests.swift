@@ -75,7 +75,7 @@ final class ScorePageRendererTests: XCTestCase {
         XCTAssertEqual(result.height, 64)
     }
 
-    func testPdfPageCountAndRotatedPageRejection() async throws {
+    func testPdfPageCountAndRotatedPagePreview() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -101,8 +101,11 @@ final class ScorePageRendererTests: XCTestCase {
             ScorePageRenderer.render(source: url, index: 1)
         }.value
         XCTAssertEqual(rotated.pageCount, 2)
-        XCTAssertNil(rotated.image)
-        XCTAssertNotNil(rotated.error)
+        XCTAssertNotNil(rotated.image)
+        XCTAssertNil(rotated.error)
+        XCTAssertEqual(rotated.orientation, 90)
+        let image = try XCTUnwrap(rotated.image?.cgImage)
+        XCTAssertGreaterThan(image.height, image.width)
     }
 
     func testSmallPdfPreviewIsSharpAndKeepsCropBoxCoordinates() async throws {
