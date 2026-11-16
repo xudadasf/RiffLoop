@@ -9,6 +9,7 @@ struct GuitarDraftDocument: Identifiable {
 struct GuitarDraftEditorView: View {
     let document: GuitarDraftDocument
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var externalOpen: ScoreExternalOpenCoordinator
     @State private var confirmDiscard = false
 
     var body: some View {
@@ -17,6 +18,8 @@ struct GuitarDraftEditorView: View {
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .interactiveDismissDisabled()
+            .onAppear { externalOpen.beginRegionEditing() }
+            .onDisappear { externalOpen.endRegionEditing() }
             .confirmationDialog("尚有未保存的编辑，确定离开？", isPresented: $confirmDiscard) {
                 Button("放弃未保存的编辑", role: .destructive) { dismiss() }
                 Button("继续编辑", role: .cancel) { }
@@ -132,6 +135,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
 struct GuitarDraftLibraryView: View {
     @State private var documents: [GuitarDraftDocument] = []
     @State private var selected: GuitarDraftDocument?
+    @State private var deleting: GuitarDraftDocument?
     @State private var message: String?
     private let store = GuitarDraftStore()
     var body: some View {
@@ -146,11 +150,15 @@ struct GuitarDraftLibraryView: View {
                 Text("识别完成后自动进入此编辑器；草稿与原素材、练习文件分别保存。")
             }
             ForEach(documents) { document in
+                HStack {
                 Button { selected = document } label: {
                     VStack(alignment: .leading) {
                         Text(document.draft.title)
                         Text("\(document.draft.bars.count) 小节 · \(document.draft.tempo) BPM · \(document.draft.numerator)/\(document.draft.denominator)").font(.caption).foregroundStyle(.secondary)
                     }
+                }
+                Spacer()
+                Button("清理草稿", role: .destructive) { deleting = document }.buttonStyle(.borderless)
                 }
             }
             if let message { Text(message).foregroundStyle(.orange) }
@@ -158,6 +166,17 @@ struct GuitarDraftLibraryView: View {
         .navigationTitle("电吉他草稿")
         .task { await refresh() }
         .fullScreenCover(item: $selected, onDismiss: { Task { await refresh() } }) { GuitarDraftEditorView(document: $0) }
+        .confirmationDialog("仅删除这份编辑草稿，已生成的 GP 和原素材会保留。请确认修正结果已另存。", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            Button("删除这份草稿", role: .destructive) {
+                guard let document = deleting else { return }
+                Task {
+                    do { try await store.remove(document.id, matching: document.draft); await refresh() }
+                    catch { message = error.localizedDescription }
+                    deleting = nil
+                }
+            }
+            Button("保留", role: .cancel) { deleting = nil }
+        }
     }
     private func refresh() async {
         do {

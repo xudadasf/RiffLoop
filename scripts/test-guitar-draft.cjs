@@ -25,3 +25,35 @@ for (const [id,value] of [['pickStroke',2],['tap',1],['slap',1],['pop',1],['fade
   assert.equal(s.tracks[0].staves[0].bars[0].voices[0].beats[0][id],expected,id);
 }
 console.log('Guitar draft: meter, electric instrument, unknowns and techniques round-trip passed');
+const edit = require('../RiffLoop/Resources/ScoreEditor/editor-state.js');
+const session = new edit.Session(draft([[beat(4),beat(4),beat(4),beat(4)]]),d=>core.validate(d,schema,false));
+session.setFret(13); session.string=2; session.setFret(11);
+assert.deepEqual(session.currentBeat.notes.map(n=>[n.string,n.fret]),[[1,13],[2,11]]);
+session.insertBeat(); assert.equal(session.currentBar.beats.length,5);
+session.undo(); assert.equal(session.currentBar.beats.length,4);
+session.redo(); assert.equal(session.currentBar.beats.length,5);
+session.deleteBeat(); session.copy('bar');session.paste();assert.equal(session.draft.bars.length,2);
+session.deleteBar(); assert.equal(session.draft.bars.length,1);
+const original=JSON.stringify(session.draft); assert.throws(()=>session.setFret(99));assert.equal(JSON.stringify(session.draft),original);
+for (let s=1;s<=6;s++) {
+  const score=reopen(draft([[beat(1,[note(s,7)])]]));
+  const n=score.tracks[0].staves[0].bars[0].voices[0].beats[0].notes[0];
+  assert.equal(7-n.string,s); assert.equal(n.realValue,[64,59,55,50,45,40][s-1]+7);
+}
+let techniques=0;
+for(const spec of schema){
+  const values=spec.choices?spec.choices.map(x=>x[1]):spec.kind==='toggle'?[0,1]:[spec.min,spec.max];
+  for(const value of values){
+    const bs=Array.from({length:4},()=>beat(4,[note(1,7)]));
+    const target=spec.scope==='note'?bs[1].notes[0]:bs[1];target.effects[spec.id]=value;
+    if(spec.id==='bendStyle')target.bend=[{offset:0,value:0},{offset:60,value:4}];
+    if(spec.id==='whammyStyle')target.whammy=[{offset:0,value:0},{offset:60,value:-4}];
+    if(spec.id==='harmonicValue')target.effects.harmonicType=2;
+    if(spec.id==='trillValue')target.effects.trillSpeed=16;
+    if(spec.id==='trillSpeed'){target.effects.trillValue=9;if(value!==16){assert.throws(()=>reopen(draft([bs])),/颤音/);continue;}}
+    if(spec.id==='graceType'&&value>0)bs.push(beat(4));
+    try { reopen(draft([bs])); techniques++; }
+    catch(error){console.error('Failed technique',spec.scope,spec.id,value);throw error;}
+  }
+}
+console.log(`Guitar editor: chord input, insert/delete, undo/redo, copy/paste, 6 string pitches and ${techniques} technique settings passed`);

@@ -77,25 +77,55 @@ actor TabRecognitionPipeline {
                 try Task.checkCancellation()
                 var candidates: [(x: Double, note: GuitarNote)] = []
                 var problems = ["数字、弦位及技巧请对照原图核对"]
-                for (stringIndex, row) in system.rows.enumerated() {
+                for (stringIndex, row) in raster.localRows(system, left: pair.0, right: pair.1).enumerated() {
                     let left = pair.0 + max(2,Int(system.gap*0.18)), right = pair.1 - 1
                     guard let band = raster.band(left: left, right: right, center: row, gap: system.gap) else { continue }
                     do {
                         var digits = try model.recognize(band.pixels, width: band.width, height: band.height, gap: system.gap)
+                        for i in digits.indices { digits[i].x += Double(band.left) }
                         // A small vertical retry is confined to this string's band.
                         if digits.isEmpty || digits.contains(where: { $0.score < 0.65 }) {
                             for shift in [-1,1] {
                                 guard let retry = raster.band(left: left, right: right, center: row + Int(Double(shift)*system.gap*0.13), gap: system.gap*0.85) else { continue }
-                                let other = try model.recognize(retry.pixels, width: retry.width, height: retry.height, gap: system.gap)
+                                var other = try model.recognize(retry.pixels, width: retry.width, height: retry.height, gap: system.gap)
+                                for i in other.indices { other[i].x += Double(retry.left) }
                                 let oldScore = digits.map(\.score).reduce(0,+) / Float(max(1,digits.count))
                                 let newScore = other.map(\.score).reduce(0,+) / Float(max(1,other.count))
                                 if !other.isEmpty && newScore > oldScore+0.1 && (digits.isEmpty || other.count == digits.count) { digits = other }
                             }
                         }
+                        if band.width > max(96,Int(system.gap*12)) || digits.contains(where: { $0.score < 0.65 }) {
+                            // A second, shorter context recovers glyphs near the end
+                            // of sparse strings without joining two-digit frets at a cut.
+                            let size = max(96,Int(system.gap*12)), step = max(1,size-Int(system.gap*3))
+                            for start in stride(from: 0, to: band.width, by: step) {
+                                let end = min(band.width,start+size)
+                                guard Double(end-start) >= system.gap*2 else { continue }
+                                let pixels = (0..<band.height).flatMap { Array(band.pixels[($0*band.width+start)..<($0*band.width+end)]) }
+                                let chunk = try model.recognize(pixels, width: end-start, height: band.height, gap: system.gap)
+                                for var other in chunk {
+                                    guard other.score >= 0.9, other.fret != nil,
+                                          !(start > 0 && other.x < system.gap*0.7),
+                                          !(end < band.width && other.x > Double(end-start)-system.gap*0.7) else { continue }
+                                    other.x += Double(band.left+start)
+                                    if let match = digits.firstIndex(where: { abs($0.x-other.x) < system.gap*0.65 }) {
+                                        if other.score > digits[match].score+0.08 { digits[match] = other }
+                                    } else { digits.append(other) }
+                                }
+                            }
+                        }
                         if digits.isEmpty { problems.append("第 \(stringIndex+1) 弦有图形但未读出数字，请补录") }
                         for value in digits {
+                            if value.fret == 1 && raster.isCrossingStem(x: value.x, row: row, gap: system.gap) {
+                                problems.append("第 \(stringIndex+1) 弦有符干状字符，未当作数字 1 写入")
+                                continue
+                            }
+                            guard value.score >= 0.5 else {
+                                problems.append("第 \(stringIndex+1) 弦约 \(Int((value.x-Double(pair.0))/Double(pair.1-pair.0)*100))% 位置有疑似字符 \(value.text)，未自动写成音符")
+                                continue
+                            }
                             let warnings = value.fret == nil ? ["数字 \(value.text) 未确定"] : value.score < 0.8 ? ["数字较模糊，请核对"] : []
-                            candidates.append((Double(left)+value.x, GuitarNote(string: stringIndex+1, fret: value.fret, review: warnings)))
+                            candidates.append((value.x, GuitarNote(string: stringIndex+1, fret: value.fret, review: warnings)))
                         }
                     } catch {
                         problems.append("第 \(stringIndex+1) 弦未读出，请手动补录")
@@ -118,6 +148,10 @@ actor TabRecognitionPipeline {
                     while Double(portion.count)*3840/Double(duration) > expected && duration < 64 { duration *= 2 }
                     while Double(portion.count)*3840/Double(duration*tuplet) > expected && tuplet < 16 { tuplet *= 2 }
                     var beats = portion.map { GuitarBeat(duration: duration, tupletNumerator: tuplet, notes: $0.notes, review: ["时值为默认值，请核对"]) }
+                    let beamDuration = raster.uniformBeamDuration(system, positions: portion.map(\.x), expectedTicks: expected)
+                    if let beamDuration {
+                        beats = portion.map { GuitarBeat(duration: beamDuration, notes: $0.notes, review: ["时值依据一致符梁，仍请核对"]) }
+                    }
                     var remaining = expected-beats.reduce(0) { $0+$1.ticks }
                     for restDuration in [1,2,4,8,16,32,64] {
                         while remaining >= 3840/Double(restDuration)-0.01 && remaining > 0.01 && beats.count < 128 {
@@ -125,7 +159,7 @@ actor TabRecognitionPipeline {
                             remaining -= 3840/Double(restDuration)
                         }
                     }
-                    var reviews = problems + ["时值暂用默认；请核对开头休止和连音"]
+                    var reviews = Array(problems.prefix(62)) + [beamDuration == nil ? "时值暂用默认；请核对开头休止和连音" : "时值依据一致符梁；技巧仍需人工核对"]
                     if groups.count > 128 { reviews.append("候选过多，已临时拆节，需重新核对小节边界") }
                     bars.append(GuitarBar(beats: beats, review: reviews, source: source))
                 }

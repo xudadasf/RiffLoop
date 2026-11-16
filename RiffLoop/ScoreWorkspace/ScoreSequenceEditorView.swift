@@ -166,6 +166,7 @@ final class ScoreSequenceEditorModel: ObservableObject {
 
 struct ScoreSequenceEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var externalOpen: ScoreExternalOpenCoordinator
     @StateObject private var model: ScoreSequenceEditorModel
     @State private var confirmDiscard = false
     @State private var recognizing = false
@@ -297,6 +298,10 @@ struct ScoreSequenceEditorView: View {
         }
         .fullScreenCover(item: $generated) { GuitarDraftEditorView(document: $0) }
         .interactiveDismissDisabled(recognizing || model.hasUnsavedChanges)
+        .onChange(of: recognizing) { _, active in
+            if active { externalOpen.beginRegionEditing() }
+            else if generated == nil { externalOpen.endRegionEditing() }
+        }
         .confirmationDialog("放弃未保存的修改？", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("放弃修改", role: .destructive) { dismiss() }
             Button("继续编辑", role: .cancel) { }

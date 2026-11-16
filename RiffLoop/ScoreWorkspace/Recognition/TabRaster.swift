@@ -10,6 +10,8 @@ struct TabSystem: Equatable {
 }
 
 struct TabRaster {
+    private final class MaskCache { var value: [UInt8]? }
+    private let cache = MaskCache()
     let width: Int
     let height: Int
     let pixels: [UInt8]
@@ -37,6 +39,7 @@ struct TabRaster {
 
     /// Local mean threshold handles uneven illumination without inventing glyphs.
     func mask() -> [UInt8] {
+        if let value = cache.value { return value }
         let stride = width + 1
         var integral = [Int](repeating: 0, count: stride * (height + 1))
         for y in 0..<height {
@@ -52,6 +55,7 @@ struct TabRaster {
                 if Int(pixels[y * width + x]) < sum / ((b-t)*(r-l)) - 12 { result[y * width + x] = 1 }
             }
         }
+        cache.value = result
         return result
     }
 
@@ -60,7 +64,9 @@ struct TabRaster {
     func deskewed() throws -> TabRaster {
         let mask = mask(), sampleStep = max(2, width / 600)
         var points: [(Int, Int)] = []
-        for y in stride(from: 0, to: height, by: 2) {
+        // Do not skip every second row: that aliases the zero-degree histogram
+        // and can beat the correct angle even on visibly tilted staff lines.
+        for y in 0..<height {
             for x in stride(from: 0, to: width, by: sampleStep) where mask[y * width + x] == 1 { points.append((x,y)) }
         }
         guard points.count > 100 else { return self }
@@ -73,17 +79,27 @@ struct TabRaster {
         let baseline = score(0)
         var best = 0.0, bestScore = baseline
         for step in -32...32 { let angle = Double(step)/4; let value = score(angle); if value > bestScore { best = angle; bestScore = value } }
+        let coarse = best
+        for step in -10...10 { let angle = coarse + Double(step)/40; let value = score(angle); if value > bestScore { best = angle; bestScore = value } }
         guard abs(best) >= 0.2, bestScore > baseline * 1.12 else { return self }
-        // Shear keeps every source row/column; no crop at the page edges.
-        let slope = tan(best * .pi / 180), padding = Int(ceil(abs(slope) * Double(width) / 2)) + 2
-        let h = height + padding * 2
-        guard h <= 4096 else { return self }
-        var out = [UInt8](repeating: 255, count: width * h)
-        for y in 0..<h { for x in 0..<width {
-            let source = Double(y-padding) + slope * Double(x-width/2), lo = Int(floor(source)), fraction = source - floor(source)
-            if lo >= 0 && lo+1 < height { out[y*width+x] = UInt8((Double(pixels[lo*width+x])*(1-fraction)+Double(pixels[(lo+1)*width+x])*fraction).rounded()) }
+        // Rotate both axes. A shear levels strings but leaves tilted bar lines,
+        // causing multiple real measures to be merged into one.
+        let angle = best * .pi / 180, c = cos(angle), s = sin(angle)
+        let w = Int(ceil(Double(width)*c+Double(height)*abs(s)))
+        let h = Int(ceil(Double(height)*c+Double(width)*abs(s)))
+        guard w <= 4096, h <= 4096 else { return self }
+        var out = [UInt8](repeating: 255, count: w * h)
+        for y in 0..<h { for x in 0..<w {
+            let dx = Double(x)-Double(w)/2, dy = Double(y)-Double(h)/2
+            let sx = c*dx-s*dy+Double(width)/2, sy = s*dx+c*dy+Double(height)/2
+            let ix = Int(floor(sx)), iy = Int(floor(sy)), fx = sx-floor(sx), fy = sy-floor(sy)
+            if ix >= 0 && ix+1 < width && iy >= 0 && iy+1 < height {
+                let top = Double(pixels[iy*width+ix])*(1-fx)+Double(pixels[iy*width+ix+1])*fx
+                let bottom = Double(pixels[(iy+1)*width+ix])*(1-fx)+Double(pixels[(iy+1)*width+ix+1])*fx
+                out[y*w+x] = UInt8((top*(1-fy)+bottom*fy).rounded())
+            }
         } }
-        return try TabRaster(width: width, height: h, pixels: out)
+        return try TabRaster(width: w, height: h, pixels: out)
     }
 
     static func groups(_ indices: [Int]) -> [[Int]] {
@@ -115,10 +131,12 @@ struct TabRaster {
             guard gap >= 4, gap <= 90, !ys.contains(where: used.contains),
                   zip(ys,ys.dropFirst()).allSatisfy({ abs(Double($0.1-$0.0)-gap) <= max(2,gap*0.18) }) else { continue }
             var support = [Int](repeating: 0, count: width)
-            for y in ys { for x in 0..<width { if (max(0,y-1)...min(height-1,y+1)).contains(where: { horizontal[$0*width+x] == 1 }) { support[x] += 1 } } }
+            for y in ys { for x in 0..<width { if (max(0,y-3)...min(height-1,y+3)).contains(where: { horizontal[$0*width+x] == 1 }) { support[x] += 1 } } }
             let xs = (0..<width).filter { support[$0] >= 4 }
             guard let left = xs.first, let right = xs.last, right-left >= max(70,Int(gap*8)),
-                  ys.allSatisfy({ y in (left...right).filter { horizontal[y*width+$0] == 1 }.count > (right-left)/2 }) else { continue }
+                  ys.allSatisfy({ y in (left...right).filter { x in
+                      (max(0,y-2)...min(height-1,y+2)).contains { horizontal[$0*width+x] == 1 }
+                  }.count > (right-left)/2 }) else { continue }
             let neighbors = rows.filter { abs(Double($0-ys[0])+gap)<gap*0.18 || abs(Double($0-ys[5])-gap)<gap*0.18 }
             if neighbors.contains(where: { y in (left...right).filter { horizontal[y*width+$0] == 1 }.count > (right-left)/2 }) { continue }
             if Self.groups((left...right).filter { support[$0] < 2 }).contains(where: { Double($0.count)>gap*6 }) { continue }
@@ -130,7 +148,17 @@ struct TabRaster {
                 guard Double(x-left)>gap*1.5, Double(right-x)>gap*0.8 else { return false }
                 let bottom = min(height-1,ys[5]+Int(gap*1.7)), top = min(bottom,ys[5]+max(1,Int(gap*0.3)))
                 let below = (top...bottom).filter { y in (max(0,x-1)...min(width-1,x+1)).contains { ink[y*width+$0] == 1 } }.count
-                return Double(below) < Double(bottom-top+1)*0.45
+                guard Double(below) < Double(bottom-top+1)*0.45 else { return false }
+                let radius = max(2,Int((gap*0.25).rounded()))
+                let centers = zip(ys,ys.dropFirst()).compactMap { pair -> Double? in
+                    let y = Int((Double(pair.0+pair.1)/2).rounded())
+                    let occupied = (max(0,x-radius)...min(width-1,x+radius)).filter { ink[y*width+$0] == 1 }
+                    return occupied.isEmpty ? nil : Double(occupied.reduce(0,+))/Double(occupied.count)
+                }
+                let straightPair = (max(0,x-1)...min(width-1,x+1)).filter { column in
+                    Double((ys[0]...ys[5]).reduce(0) { $0+Int(ink[$1*width+column]) }) >= Double(ys[5]-ys[0]+1)*0.98
+                }.count >= 2
+                return centers.count == 5 && (straightPair || (centers.max()! - centers.min()! <= max(1.2,gap*0.08)))
             }
             var boundaries = [left]
             for x in candidates { if Double(x-(boundaries.last ?? left)) > gap*0.8 { boundaries.append(x) } }
@@ -140,13 +168,77 @@ struct TabRaster {
         return result
     }
 
-    func band(left: Int, right: Int, center: Int, gap: Double) -> (pixels: [UInt8], width: Int, height: Int)? {
+    func localRows(_ system: TabSystem, left: Int, right: Int) -> [Int] {
+        let ink = mask()
+        let radius = max(2,Int(system.gap*0.25))
+        return system.rows.map { row in
+            let range = max(0,row-radius)...min(height-1,row+radius)
+            let coverage = range.map { y in (left..<right).reduce(0) { $0 + Int(ink[y*width+$1]) } }
+            let peak = coverage.max() ?? 0
+            let best = zip(range,coverage).filter { $0.1 == peak }.map { $0.0 }
+            return best.reduce(0,+)/max(1,best.count)
+        }
+    }
+
+    /// Accept only consistent, visible beam groups. Mixed rhythms, dots, rests
+    /// and tuplets are deliberately left for manual verification.
+    func uniformBeamDuration(_ system: TabSystem, positions: [Double], expectedTicks: Double) -> Int? {
+        guard positions.count >= 4 else { return nil }
+        let ink = mask(), gap = system.gap
+        let top = max(0,system.rows[0]-Int(gap*3)), bottom = min(height-1,system.rows[5]+Int(gap*3))
+        var counts: [Int] = []
+        for pair in zip(positions,positions.dropFirst()) {
+            let distance = pair.1-pair.0
+            guard distance >= gap*0.9, distance <= gap*4 else { continue }
+            let l = max(0,Int(pair.0+gap*0.3)), r = min(width-1,Int(pair.1-gap*0.3))
+            guard r-l >= max(4,Int(gap*0.5)) else { continue }
+            let rows = (top...bottom).filter { y in
+                !system.rows.contains(where: { abs($0-y)<=2 }) &&
+                    Double((l...r).reduce(0) { $0+Int(ink[y*width+$1]) }) >= Double(r-l+1)*0.82
+            }
+            let bands = Self.groups(rows).filter { $0.count >= max(2,Int(gap*0.12)) && Double($0.count)<=gap*0.5 }
+            if (1...4).contains(bands.count) { counts.append(bands.count) }
+        }
+        guard counts.count >= max(3,positions.count/2), Set(counts).count == 1, let count = counts.first else { return nil }
+        let duration = 1 << (count+2)
+        guard duration <= 64, abs(Double(positions.count)*3840/Double(duration)-expectedTicks)<0.01 else { return nil }
+        return duration
+    }
+
+    func isCrossingStem(x: Double, row: Int, gap: Double) -> Bool {
+        let ink = mask(), radius = max(2,Int(gap*0.25))
+        let top = max(0,row-Int(gap*0.85)), bottom = min(height-1,row+Int(gap*0.85))
+        let centeredRadius = max(3,Int(gap*0.4)), margin = max(2,Int(gap*0.16)), half = max(margin+1,Int(gap*0.45))
+        func mass(_ rows: ClosedRange<Int>) -> Int {
+            rows.reduce(0) { sum,y in sum + (max(0,Int(x)-centeredRadius)...min(width-1,Int(x)+centeredRadius)).reduce(0) { $0+Int(ink[y*width+$1]) } }
+        }
+        let above = mass(max(0,row-half)...max(0,row-margin))
+        let below = mass(min(height-1,row+margin)...min(height-1,row+half))
+        if min(above,below) < max(4,Int(gap*0.25)) { return true }
+        return (max(0,Int(x)-radius)...min(width-1,Int(x)+radius)).contains { column in
+            Double((top...bottom).reduce(0) { $0+Int(ink[$1*width+column]) }) >= Double(bottom-top+1)*0.88
+        }
+    }
+
+    func band(left: Int, right: Int, center: Int, gap: Double) -> (pixels: [UInt8], width: Int, height: Int, left: Int)? {
         let l = max(0,left), r = min(width,right), top = max(0,Int((Double(center)-gap*0.45).rounded())), bottom = min(height,Int((Double(center)+gap*0.45).rounded())+1)
         guard r>l, bottom>top else { return nil }
-        let pixels = (top..<bottom).flatMap { Array(self.pixels[($0*width+l)..<($0*width+r)]) }
         // Reject empty strings: line ink alone is not a note. Require ink away from the centre.
-        let margin = max(2,Int(gap*0.16)), ink = pixels.enumerated().filter { index,value in abs(index/(r-l)-(center-top))>margin && value < 155 }.count
-        guard ink >= max(4,Int(gap*0.6)) else { return nil }
-        return (pixels,r-l,bottom-top)
+        let margin = max(2,Int(gap*0.16))
+        let ink = mask()
+        let columns = (l..<r).filter { x in
+            (top..<bottom).filter { abs($0-center)>margin && ink[$0*width+x] == 1 }.count >= max(2,Int(gap*0.18))
+        }
+        let content = Self.groups(columns).filter { $0.count >= max(3,Int(gap*0.2)) }
+        guard let first = content.first?.first, let last = content.last?.last else { return nil }
+        // Long empty prefixes harm CTC decoding on strings played only at the end
+        // of a measure. Trim to actual off-line glyph ink, keeping a small border.
+        let x0 = max(l,first-max(2,Int(gap*0.35))), x1 = min(r,last+max(3,Int(gap*0.35))+1)
+        var band = (top..<bottom).flatMap { Array(pixels[($0*width+x0)..<($0*width+x1)]) }
+        let sorted = band.sorted(), low = Int(sorted[sorted.count/50]), high = Int(sorted[sorted.count*95/100])
+        if high < 215 && high-low > 15 {
+            band = band.map { UInt8(min(255,max(0,(Int($0)-low)*255/(high-low)))) }
+        }
+        return (band,x1-x0,bottom-top,x0)
     }
 }

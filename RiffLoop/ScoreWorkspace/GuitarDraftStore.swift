@@ -126,6 +126,13 @@ actor GuitarDraftStore {
         try data.write(to: fileURL(id), options: .atomic)
     }
 
+    func remove(_ id: UUID, matching expected: GuitarDraft) throws {
+        Self.updateLock.lock()
+        defer { Self.updateLock.unlock() }
+        guard try load(id) == expected else { throw GuitarDraftStoreError.conflict }
+        try fileManager.removeItem(at: fileURL(id))
+    }
+
     private func encoded(_ draft: GuitarDraft) throws -> Data {
         guard draft.isValidForStorage else { throw GuitarDraftStoreError.invalidDraft }
         let data: Data

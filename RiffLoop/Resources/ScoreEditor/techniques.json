@@ -93,27 +93,6 @@
     ]
   },
   {
-    "id": "bendStyle",
-    "scope": "note",
-    "category": "推弦与揉弦",
-    "label": "推弦方式",
-    "kind": "choice",
-    "choices": [
-      [
-        "默认",
-        0
-      ],
-      [
-        "渐进",
-        1
-      ],
-      [
-        "快速",
-        2
-      ]
-    ]
-  },
-  {
     "id": "isPalmMute",
     "scope": "note",
     "category": "奏法",
@@ -585,27 +564,6 @@
       ],
       [
         "宽揉弦",
-        2
-      ]
-    ]
-  },
-  {
-    "id": "whammyStyle",
-    "scope": "beat",
-    "category": "推弦与揉弦",
-    "label": "摇把方式",
-    "kind": "choice",
-    "choices": [
-      [
-        "默认",
-        0
-      ],
-      [
-        "渐进",
-        1
-      ],
-      [
-        "快速",
         2
       ]
     ]

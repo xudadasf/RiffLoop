@@ -104,9 +104,12 @@ function snapshot(score,schema){
   return {title:score.title,tempo:score.tempo,program:score.tracks[0].playbackInfo.program,tuning:score.tracks[0].staves[0].stringTuning.tunings,
     capo:score.tracks[0].staves[0].capo,bars:score.tracks[0].staves[0].bars.map((bar,i)=>({
       meter:[score.masterBars[i].timeSignatureNumerator,score.masterBars[i].timeSignatureDenominator],
+      repeatStart:score.masterBars[i].isRepeatStart,repeatCount:score.masterBars[i].repeatCount,alternateEndings:score.masterBars[i].alternateEndings,
+      section:score.masterBars[i].section?.text||'',tempos:score.masterBars[i].tempoAutomations.map(a=>a.value),
       beats:bar.voices[0].beats.map(b=>({duration:b.duration,dots:b.dots,tuplet:[b.tupletNumerator,b.tupletDenominator],
-        effects:effects(b,'beat'),whammy:points(b.whammyBarPoints),tremolo:b.tremoloSpeed,
-        notes:b.notes.map(n=>({string:n.string,fret:n.fret,effects:effects(n,'note'),bend:points(n.bendPoints)})).sort((x,y)=>x.string-y.string)}))
+        effects:effects(b,'beat'),whammy:points(b.whammyBarPoints),tremolo:b.tremoloSpeed,text:b.text||'',
+        playbackStart:b.playbackStart,playbackDuration:b.playbackDuration,
+        notes:b.notes.map(n=>({string:n.string,fret:n.fret,pitch:n.realValue,effects:effects(n,'note'),bend:points(n.bendPoints)})).sort((x,y)=>x.string-y.string)}))
     }))};
 }
 function exportDraft(a,draft,schema){
