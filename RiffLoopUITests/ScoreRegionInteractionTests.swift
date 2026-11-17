@@ -11,6 +11,7 @@ final class ScoreRegionInteractionTests: XCTestCase {
         app.launchEnvironment["RIFFLOOP_REGION_UI_TEST_CASE"] = id
         app.launch()
         XCTAssertTrue(app.buttons["region.delete"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["region.back"].isHittable)
         return app
     }
 
@@ -73,7 +74,7 @@ final class ScoreRegionInteractionTests: XCTestCase {
         app.buttons["region.next"].tap()
         XCTAssertTrue(app.navigationBars["区域顺序与间隔"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["识别并进入编辑"].exists)
-        let back = app.navigationBars["区域顺序与间隔"].buttons["返回"]
+        let back = app.buttons["sequence.back"]
         XCTAssertTrue(back.exists && back.isHittable, "Recognition settings must have a visible return control")
         capture(app, name: "Region-next-recognition-settings")
         back.tap()
@@ -94,6 +95,7 @@ final class ScoreRegionInteractionTests: XCTestCase {
         XCTAssertTrue(discard.waitForExistence(timeout: 5))
         discard.tap()
         XCTAssertTrue(app.buttons["region.next"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["region.back"].isHittable, "Region Return must remain visible after closing settings")
         expect(app.buttons[secondID], "label == %@", "方框 1")
         expect(app.textFields["region.gap"], "value == %@", "0")
         capture(app, name: "Returned-to-region-with-saved-settings")

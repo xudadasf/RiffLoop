@@ -268,16 +268,24 @@ struct ScoreSequenceEditorView: View {
                 }
             }
         }
+        // Keep Return in a fixed page control instead of the system's leading
+        // navigation item, which can disappear after dismissing a cover on iPad.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack {
+                Button("返回", systemImage: "chevron.left") {
+                    if model.hasUnsavedChanges { confirmDiscard = true } else { dismiss() }
+                }
+                .buttonStyle(.bordered).controlSize(.large)
+                .accessibilityIdentifier("sequence.back")
+                Spacer()
+            }
+            .padding(.horizontal).padding(.vertical, 4)
+            .background(.bar)
+        }
         .disabled(model.isSaving)
         .navigationTitle("区域顺序与间隔")
         .navigationBarBackButtonHidden()
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("返回") {
-                    if model.hasUnsavedChanges { confirmDiscard = true } else { dismiss() }
-                }
-                .disabled(model.isSaving)
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("保存") { Task { await model.save() } }
                     .disabled(model.isSaving)

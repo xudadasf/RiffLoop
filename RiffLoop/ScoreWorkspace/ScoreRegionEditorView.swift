@@ -341,6 +341,12 @@ struct ScoreRegionEditorView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack {
+                Button("返回", systemImage: "chevron.left") {
+                    if model.hasPendingChange || model.hasUnappliedInputs { present(.discard) } else { leaveEditor() }
+                }
+                .buttonStyle(.bordered).controlSize(.large)
+                .accessibilityIdentifier("region.back")
+                .disabled(model.busy)
                 Button("上一页") { Task { await model.changePage(model.pageIndex - 1) } }
                     .disabled(locked || model.pageIndex <= 0)
                 Text("\(model.pageCount == 0 ? 0 : model.pageIndex + 1) / \(model.pageCount)")
@@ -415,11 +421,6 @@ struct ScoreRegionEditorView: View {
         .navigationTitle("手动框选")
         .navigationBarBackButtonHidden()
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("返回") {
-                    if model.hasPendingChange || model.hasUnappliedInputs { present(.discard) } else { leaveEditor() }
-                }.disabled(model.busy)
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("下一步：识别设置") {
                     editingInput = nil
