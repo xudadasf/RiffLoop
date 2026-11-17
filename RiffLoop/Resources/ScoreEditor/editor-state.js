@@ -19,7 +19,16 @@ class Session {
   deleteNote(){this.change(()=>{this.currentBeat.notes=this.currentBeat.notes.filter(n=>n.string!==this.string);});}
   insertBeat(after=false){this.change(()=>{const b=beat(this.currentBeat.duration);this.currentBar.beats.splice(this.beat+(after?1:0),0,b);if(after)this.beat++;});}
   deleteBeat(){this.change(()=>{if(this.currentBar.beats.length===1)this.currentBar.beats[0]=beat(this.currentBeat.duration);else this.currentBar.beats.splice(this.beat,1);});}
-  insertBar(){this.change(d=>{const b=bar();b.beats=Array.from({length:d.numerator},()=>beat(d.denominator));d.bars.splice(this.bar+1,0,b);this.bar++;this.beat=0;});}
+  insertBar(){this.insertEmptyBars(1);}
+  insertEmptyBars(count,before=false){
+    if(!Number.isInteger(count)||count<1||count>99)throw Error('空白小节数请输入 1 到 99。');
+    if(this.draft.bars.length+count>512)throw Error('插入后超过 512 小节，请减少数量。');
+    this.change(d=>{const current=this.currentBar,numerator=current.numerator??d.numerator,denominator=current.denominator??d.denominator;
+      const inserted=Array.from({length:count},()=>{const b=bar();b.numerator=numerator;b.denominator=denominator;
+        b.beats=Array.from({length:numerator},()=>beat(denominator));if(current.tempo)b.tempo=current.tempo;return b;});
+      const at=this.bar+(before?0:1);d.bars.splice(at,0,...inserted);this.bar=at;this.beat=0;
+    });
+  }
   deleteBar(){this.change(d=>{if(d.bars.length===1){d.bars[0]=bar();d.bars[0].beats=Array.from({length:d.numerator},()=>beat(d.denominator));}else d.bars.splice(this.bar,1);this.beat=0;});}
   copy(scope){this.clipboard={scope,value:copy(scope==='bar'?this.currentBar:this.currentBeat)};}
   paste(){if(!this.clipboard)return;this.change(d=>{if(this.clipboard.scope==='bar'){d.bars.splice(this.bar+1,0,copy(this.clipboard.value));this.bar++;this.beat=0;}else{this.currentBar.beats.splice(this.beat+1,0,copy(this.clipboard.value));this.beat++;}});}

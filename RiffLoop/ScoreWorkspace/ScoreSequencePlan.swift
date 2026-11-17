@@ -98,11 +98,14 @@ struct ScoreSequencePlan: Codable, Equatable {
     private(set) var entries: [ScoreSequenceEntry]
     /// Missing from older plans; use standard values without rewriting them.
     private(set) var recognitionSettings: ScoreRecognitionSettings?
+    /// Nil preserves old plans with individually assigned gaps until explicitly unified.
+    private(set) var uniformGapAfter: Int?
 
     init(materials: [ScoreSequenceMaterial], regions: [ScoreSequenceRegionReference]) throws {
         self.version = 1
         self.materials = materials
         self.recognitionSettings = nil
+        self.uniformGapAfter = 1
         self.entries = regions.enumerated().map { index, reference in
             ScoreSequenceEntry(number: index + 1, reference: reference, isSelected: true, gapAfter: 1)
         }
@@ -114,6 +117,7 @@ struct ScoreSequencePlan: Codable, Equatable {
 
     func validate() throws {
         guard version == 1, recognitionSettings?.isValid != false,
+              uniformGapAfter.map({ (0...99).contains($0) }) != false,
               !materials.isEmpty, materials.allSatisfy(\.isValid),
               Set(materials).count == materials.count,
               Set(materials.map(\.name)).count == materials.count,
@@ -153,6 +157,13 @@ struct ScoreSequencePlan: Codable, Equatable {
             throw ScoreSequenceError.invalidNumber
         }
         entries[index].gapAfter = gap
+        uniformGapAfter = nil
+    }
+
+    mutating func setUniformGapAfter(_ gap: Int) throws {
+        guard (0...99).contains(gap) else { throw ScoreSequenceError.invalidGap }
+        uniformGapAfter = gap
+        for index in entries.indices { entries[index].gapAfter = gap }
     }
 
     /// Newly drawn regions append without changing existing box numbers or order.
@@ -168,7 +179,8 @@ struct ScoreSequencePlan: Codable, Equatable {
         let maxNumber = entries.map(\.number).max() ?? 0
         guard references.count <= Int.max - maxNumber else { throw ScoreSequenceError.invalidPlan }
         entries.append(contentsOf: references.enumerated().map { index, reference in
-            ScoreSequenceEntry(number: maxNumber + index + 1, reference: reference, isSelected: true, gapAfter: 1)
+            ScoreSequenceEntry(number: maxNumber + index + 1, reference: reference, isSelected: true,
+                               gapAfter: uniformGapAfter ?? 1)
         })
     }
 
@@ -198,7 +210,8 @@ struct ScoreSequencePlan: Codable, Equatable {
             return $0.regionID.uuidString < $1.regionID.uuidString
         }
         guard newRegions.isEmpty else { throw ScoreSequenceError.unregisteredRegions(newRegions) }
-        return ScoreRecognitionOrder(regions: selected.map(\.reference), gaps: selected.dropLast().map(\.gapAfter),
+        return ScoreRecognitionOrder(regions: selected.map(\.reference),
+                                     gaps: selected.dropLast().map { uniformGapAfter ?? $0.gapAfter },
                                      settings: effectiveSettings)
     }
 }

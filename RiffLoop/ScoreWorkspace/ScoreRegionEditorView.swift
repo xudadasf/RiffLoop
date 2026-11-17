@@ -110,7 +110,6 @@ final class ScoreRegionEditorModel: ObservableObject {
     @Published private(set) var selectedID: UUID?
     @Published private(set) var snapshot: ScoreRegionsSnapshot?
     @Published var numberInput = ""
-    @Published var gapInput = ""
     @Published var message: String?
 
     let source: URL
@@ -119,6 +118,7 @@ final class ScoreRegionEditorModel: ObservableObject {
     private var orientation = 0
     private enum Change {
         case add(ScoreRegion), remove(ScoreRegion)
+        case resize(original: ScoreRegion, updated: ScoreRegion)
         case layout(ScoreRegionLocation, number: Int, gapAfter: Int)
     }
     private var pendingChange: Change?
@@ -135,10 +135,15 @@ final class ScoreRegionEditorModel: ObservableObject {
         return nil
     }
 
+    var pendingResizedRegion: ScoreRegion? {
+        if case let .resize(_, updated) = pendingChange { return updated }
+        return nil
+    }
+
     var totalRegions: Int { snapshot?.layout.count ?? 0 }
     var hasUnappliedInputs: Bool {
         guard let selectedID else { return false }
-        return numberInput != String(number(for: selectedID) ?? 0) || gapInput != String(gap(for: selectedID))
+        return numberInput != String(number(for: selectedID) ?? 0)
     }
     private func location(_ id: UUID) -> ScoreRegionLocation {
         ScoreRegionLocation(pageIndex: pageIndex, rotation: orientation, regionID: id)
@@ -146,31 +151,35 @@ final class ScoreRegionEditorModel: ObservableObject {
     func number(for id: UUID) -> Int? { snapshot?.number(for: location(id)) }
     func gap(for id: UUID) -> Int { snapshot?.layout.first { $0.location == location(id) }?.gapAfter ?? 1 }
 
-    func select(_ id: UUID) {
+    func select(_ id: UUID) async {
         guard !busy, !hasPendingChange, regions.contains(where: { $0.id == id }) else { return }
-        guard !hasUnappliedInputs else { message = "请先应用或恢复当前框的编号和间隔。"; return }
+        if selectedID == id { return }
+        guard await finishNumberInput() else { return }
         selectedID = id
         resetInputs()
     }
 
     func resetInputs() {
         numberInput = selectedID.flatMap { number(for: $0) }.map(String.init) ?? ""
-        gapInput = selectedID.map { String(gap(for: $0)) } ?? ""
     }
 
     func applyInputs() async {
         guard !busy, !hasPendingChange, let selectedID, let snapshot else { return }
         guard let number = Int(numberInput.trimmingCharacters(in: .whitespacesAndNewlines)),
-              (1...max(1, totalRegions)).contains(number),
-              let gap = Int(gapInput.trimmingCharacters(in: .whitespacesAndNewlines)), (0...99).contains(gap) else {
-            message = "编号请输入 1 到 \(totalRegions)；后接空白小节请输入 0 到 99，0 表示连续。"
+              (1...max(1, totalRegions)).contains(number) else {
+            message = "编号请输入 1 到 \(totalRegions)。"
             return
         }
-        await save(.layout(location(selectedID), number: number, gapAfter: gap), basedOn: snapshot)
+        await save(.layout(location(selectedID), number: number, gapAfter: gap(for: selectedID)), basedOn: snapshot)
+    }
+
+    private func finishNumberInput() async -> Bool {
+        if hasUnappliedInputs { await applyInputs() }
+        return !busy && !hasPendingChange && !hasUnappliedInputs
     }
 
     func makePlan() async -> ScoreSequencePlan? {
-        guard !busy, !hasPendingChange, !hasUnappliedInputs else { return nil }
+        guard !busy, !hasPendingChange, await finishNumberInput() else { return nil }
         busy = true
         defer { busy = false }
         do {
@@ -191,7 +200,7 @@ final class ScoreRegionEditorModel: ObservableObject {
     }
 
     func changePage(_ index: Int) async {
-        guard !busy, !hasPendingChange, !hasUnappliedInputs, index >= 0, index < pageCount else { return }
+        guard !busy, !hasPendingChange, index >= 0, index < pageCount, await finishNumberInput() else { return }
         busy = true
         defer { busy = false }
         await showPage(index)
@@ -233,7 +242,7 @@ final class ScoreRegionEditorModel: ObservableObject {
     }
 
     func addRegion(_ region: ScoreRegion, onPage index: Int) async {
-        guard !busy, !hasPendingChange, !hasUnappliedInputs else { message = "请先处理尚未保存的区域或输入。"; return }
+        guard !busy, !hasPendingChange, await finishNumberInput() else { return }
         guard pageIndex == index, image != nil, region.isValid, let snapshot else {
             message = "页面已变化或区域无效，请重新画框。"
             return
@@ -242,9 +251,16 @@ final class ScoreRegionEditorModel: ObservableObject {
     }
 
     func removeRegion(_ id: UUID) async {
-        guard !busy, !hasPendingChange, !hasUnappliedInputs, image != nil, let snapshot,
+        guard !busy, !hasPendingChange, await finishNumberInput(), image != nil, let snapshot,
               let region = regions.first(where: { $0.id == id }) else { return }
         await save(.remove(region), basedOn: snapshot)
+    }
+
+    func resizeRegion(_ updated: ScoreRegion, onPage index: Int) async {
+        guard !busy, !hasPendingChange, await finishNumberInput(), pageIndex == index,
+              image != nil, updated.isValid, let snapshot,
+              let original = regions.first(where: { $0.id == updated.id }), original != updated else { return }
+        await save(.resize(original: original, updated: updated), basedOn: snapshot)
     }
 
     private func refresh(from snapshot: ScoreRegionsSnapshot) {
@@ -276,6 +292,13 @@ final class ScoreRegionEditorModel: ObservableObject {
             case let .layout(location, number, gap):
                 let updated = try base.changing(location, number: number, gapAfter: gap)
                 saved = try await store.saveLayout(updated, replacing: base)
+            case let .resize(original, updated):
+                guard let index = current.firstIndex(where: { $0.id == original.id }),
+                      current[index] == original else { throw ScoreRegionsError.conflict }
+                var resized = current
+                resized[index] = updated
+                saved = try await store.savePage(index: pageIndex, rotation: orientation,
+                                                regions: resized, replacing: current)
             }
             refresh(from: saved)
             pendingChange = nil
@@ -324,15 +347,18 @@ struct ScoreRegionEditorView: View {
     @State private var drawing = false
     @State private var dragStart: CGPoint?
     @State private var dragEnd: CGPoint?
+    @State private var resizingID: UUID?
+    @State private var resizeStart: ScoreRegion?
+    @State private var resizePreview: ScoreRegion?
     private enum Dialog { case delete(UUID), discard, message(String) }
     @State private var dialog: Dialog?
     @State private var showDialog = false
     @State private var nextPlan: ScoreSequencePlan?
     @State private var nextPlanID = UUID()
-    private enum InputField: Hashable { case number, gap }
+    private enum InputField: Hashable { case number }
     @FocusState private var editingInput: InputField?
 
-    private var locked: Bool { model.busy || model.hasPendingChange || model.hasUnappliedInputs }
+    private var locked: Bool { model.busy || model.hasPendingChange }
 
     init(source: URL, store: ScoreRegionsStore? = nil) {
         _model = StateObject(wrappedValue: ScoreRegionEditorModel(source: source, store: store))
@@ -360,7 +386,7 @@ struct ScoreRegionEditorView: View {
                     .accessibilityIdentifier("region.drawing")
             }
             .padding(.horizontal)
-            Text("点击方框选中；打开画框后拖动新增，关闭后可滚动。按编号连接，改号后其他框自动顺延。")
+            Text(resizingID == nil ? "点击选中，双击拖动四角调整区域；打开画框后拖动新增。按编号连接。" : "拖动四个角调整范围，松手自动保存；点“完成调整”退出。")
                 .font(.caption).foregroundStyle(.secondary)
             if !externalOpen.pending.isEmpty {
                 HStack {
@@ -381,7 +407,8 @@ struct ScoreRegionEditorView: View {
             }
             if let image = model.image {
                 GeometryReader { geometry in
-                    let fit = min(geometry.size.width / image.size.width, geometry.size.height / image.size.height)
+                    let fit = min(max(1, geometry.size.width - 48) / image.size.width,
+                                  max(1, geometry.size.height - 48) / image.size.height)
                     let size = CGSize(width: image.size.width * fit * zoom, height: image.size.height * fit * zoom)
                     ScrollView([.horizontal, .vertical]) {
                         ZStack(alignment: .topLeading) {
@@ -401,14 +428,21 @@ struct ScoreRegionEditorView: View {
                                     .offset(x: rect.minX, y: rect.minY)
                                     .allowsHitTesting(false)
                             }
+                            if let id = resizingID, let region = model.regions.first(where: { $0.id == id }) {
+                                ForEach(ScoreRegionCorner.allCases, id: \.rawValue) { corner in
+                                    resizeHandle(corner, region: displayedRegion(region), size: size)
+                                }
+                            }
                         }
                         .frame(width: size.width, height: size.height)
                         .contentShape(Rectangle())
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("region.canvas")
-                        .simultaneousGesture(drawing && !locked ? drawGesture(size: size) : nil)
+                        .coordinateSpace(name: "region.canvas.space")
+                        .simultaneousGesture(drawing && resizingID == nil && !locked ? drawGesture(size: size) : nil)
+                        .padding(24)
                     }
-                    .scrollDisabled(drawing && !model.hasPendingChange)
+                    .scrollDisabled(drawing || resizingID != nil)
                 }
                 selectedRegionControls
             } else {
@@ -438,6 +472,10 @@ struct ScoreRegionEditorView: View {
         .onChange(of: model.busy) { _, busy in
             if busy { dragStart = nil; dragEnd = nil }
         }
+        .onChange(of: model.selectedID) { _, id in
+            if id != resizingID { resizingID = nil; resizeStart = nil; resizePreview = nil }
+        }
+        .onChange(of: model.pageIndex) { _, _ in resizingID = nil; resizeStart = nil; resizePreview = nil }
         .onChange(of: model.message) { _, value in
             if let value { present(.message(value)); model.message = nil }
         }
@@ -492,22 +530,72 @@ struct ScoreRegionEditorView: View {
     private func regionButton(_ region: ScoreRegion, size: CGSize) -> some View {
         let selected = model.selectedID == region.id
         let number = model.number(for: region.id) ?? 0
-        return Button { editingInput = nil; model.select(region.id) } label: {
-            Rectangle().fill(selected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.04))
+        let displayed = displayedRegion(region)
+        return Rectangle().fill(selected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.04))
                 .overlay { Rectangle().stroke(selected ? Color.orange : Color.blue, lineWidth: selected ? 3 : 2) }
                 .overlay(alignment: .topLeading) {
                     Text("\(number)").font(.body.bold()).padding(4)
                         .foregroundStyle(.white).background(selected ? Color.orange : Color.blue)
                 }
                 .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .frame(width: size.width * region.width, height: size.height * region.height)
-        .offset(x: size.width * region.x, y: size.height * region.y)
+        .frame(width: size.width * displayed.width, height: size.height * displayed.height)
+        .offset(x: size.width * displayed.x, y: size.height * displayed.y)
+        .gesture(TapGesture(count: 2).exclusively(before: TapGesture(count: 1)).onEnded { tap in
+            switch tap {
+            case .first: chooseRegion(region.id, resize: true)
+            case .second: chooseRegion(region.id, resize: false)
+            }
+        })
         .disabled(model.busy || model.hasPendingChange)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("方框 \(number)")
-        .accessibilityValue(selected ? "已选中，后接 \(model.gap(for: region.id)) 个空白小节" : "未选中")
+        .accessibilityValue(selected ? (resizingID == region.id ? "已选中，正在调整四角" : "已选中") : "未选中")
+        .accessibilityAction { chooseRegion(region.id, resize: false) }
+        .accessibilityAction(named: "调整区域") { chooseRegion(region.id, resize: true) }
         .accessibilityIdentifier("region-\(region.id.uuidString)")
+    }
+
+    private func chooseRegion(_ id: UUID, resize: Bool) {
+        editingInput = nil
+        Task {
+            await model.select(id)
+            guard model.selectedID == id, !locked else { return }
+            resizingID = resize ? id : nil
+            resizeStart = nil; resizePreview = nil
+        }
+    }
+
+    private func displayedRegion(_ region: ScoreRegion) -> ScoreRegion {
+        if let resizePreview, resizePreview.id == region.id { return resizePreview }
+        if let pending = model.pendingResizedRegion, pending.id == region.id { return pending }
+        return region
+    }
+
+    private func resizeHandle(_ corner: ScoreRegionCorner, region: ScoreRegion, size: CGSize) -> some View {
+        Circle().fill(.orange).frame(width: 20, height: 20)
+            .overlay { Circle().stroke(.white, lineWidth: 2) }
+            .frame(width: 44, height: 44).contentShape(Rectangle())
+            .offset(x: size.width * (corner.isLeft ? region.x : region.x + region.width) - 22,
+                    y: size.height * (corner.isTop ? region.y : region.y + region.height) - 22)
+            .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("region.canvas.space"))
+                .onChanged { value in
+                    guard !locked, size.width > 0, size.height > 0 else { return }
+                    if resizeStart == nil { resizeStart = region }
+                    resizePreview = resizeStart?.resized(corner: corner,
+                        dx: value.translation.width / size.width, dy: value.translation.height / size.height)
+                }
+                .onEnded { value in
+                    guard let original = resizeStart else { return }
+                    let updated = original.resized(corner: corner,
+                        dx: value.translation.width / size.width, dy: value.translation.height / size.height)
+                    let page = model.pageIndex
+                    resizeStart = nil; resizePreview = nil
+                    Task { await model.resizeRegion(updated, onPage: page) }
+                })
+            .allowsHitTesting(!locked)
+            .accessibilityElement().accessibilityLabel("\(corner.title)，拖动调整范围")
+            .accessibilityIdentifier("region.corner.\(corner.rawValue)")
     }
 
     private var selectedRegionControls: some View {
@@ -517,19 +605,19 @@ struct ScoreRegionEditorView: View {
                     Text(model.selectedID == nil ? "请先点击一个框" : "编号")
                     TextField("编号", text: $model.numberInput)
                         .frame(width: 58, height: 44).focused($editingInput, equals: .number).accessibilityIdentifier("region.number")
-                    Text("后接空白小节")
-                    TextField("间隔", text: $model.gapInput)
-                        .frame(width: 58, height: 44).focused($editingInput, equals: .gap).accessibilityIdentifier("region.gap")
-                    Button("应用") { editingInput = nil; Task { await model.applyInputs() } }
+                    Button("改编号") { editingInput = nil; Task { await model.applyInputs() } }
                         .accessibilityIdentifier("region.apply")
                         .disabled(!model.hasUnappliedInputs)
                     Button("恢复") { editingInput = nil; model.resetInputs() }
                         .disabled(!model.hasUnappliedInputs)
+                    Button(resizingID == nil ? "调整区域" : "完成调整") {
+                        if let id = model.selectedID { chooseRegion(id, resize: resizingID == nil) }
+                    }
+                    .accessibilityIdentifier("region.resize")
                     Button("删除选中框", role: .destructive) {
                         if let id = model.selectedID { present(.delete(id)) }
                     }
                     .accessibilityIdentifier("region.delete")
-                    .disabled(model.hasUnappliedInputs)
                 }
                 .textFieldStyle(.roundedBorder).keyboardType(.numberPad)
                 .buttonStyle(.bordered).controlSize(.large)
@@ -537,7 +625,7 @@ struct ScoreRegionEditorView: View {
                 .padding(.horizontal)
             }
             .frame(height: 60)
-            Text("共 \(model.totalRegions) 个框 · 间隔 0 表示连续；最后一个框不追加空白小节。修改后点“应用”。")
+            Text("共 \(model.totalRegions) 个框 · 间隔在下一步统一设置；具体小节在识别后的核对页面调整。")
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("region.help")
         }

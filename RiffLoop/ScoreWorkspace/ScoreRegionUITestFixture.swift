@@ -23,8 +23,9 @@ struct ScoreRegionUITestFixture: View {
                 let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("RegionUITests/\(id.uuidString)", isDirectory: true)
                 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-                let file = root.appendingPathComponent("synthetic.png")
-                let regionStore = ScoreRegionsStore(source: file, folder: root.appendingPathComponent("regions"))
+                let file = root.appendingPathComponent("synthetic-\(id.uuidString).png")
+                // Use the same isolated source identity through the actual recognition path.
+                let regionStore = ScoreRegionsStore(source: file)
                 if !FileManager.default.fileExists(atPath: file.path) {
                     let image = UIGraphicsImageRenderer(size: CGSize(width: 1200, height: 800)).image { context in
                         UIColor.white.setFill(); context.fill(CGRect(x: 0, y: 0, width: 1200, height: 800))

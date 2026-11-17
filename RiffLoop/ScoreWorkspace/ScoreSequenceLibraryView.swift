@@ -37,7 +37,6 @@ enum ScoreSequenceFactory {
         guard !sources.isEmpty else { throw ScoreSequenceCreationError.noMaterials }
         var materials: [ScoreSequenceMaterial] = []
         var references: [ScoreSequenceRegionReference] = []
-        var gaps: [Int] = []
         var missing: [String] = []
         for (source, snapshot) in sources {
             let material = ScoreSequenceMaterial(name: source.lastPathComponent, sourceDigest: snapshot.sourceDigest)
@@ -48,12 +47,9 @@ enum ScoreSequenceFactory {
             }
             if boxes.isEmpty { missing.append(material.name) }
             references.append(contentsOf: boxes)
-            gaps.append(contentsOf: snapshot.layout.map(\.gapAfter))
         }
         guard missing.isEmpty else { throw ScoreSequenceCreationError.withoutRegions(missing) }
-        var plan = try ScoreSequencePlan(materials: materials, regions: references)
-        for (index, gap) in gaps.enumerated() { try plan.setGapAfter(gap, number: index + 1) }
-        return plan
+        return try ScoreSequencePlan(materials: materials, regions: references)
     }
 
     /// Keep the caller's material, page and within-page order; dictionary order is not stable.

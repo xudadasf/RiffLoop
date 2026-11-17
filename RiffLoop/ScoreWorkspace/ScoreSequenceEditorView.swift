@@ -1,169 +1,5 @@
 import SwiftUI
 
-/// Edits a supplied task. The caller owns task loading and durable storage.
-@MainActor
-final class ScoreSequenceEditorModel: ObservableObject {
-    @Published private(set) var plan: ScoreSequencePlan
-    @Published private(set) var isSaving = false
-    @Published var message: String?
-    @Published var numberInputs: [Int: String]
-    @Published var gapInputs: [Int: String]
-    @Published var tempoInput: String
-    @Published var numeratorInput: String
-    @Published var denominatorInput: String
-    @Published var tuningInput: String
-    private var savedPlan: ScoreSequencePlan?
-    private let saveAction: (ScoreSequencePlan) async throws -> Void
-    private let offeredRegions: [ScoreSequenceRegionReference]
-
-    init(plan: ScoreSequencePlan, isSaved: Bool, newRegions: [ScoreSequenceRegionReference] = [],
-         save: @escaping (ScoreSequencePlan) async throws -> Void) {
-        self.plan = plan
-        self.savedPlan = isSaved ? plan : nil
-        self.saveAction = save
-        var seen = Set<ScoreSequenceRegionReference>()
-        self.offeredRegions = newRegions.filter { seen.insert($0).inserted }
-        self.numberInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.enumerated().map { ($0.offset, String($0.element.number)) })
-        self.gapInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.map { ($0.number, String($0.gapAfter)) })
-        let settings = plan.effectiveSettings
-        self.tempoInput = String(settings.tempo)
-        self.numeratorInput = String(settings.numerator)
-        self.denominatorInput = String(settings.denominator)
-        self.tuningInput = settings.tuningText
-    }
-
-    private var pendingNumbers: Set<Int> {
-        Set(plan.selectedEntries.enumerated().compactMap { numberInputs[$0.offset] == String($0.element.number) ? nil : $0.offset })
-    }
-
-    private var pendingGaps: Set<Int> {
-        Set(plan.selectedEntries.compactMap { gapInputs[$0.number] == String($0.gapAfter) ? nil : $0.number })
-    }
-
-    private var pendingSettings: Bool {
-        let settings = plan.effectiveSettings
-        return tempoInput != String(settings.tempo) || numeratorInput != String(settings.numerator) ||
-            denominatorInput != String(settings.denominator) || tuningInput != settings.tuningText
-    }
-
-    var hasUnsavedChanges: Bool {
-        savedPlan != plan || !pendingNumbers.isEmpty || !pendingGaps.isEmpty || pendingSettings
-    }
-
-    var newRegions: [ScoreSequenceRegionReference] {
-        let existing = Set(plan.entries.map(\.reference))
-        return offeredRegions.filter { !existing.contains($0) }
-    }
-
-    private func syncInputs() {
-        numberInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.enumerated().map { ($0.offset, String($0.element.number)) })
-        gapInputs = Dictionary(uniqueKeysWithValues: plan.selectedEntries.map { ($0.number, String($0.gapAfter)) })
-        let settings = plan.effectiveSettings
-        tempoInput = String(settings.tempo)
-        numeratorInput = String(settings.numerator)
-        denominatorInput = String(settings.denominator)
-        tuningInput = settings.tuningText
-    }
-
-    private func canApply(exceptNumber position: Int? = nil, exceptGap number: Int? = nil,
-                          exceptSettings: Bool = false) -> Bool {
-        guard pendingNumbers.subtracting(position.map { [$0] } ?? []).isEmpty,
-              pendingGaps.subtracting(number.map { [$0] } ?? []).isEmpty,
-              exceptSettings || !pendingSettings else {
-            message = "请先调整或恢复其他尚未应用的输入。"
-            return false
-        }
-        return true
-    }
-
-    func applySettings() {
-        guard !isSaving, canApply(exceptSettings: true) else { return }
-        guard let tempo = Int(tempoInput.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let numerator = Int(numeratorInput.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let denominator = Int(denominatorInput.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let tuning = ScoreRecognitionSettings.parseTuning(tuningInput) else {
-            message = "请输入速度、拍号和六根弦的音名，例如 E2 A2 D3 G3 B3 E4。"
-            return
-        }
-        let settings = ScoreRecognitionSettings(tempo: tempo, numerator: numerator,
-                                                denominator: denominator, tuning: tuning)
-        guard settings.isValid else {
-            message = "速度请输入 1 到 999，拍号分子请输入 1 到 32，分母使用 1、2、4、8、16 或 32。"
-            return
-        }
-        if change({ try $0.setRecognitionSettings(settings) }) {
-            message = "识别设置已应用，请保存任务。"
-        }
-    }
-
-    func assign(position: Int) {
-        guard canApply(exceptNumber: position), let text = numberInputs[position] else { return }
-        guard let number = Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            message = "请输入已采用区域的顺序表框编号。"
-            return
-        }
-        _ = change { try $0.assign(number: number, toPosition: position) }
-    }
-
-    func select(_ selected: Bool, number: Int) {
-        guard canApply() else { return }
-        _ = change { try $0.setSelected(selected, number: number) }
-    }
-
-    func appendNewRegions() {
-        guard !isSaving, canApply() else { return }
-        let references = newRegions
-        guard !references.isEmpty else { return }
-        var updated = plan
-        do {
-            try updated.append(references)
-            plan = updated
-            syncInputs()
-            message = "已将 \(references.count) 个新区域追加到末尾，请保存计划。"
-        } catch {
-            message = "无法追加区域，请重新打开计划并核对素材。"
-        }
-    }
-
-    func setGap(number: Int) {
-        guard canApply(exceptGap: number), let text = gapInputs[number] else { return }
-        guard let gap = Int(text.trimmingCharacters(in: .whitespacesAndNewlines)), (0...99).contains(gap) else {
-            message = "空白小节请输入 0 到 99 之间的整数；0 表示连续。"
-            return
-        }
-        _ = change { try $0.setGapAfter(gap, number: number) }
-    }
-
-    private func change(_ operation: (inout ScoreSequencePlan) throws -> Void) -> Bool {
-        guard !isSaving else { return false }
-        var updated = plan
-        do {
-            try operation(&updated)
-            plan = updated
-            syncInputs()
-            return true
-        } catch {
-            message = "无法调整。请确认编号属于已采用区域，且内容有效。"
-            return false
-        }
-    }
-
-    func save() async {
-        guard !isSaving, canApply() else { return }
-        isSaving = true
-        defer { isSaving = false }
-        let snapshot = plan
-        do {
-            try snapshot.validate()
-            try await saveAction(snapshot)
-            savedPlan = snapshot
-            message = "任务设置已保存。"
-        } catch {
-            message = "保存失败：\(error.localizedDescription)"
-        }
-    }
-}
-
 struct ScoreSequenceEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var externalOpen: ScoreExternalOpenCoordinator
@@ -173,16 +9,14 @@ struct ScoreSequenceEditorView: View {
     @State private var recognitionProgress = ""
     @State private var recognitionTask: Task<Void, Never>?
     @State private var generated: GuitarDraftDocument?
+    private enum Input { case tempo, numerator, denominator, tuning, gap }
+    @FocusState private var editingInput: Input?
     private let pageNumbers: [ScoreSequenceRegionReference: Int]
     private let materialURLs: [String: URL]
 
-    /// `pageNumbers` maps references to material-wide numbers visible while drawing.
-    /// The separately assigned sequence numbers are stable only within this task.
     init(plan: ScoreSequencePlan, isSaved: Bool = true,
-         pageNumbers: [ScoreSequenceRegionReference: Int] = [:],
-         materialURLs: [String: URL] = [:],
-         newRegions: [ScoreSequenceRegionReference] = [],
-         save: @escaping (ScoreSequencePlan) async throws -> Void) {
+         pageNumbers: [ScoreSequenceRegionReference: Int] = [:], materialURLs: [String: URL] = [:],
+         newRegions: [ScoreSequenceRegionReference] = [], save: @escaping (ScoreSequencePlan) async throws -> Void) {
         _model = StateObject(wrappedValue: ScoreSequenceEditorModel(plan: plan, isSaved: isSaved, newRegions: newRegions, save: save))
         self.pageNumbers = pageNumbers
         self.materialURLs = materialURLs
@@ -190,64 +24,61 @@ struct ScoreSequenceEditorView: View {
 
     var body: some View {
         List {
-            Section {
-                Text("输入另一个已采用的顺序表框编号并点“调整”，可交换两个写入位置。修改空白小节数后点“设置”。")
-                Text("新计划沿用画框页的顺序和间隔。多个素材合并后，顺序表框编号在本任务内连续排列；已保存的计划保留原设置。")
-                Text("0 表示连续，默认在区域之间插入 1 个空白小节；最后一个区域后不会插入。")
-                Text("PDF 缩略图显示首页；区域页码以文字为准。")
-                Text("请尽量每框一行完整六线谱。识别优先读取品位与弦位；未知内容和默认时值会保留待核对标记。")
-                    .foregroundStyle(.secondary)
-            }
-            Section {
-                Button("识别并进入编辑") { startRecognition() }
-                    .disabled(model.hasUnsavedChanges || model.isSaving || recognizing || model.plan.selectedEntries.isEmpty)
-                if model.hasUnsavedChanges { Text("请先应用输入并保存任务，再开始识别。").font(.caption) }
-            }
             Section("识别设置") {
-                Text("这些值由你设置，并非从谱面识别；完成后点“应用设置”，再保存任务。")
-                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Text("速度 BPM")
-                    TextField("100", text: $model.tempoInput).keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 90)
+                    TextField("100", text: $model.tempoInput).frame(maxWidth: 90).focused($editingInput, equals: .tempo).accessibilityIdentifier("sequence.tempo")
                     Text("拍号")
-                    TextField("4", text: $model.numeratorInput).keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 65)
+                    TextField("4", text: $model.numeratorInput).frame(maxWidth: 65).focused($editingInput, equals: .numerator).accessibilityIdentifier("sequence.numerator")
                     Text("/")
-                    TextField("4", text: $model.denominatorInput).keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 65)
-                }
+                    TextField("4", text: $model.denominatorInput).frame(maxWidth: 65).focused($editingInput, equals: .denominator).accessibilityIdentifier("sequence.denominator")
+                }.keyboardType(.numberPad)
                 TextField("E2 A2 D3 G3 B3 E4", text: $model.tuningInput)
+                    .focused($editingInput, equals: .tuning)
                     .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
-                Text("调弦顺序：第 6 弦到第 1 弦；音名之间用空格分开。")
+                    .accessibilityIdentifier("sequence.tuning")
+                Text("调弦从第 6 弦到第 1 弦，音名用空格分开。BPM 和拍号由你设置。")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("应用设置") { model.applySettings() }
+                HStack {
+                    Text("统一空白小节")
+                    TextField("小节数", text: $model.uniformGapInput).keyboardType(.numberPad).frame(maxWidth: 90)
+                        .focused($editingInput, equals: .gap)
+                        .accessibilityIdentifier("sequence.gap")
+                    Text("0 表示连续").font(.caption).foregroundStyle(.secondary)
+                }
+                Text("在每两个区域之间插入相同数量的空白小节，末尾不追加。具体位置的增删，识别后到核对编辑页的“小节”中操作。")
+                    .font(.caption).foregroundStyle(.secondary)
+                if model.preservesLegacyGaps {
+                    Text("旧任务含不同间隔，暂按原设置保留。填写上方数值即可统一替换。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             if !model.newRegions.isEmpty {
                 Section("新增区域") {
-                    Text("已发现 \(model.newRegions.count) 个新画的区域。追加后请确认顺序并保存。")
-                    Button("追加新区域到末尾") { model.appendNewRegions() }
+                    Button("追加 \(model.newRegions.count) 个新区域到末尾") { model.appendNewRegions() }
                 }
             }
-            Section("已采用 · 写入顺序") {
-                if model.plan.selectedEntries.isEmpty {
-                    Text("没有采用的区域，请从下方选择。")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(Array(model.plan.selectedEntries.enumerated()), id: \.offset) { index, entry in
-                    ScoreSequencePositionRow(
-                        position: index, entry: entry, pageNumber: pageNumbers[entry.reference],
-                        materialURL: materialURLs[entry.reference.material.name],
-                        isLast: index == model.plan.selectedEntries.count - 1,
-                        numberText: Binding(get: { model.numberInputs[index] ?? String(entry.number) },
-                                            set: { model.numberInputs[index] = $0 }),
-                        gapText: Binding(get: { model.gapInputs[entry.number] ?? String(entry.gapAfter) },
-                                         set: { model.gapInputs[entry.number] = $0 }),
-                        assign: { model.assign(position: index) },
-                        setGap: { model.setGap(number: entry.number) },
-                        unselect: { model.select(false, number: entry.number) }
-                    )
+            Section("连接顺序") {
+                Text("新任务按画框页的编号排列；需要微调时点上移或下移。PDF 缩略图显示首页，以文字页码为准。")
+                    .font(.caption).foregroundStyle(.secondary)
+                if model.plan.selectedEntries.isEmpty { Text("请从下方选择需要采用的区域。") }
+                ForEach(Array(model.plan.selectedEntries.enumerated()), id: \.element.number) { index, entry in
+                    HStack {
+                        ScoreMaterialThumbnailView(url: materialURLs[entry.reference.material.name])
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("第 \(index + 1) 段 · 框 \(entry.number)").font(.headline)
+                            Text(sourceDescription(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                        Spacer()
+                        Button("上移") { model.move(number: entry.number, offset: -1) }
+                            .disabled(index == 0).accessibilityIdentifier("sequence.up.\(entry.number)")
+                        Button("下移") { model.move(number: entry.number, offset: 1) }
+                            .disabled(index == model.plan.selectedEntries.count - 1)
+                            .accessibilityIdentifier("sequence.down.\(entry.number)")
+                        Button("不采用") { model.select(false, number: entry.number) }
+                            .accessibilityIdentifier("sequence.exclude.\(entry.number)")
+                    }
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("sequence.row.\(entry.number)")
                 }
             }
             let unselected = model.plan.entries.filter { !$0.isSelected }
@@ -255,53 +86,59 @@ struct ScoreSequenceEditorView: View {
                 Section("未采用") {
                     ForEach(unselected, id: \.number) { entry in
                         HStack {
-                            ScoreMaterialThumbnailView(url: materialURLs[entry.reference.material.name])
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("顺序表框 \(entry.number)").font(.headline)
-                                Text(sourceDescription(entry, pageNumber: pageNumbers[entry.reference]))
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
+                            Text("框 \(entry.number) · \(sourceDescription(entry))")
                             Spacer()
                             Button("采用") { model.select(true, number: entry.number) }
+                                .accessibilityIdentifier("sequence.include.\(entry.number)")
                         }
                     }
                 }
             }
         }
-        // Keep Return in a fixed page control instead of the system's leading
-        // navigation item, which can disappear after dismissing a cover on iPad.
+        .textFieldStyle(.roundedBorder)
+        // Explicit styles prevent List from forwarding one tap to all row buttons.
+        .buttonStyle(.bordered)
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
                 Button("返回", systemImage: "chevron.left") {
+                    editingInput = nil
                     if model.hasUnsavedChanges { confirmDiscard = true } else { dismiss() }
                 }
-                .buttonStyle(.bordered).controlSize(.large)
-                .accessibilityIdentifier("sequence.back")
+                .buttonStyle(.bordered).controlSize(.large).accessibilityIdentifier("sequence.back")
                 Spacer()
-            }
-            .padding(.horizontal).padding(.vertical, 4)
-            .background(.bar)
+            }.padding(.horizontal).padding(.vertical, 4).background(.bar)
         }
-        .disabled(model.isSaving)
-        .navigationTitle("区域顺序与间隔")
-        .navigationBarBackButtonHidden()
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 6) {
+                if let message = model.message {
+                    Text(message).font(.callout).foregroundStyle(.red).accessibilityIdentifier("sequence.message")
+                }
+                HStack {
+                    Text(model.hasUnsavedChanges ? "识别时会自动保存当前设置" : (model.status ?? "设置已保存"))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("识别并进入编辑") { startRecognition() }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(model.plan.selectedEntries.isEmpty).accessibilityIdentifier("sequence.recognize")
+                }
+            }.padding().background(.bar)
+        }
+        .disabled(model.isSaving || recognizing)
+        .navigationTitle("区域顺序与间隔").navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("保存") { Task { await model.save() } }
-                    .disabled(model.isSaving)
+                Button("保存") { editingInput = nil; Task { await model.save() } }
+                    .disabled(model.isSaving || recognizing).accessibilityIdentifier("sequence.save")
             }
         }
-        .disabled(recognizing)
         .overlay {
             if recognizing {
                 VStack(spacing: 12) {
                     ProgressView(recognitionProgress)
-                    Button("停止识别并保留草稿") { recognitionTask?.cancel() }
-                }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .disabled(false)
+                    Button("停止识别并保留草稿") { recognitionTask?.cancel() }.buttonStyle(.bordered)
+                }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).disabled(false)
             } else if model.isSaving {
-                ProgressView("正在保存…").padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                ProgressView("正在保存…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
         }
         .fullScreenCover(item: $generated) { GuitarDraftEditorView(document: $0) }
@@ -314,84 +151,31 @@ struct ScoreSequenceEditorView: View {
             Button("放弃修改", role: .destructive) { dismiss() }
             Button("继续编辑", role: .cancel) { }
         }
-        .alert("区域顺序与间隔", isPresented: Binding(
-            get: { model.message != nil }, set: { if !$0 { model.message = nil } }
-        )) {
-            Button("好") { model.message = nil }
-        } message: {
-            Text(model.message ?? "")
-        }
+    }
+
+    private func sourceDescription(_ entry: ScoreSequenceEntry) -> String {
+        let prefix = "\(entry.reference.material.name) · 第 \(entry.reference.pageIndex + 1) 页"
+        return pageNumbers[entry.reference].map { prefix + " · 素材框 \($0)" } ?? prefix
     }
 
     private func startRecognition() {
-        guard !recognizing, !model.hasUnsavedChanges else { return }
+        guard !recognizing, !model.isSaving else { return }
+        editingInput = nil
         recognizing = true
-        recognitionProgress = "正在核对素材和区域…"
-        let plan = model.plan
+        recognitionProgress = "正在保存设置…"
         recognitionTask = Task {
             defer { recognizing = false; recognitionTask = nil }
+            guard await model.save() else { return }
+            let plan = model.plan
             do {
+                recognitionProgress = "正在核对素材和区域…"
                 let regions = try await TabRecognitionPipeline.regions(plan: plan, materialURLs: materialURLs)
                 let draft = try await TabRecognitionPipeline.shared.recognize(regions: regions, settings: plan.effectiveSettings) { current, total in
                     await MainActor.run { recognitionProgress = "正在识别第 \(current) / \(total) 个区域…" }
                 }
-                // A cancellation requests a partial editable result, not loss of the work.
                 let id = try await GuitarDraftStore().create(draft)
                 generated = .init(id: id, draft: draft)
             } catch { model.message = "识别未完成：\(error.localizedDescription)" }
         }
-    }
-}
-
-private func sourceDescription(_ entry: ScoreSequenceEntry, pageNumber: Int?) -> String {
-    let prefix = "\(entry.reference.material.name) · 第 \(entry.reference.pageIndex + 1) 页"
-    return pageNumber.map { prefix + " · 素材框 \($0)" } ?? prefix + " · 素材框编号待确认"
-}
-
-private struct ScoreSequencePositionRow: View {
-    let position: Int
-    let entry: ScoreSequenceEntry
-    let pageNumber: Int?
-    let materialURL: URL?
-    let isLast: Bool
-    @Binding var numberText: String
-    @Binding var gapText: String
-    let assign: () -> Void
-    let setGap: () -> Void
-    let unselect: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                ScoreMaterialThumbnailView(url: materialURL)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("写入位置 \(position + 1)").font(.headline)
-                    Text(sourceDescription(entry, pageNumber: pageNumber))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("取消采用", action: unselect)
-            }
-            HStack {
-                Text("顺序表框编号")
-                TextField("编号", text: $numberText)
-                    .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
-                    .frame(width: 76)
-                Button("调整", action: assign)
-                Button("恢复") { numberText = String(entry.number) }
-                Spacer()
-            }
-            HStack {
-                Text("之后空白小节")
-                TextField("小节数", text: $gapText)
-                    .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
-                    .frame(width: 76)
-                Button("设置", action: setGap)
-                Button("恢复") { gapText = String(entry.gapAfter) }
-                if isLast { Text("当前位于末尾，不插入空白").font(.caption).foregroundStyle(.secondary) }
-                Spacer()
-            }
-        }
-        .padding(.vertical, 4)
     }
 }

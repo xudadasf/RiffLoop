@@ -35,6 +35,26 @@ session.redo(); assert.equal(session.currentBar.beats.length,5);
 session.deleteBeat(); session.copy('bar');session.paste();assert.equal(session.draft.bars.length,2);
 session.deleteBar(); assert.equal(session.draft.bars.length,1);
 const original=JSON.stringify(session.draft); assert.throws(()=>session.setFret(99));assert.equal(JSON.stringify(session.draft),original);
+const localSpacing = new edit.Session(draft([[beat(4,[note(1,13)])],[beat(1,[note(2,11)])]]),d=>core.validate(d,schema,false));
+localSpacing.currentBar.numerator=6;localSpacing.currentBar.denominator=8;localSpacing.currentBar.tempo=70;
+const beforeSpacing=JSON.stringify(localSpacing.draft);
+localSpacing.insertEmptyBars(2,true);
+assert.equal(localSpacing.draft.bars.length,4);
+assert.equal(localSpacing.draft.bars[2].beats[0].notes[0].fret,13);
+for(const b of localSpacing.draft.bars.slice(0,2)){
+  assert.equal(b.beats.reduce((n,x)=>n+core.ticks(x),0),2880);
+  assert.equal(b.beats.every(x=>x.notes.length===0),true);
+  assert.equal(b.tempo,70);
+}
+localSpacing.undo();assert.equal(JSON.stringify(localSpacing.draft),beforeSpacing);
+localSpacing.redo();assert.equal(localSpacing.draft.bars.length,4);
+const afterSpacing=JSON.stringify(localSpacing.draft);
+for(const invalid of [0,-1,1.5,100,NaN])assert.throws(()=>localSpacing.insertEmptyBars(invalid));
+assert.equal(JSON.stringify(localSpacing.draft),afterSpacing);
+localSpacing.bar=3;localSpacing.insertEmptyBars(1);assert.equal(localSpacing.draft.bars.length,5);
+assert.equal(localSpacing.draft.bars[3].beats[0].notes[0].fret,11);
+assert.equal(localSpacing.draft.bars[4].beats.reduce((n,x)=>n+core.ticks(x),0),3840);
+console.log('Local blank measures: before/after, local meter, note preservation and undo passed');
 for (let s=1;s<=6;s++) {
   const score=reopen(draft([[beat(1,[note(s,7)])]]));
   const n=score.tracks[0].staves[0].bars[0].voices[0].beats[0].notes[0];

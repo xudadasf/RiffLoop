@@ -52,7 +52,7 @@ final class ScoreRegionLayoutTests: XCTestCase {
         XCTAssertEqual(plan.entries.map(\.number), [1, 2, 3])
         let order = try plan.recognitionOrder(available: Set(plan.entries.map(\.reference)))
         XCTAssertEqual(order.regions.map(\.pageIndex), [2, 0, 0])
-        XCTAssertEqual(order.gaps, [0, 1], "Final box does not insert a trailing gap")
+        XCTAssertEqual(order.gaps, [1, 1], "Final box does not insert a trailing gap")
     }
 
     func testDeletingAndAddingPreserveOtherBoxesSettings() async throws {
@@ -79,7 +79,7 @@ final class ScoreRegionLayoutTests: XCTestCase {
         try await store.saveLayout(snapshot.changing(snapshot.layout[1].location, number: 1, gapAfter: 0), replacing: snapshot)
         let newPlan = try await ScoreSequenceFactory.makePlan(from: [source], regionsFolder: folder)
         XCTAssertEqual(newPlan.entries.map(\.reference.regionID), [b.id, a.id])
-        XCTAssertEqual(newPlan.entries.map(\.gapAfter), [0, 1])
+        XCTAssertEqual(newPlan.entries.map(\.gapAfter), [1, 1], "New plans use one global gap, not per-box legacy settings")
         let stored = try await planStore.load()
         XCTAssertEqual(stored, original)
     }
@@ -109,18 +109,17 @@ final class ScoreRegionLayoutTests: XCTestCase {
         let model = ScoreRegionEditorModel(source: source, store: store)
         await model.open()
         XCTAssertNil(model.selectedID)
-        model.select(b.id)
+        await model.select(b.id)
         model.numberInput = "1"
-        model.gapInput = "0"
         await model.applyInputs()
         XCTAssertEqual(model.selectedID, b.id)
         XCTAssertEqual(model.number(for: b.id), 1)
         XCTAssertEqual(model.number(for: a.id), 2)
-        XCTAssertEqual(model.gap(for: b.id), 0)
+        XCTAssertEqual(model.gap(for: b.id), 1)
         let prepared = await model.makePlan()
         let plan = try XCTUnwrap(prepared)
         XCTAssertEqual(plan.entries.map(\.reference.regionID), [b.id, a.id])
-        XCTAssertEqual(plan.entries.map(\.gapAfter), [0, 1])
+        XCTAssertEqual(plan.entries.map(\.gapAfter), [1, 1])
         await model.removeRegion(b.id)
         XCTAssertEqual(model.regions, [a])
         XCTAssertNil(model.selectedID)
@@ -134,9 +133,9 @@ final class ScoreRegionLayoutTests: XCTestCase {
         try await store.savePage(index: 0, rotation: 0, regions: [a, b])
         let model = ScoreRegionEditorModel(source: source, store: store)
         await model.open()
-        model.select(a.id)
-        model.gapInput = "-1"
-        model.select(b.id)
+        await model.select(a.id)
+        model.numberInput = "-1"
+        await model.select(b.id)
         XCTAssertEqual(model.selectedID, a.id)
         await model.removeRegion(a.id)
         XCTAssertEqual(model.regions, [a, b])
@@ -146,8 +145,8 @@ final class ScoreRegionLayoutTests: XCTestCase {
         let plan = await model.makePlan()
         XCTAssertNil(plan)
         model.resetInputs()
-        XCTAssertEqual(model.gapInput, "1")
-        model.select(b.id)
+        XCTAssertEqual(model.numberInput, "1")
+        await model.select(b.id)
         XCTAssertEqual(model.selectedID, b.id)
     }
 
@@ -155,9 +154,8 @@ final class ScoreRegionLayoutTests: XCTestCase {
         try await store.savePage(index: 0, rotation: 0, regions: [a, b])
         let model = ScoreRegionEditorModel(source: source, store: store)
         await model.open()
-        model.select(b.id)
+        await model.select(b.id)
         model.numberInput = "1"
-        model.gapInput = "0"
         let c = ScoreRegion(x: 0, y: 0, width: 0.2, height: 0.2)
         let external = ScoreRegionsStore(source: source, folder: folder)
         try await external.savePage(index: 0, rotation: 0, regions: [a, b, c])
@@ -169,7 +167,82 @@ final class ScoreRegionLayoutTests: XCTestCase {
         await model.retryPendingChange()
         XCTAssertFalse(model.hasPendingChange)
         XCTAssertEqual(model.snapshot?.layout.map(\.location.regionID), [b.id, a.id, c.id])
-        XCTAssertEqual(model.snapshot?.layout.map(\.gapAfter), [0, 5, 1])
+        XCTAssertEqual(model.snapshot?.layout.map(\.gapAfter), [1, 5, 1])
+    }
+
+    func testAllCornersKeepOppositeCornerAndClampToPage() {
+        for corner in ScoreRegionCorner.allCases {
+            let resized = a.resized(corner: corner, dx: corner.isLeft ? -0.05 : 0.05,
+                                    dy: corner.isTop ? -0.04 : 0.04)
+            XCTAssertEqual(resized.id, a.id)
+            XCTAssertTrue(resized.isValid)
+            XCTAssertEqual(resized.width, a.width + 0.05, accuracy: 0.000001)
+            XCTAssertEqual(resized.height, a.height + 0.04, accuracy: 0.000001)
+            XCTAssertEqual(corner.isLeft ? resized.x + resized.width : resized.x,
+                           corner.isLeft ? a.x + a.width : a.x, accuracy: 0.000001)
+            XCTAssertEqual(corner.isTop ? resized.y + resized.height : resized.y,
+                           corner.isTop ? a.y + a.height : a.y, accuracy: 0.000001)
+            for distance in [-100.0, 100.0] {
+                XCTAssertTrue(a.resized(corner: corner, dx: distance, dy: distance).isValid)
+            }
+        }
+        XCTAssertEqual(a.resized(corner: .topLeft, dx: .nan, dy: 0), a)
+    }
+
+    func testResizePersistsGeometryWithoutChangingIdentityOrderOrLegacyGaps() async throws {
+        try await store.savePage(index: 0, rotation: 0, regions: [a, b])
+        let original = try await store.snapshot()
+        let layout = try original.changing(original.layout[1].location, number: 1, gapAfter: 3)
+        try await store.saveLayout(layout, replacing: original)
+        let model = ScoreRegionEditorModel(source: source, store: store)
+        await model.open()
+        await model.select(b.id)
+        let resized = b.resized(corner: .bottomRight, dx: 0.1, dy: -0.1)
+        await model.resizeRegion(resized, onPage: 0)
+        let reopened = try await ScoreRegionsStore(source: source, folder: folder).snapshot()
+        XCTAssertEqual(reopened.layout, layout)
+        XCTAssertEqual(reopened.pages[0].regions, [a, resized])
+        XCTAssertEqual(model.selectedID, b.id)
+        let prepared = await model.makePlan()
+        let plan = try XCTUnwrap(prepared)
+        XCTAssertEqual(plan.entries.map(\.reference.regionID), [b.id, a.id])
+    }
+
+    func testResizeConflictRetryPreservesNewBoxesAndRejectsChangedTarget() async throws {
+        try await store.savePage(index: 0, rotation: 0, regions: [a])
+        let model = ScoreRegionEditorModel(source: source, store: store)
+        await model.open()
+        await model.select(a.id)
+        try await store.savePage(index: 0, rotation: 0, regions: [a, b])
+        let resized = a.resized(corner: .topLeft, dx: -0.05, dy: -0.05)
+        await model.resizeRegion(resized, onPage: 0)
+        XCTAssertTrue(model.hasPendingChange)
+        XCTAssertEqual(model.pendingResizedRegion, resized)
+        await model.retryPendingChange()
+        XCTAssertFalse(model.hasPendingChange)
+        XCTAssertEqual(model.regions, [resized, b])
+
+        let external = resized.resized(corner: .bottomRight, dx: 0.1, dy: 0.1)
+        try await store.savePage(index: 0, rotation: 0, regions: [external, b])
+        await model.resizeRegion(a, onPage: 0)
+        await model.retryPendingChange()
+        XCTAssertTrue(model.hasPendingChange, "Retry must not overwrite another edit of this box")
+        await model.discardPendingChange()
+        XCTAssertEqual(model.regions, [external, b])
+    }
+
+    func testSelectingAnotherBoxAutomaticallySavesValidNumber() async throws {
+        try await store.savePage(index: 0, rotation: 0, regions: [a, b])
+        let model = ScoreRegionEditorModel(source: source, store: store)
+        await model.open()
+        await model.select(b.id)
+        model.numberInput = "1"
+        await model.select(a.id)
+        XCTAssertEqual(model.number(for: b.id), 1)
+        XCTAssertEqual(model.selectedID, a.id)
+        XCTAssertEqual(model.numberInput, "2")
+        XCTAssertFalse(model.hasUnappliedInputs)
+        XCTAssertNil(model.message)
     }
 
     func testPageChangeClearsSelectionAndPendingInputCanBeDiscardedAfterConflict() async throws {
@@ -180,15 +253,16 @@ final class ScoreRegionLayoutTests: XCTestCase {
             return ScorePagePreview(image: rendered.image, pageCount: 2, orientation: 0, error: nil)
         }
         await model.open()
-        model.select(a.id)
+        await model.select(a.id)
         await model.changePage(1)
         XCTAssertNil(model.selectedID)
         XCTAssertEqual(model.regions, [b])
-        model.select(b.id)
-        model.gapInput = "3"
+        await model.select(b.id)
+        model.numberInput = "3"
         await model.changePage(0)
         XCTAssertEqual(model.pageIndex, 1)
         try await store.savePage(index: 1, rotation: 0, regions: [])
+        model.numberInput = "1"
         await model.applyInputs()
         XCTAssertTrue(model.hasPendingChange)
         await model.discardPendingChange()

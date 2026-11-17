@@ -3,107 +3,126 @@ import XCTest
 
 @MainActor
 final class ScoreSequenceEditorModelTests: XCTestCase {
-    private func samplePlan() throws -> ScoreSequencePlan {
+    private func samplePlan(count: Int = 2) throws -> ScoreSequencePlan {
         let material = ScoreSequenceMaterial(name: "sample.pdf", sourceDigest: String(repeating: "a", count: 64))
-        let regions = (0..<2).map { page in
-            ScoreSequenceRegionReference(material: material, pageIndex: page, rotation: 0, regionID: UUID())
+        let regions = (0..<count).map {
+            ScoreSequenceRegionReference(material: material, pageIndex: $0, rotation: 0, regionID: UUID())
         }
         return try ScoreSequencePlan(materials: [material], regions: regions)
     }
 
-    func testSettingsCannotBeLostAndAreSavedWithThePlan() async throws {
-        let plan = try samplePlan()
+    func testSettingsAndGlobalGapSaveTogetherWithoutApply() async throws {
+        let plan = try samplePlan(count: 3)
         var saved: ScoreSequencePlan?
         let model = ScoreSequenceEditorModel(plan: plan, isSaved: true) { saved = $0 }
         XCTAssertFalse(model.hasUnsavedChanges)
-        model.tempoInput = "120"
-        model.numeratorInput = "3"
-        model.denominatorInput = "8"
-        model.tuningInput = "D2 A2 D3 G3 B3 E4"
-        XCTAssertTrue(model.hasUnsavedChanges)
-        await model.save()
-        XCTAssertNil(saved, "Unapplied input must never be silently discarded")
-        model.applySettings()
-        XCTAssertEqual(model.plan.effectiveSettings.tempo, 120)
-        XCTAssertEqual(model.plan.effectiveSettings.tuning, [38, 45, 50, 55, 59, 64])
-        await model.save()
-        XCTAssertEqual(saved?.effectiveSettings, model.plan.effectiveSettings)
+        model.tempoInput = "120"; model.numeratorInput = "3"; model.denominatorInput = "8"
+        model.tuningInput = "D2 A2 D3 G3 B3 E4"; model.uniformGapInput = "2"
+        let success = await model.save()
+        XCTAssertTrue(success)
+        let result = try XCTUnwrap(saved)
+        XCTAssertEqual(result.effectiveSettings.tempo, 120)
+        XCTAssertEqual(result.effectiveSettings.tuning, [38, 45, 50, 55, 59, 64])
+        XCTAssertEqual(result.uniformGapAfter, 2)
+        XCTAssertEqual(result.entries.map(\.gapAfter), [2, 2, 2])
+        XCTAssertEqual(try result.recognitionOrder(available: Set(result.entries.map(\.reference))).gaps, [2, 2])
         XCTAssertFalse(model.hasUnsavedChanges)
-
-        model.tuningInput = "not a tuning"
-        model.applySettings()
-        XCTAssertEqual(model.plan.effectiveSettings.tempo, 120)
-        XCTAssertTrue(model.hasUnsavedChanges)
-        XCTAssertNotNil(model.message)
+        XCTAssertNil(model.message, "A normal save must not open a modal")
+        let reopened = try JSONDecoder().decode(ScoreSequencePlan.self, from: JSONEncoder().encode(result))
+        XCTAssertEqual(reopened, result)
     }
 
-    func testPendingInputsCannotBeSilentlyDroppedBySaveOrSelection() async throws {
-        let plan = try samplePlan()
-        var saved: [ScoreSequencePlan] = []
-        let model = ScoreSequenceEditorModel(plan: plan, isSaved: true) { saved.append($0) }
-        XCTAssertFalse(model.hasUnsavedChanges)
-        model.numberInputs[0] = "2"
-        XCTAssertTrue(model.hasUnsavedChanges)
-        await model.save()
-        XCTAssertTrue(saved.isEmpty)
-        model.select(false, number: 1)
-        XCTAssertEqual(model.plan, plan)
-        model.assign(position: 0)
-        XCTAssertEqual(model.plan.selectedEntries.map(\.number), [2, 1])
-        await model.save()
-        XCTAssertEqual(saved.last?.selectedEntries.map(\.number), [2, 1])
-        XCTAssertFalse(model.hasUnsavedChanges)
-    }
-
-    func testInvalidGapPreservesPlanAndSaveFailureKeepsChanges() async throws {
-        let plan = try samplePlan()
-        struct SaveFailure: Error { }
-        let model = ScoreSequenceEditorModel(plan: plan, isSaved: false) { _ in throw SaveFailure() }
-        model.gapInputs[1] = "100"
-        model.setGap(number: 1)
-        XCTAssertEqual(model.plan, plan)
-        XCTAssertTrue(model.hasUnsavedChanges)
-        model.gapInputs[1] = "0"
-        model.setGap(number: 1)
-        XCTAssertEqual(model.plan.selectedEntries[0].gapAfter, 0)
-        await model.save()
-        XCTAssertTrue(model.hasUnsavedChanges)
-        XCTAssertNotNil(model.message)
-    }
-
-    func testAppendNewRegionsPreservesExistingPlanAndRequiresSave() async throws {
-        var plan = try samplePlan()
-        try plan.assign(number: 2, toPosition: 0)
-        try plan.setGapAfter(0, number: 2)
-        let original = plan.entries
-        let material = try XCTUnwrap(plan.materials.first)
-        let firstNew = ScoreSequenceRegionReference(material: material, pageIndex: 2, rotation: 0, regionID: UUID())
-        let secondNew = ScoreSequenceRegionReference(material: material, pageIndex: 3, rotation: 0, regionID: UUID())
+    func testPendingSettingsSurviveReorderAndSelectionWithoutBlocking() async throws {
+        let plan = try samplePlan(count: 3)
         var saved: ScoreSequencePlan?
-        let offered = [original[0].reference, firstNew, firstNew, secondNew]
-        let model = ScoreSequenceEditorModel(plan: plan, isSaved: true, newRegions: offered) { saved = $0 }
-
-        XCTAssertEqual(model.newRegions, [firstNew, secondNew])
-        model.numberInputs[0] = "1"
-        model.appendNewRegions()
-        XCTAssertEqual(model.plan.entries, original, "Pending input must not be discarded by appending")
-        XCTAssertEqual(model.newRegions.count, 2)
-        model.numberInputs[0] = String(original[0].number)
-
-        model.appendNewRegions()
-        XCTAssertEqual(Array(model.plan.entries.prefix(original.count)), original)
-        XCTAssertEqual(model.plan.entries.map(\.number), [2, 1, 3, 4])
-        XCTAssertEqual(model.plan.entries.suffix(2).map(\.reference), [firstNew, secondNew])
-        XCTAssertEqual(model.plan.entries.suffix(2).map(\.gapAfter), [1, 1])
-        XCTAssertTrue(model.newRegions.isEmpty)
-        XCTAssertTrue(model.hasUnsavedChanges)
-        model.appendNewRegions()
-        XCTAssertEqual(model.plan.entries.count, 4, "Repeated taps cannot duplicate regions")
+        let model = ScoreSequenceEditorModel(plan: plan, isSaved: true) { saved = $0 }
+        model.tempoInput = "70"; model.uniformGapInput = "0"
+        model.move(number: 2, offset: -1)
+        XCTAssertEqual(model.plan.selectedEntries.map(\.number), [2, 1, 3])
+        model.select(false, number: 1)
+        XCTAssertEqual(model.plan.selectedEntries.map(\.number), [2, 3])
+        XCTAssertEqual(model.tempoInput, "70")
+        XCTAssertEqual(model.uniformGapInput, "0")
+        XCTAssertNil(model.message)
         await model.save()
-        let savedPlan = try XCTUnwrap(saved)
+        XCTAssertEqual(saved?.effectiveSettings.tempo, 70)
+        XCTAssertEqual(saved?.entries.map(\.gapAfter), [0, 0, 0])
         XCTAssertFalse(model.hasUnsavedChanges)
-        let reopened = ScoreSequenceEditorModel(plan: savedPlan, isSaved: true, newRegions: offered) { _ in }
-        XCTAssertTrue(reopened.newRegions.isEmpty, "Already appended references must not be offered again")
+    }
+
+    func testInvalidFieldsNeverPartiallySaveAndCorrectingThemNeedsNoRestore() async throws {
+        let plan = try samplePlan()
+        var writes: [ScoreSequencePlan] = []
+        let model = ScoreSequenceEditorModel(plan: plan, isSaved: true) { writes.append($0) }
+        model.tempoInput = "70"; model.uniformGapInput = "100"
+        var success = await model.save()
+        XCTAssertFalse(success)
+        XCTAssertEqual(model.plan, plan)
+        XCTAssertTrue(writes.isEmpty)
+        XCTAssertTrue(model.message?.contains("0 到 99") == true)
+        model.uniformGapInput = "0"; model.tuningInput = "invalid"
+        success = await model.save()
+        XCTAssertFalse(success)
+        XCTAssertTrue(writes.isEmpty)
+        model.tuningInput = plan.effectiveSettings.tuningText
+        success = await model.save()
+        XCTAssertTrue(success)
+        XCTAssertEqual(writes.count, 1)
+        XCTAssertEqual(writes[0].effectiveSettings.tempo, 70)
+        XCTAssertFalse(model.hasUnsavedChanges)
+    }
+
+    func testSaveFailureKeepsFormAndRetrySavesIt() async throws {
+        struct SaveFailure: Error { }
+        var fail = true
+        var saved: ScoreSequencePlan?
+        let model = ScoreSequenceEditorModel(plan: try samplePlan(), isSaved: true) {
+            if fail { throw SaveFailure() }; saved = $0
+        }
+        model.tempoInput = "70"; model.uniformGapInput = "3"
+        let failed = await model.save()
+        XCTAssertFalse(failed)
+        XCTAssertEqual(model.tempoInput, "70"); XCTAssertEqual(model.uniformGapInput, "3")
+        XCTAssertTrue(model.hasUnsavedChanges); XCTAssertFalse(model.isSaving)
+        fail = false
+        let success = await model.save()
+        XCTAssertTrue(success); XCTAssertEqual(saved?.uniformGapAfter, 3)
+        XCTAssertFalse(model.hasUnsavedChanges)
+    }
+
+    func testAppendPreservesTypedSettingsAndCannotDuplicate() async throws {
+        let plan = try samplePlan()
+        let material = try XCTUnwrap(plan.materials.first)
+        let added = ScoreSequenceRegionReference(material: material, pageIndex: 3, rotation: 0, regionID: UUID())
+        let model = ScoreSequenceEditorModel(plan: plan, isSaved: true, newRegions: [added, added]) { _ in }
+        model.tempoInput = "70"; model.uniformGapInput = "2"
+        model.appendNewRegions()
+        model.appendNewRegions()
+        XCTAssertEqual(model.plan.entries.count, 3)
+        XCTAssertEqual(model.tempoInput, "70")
+        XCTAssertEqual(model.uniformGapInput, "2")
+        XCTAssertTrue(model.newRegions.isEmpty)
+        await model.save()
+        XCTAssertEqual(model.plan.entries.map(\.gapAfter), [2, 2, 2])
+        XCTAssertFalse(model.hasUnsavedChanges)
+    }
+
+    func testLegacyMixedGapsRemainUntilUserChoosesUniformValue() async throws {
+        var plan = try samplePlan(count: 3)
+        try plan.setGapAfter(0, number: 1); try plan.setGapAfter(3, number: 2)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as? [String: Any])
+        json.removeValue(forKey: "uniformGapAfter")
+        let legacy = try JSONDecoder().decode(ScoreSequencePlan.self, from: JSONSerialization.data(withJSONObject: json))
+        let model = ScoreSequenceEditorModel(plan: legacy, isSaved: true) { _ in }
+        XCTAssertTrue(model.preservesLegacyGaps)
+        XCTAssertFalse(model.hasUnsavedChanges)
+        model.tempoInput = "70"
+        await model.save()
+        XCTAssertEqual(model.plan.entries.map(\.gapAfter), [0, 3, 1])
+        model.uniformGapInput = "2"
+        await model.save()
+        XCTAssertEqual(model.plan.entries.map(\.gapAfter), [2, 2, 2])
+        XCTAssertEqual(model.plan.uniformGapAfter, 2)
     }
 
     func testInvalidNewRegionDoesNotPartiallyAppend() throws {
