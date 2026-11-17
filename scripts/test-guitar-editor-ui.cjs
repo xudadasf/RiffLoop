@@ -14,11 +14,21 @@ await page.waitForSelector('.scoreTarget');
 const target=(bar,beat,string)=>page.locator(`.scoreTarget[data-bar="${bar}"][data-beat="${beat}"][data-string="${string}"]`);
 await target(0,0,2).click();await page.locator('#keypad button').filter({hasText:/^1$/}).click();await page.waitForTimeout(1350);await page.locator('#keypad button').filter({hasText:/^3$/}).click();
 assert.equal(await page.evaluate(()=>session.currentNote.fret),13);assert.equal(await page.evaluate(()=>session.currentNote.string),2);
-await page.locator('#tab-beat').click();await page.locator('#insertBefore').click();assert.equal(await page.evaluate(()=>session.currentBar.beats.length),5);await page.locator('#undo').click();assert.equal(await page.evaluate(()=>session.currentBar.beats.length),4);await page.locator('#redo').click();assert.equal(await page.evaluate(()=>session.currentBar.beats.length),5);await page.locator('#undo').click();
+await page.locator('#insertMenu').click();await page.locator('#insertBefore').click();assert.equal(await page.evaluate(()=>session.currentBar.beats.length),5);assert.equal(await page.evaluate(()=>session.currentNote.fret),null);await page.getByRole('button',{name:'8',exact:true}).click();assert.deepEqual(await page.evaluate(()=>session.currentBar.beats.slice(0,2).map(b=>b.notes[0].fret)),[8,13]);await page.locator('#undo').click();await page.locator('#undo').click();assert.equal(await page.evaluate(()=>session.currentBar.beats.length),4);await page.locator('#redo').click();assert.equal(await page.evaluate(()=>session.currentBar.beats.length),5);await page.locator('#undo').click();
+await page.locator('#insertRestBefore').click();assert.equal(await page.evaluate(()=>session.currentBeat.notes.length),0);assert.equal(await page.evaluate(()=>session.currentBar.beats[1].notes[0].fret),13);await page.locator('#undo').click();
 await page.locator('#techniques').click();await page.getByRole('button',{name:'掌根闷音 P.M.',exact:true}).click();assert.equal(await page.locator('#panel').evaluate(e=>e.open),false,'Common techniques leave the score available');
 assert.equal(await page.evaluate(()=>session.currentNote.effects.isPalmMute),1);await page.getByRole('button',{name:'掌根闷音 P.M.',exact:true}).click();assert.equal(await page.evaluate(()=>session.currentNote.effects.isPalmMute),0);await page.getByRole('button',{name:'掌根闷音 P.M.',exact:true}).click();
 await page.locator('#tab-note').click();await page.getByRole('button',{name:'全音推弦',exact:true}).click();
 assert.equal(await page.evaluate(()=>session.currentNote.bend.length),2);
+await page.locator('#appliedTechniques').click();assert.equal(await page.locator('[data-applied="note:isPalmMute"]').count(),1);
+await page.locator('[data-applied="note:bend"]').getByRole('button',{name:'修改',exact:true}).click();
+await page.getByLabel('控制点 2 变化半音',{exact:true}).fill('1.5');await page.getByLabel('控制点 2 变化半音',{exact:true}).press('Tab');assert.equal(await page.evaluate(()=>session.currentNote.bend[1].value),3);
+await page.getByRole('button',{name:'添加控制点',exact:true}).click();assert.equal(await page.evaluate(()=>session.currentNote.bend.length),3);
+await fs.mkdir(path.resolve(__dirname,'../output/editor-touch-techniques-20261117'),{recursive:true});await page.screenshot({path:path.resolve(__dirname,'../output/editor-touch-techniques-20261117/curve-editor.png')});
+await page.getByRole('button',{name:'全音',exact:true}).click();assert.equal(await page.getByLabel('控制点 2 变化半音',{exact:true}).inputValue(),'2','Preset refreshes editable points');await page.locator('#panelClose').click();
+await page.locator('#appliedTechniques').click();await page.locator('[data-applied="note:isPalmMute"]').getByRole('button',{name:'取消',exact:true}).click();assert.equal(await page.evaluate(()=>session.currentNote.effects.isPalmMute),undefined);assert.equal(await page.evaluate(()=>session.currentNote.bend.length),2,'Removing PM keeps the bend');
+await page.locator('#panelClose').click();await page.locator('#undo').click();assert.equal(await page.evaluate(()=>session.currentNote.effects.isPalmMute),1);
+await page.locator('#appliedTechniques').click();await page.screenshot({path:path.resolve(__dirname,'../output/editor-touch-techniques-20261117/applied-techniques.png')});await page.locator('#panelClose').click();
 await page.locator('#bars').click();await page.getByLabel('插入空白小节数',{exact:true}).fill('2');await page.getByRole('button',{name:'在本小节后插入',exact:true}).click();assert.equal(await page.evaluate(()=>session.draft.bars.length),3);await page.locator('#undo').click();assert.equal(await page.evaluate(()=>session.draft.bars.length),1);
 // Reflow's delete is deliberately two-stage: note -> rest -> removed beat.
 await page.locator('#tab-beat').click();await page.locator('#insertAfter').click();await page.getByRole('button',{name:'7',exact:true}).click();
@@ -38,14 +48,36 @@ await page.locator('#save').click();assert.equal(await page.evaluate(()=>message
 await page.evaluate(()=>{session.change(d=>{d.title='电吉他编辑与试听';d.bars=Array.from({length:8},(_,i)=>({...GuitarEdit.bar(),section:i===0?'前奏':i===4?'主歌':'',beats:Array.from({length:8},(_,j)=>({...GuitarEdit.beat(8),notes:[GuitarEdit.note(j<4?2:3,[8,10,8,10,6,8,6,8][j])]}))}));d.bars[2].beats[0].notes=[{string:4,effects:{},bend:[],review:['待核对']}];d.bars[0].beats[0].notes[0].effects.isHammerPullOrigin=1;d.bars[1].beats[3].notes[0].effects.vibrato=1;});session.bar=0;session.beat=1;session.string=2;render();});
 await page.waitForSelector('.scoreTarget[data-bar="7"]');assert.equal(await target(2,0,4).textContent(),'?', 'Swift omitted nil frets remain visible as unknown notes');await target(0,1,2).click();assert.equal(await page.evaluate(()=>session.currentNote.fret),10);
 await page.waitForFunction(()=>!document.getElementById('play').disabled);await page.locator('#techniques').click();
-const pad=await page.locator('#thumbPad').boundingBox();await page.mouse.move(pad.x+pad.width/2,pad.y+pad.height/2);await page.mouse.down();await page.mouse.move(pad.x+pad.width/2,pad.y+pad.height/2+31);await page.mouse.up();assert.equal(await page.evaluate(()=>session.string),3,'Thumb drag moves one string');await page.locator('#stringUp').click();
+// Replay a real touch scroll over an engraved note. Pointer-down must not pick.
+const touch=await page.context().newCDPSession(page);const hit=await target(0,2,2).boundingBox();
+const beforeTouch=await page.evaluate(()=>[session.bar,session.beat,session.string]);
+await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:hit.x+15,y:hit.y+hit.height/2}]});
+assert.deepEqual(await page.evaluate(()=>[session.bar,session.beat,session.string]),beforeTouch,'Finger-down is not selection');
+for(let step=1;step<=6;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:hit.x+15,y:hit.y+hit.height/2-step*18}]});
+await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+await page.waitForTimeout(350);assert.deepEqual(await page.evaluate(()=>[session.bar,session.beat,session.string]),beforeTouch,'Scroll must not pick or extend notes');
+assert.ok(await page.locator('#scoreViewport').evaluate(e=>e.scrollTop)>40,'Touch scroll moved the page');
+await page.locator('#scoreViewport').evaluate(e=>e.scrollTop=600);
+const scrolled=await page.locator('#scoreViewport').evaluate(e=>e.scrollTop);
+assert.ok(scrolled>40,'Touch scrolling remains available');await page.locator('#tab-note').click();
+assert.equal(await page.locator('#scoreViewport').evaluate(e=>e.scrollTop),scrolled,'Switching tools must not pull the page back to the edit cursor');
+await page.locator('#shiftKey').click();assert.equal(await page.locator('#scoreViewport').evaluate(e=>e.scrollTop),scrolled,'Range mode does not move the page');await page.evaluate(()=>guitarReply({saved:true}));assert.equal(await page.locator('#scoreViewport').evaluate(e=>e.scrollTop),scrolled,'Saved reply does not move the page');await page.locator('#shiftKey').click();
+// A finger drag must scroll, not move the edit cursor or extend a range.
+const pad=await page.locator('#thumbPad').boundingBox();const prior=await page.evaluate(()=>[session.bar,session.beat,session.string,session.anchor]);
+await page.mouse.move(pad.x+pad.width/2,pad.y+pad.height/2);await page.mouse.down();await page.mouse.move(pad.x+pad.width/2,pad.y+pad.height/2+31);await page.mouse.up();
+assert.deepEqual(await page.evaluate(()=>[session.bar,session.beat,session.string,session.anchor]),prior,'Dragging the navigation area must not select notes');
 assert.equal(await page.locator('#toolTabs [role=tab]').count(),8);
+await page.locator('#selectMode').click();
+const oldRange=await page.evaluate(()=>JSON.stringify([session.bar,session.beat,session.string,session.anchor]));
+await target(7,0,2).evaluate(el=>{el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:90,clientX:100,clientY:100}));window.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:90}));el.click();});
+assert.equal(await page.evaluate(()=>JSON.stringify([session.bar,session.beat,session.string,session.anchor])),oldRange,'Cancelled drag and compatibility click never extend selection');
+await page.locator('#editMode').click();await target(7,0,2).tap();assert.equal(await page.evaluate(()=>session.bar),7,'A fresh single tap still selects after a cancelled gesture');
 
-await fs.mkdir(path.resolve(__dirname,'../output/reflow-controls-20261117'),{recursive:true});await page.screenshot({path:path.resolve(__dirname,'../output/reflow-controls-20261117/editor-mini.png')});
+await fs.mkdir(path.resolve(__dirname,'../output/editor-touch-techniques-20261117'),{recursive:true});await page.screenshot({path:path.resolve(__dirname,'../output/editor-touch-techniques-20261117/editor-mini.png')});
 
 await page.locator('#barChoice').selectOption('7');await page.waitForTimeout(100);
 const reached=await target(7,0,2).boundingBox();assert.ok(reached.y>100&&reached.y<480,'Bar navigation brings selection above floating controls');
-await page.evaluate(()=>{window.rotated=false;scoreEditor.api.renderFinished.on(()=>setTimeout(()=>window.rotated=true,100));});await page.setViewportSize({width:744,height:1133});await page.waitForFunction(()=>window.rotated);await page.waitForFunction(()=>{const r=document.querySelector('.scoreTarget[data-bar="7"][data-beat="0"][data-string="2"]')?.getBoundingClientRect();return r&&r.y>160&&r.y<680});assert.ok(await page.evaluate(()=>document.querySelector('#keypad').getBoundingClientRect().right<=innerWidth),'Portrait keypad stays on screen');await page.screenshot({path:path.resolve(__dirname,'../output/reflow-controls-20261117/editor-portrait.png')});
+await page.evaluate(()=>{window.rotated=false;scoreEditor.api.renderFinished.on(()=>setTimeout(()=>window.rotated=true,100));});await page.setViewportSize({width:744,height:1133});await page.waitForFunction(()=>window.rotated);await page.waitForFunction(()=>{const r=document.querySelector('.scoreTarget[data-bar="7"][data-beat="0"][data-string="2"]')?.getBoundingClientRect();return r&&r.y>160&&r.y<680});assert.ok(await page.evaluate(()=>document.querySelector('#keypad').getBoundingClientRect().right<=innerWidth),'Portrait keypad stays on screen');await page.screenshot({path:path.resolve(__dirname,'../output/editor-touch-techniques-20261117/editor-portrait.png')});
 assert.equal(await page.locator('img.toolIcon').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth>0)),true,'All bundled icons load');assert.deepEqual(errors,[]);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(overflow,false,'No page-level horizontal overflow');
 console.log('iPad mini: direct score/string selection, frets, techniques, local bars, real playback/pause/stop and one Save passed');
-}finally{if(browser){const active=browser.contexts()[0]?.pages()[0];if(active){await fs.mkdir(path.resolve(__dirname,'../output/reflow-controls-20261117'),{recursive:true});await active.screenshot({path:path.resolve(__dirname,'../output/reflow-controls-20261117/editor-latest.png')}).catch(()=>{});}await browser.close();}await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e.stack);process.exitCode=1;});
+}finally{if(browser){const active=browser.contexts()[0]?.pages()[0];if(active){await fs.mkdir(path.resolve(__dirname,'../output/editor-touch-techniques-20261117'),{recursive:true});await active.screenshot({path:path.resolve(__dirname,'../output/editor-touch-techniques-20261117/editor-latest.png')}).catch(()=>{});}await browser.close();}await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e.stack);process.exitCode=1;});

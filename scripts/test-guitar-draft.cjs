@@ -72,7 +72,15 @@ for(const spec of schema){
     if(spec.id==='trillValue')target.effects.trillSpeed=16;
     if(spec.id==='trillSpeed'){target.effects.trillValue=9;if(value!==16){assert.throws(()=>reopen(draft([bs])),/颤音/);continue;}}
     if(spec.id==='graceType'&&value>0)bs.push(beat(4));
-    try { reopen(draft([bs])); techniques++; }
+    try {
+      const source=draft([bs]);reopen(source);techniques++;
+      const editing=new edit.Session(source,d=>core.validate(d,schema,false));editing.beat=1;
+      const before=JSON.stringify(editing.draft);editing.removeEffect(spec.scope,spec.id);
+      assert.equal((spec.scope==='note'?editing.currentNote:editing.currentBeat).effects[spec.id],undefined);
+      if(spec.id==='graceType'&&value>0)editing.draft.bars[0].beats.pop();
+      reopen(editing.draft);
+      editing.undo();assert.equal(JSON.stringify(editing.draft),before,'Removing a technique must be undoable');reopen(editing.draft);
+    }
     catch(error){console.error('Failed technique',spec.scope,spec.id,value);throw error;}
   }
 }

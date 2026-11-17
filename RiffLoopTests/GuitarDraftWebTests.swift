@@ -35,10 +35,15 @@ final class GuitarDraftWebTests: XCTestCase {
             (()=>{const tapDigit=n=>[...document.querySelectorAll('#keypad button')].find(b=>b.textContent===String(n)).click();
             tapDigit(1);tapDigit(3);document.getElementById('stringDown').click();tapDigit(1);tapDigit(1);
             document.getElementById('tab-beat').click();document.getElementById('insertBefore').click();document.getElementById('insertBefore').click();document.getElementById('undo').click();document.getElementById('redo').click();
+            const frontOK=session.currentBar.beats[0].notes[0].fret===null && session.currentBar.beats[2].notes[0].fret===13;
             session.beat=2;session.string=1;render();document.getElementById('techniques').click();
             [...document.querySelectorAll('#toolStrip button')].find(b=>b.textContent==='掌根闷音 P.M.').click();
+            document.getElementById('appliedTechniques').click();
+            const applied=document.querySelector('[data-applied="note:isPalmMute"]');
+            applied.querySelectorAll('button')[1].click();const removed=!session.currentNote.effects.isPalmMute;
+            document.getElementById('panelClose').click();document.getElementById('undo').click();
             render();document.getElementById('save').click();
-            return session.currentBar.beats.length===6 && session.currentBeat.notes.length===2;})()
+            return frontOK && removed && session.currentBar.beats.length===6 && session.currentBeat.notes.length===2;})()
             """, editor)
         XCTAssertEqual(value as? Bool,true)
         var saved = draft

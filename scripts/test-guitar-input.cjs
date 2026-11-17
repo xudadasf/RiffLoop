@@ -25,3 +25,19 @@ const incomplete=make();incomplete.currentBar.beats=[edit.beat(8)];incomplete.tu
 const full=make();full.currentBar.beats=[edit.beat(1)];const original=JSON.stringify(full.draft);assert.throws(()=>full.tuplet(3,core));assert.equal(JSON.stringify(full.draft),original,'Invalid group is atomic');
 for(const [count,denominator] of [[2,3],[3,2],[4,3],[5,4],[6,4],[7,4],[8,6],[9,8]]){const group=make();group.currentBar.beats=Array.from({length:count},()=>edit.beat(16));group.tuplet(count,core);assert.ok(group.currentBar.beats.every(b=>b.tupletDenominator===denominator));assert.ok(Math.abs(group.currentBar.beats.reduce((sum,b)=>sum+core.ticks(b),0)-240*denominator)<1e-6,`Tuplet ${count} must last ${denominator} normal notes`);}
 console.log('Reflow input: digit entry, chord, navigation, insert/erase, split, range effects and tuplets passed');
+const insert=make();insert.setFret(13);insert.currentBeat.dots=1;insert.insertBeat(false,true);
+assert.equal(insert.currentBeat.notes[0].fret,null,'Insert before never guesses an open string');assert.equal(insert.currentBeat.dots,1);
+insert.inputDigit(8);assert.deepEqual(insert.currentBar.beats.slice(0,2).map(b=>b.notes[0].fret),[8,13]);insert.undo();insert.undo();assert.equal(insert.currentNote.fret,13);
+const technique=make();technique.setFret(8);technique.toggleEffect('note','isPalmMute');technique.toggleEffect('note','harmonicType',2);technique.currentNote.effects.harmonicValue=12;
+technique.removeEffect('note','harmonicType');assert.equal(technique.currentNote.effects.harmonicValue,undefined);assert.equal(technique.currentNote.effects.isPalmMute,1);
+technique.setCurve('note',[{offset:0,value:0},{offset:60,value:4}]);technique.currentNote.effects.bendStyle=2;technique.setCurve('note',[]);assert.equal(technique.currentNote.effects.bendStyle,undefined);
+technique.currentBeat.effects.graceType=2;const originalNote=technique.currentNote.fret;const originalTicks=core.ticks(technique.currentBeat);technique.clearTechniques();assert.equal(technique.currentNote.fret,originalNote);assert.equal(core.ticks(technique.currentBeat),originalTicks,'Bulk technique reset does not turn grace notes into extra beats');
+technique.undo();assert.equal(technique.currentNote.effects.isPalmMute,1);
+console.log('Front insertion, editing/removing individual techniques and safe reset passed');
+const fs=require('node:fs'),vm=require('node:vm');
+const groups=vm.runInNewContext(fs.readFileSync(require.resolve('../RiffLoop/Resources/ScoreEditor/technique-editor.js'),'utf8')+'; techniqueGroups;');
+assert.deepEqual(Object.values(groups).flat().sort(),schema.map(s=>`${s.scope}:${s.id}`).sort(),'Every technique parameter has exactly one reachable category');
+const quiet=make();quiet.setFret(8);quiet.currentBeat.effects.dynamics=0;quiet.currentNote.effects.leftHandFinger=0;
+const present=vm.runInNewContext(fs.readFileSync(require.resolve('../RiffLoop/Resources/ScoreEditor/technique-editor.js'),'utf8')+'; effectPresent;');
+assert.equal(present(schema.find(s=>s.id==='dynamics'),quiet.currentBeat),true,'ppp is active, not the default');assert.equal(present(schema.find(s=>s.id==='leftHandFinger'),quiet.currentNote),true,'Thumb fingering is active');
+console.log('All technique categories reachable; zero-valued dynamics/fingerings remain editable');

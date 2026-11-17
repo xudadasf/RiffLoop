@@ -10,6 +10,10 @@ class GuitarScoreSurface {
       display:{layoutMode:alphaTab.LayoutMode.Page,staveProfile:alphaTab.StaveProfile.ScoreTab,scale:this.scale},
       player:{playerMode:alphaTab.PlayerMode.EnabledSynthesizer,soundFont:null,enableCursor:true,enableUserInteraction:false,enableElementHighlighting:true,scrollElement:'#scoreViewport',scrollMode:alphaTab.ScrollMode.Off}
     });
+    this.revealPending=false;
+    this.tapGuard=new GuitarTapGuard(document.getElementById('scoreViewport'));
+    this.onResize=()=>{const selected=this.overlay.querySelector('.selected');if(selected){const r=selected.getBoundingClientRect();if(r.bottom>0&&r.top<innerHeight)this.revealPending=true;}};
+    window.addEventListener('resize',this.onResize);
     this.api.renderFinished.on(()=>requestAnimationFrame(()=>this.drawTargets()));
     this.api.playerReady.on(()=>{this.ready=true;this.configureOutput();this.onState({ready:true,playing:false});});
     this.api.playerStateChanged.on(e=>{
@@ -24,19 +28,20 @@ class GuitarScoreSurface {
       if(target){const r=target.getBoundingClientRect(),v=document.getElementById('scoreViewport').getBoundingClientRect();if(r.top<v.top+90||r.bottom>v.bottom-240)target.scrollIntoView({block:'center',inline:'nearest'});}
     });
     this.api.error.on(e=>{this.pause();this.onError(e.message||String(e));});
-    this.api.noteMouseDown.on(n=>this.pick(n.beat.voice.bar.index,n.beat.index,7-n.string));
-    this.api.beatMouseDown.on(b=>this.pick(b.voice.bar.index,b.index,this.selection.string));
+    // The renderer must never select on finger-down: that may be a scroll.
+    // TAB overlay clicks are the sole pointer-based selection entry point.
   }
   configureOutput(){window.RiffLoopAudio.install(this.api.player?.output);}
   loadSoundFont(bytes){this.api.loadSoundFont(bytes,false);}
-  update(draft,selection,schema){
+  update(draft,selection,schema,reveal=false){
+    if(reveal)this.revealPending=true;
     this.selection={bar:selection.bar,beat:selection.beat,string:selection.string};this.editSession=selection;this.draft=draft;
     const encoded=JSON.stringify(draft);
     if(encoded!==this.serialized){
       this.pause();this.serialized=encoded;this.ready=false;this.onState({ready:false,playing:false});
       this.score=GuitarDraftCore.makeScore(alphaTab,draft,schema,false);
       this.api.renderScore(this.score,[0]);
-    }else this.highlight();
+    }else {this.highlight();this.finishReveal();}
   }
   drawTargets(){
     this.overlay.replaceChildren();if(!this.score)return;
@@ -53,11 +58,12 @@ class GuitarScoreSurface {
         target.onclick=()=>this.pick(bi,ti,string);this.overlay.append(target);
       }
     }
-    this.highlight();if(!this.wantsPlay)this.revealSelection();
+    this.highlight();this.finishReveal();
   }
+  finishReveal(){if(this.revealPending&&!this.wantsPlay){this.revealPending=false;this.revealSelection();}}
   highlight(){for(const target of this.overlay.children){const active=+target.dataset.bar===this.selection.bar&&+target.dataset.beat===this.selection.beat&&+target.dataset.string===this.selection.string;target.classList.toggle('selected',active);target.classList.toggle('inRange',!!this.editSession?.isSelected(+target.dataset.bar,+target.dataset.beat));target.setAttribute('aria-pressed',String(active));}}
   pick(bar,beat,string){this.pause();this.onSelect(bar,beat,string);}
-  seekSelection(){const b=this.score?.tracks[0].staves[0].bars[this.selection.bar]?.voices[0].beats[this.selection.beat];if(b){this.pauseTick=b.absolutePlaybackStart;this.api.tickPosition=this.pauseTick;this.revealSelection();}}
+  seekSelection(){const b=this.score?.tracks[0].staves[0].bars[this.selection.bar]?.voices[0].beats[this.selection.beat];if(b){this.pauseTick=b.absolutePlaybackStart;this.api.tickPosition=this.pauseTick;}}
   revealSelection(){
     const target=this.overlay.querySelector(`[data-bar="${this.selection.bar}"][data-beat="${this.selection.beat}"][data-string="${this.selection.string}"]`);
     if(!target)return;
@@ -80,6 +86,6 @@ class GuitarScoreSurface {
   stop(){this.pause();this.pauseTick=0;this.api.stop();this.api.tickPosition=0;}
   loop(enabled){this.api.isLooping=enabled;}
   zoom(delta){this.pause();this.scale=Math.max(.7,Math.min(2,this.scale+delta));this.api.settings.display.scale=this.scale;this.api.updateSettings();this.api.render();}
-  destroy(){this.stop();this.api.destroy();}
+  destroy(){window.removeEventListener('resize',this.onResize);this.tapGuard.destroy();this.stop();this.api.destroy();}
 }
 window.GuitarScoreSurface=GuitarScoreSurface;

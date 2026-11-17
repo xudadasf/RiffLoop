@@ -5,15 +5,15 @@ const note=(string,fret)=>({string,fret,effects:{},bend:[],review:[]});
 const beat=(duration=4)=>({duration,dots:0,tupletNumerator:1,tupletDenominator:1,notes:[],effects:{},whammy:[],tremolo:0,text:'',review:[]});
 const bar=()=>({beats:[beat(1)],review:[],repeatStart:false,repeatCount:0,alternateEndings:0,section:''});
 class Session {
-  constructor(draft,validate){this.draft=copy(draft);this.validate=validate;this.undoStack=[];this.redoStack=[];this.bar=0;this.beat=0;this.string=1;this.clipboard=null;this.saved=JSON.stringify(draft);this.anchor=null;this.pendingDigit='';}
+  constructor(draft,validate){this.draft=copy(draft);this.validate=validate;this.undoStack=[];this.redoStack=[];this.bar=0;this.beat=0;this.string=1;this.clipboard=null;this.saved=JSON.stringify(draft);this.anchor=null;this.pendingDigit='';this.revision=0;}
   get dirty(){return JSON.stringify(this.draft)!==this.saved;}
   get currentBar(){return this.draft.bars[this.bar];}
   get currentBeat(){return this.currentBar.beats[this.beat];}
   get currentNote(){return this.currentBeat.notes.find(n=>n.string===this.string);}
   clamp(){this.bar=Math.max(0,Math.min(this.bar,this.draft.bars.length-1));this.beat=Math.max(0,Math.min(this.beat,this.currentBar.beats.length-1));}
   snapshot(){return {draft:copy(this.draft),bar:this.bar,beat:this.beat,string:this.string};}
-  restore(s){this.draft=s.draft;this.bar=s.bar;this.beat=s.beat;this.string=s.string;this.clearSelection();this.clamp();}
-  change(fn){const before=this.snapshot();try{fn(this.draft);this.validate(this.draft);if(JSON.stringify(before.draft)===JSON.stringify(this.draft))return;this.undoStack.push(before);if(this.undoStack.length>40)this.undoStack.shift();this.redoStack=[];this.clamp();}catch(e){this.restore(before);throw e;}}
+  restore(s){this.revision++;this.draft=s.draft;this.bar=s.bar;this.beat=s.beat;this.string=s.string;this.clearSelection();this.clamp();}
+  change(fn){const before=this.snapshot();try{fn(this.draft);this.validate(this.draft);if(JSON.stringify(before.draft)===JSON.stringify(this.draft))return;this.revision++;this.undoStack.push(before);if(this.undoStack.length>40)this.undoStack.shift();this.redoStack=[];this.clamp();}catch(e){this.restore(before);throw e;}}
   undo(){if(!this.undoStack.length)return;this.redoStack.push(this.snapshot());this.restore(this.undoStack.pop());}
   redo(){if(!this.redoStack.length)return;this.undoStack.push(this.snapshot());this.restore(this.redoStack.pop());}
   endDigits(){this.pendingDigit='';}
@@ -24,6 +24,9 @@ class Session {
   get selectedBeats(){if(!this.anchor)return [this.currentBeat];return this.draft.bars.flatMap((bar,bi)=>bar.beats.filter((b,ti)=>this.isSelected(bi,ti)));}
   targets(scope){return scope==='beat'?this.selectedBeats:this.anchor?this.selectedBeats.flatMap(b=>b.notes):this.currentNote?[this.currentNote]:[];}
   toggleEffect(scope,id,value=1,defaultValue=0){const targets=this.targets(scope);if(!targets.length)throw Error('先在当前弦输入品位，或选中已有音符。');const next=targets.every(t=>(t.effects[id]??defaultValue)===value)?defaultValue:value;this.change(()=>targets.forEach(t=>{t.effects[id]=next;}));}
+  removeEffect(scope,id){this.change(()=>this.targets(scope).forEach(t=>{delete t.effects[id];const dependent={harmonicType:'harmonicValue',trillValue:'trillSpeed',brushType:'brushDuration'}[id];if(dependent)delete t.effects[dependent];}));}
+  setCurve(scope,points){const targets=this.targets(scope);if(!targets.length)throw Error('先选中已有音符。');this.change(()=>targets.forEach(t=>{t[scope==='note'?'bend':'whammy']=copy(points);if(!points.length)delete t.effects[scope==='note'?'bendStyle':'whammyStyle'];}));}
+  clearTechniques(){this.change(()=>{this.targets('note').forEach(n=>{n.effects={};n.bend=[];});this.targets('beat').forEach(b=>{const grace=b.effects.graceType;b.effects=grace?{graceType:grace}:{};b.whammy=[];b.tremolo=0;});});}
   setDuration(duration){this.change(()=>this.selectedBeats.forEach(b=>{b.duration=duration;b.review=b.review.filter(x=>!x.includes('时值'));}));}
   toggleDots(dots=1){const value=this.selectedBeats.every(b=>b.dots===dots)?0:dots;this.change(()=>this.selectedBeats.forEach(b=>b.dots=value));}
   move(dx,dy,byBar=false,extend=false){
@@ -55,7 +58,7 @@ class Session {
   setFret(fret){this.change(()=>{let n=this.currentNote;if(!n){n=note(this.string,fret);this.currentBeat.notes.push(n);}n.fret=fret;n.review=[];});}
   rest(){this.change(()=>{this.currentBeat.notes=[];});}
   deleteNote(){this.change(()=>{this.currentBeat.notes=this.currentBeat.notes.filter(n=>n.string!==this.string);});}
-  insertBeat(after=false){this.change(()=>{const b=beat(this.currentBeat.duration);this.currentBar.beats.splice(this.beat+(after?1:0),0,b);if(after)this.beat++;});}
+  insertBeat(after=false,noteEntry=false){this.clearSelection();this.change(()=>{const old=this.currentBeat,b=beat(old.duration);b.dots=old.dots;b.tupletNumerator=old.tupletNumerator;b.tupletDenominator=old.tupletDenominator;if(noteEntry){const n=note(this.string,null);n.review=['请输入新音符的品位'];b.notes=[n];}this.currentBar.beats.splice(this.beat+(after?1:0),0,b);if(after)this.beat++;});}
   deleteBeat(){this.change(()=>{if(this.currentBar.beats.length===1)this.currentBar.beats[0]=beat(this.currentBeat.duration);else this.currentBar.beats.splice(this.beat,1);});}
   insertBar(){this.insertEmptyBars(1);}
   insertEmptyBars(count,before=false){
