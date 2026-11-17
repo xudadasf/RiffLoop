@@ -39,7 +39,8 @@ class Session {
   erase(){if(this.currentBeat.notes.length)this.deleteNote();else this.deleteBeat();}
   split(){const targets=this.selectedBeats;if(targets.some(b=>b.duration>=64))throw Error('六十四分音符不能再拆分。');this.change(()=>{for(const bar of this.draft.bars){for(let i=bar.beats.length-1;i>=0;i--){const b=bar.beats[i];if(!targets.includes(b))continue;b.duration*=2;bar.beats.splice(i+1,0,copy(b));}}});this.clearSelection();}
   tuplet(n,core){
-    const denominator=n===2?3:n===3?2:n<8?4:8;
+    const denominator={2:3,3:2,4:3,5:4,6:4,7:4,8:6,9:8}[n];
+    if(!denominator)throw Error('请选择 2 到 9 连音。');
     if(this.anchor&&this.anchor.bar!==this.bar)throw Error('连音组需在同一小节内。');
     const start=this.anchor?Math.min(this.anchor.beat,this.beat):this.beat;
     let group=this.anchor?this.selectedBeats:this.currentBar.beats.slice(start,start+n);
