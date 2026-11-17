@@ -41,7 +41,7 @@ $('save').onclick=()=>{if(busy)return;surface.pause();busy=true;document.body.in
 $('prev').onclick=()=>perform(()=>{session.bar--;session.beat=0;});$('next').onclick=()=>perform(()=>{session.bar++;session.beat=0;});$('barChoice').onchange=e=>perform(()=>{session.bar=Number(e.target.value);session.beat=0;});
 $('source').onclick=()=>{if(!busy&&session.currentBar.source){busy=true;document.body.inert=true;send('source',{source:session.currentBar.source});}};$('hideSource').onclick=()=>{$('reference').hidden=true;};
 $('preview').onclick=()=>{document.body.classList.toggle('reading');$('preview').textContent=document.body.classList.contains('reading')?'编辑':'阅读';surface.api.render();};
-$('play').onclick=()=>{if(playing)surface.pause();else surface.play();};$('stop').onclick=()=>surface.stop();
+$('play').onclick=()=>{if(playing)surface.pause();else{send('activateAudio');surface.play();}};$('stop').onclick=()=>surface.stop();
 $('loop').onclick=()=>{const enabled=$('loop').getAttribute('aria-pressed')!=='true';$('loop').setAttribute('aria-pressed',String(enabled));surface.loop(enabled);};
 $('zoomIn').onclick=()=>surface.zoom(.15);$('zoomOut').onclick=()=>surface.zoom(-.15);
 $('keypadToggle').onclick=()=>document.body.classList.toggle('hideKeypad');

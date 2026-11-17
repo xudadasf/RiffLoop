@@ -53,11 +53,24 @@ class GuitarScoreSurface {
         target.onclick=()=>this.pick(bi,ti,string);this.overlay.append(target);
       }
     }
-    this.highlight();
+    this.highlight();if(!this.wantsPlay)this.revealSelection();
   }
   highlight(){for(const target of this.overlay.children){const active=+target.dataset.bar===this.selection.bar&&+target.dataset.beat===this.selection.beat&&+target.dataset.string===this.selection.string;target.classList.toggle('selected',active);target.setAttribute('aria-pressed',String(active));}}
   pick(bar,beat,string){this.pause();this.onSelect(bar,beat,string);}
-  seekSelection(){const b=this.score?.tracks[0].staves[0].bars[this.selection.bar]?.voices[0].beats[this.selection.beat];if(b){this.pauseTick=b.absolutePlaybackStart;this.api.tickPosition=this.pauseTick;}}
+  seekSelection(){const b=this.score?.tracks[0].staves[0].bars[this.selection.bar]?.voices[0].beats[this.selection.beat];if(b){this.pauseTick=b.absolutePlaybackStart;this.api.tickPosition=this.pauseTick;this.revealSelection();}}
+  revealSelection(){
+    const target=this.overlay.querySelector(`[data-bar="${this.selection.bar}"][data-beat="${this.selection.beat}"][data-string="${this.selection.string}"]`);
+    if(!target)return;
+    const viewport=document.getElementById('scoreViewport'),r=target.getBoundingClientRect(),v=viewport.getBoundingClientRect();
+    let top=v.top+16,bottom=v.bottom-16;
+    for(const selector of ['header','.documentTools','#status','.navigator','.editDock','.rightDock']){
+      const el=document.querySelector(selector);if(!el?.getClientRects().length)continue;
+      const box=el.getBoundingClientRect();if(r.right<box.left||r.left>box.right)continue;
+      if(box.top<v.top+v.height/2)top=Math.max(top,box.bottom+12);else bottom=Math.min(bottom,box.top-12);
+    }
+    if(r.top<top||r.bottom>bottom)viewport.scrollBy({top:(r.top+r.bottom-top-bottom)/2});
+    if(r.left<v.left+12||r.right>v.right-12)viewport.scrollBy({left:(r.left+r.right-v.left-v.right)/2});
+  }
   play(){
     if(!this.ready)return false;this.configureOutput();this.pauseTick=null;this.wantsPlay=true;
     this.api.player?.output?.riffloopSetPlaybackAllowed?.(true);

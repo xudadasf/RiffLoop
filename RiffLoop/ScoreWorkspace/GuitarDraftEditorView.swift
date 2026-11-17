@@ -104,6 +104,11 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                 } catch { reply(["message": error.localizedDescription]) }
                 return
             }
+            if action == "activateAudio" {
+                do { try AVAudioSession.sharedInstance().setActive(true) }
+                catch { pause(); reply(["message": "暂时无法播放：\(error.localizedDescription)"]) }
+                return
+            }
             guard !working else { return }
             if action == "close" { close(); return }
             if action == "closeDirty" { closeDirty(); return }
