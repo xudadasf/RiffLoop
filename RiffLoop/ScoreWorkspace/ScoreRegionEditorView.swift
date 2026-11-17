@@ -531,20 +531,20 @@ struct ScoreRegionEditorView: View {
         let selected = model.selectedID == region.id
         let number = model.number(for: region.id) ?? 0
         let displayed = displayedRegion(region)
-        return Rectangle().fill(selected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.04))
+        return Button { chooseRegion(region.id, resize: false) } label: {
+            Rectangle().fill(selected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.04))
                 .overlay { Rectangle().stroke(selected ? Color.orange : Color.blue, lineWidth: selected ? 3 : 2) }
                 .overlay(alignment: .topLeading) {
                     Text("\(number)").font(.body.bold()).padding(4)
                         .foregroundStyle(.white).background(selected ? Color.orange : Color.blue)
                 }
                 .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
         .frame(width: size.width * displayed.width, height: size.height * displayed.height)
         .offset(x: size.width * displayed.x, y: size.height * displayed.y)
-        .gesture(TapGesture(count: 2).exclusively(before: TapGesture(count: 1)).onEnded { tap in
-            switch tap {
-            case .first: chooseRegion(region.id, resize: true)
-            case .second: chooseRegion(region.id, resize: false)
-            }
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            chooseRegion(region.id, resize: true)
         })
         .disabled(model.busy || model.hasPendingChange)
         .accessibilityElement(children: .ignore)
@@ -557,12 +557,16 @@ struct ScoreRegionEditorView: View {
     }
 
     private func chooseRegion(_ id: UUID, resize: Bool) {
-        editingInput = nil
+        // A normal Button selects immediately. Waiting for a double-tap failure
+        // let a late single-tap callback clear a newly focused number field.
+        if model.selectedID != id || resize { editingInput = nil }
         Task {
             await model.select(id)
             guard model.selectedID == id, !locked else { return }
-            resizingID = resize ? id : nil
-            resizeStart = nil; resizePreview = nil
+            if resize {
+                resizingID = id
+                resizeStart = nil; resizePreview = nil
+            }
         }
     }
 
@@ -611,7 +615,8 @@ struct ScoreRegionEditorView: View {
                     Button("恢复") { editingInput = nil; model.resetInputs() }
                         .disabled(!model.hasUnappliedInputs)
                     Button(resizingID == nil ? "调整区域" : "完成调整") {
-                        if let id = model.selectedID { chooseRegion(id, resize: resizingID == nil) }
+                        if resizingID != nil { resizingID = nil; resizeStart = nil; resizePreview = nil }
+                        else if let id = model.selectedID { chooseRegion(id, resize: true) }
                     }
                     .accessibilityIdentifier("region.resize")
                     Button("删除选中框", role: .destructive) {
