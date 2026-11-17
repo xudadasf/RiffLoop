@@ -226,7 +226,9 @@ jobs:
           mkdir -p TestArtifacts/PracticeScreenshots
           for result in DerivedData/Logs/Test/*.xcresult; do
             test -d "$result" || continue
-            xcrun xcresulttool export attachments --path "$result" --output-path TestArtifacts/PracticeScreenshots || true
+            destination="TestArtifacts/PracticeScreenshots/$(basename "$result" .xcresult)"
+            mkdir -p "$destination"
+            xcrun xcresulttool export attachments --path "$result" --output-path "$destination" || true
           done
 
       - name: Upload iPad mini screenshot and test result
