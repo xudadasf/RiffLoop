@@ -29,6 +29,8 @@ on:
       - "scripts/*release*"
       - "scripts/rerun-ci.ps1"
       - "scripts/sideload-install.ps1"
+      - "scripts/test-sideload-install.ps1"
+      - "scripts/test-reproduction-write-budget.swift"
       - ".github/workflows/ios-unsigned-ipa.yml"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
@@ -59,6 +61,8 @@ on:
       - "scripts/*release*"
       - "scripts/rerun-ci.ps1"
       - "scripts/sideload-install.ps1"
+      - "scripts/test-sideload-install.ps1"
+      - "scripts/test-reproduction-write-budget.swift"
       - ".github/workflows/ios-unsigned-ipa.yml"
       - ".xcode-version"
       - ".github/workflows/ios-ci.yml"
@@ -123,6 +127,7 @@ jobs:
       - name: Test release safety gates
         run: |
           pwsh -File scripts/test-release-workflow.ps1
+          pwsh -File scripts/test-sideload-install.ps1
           python3 scripts/test-verify-ipa.py
 
       - name: Prepare iPad mini simulator

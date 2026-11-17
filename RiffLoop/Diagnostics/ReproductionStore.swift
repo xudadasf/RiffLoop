@@ -11,6 +11,63 @@ struct ReproductionEvent: Codable {
     let state: [String: String]
 }
 
+/// Each append starts with a complete event, then stores only changed state fields.
+/// A missing/torn line invalidates dependent deltas until the next complete event.
+/// Incident archives and exported journals still contain full ReproductionEvents.
+enum ReproductionCheckpoint {
+    private struct Line: Codable {
+        let sequence: Int
+        let date: Date
+        let elapsed: Double
+        let kind: String
+        let name: String
+        let details: [String: String]
+        let state: [String: String]
+        let stateBaseSequence: Int?
+        let removedStateKeys: [String]?
+    }
+
+    static func encode(_ events: [ReproductionEvent]) throws -> Data {
+        var data = Data()
+        var previous: ReproductionEvent?
+        let encoder = JSONEncoder()
+        for event in events {
+            let changed = previous.map { old in event.state.filter { old.state[$0.key] != $0.value } } ?? event.state
+            let removed = previous.map { old in old.state.keys.filter { event.state[$0] == nil } }
+            let line = Line(sequence: event.sequence, date: event.date, elapsed: event.elapsed,
+                kind: event.kind, name: event.name, details: event.details, state: changed,
+                stateBaseSequence: previous?.sequence, removedStateKeys: removed?.isEmpty == false ? removed : nil)
+            data.append(try encoder.encode(line)); data.append(10)
+            previous = event
+        }
+        return data
+    }
+
+    static func decode(_ data: Data) -> (events: [ReproductionEvent], errors: Int) {
+        var events: [ReproductionEvent] = []
+        var previous: ReproductionEvent?
+        var errors = 0
+        for bytes in data.split(separator: 10) {
+            do {
+                let line = try JSONDecoder().decode(Line.self, from: Data(bytes))
+                var state = line.state
+                if let base = line.stateBaseSequence {
+                    guard let old = previous, old.sequence == base else {
+                        errors += 1; previous = nil; continue
+                    }
+                    state = old.state
+                    for key in line.removedStateKeys ?? [] { state.removeValue(forKey: key) }
+                    state.merge(line.state) { _, new in new }
+                }
+                let event = ReproductionEvent(sequence: line.sequence, date: line.date, elapsed: line.elapsed,
+                    kind: line.kind, name: line.name, details: line.details, state: state)
+                events.append(event); previous = event
+            } catch { errors += 1; previous = nil }
+        }
+        return (events, errors)
+    }
+}
+
 struct ReproductionMaterial: Codable {
     let id: String
     let name: String
@@ -86,10 +143,11 @@ final class ReproductionStore: @unchecked Sendable {
                     let checkpointDirectory = self.directory(previous.id)
                     let files = (try? FileManager.default.contentsOfDirectory(at: checkpointDirectory, includingPropertiesForKeys: nil)) ?? []
                     var events: [Int: ReproductionEvent] = [:]
+                    var recoveryErrors = 0
                     for file in files where file.lastPathComponent.hasPrefix("checkpoint") && file.pathExtension == "jsonl" {
-                        for line in (try? Data(contentsOf: file))?.split(separator: 10) ?? [] {
-                            if let event = try? JSONDecoder().decode(ReproductionEvent.self, from: Data(line)) { events[event.sequence] = event }
-                        }
+                        let decoded = ReproductionCheckpoint.decode((try? Data(contentsOf: file)) ?? Data())
+                        recoveryErrors += decoded.errors
+                        for event in decoded.events { events[event.sequence] = event }
                     }
                     var recoveredData = Data()
                     for event in events.values.sorted(by: { $0.sequence < $1.sequence }) {
@@ -99,6 +157,11 @@ final class ReproductionStore: @unchecked Sendable {
                         try recoveredData.write(to: checkpointDirectory.appendingPathComponent("events-recovered.jsonl"), options: .atomic)
                     }
                     var recovered = previous
+                    recovered.recordingErrors += recoveryErrors
+                    if let latest = events.values.max(by: { $0.sequence < $1.sequence }) {
+                        recovered.lastSequence = max(recovered.lastSequence, latest.sequence)
+                        recovered.lastState = latest.state
+                    }
                     recovered.incidents += 1
                     recovered.phase = "unfinished_unknown"
                     try JSONEncoder().encode(recovered).write(to: self.directory(previous.id).appendingPathComponent("manifest.json"), options: .atomic)
@@ -295,18 +358,16 @@ final class ReproductionStore: @unchecked Sendable {
         } else if uptime < recordingUntil {
             persistEvent(event)
         }
-        // Append only new steps every three seconds. Three rotating parts preserve
-        // the recent crash prelude without rewriting the entire 60-second buffer.
-        if kind == "incident" || kind == "lifecycle" || uptime - lastCheckpoint >= 3 {
+        // Normal activity is batched; lifecycle transitions/incidents still flush immediately.
+        // Delta states avoid re-writing all player settings with every position sample.
+        if kind == "incident" || kind == "lifecycle" || uptime - lastCheckpoint >= 15 {
             do {
                 let folder = directory(current.id)
                 let checkpoint = folder.appendingPathComponent("checkpoint.jsonl")
                 let previous = folder.appendingPathComponent("checkpoint-1.jsonl")
                 let older = folder.appendingPathComponent("checkpoint-2.jsonl")
-                var data = Data()
-                for item in buffer where item.event.sequence > max(lastCheckpointSequence, lastArchivedSequence) {
-                    data.append(try JSONEncoder().encode(item.event)); data.append(10)
-                }
+                let pending = buffer.filter { $0.event.sequence > max(lastCheckpointSequence, lastArchivedSequence) }.map(\.event)
+                let data = try ReproductionCheckpoint.encode(pending)
                 let bytes = (try? checkpoint.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 if kind == "incident" {
                     // These steps have just been archived with the incident.
@@ -437,6 +498,15 @@ final class ReproductionStore: @unchecked Sendable {
         let fm = FileManager.default
         defer { try? fm.removeItem(at: staging) }
         var manifest = try JSONDecoder().decode(ReproductionSession.self, from: Data(contentsOf: staging.appendingPathComponent("manifest.json")))
+        // Expand only the staging copies so external tools never mistake deltas for full state.
+        for file in try fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil)
+            where file.lastPathComponent.hasPrefix("checkpoint") && file.pathExtension == "jsonl" {
+            let decoded = ReproductionCheckpoint.decode(try Data(contentsOf: file))
+            manifest.recordingErrors += decoded.errors
+            var canonical = Data()
+            for event in decoded.events { canonical.append(try JSONEncoder().encode(event)); canonical.append(10) }
+            try canonical.write(to: file, options: .atomic)
+        }
         var events: [ReproductionEvent] = []
         for file in try fm.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil)
             where file.lastPathComponent.hasPrefix("events-") && file.pathExtension == "jsonl" {

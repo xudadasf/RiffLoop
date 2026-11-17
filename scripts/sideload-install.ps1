@@ -22,9 +22,19 @@ param(
     [string]$ExpectedRef = 'HEAD',
     [string]$ExpectedAppleId = '',
     [string]$ExpectedUdid = '',
+    [ValidateSet('Any', 'Network', 'USB')][string]$ConnectionType = 'Any',
     [int]$TimeoutMinutes = 20,
     [switch]$DryRun
 )
+
+function Test-SelectedAppleId([string]$Selected, [string]$Expected) {
+    $selectedId = $Selected.Trim() -replace '\s+\[\d+\s+App IDs? Remaining(?:,\s*updates\s+\d+[dhm])?\]$', ''
+    return $selectedId -eq $Expected.Trim()
+}
+
+function Test-SideloadInstallComplete([string]$Log) {
+    return $Log -match '(?m)^Installing(?:[ \t]+100%:[ \t]+Complete|:[ \t]+100%[ \t]+Complete)[ \t]*\r?$'
+}
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -55,16 +65,26 @@ $stderrLog = "$stdoutLog.err"
 #    the AppleMobileDeviceService session locked for a while, so settle first and
 #    retry the launch if the device never shows up.
 Get-Process -Name Sideloadly -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Host "等待 40 秒释放旧的设备连接…"
 Start-Sleep -Seconds 40
 $proc = Start-Process -FilePath $sideloadlyExe -ArgumentList "`"$IpaPath`"" -PassThru `
-    -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+    -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Hidden
+try {
 Write-Host "Sideloadly PID: $($proc.Id), log: $stdoutLog"
 
 function Wait-Until([scriptblock]$Condition, [string]$What) {
     $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
     while ((Get-Date) -lt $deadline) {
         if (& $Condition) { return $true }
+        $currentLog = Get-Content $stdoutLog -Raw -ErrorAction SilentlyContinue
+        if ($currentLog -match '(?im)^.*(ERROR:|Installation failed|Sideloading failed).*$') {
+            throw "Sideloadly 报告失败，请查看日志：$stdoutLog"
+        }
         if ($proc.HasExited) {
+            if ($proc.ExitCode -eq 0 -and $currentLog -match 'Update successful' -and
+                $currentLog -match 'Restarting') {
+                throw 'Sideloadly 已自动更新并重启，本次流程中断。请等待新窗口加载完成后重试一键续签。'
+            }
             $tail = Get-Content $stdoutLog -Tail 10 -ErrorAction SilentlyContinue
             throw "Sideloadly 提前退出（exit $($proc.ExitCode)）。日志末尾：`n$tail"
         }
@@ -106,24 +126,40 @@ function Find-DeviceName {
         Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ComboBox } |
         Select-Object -First 1
     if (-not $combo) { return $null }
+    function Test-TargetName([string]$Name) {
+        if (-not $Name -or $Name -eq '<no devices detected>') { return $false }
+        if ($ExpectedUdid -and $Name -notlike "*$ExpectedUdid*") { return $false }
+        $wireless = $Name -match '(?i)wi[ -]?fi|wireless|network|无线'
+        if ($ConnectionType -eq 'Network') { return $wireless }
+        if ($ConnectionType -eq 'USB') { return (-not $wireless) }
+        return $true
+    }
     try {
-        $value = $combo.GetCurrentPattern(
-            [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
-        if ($value -and $value -ne "<no devices detected>") { return $value }
+        $value = $combo.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        if (Test-TargetName $value) { return $value }
     } catch {}
-    $items = $combo.FindAll([System.Windows.Automation.TreeScope]::Descendants,
-        [System.Windows.Automation.Condition]::TrueCondition)
-    foreach ($it in $items) {
-        if ($it.Current.Name -and $it.Current.Name -ne "<no devices detected>") {
-            return $it.Current.Name
+    try {
+        $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+        $items = $combo.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.Condition]::TrueCondition)
+        foreach ($it in $items) {
+            if (Test-TargetName $it.Current.Name) {
+                try {
+                    $it.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+                    $value = $combo.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+                    if (Test-TargetName $value) { return $value }
+                } catch {}
+            }
         }
+    } catch {} finally {
+        try { $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse() } catch {}
     }
     return $null
 }
 
 $deviceName = $null
 $hintShown = $false
-$deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+$deadline = (Get-Date).AddSeconds(45)
 while ((Get-Date) -lt $deadline -and -not $deviceName) {
     $deviceName = Find-DeviceName
     if (-not $deviceName) {
@@ -134,7 +170,7 @@ while ((Get-Date) -lt $deadline -and -not $deviceName) {
         Start-Sleep -Seconds 10
     }
 }
-if (-not $deviceName) { throw "等待超时仍未检测到 iPad：请确认 USB 连接并在 iPad 上点「信任」后重试" }
+if (-not $deviceName) { throw "未能选择目标 iPad 的 $ConnectionType 连接，请检查配对、Wi-Fi 同步或 USB 数据线" }
 Write-Host "设备：$deviceName"
 if ($ExpectedUdid -and $deviceName -notlike "*$ExpectedUdid*") {
     throw 'Sideloadly 当前选择的设备与待续签 iPad 不一致；请在窗口选择正确设备后重试。'
@@ -161,7 +197,7 @@ if ($acct) {
     }
 }
 if (-not $acctOk) { throw "Sideloadly 没有记住的 Apple 账号，请先在 GUI 中登录一次" }
-if ($ExpectedAppleId -and $accountValue.Trim() -ne $ExpectedAppleId) {
+if ($ExpectedAppleId -and -not (Test-SelectedAppleId $accountValue $ExpectedAppleId)) {
     throw 'Sideloadly 当前选择的 Apple 账号与原安装账号不一致；请在窗口选择原账号后重试。'
 }
 Write-Host "Apple 账号已记住"
@@ -179,13 +215,12 @@ $start.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Inv
 Write-Host "已点击 Start，等待安装完成…"
 
 $null = Wait-Until {
-    (Get-Content $stdoutLog -ErrorAction SilentlyContinue) -match "Installing 100%: Complete|Done work"
+    Test-SideloadInstallComplete (Get-Content $stdoutLog -Raw -ErrorAction SilentlyContinue)
 } "安装完成"
 $log = Get-Content $stdoutLog -Raw
-if ($log -notmatch "Installing 100%: Complete") { throw "安装未确认完成，请查看日志：$stdoutLog" }
 if ($log -notmatch "will mangle bundleID") { throw "未确认自动 Bundle ID，请不要启动应用并检查 Sideloadly 设置" }
 if ($log -notmatch "App successfully prepared for auto-refresh") { throw "未确认 Automatic Refresh 已登记" }
-Write-Host "安装完成：Installing 100%: Complete"
+Write-Host "安装完成：Sideloadly 已确认安装完成。"
 
 # 7. Verify the daemon registered the install for auto-refresh.
 Start-Sleep -Seconds 5
@@ -207,3 +242,11 @@ print(json.dumps(dict(r), ensure_ascii=False, default=str))
 $verify = python $pyScript $dbCopy
 Write-Host "数据库最新记录：$verify"
 Write-Host "完成。若 Apple 弹出登录/验证窗口，请由用户在窗口中完成。"
+
+} catch {
+    # Do not leave a wireless attempt running while the caller falls back to USB.
+    if ($proc -and -not $proc.HasExited) {
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw
+}

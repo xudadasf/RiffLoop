@@ -12,7 +12,7 @@ final class ReproductionStoreTests: XCTestCase {
     private func events(_ root: URL, _ id: String) throws -> [ReproductionEvent] {
         try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent(id), includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "jsonl" }
-            .flatMap { try Data(contentsOf: $0).split(separator: 10).map { try JSONDecoder().decode(ReproductionEvent.self, from: Data($0)) } }
+            .flatMap { ReproductionCheckpoint.decode(try Data(contentsOf: $0)).events }
             .sorted { $0.sequence < $1.sequence }
     }
 
@@ -179,6 +179,55 @@ final class ReproductionStoreTests: XCTestCase {
         XCTAssertEqual(index.count, 64)
         XCTAssertEqual(index.last?.details["step"], "79")
         XCTAssertLessThanOrEqual(indexData.count, 128_000)
+    }
+
+    func testCompactCheckpointRecoversExactStateAcrossBlocksAndLegacyLines() throws {
+        let first = ReproductionEvent(sequence: 1, date: Date(), elapsed: 0, kind: "action", name: "open",
+            details: ["file": "synthetic.gp"], state: ["tempo": "100", "position": "1", "removed": "yes"])
+        let second = ReproductionEvent(sequence: 2, date: first.date, elapsed: 1, kind: "sample", name: "position",
+            details: [:], state: ["tempo": "100", "position": "2"])
+        let third = ReproductionEvent(sequence: 3, date: first.date, elapsed: 2, kind: "action", name: "pause",
+            details: [:], state: ["tempo": "80", "position": "2", "playing": "false"])
+        var bytes = try JSONEncoder().encode(first); bytes.append(10) // pre-upgrade format
+        bytes.append(try ReproductionCheckpoint.encode([second, third]))
+        let decoded = ReproductionCheckpoint.decode(bytes)
+        XCTAssertEqual(decoded.errors, 0)
+        XCTAssertEqual(decoded.events.map(\.state), [first.state, second.state, third.state])
+        XCTAssertEqual(decoded.events.map(\.sequence), [1, 2, 3])
+    }
+
+    func testDamagedCheckpointDoesNotInventStateAndNextAppendCanRecover() throws {
+        let original = ReproductionEvent(sequence: 1, date: Date(), elapsed: 0, kind: "action", name: "open", details: [:], state: ["tempo": "100"])
+        let next = ReproductionEvent(sequence: 2, date: original.date, elapsed: 1, kind: "action", name: "seek", details: ["tick": "4"], state: ["tempo": "100", "tick": "4"])
+        let encoded = try ReproductionCheckpoint.encode([original, next])
+        let lines = encoded.split(separator: 10)
+        var damaged = Data("torn-line\n".utf8); damaged.append(contentsOf: lines[1]); damaged.append(10)
+        damaged.append(try ReproductionCheckpoint.encode([next]))
+        let recovered = ReproductionCheckpoint.decode(damaged)
+        XCTAssertEqual(recovered.errors, 2)
+        XCTAssertEqual(recovered.events.count, 1)
+        XCTAssertEqual(recovered.events.first?.state, next.state)
+        XCTAssertEqual(recovered.events.first?.details, next.details)
+    }
+
+    func testRelaunchExpandsDeltaCheckpointIntoFullReplayState() async throws {
+        let root = try root()
+        let store = ReproductionStore(root: root)
+        store.start(environment: [:]); store.phase("active")
+        store.update(["tempo": "100", "file": "synthetic.gp"])
+        store.record("action", "play")
+        store.update(["tempo": "80", "position": "123"])
+        store.record("action", "seek", ["tick": "123"])
+        store.phase("active") // immediate flush despite normal batching
+        let before = await store.sessions()
+        let id = try XCTUnwrap(before.first?.id)
+        let next = ReproductionStore(root: root); next.start(environment: [:])
+        _ = await next.sessions()
+        let data = try Data(contentsOf: root.appendingPathComponent(id).appendingPathComponent("events-recovered.jsonl"))
+        let recovered = try data.split(separator: 10).map { try JSONDecoder().decode(ReproductionEvent.self, from: Data($0)) }
+        let seek = try XCTUnwrap(recovered.first { $0.name == "seek" })
+        XCTAssertEqual(seek.state, ["tempo": "80", "file": "synthetic.gp", "position": "123"])
+        XCTAssertEqual(seek.details["tick"], "123")
     }
 
 }
