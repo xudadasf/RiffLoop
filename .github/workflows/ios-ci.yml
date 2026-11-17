@@ -171,6 +171,18 @@ jobs:
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
             xcrun simctl bootstatus "$DEVICE_ID" -b
 
+      - name: Test region selection on iPad mini
+        run: >-
+          xcodebuild test
+          -project RiffLoop.xcodeproj
+          -scheme RiffLoop
+          -sdk iphonesimulator
+          -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
+          -derivedDataPath DerivedData
+          -only-testing:RiffLoopTests/ScoreRegionLayoutTests
+          -only-testing:RiffLoopUITests
+          CODE_SIGNING_ALLOWED=NO
+
       - name: Build and run unit tests on iPad mini
         run: >-
           xcodebuild test
@@ -179,6 +191,8 @@ jobs:
           -sdk iphonesimulator
           -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
           -derivedDataPath DerivedData
+          -skip-testing:RiffLoopUITests
+          -skip-testing:RiffLoopTests/ScoreRegionLayoutTests
           ${{ inputs.run_vision_comparison != true && '-skip-testing:RiffLoopTests/SyntheticVisionTabPreprocessingBenchmarkTests/testIndependentSyntheticVisionPreprocessingComparison' || '' }}
           CODE_SIGNING_ALLOWED=NO
 

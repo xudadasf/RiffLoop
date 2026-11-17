@@ -107,13 +107,20 @@ final class ScoreRegionEditorModel: ObservableObject {
     @Published private(set) var pageCount = 0
     @Published private(set) var busy = false
     @Published private(set) var hasPendingChange = false
+    @Published private(set) var selectedID: UUID?
+    @Published private(set) var snapshot: ScoreRegionsSnapshot?
+    @Published var numberInput = ""
+    @Published var gapInput = ""
     @Published var message: String?
 
-    private let source: URL
+    let source: URL
     private let store: ScoreRegionsStore
     private let renderer: @Sendable (URL, Int) -> ScorePagePreview
     private var orientation = 0
-    private enum Change { case add(ScoreRegion), remove(ScoreRegion) }
+    private enum Change {
+        case add(ScoreRegion), remove(ScoreRegion)
+        case layout(ScoreRegionLocation, number: Int, gapAfter: Int)
+    }
     private var pendingChange: Change?
 
     init(source: URL, store: ScoreRegionsStore? = nil,
@@ -128,15 +135,63 @@ final class ScoreRegionEditorModel: ObservableObject {
         return nil
     }
 
+    var totalRegions: Int { snapshot?.layout.count ?? 0 }
+    var hasUnappliedInputs: Bool {
+        guard let selectedID else { return false }
+        return numberInput != String(number(for: selectedID) ?? 0) || gapInput != String(gap(for: selectedID))
+    }
+    private func location(_ id: UUID) -> ScoreRegionLocation {
+        ScoreRegionLocation(pageIndex: pageIndex, rotation: orientation, regionID: id)
+    }
+    func number(for id: UUID) -> Int? { snapshot?.number(for: location(id)) }
+    func gap(for id: UUID) -> Int { snapshot?.layout.first { $0.location == location(id) }?.gapAfter ?? 1 }
+
+    func select(_ id: UUID) {
+        guard !busy, !hasPendingChange, regions.contains(where: { $0.id == id }) else { return }
+        guard !hasUnappliedInputs else { message = "请先应用或恢复当前框的编号和间隔。"; return }
+        selectedID = id
+        resetInputs()
+    }
+
+    func resetInputs() {
+        numberInput = selectedID.flatMap { number(for: $0) }.map(String.init) ?? ""
+        gapInput = selectedID.map { String(gap(for: $0)) } ?? ""
+    }
+
+    func applyInputs() async {
+        guard !busy, !hasPendingChange, let selectedID, let snapshot else { return }
+        guard let number = Int(numberInput.trimmingCharacters(in: .whitespacesAndNewlines)),
+              (1...max(1, totalRegions)).contains(number),
+              let gap = Int(gapInput.trimmingCharacters(in: .whitespacesAndNewlines)), (0...99).contains(gap) else {
+            message = "编号请输入 1 到 \(totalRegions)；后接空白小节请输入 0 到 99，0 表示连续。"
+            return
+        }
+        await save(.layout(location(selectedID), number: number, gapAfter: gap), basedOn: snapshot)
+    }
+
+    func makePlan() async -> ScoreSequencePlan? {
+        guard !busy, !hasPendingChange, !hasUnappliedInputs else { return nil }
+        busy = true
+        defer { busy = false }
+        do {
+            let latest = try await store.snapshot()
+            refresh(from: latest)
+            return try ScoreSequenceFactory.makePlan(from: [(source, latest)])
+        } catch {
+            message = "无法继续识别：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
     func open() async {
-        guard !busy, !hasPendingChange else { return }
+        guard !busy, !hasPendingChange, !hasUnappliedInputs else { return }
         busy = true
         defer { busy = false }
         await showPage(0)
     }
 
     func changePage(_ index: Int) async {
-        guard !busy, !hasPendingChange, index >= 0, index < pageCount else { return }
+        guard !busy, !hasPendingChange, !hasUnappliedInputs, index >= 0, index < pageCount else { return }
         busy = true
         defer { busy = false }
         await showPage(index)
@@ -146,6 +201,9 @@ final class ScoreRegionEditorModel: ObservableObject {
         // Clear first so a failed page never keeps another page's editable image.
         image = nil
         regions = []
+        selectedID = nil
+        snapshot = nil
+        resetInputs()
         pageIndex = index
         do {
             try await store.bindSource()
@@ -166,7 +224,7 @@ final class ScoreRegionEditorModel: ObservableObject {
         }
         orientation = preview.orientation
         do {
-            regions = try await store.loadPage(index: index, rotation: orientation)
+            refresh(from: try await store.snapshot())
             image = renderedImage
         } catch {
             image = nil
@@ -175,38 +233,51 @@ final class ScoreRegionEditorModel: ObservableObject {
     }
 
     func addRegion(_ region: ScoreRegion, onPage index: Int) async {
-        guard !busy, !hasPendingChange else { message = "请先处理尚未保存的区域。"; return }
-        guard pageIndex == index, image != nil, region.isValid else {
+        guard !busy, !hasPendingChange, !hasUnappliedInputs else { message = "请先处理尚未保存的区域或输入。"; return }
+        guard pageIndex == index, image != nil, region.isValid, let snapshot else {
             message = "页面已变化或区域无效，请重新画框。"
             return
         }
-        await save(.add(region), basedOn: regions)
+        await save(.add(region), basedOn: snapshot)
     }
 
     func removeRegion(_ id: UUID) async {
-        guard !busy, !hasPendingChange, image != nil,
+        guard !busy, !hasPendingChange, !hasUnappliedInputs, image != nil, let snapshot,
               let region = regions.first(where: { $0.id == id }) else { return }
-        await save(.remove(region), basedOn: regions)
+        await save(.remove(region), basedOn: snapshot)
     }
 
-    private func save(_ change: Change, basedOn current: [ScoreRegion]) async {
+    private func refresh(from snapshot: ScoreRegionsSnapshot) {
+        self.snapshot = snapshot
+        regions = snapshot.pages.first { $0.index == pageIndex && $0.rotation == orientation }?.regions ?? []
+        if let selectedID, !regions.contains(where: { $0.id == selectedID }) { self.selectedID = nil }
+        resetInputs()
+    }
+
+    private func save(_ change: Change, basedOn base: ScoreRegionsSnapshot) async {
         busy = true
         defer { busy = false }
         do {
-            let updated: [ScoreRegion]
+            let current = base.pages.first { $0.index == pageIndex && $0.rotation == orientation }?.regions ?? []
+            let saved: ScoreRegionsSnapshot
             switch change {
             case let .add(region):
                 guard !current.contains(where: { $0.id == region.id }) else { throw ScoreRegionsError.conflict }
-                updated = current + [region]
+                saved = try await store.savePage(index: pageIndex, rotation: orientation,
+                                                regions: current + [region], replacing: current)
+                selectedID = region.id
             case let .remove(region):
                 guard let existing = current.first(where: { $0.id == region.id }) else {
                     throw ScoreRegionsError.conflict
                 }
                 guard existing == region else { throw ScoreRegionsError.conflict }
-                updated = current.filter { $0.id != region.id }
+                saved = try await store.savePage(index: pageIndex, rotation: orientation,
+                                                regions: current.filter { $0.id != region.id }, replacing: current)
+            case let .layout(location, number, gap):
+                let updated = try base.changing(location, number: number, gapAfter: gap)
+                saved = try await store.saveLayout(updated, replacing: base)
             }
-            try await store.savePage(index: pageIndex, rotation: orientation, regions: updated, replacing: current)
-            regions = updated
+            refresh(from: saved)
             pendingChange = nil
             hasPendingChange = false
         } catch {
@@ -220,7 +291,7 @@ final class ScoreRegionEditorModel: ObservableObject {
         guard !busy, let change = pendingChange else { return }
         busy = true
         do {
-            let latest = try await store.loadPage(index: pageIndex, rotation: orientation)
+            let latest = try await store.snapshot()
             busy = false
             await save(change, basedOn: latest)
         } catch {
@@ -234,7 +305,7 @@ final class ScoreRegionEditorModel: ObservableObject {
         busy = true
         defer { busy = false }
         do {
-            regions = try await store.loadPage(index: pageIndex, rotation: orientation)
+            refresh(from: try await store.snapshot())
             pendingChange = nil
             hasPendingChange = false
         } catch {
@@ -244,7 +315,7 @@ final class ScoreRegionEditorModel: ObservableObject {
 
 }
 
-/// Manual region selection only. Recognition and ordering are not implemented here.
+/// Select and configure saved regions before handing them to the recognition plan.
 struct ScoreRegionEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var externalOpen: ScoreExternalOpenCoordinator
@@ -253,8 +324,15 @@ struct ScoreRegionEditorView: View {
     @State private var drawing = false
     @State private var dragStart: CGPoint?
     @State private var dragEnd: CGPoint?
-    @State private var regionPendingDeletion: UUID?
-    @State private var confirmDiscard = false
+    private enum Dialog { case delete(UUID), discard, message(String) }
+    @State private var dialog: Dialog?
+    @State private var showDialog = false
+    @State private var nextPlan: ScoreSequencePlan?
+    @State private var nextPlanID = UUID()
+    private enum InputField: Hashable { case number, gap }
+    @FocusState private var editingInput: InputField?
+
+    private var locked: Bool { model.busy || model.hasPendingChange || model.hasUnappliedInputs }
 
     init(source: URL, store: ScoreRegionsStore? = nil) {
         _model = StateObject(wrappedValue: ScoreRegionEditorModel(source: source, store: store))
@@ -264,18 +342,19 @@ struct ScoreRegionEditorView: View {
         VStack(spacing: 8) {
             HStack {
                 Button("上一页") { Task { await model.changePage(model.pageIndex - 1) } }
-                    .disabled(model.busy || model.hasPendingChange || model.pageIndex <= 0)
+                    .disabled(locked || model.pageIndex <= 0)
                 Text("\(model.pageCount == 0 ? 0 : model.pageIndex + 1) / \(model.pageCount)")
                 Button("下一页") { Task { await model.changePage(model.pageIndex + 1) } }
-                    .disabled(model.busy || model.hasPendingChange || model.pageIndex + 1 >= model.pageCount)
+                    .disabled(locked || model.pageIndex + 1 >= model.pageCount)
                 Spacer()
                 Button("缩小") { zoom = max(1, zoom / 1.25) }.disabled(zoom <= 1)
                 Text("\(Int(zoom * 100))%")
                 Button("放大") { zoom = min(4, zoom * 1.25) }.disabled(zoom >= 4)
-                Toggle("画框", isOn: $drawing).fixedSize().disabled(model.image == nil || model.busy || model.hasPendingChange)
+                Toggle("画框", isOn: $drawing).fixedSize().disabled(model.image == nil || locked)
+                    .accessibilityIdentifier("region.drawing")
             }
             .padding(.horizontal)
-            Text("打开画框后拖动画出区域；关闭画框可滚动。区域仅用于保存，自动识别尚未完成。")
+            Text("点击方框选中；打开画框后拖动新增，关闭后可滚动。按编号连接，改号后其他框自动顺延。")
                 .font(.caption).foregroundStyle(.secondary)
             if !externalOpen.pending.isEmpty {
                 HStack {
@@ -284,7 +363,7 @@ struct ScoreRegionEditorView: View {
                         externalOpen.endRegionEditing()
                         externalOpen.openNext()
                     }
-                    .disabled(model.busy || model.hasPendingChange || dragStart != nil)
+                    .disabled(locked || dragStart != nil)
                 }
             }
             if model.hasPendingChange {
@@ -301,46 +380,31 @@ struct ScoreRegionEditorView: View {
                     ScrollView([.horizontal, .vertical]) {
                         ZStack(alignment: .topLeading) {
                             Image(uiImage: image).resizable().frame(width: size.width, height: size.height)
-                            ForEach(Array(model.regions.enumerated()), id: \.element.id) { index, region in
-                                Rectangle().stroke(.blue, lineWidth: 2)
-                                    .frame(width: size.width * region.width, height: size.height * region.height)
-                                    .overlay(alignment: .topLeading) {
-                                        Text("\(index + 1)")
-                                            .font(.caption.bold())
-                                            .padding(3)
-                                            .foregroundStyle(.white)
-                                            .background(.blue)
-                                    }
-                                    .offset(x: size.width * region.x, y: size.height * region.y)
+                            ForEach(model.regions) { region in
+                                regionButton(region, size: size)
                             }
                             if let region = model.pendingAddedRegion {
                                 Rectangle().stroke(.orange, lineWidth: 3)
                                     .frame(width: size.width * region.width, height: size.height * region.height)
                                     .offset(x: size.width * region.x, y: size.height * region.y)
+                                    .allowsHitTesting(false)
                             }
                             if let rect = dragRectangle(size: size) {
                                 Rectangle().stroke(.orange, lineWidth: 2)
                                     .frame(width: rect.width, height: rect.height)
                                     .offset(x: rect.minX, y: rect.minY)
+                                    .allowsHitTesting(false)
                             }
                         }
                         .frame(width: size.width, height: size.height)
                         .contentShape(Rectangle())
-                        .gesture(drawing && !model.busy && !model.hasPendingChange ? drawGesture(size: size) : nil)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("region.canvas")
+                        .simultaneousGesture(drawing && !locked ? drawGesture(size: size) : nil)
                     }
                     .scrollDisabled(drawing && !model.hasPendingChange)
                 }
-                if !model.regions.isEmpty {
-                    ScrollView(.horizontal) {
-                        HStack {
-                            ForEach(Array(model.regions.enumerated()), id: \.element.id) { index, region in
-                                Button("删除区域 \(index + 1)", role: .destructive) {
-                                    regionPendingDeletion = region.id
-                                }.disabled(model.busy || model.hasPendingChange)
-                            }
-                        }.padding(.horizontal)
-                    }
-                }
+                selectedRegionControls
             } else {
                 Spacer()
                 Text("此页面暂无可框选的预览。")
@@ -353,38 +417,126 @@ struct ScoreRegionEditorView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("返回") {
-                    if model.hasPendingChange { confirmDiscard = true } else { leaveEditor() }
+                    if model.hasPendingChange || model.hasUnappliedInputs { present(.discard) } else { leaveEditor() }
                 }.disabled(model.busy)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("下一步：识别设置") {
+                    editingInput = nil
+                    Task {
+                        if let plan = await model.makePlan() { nextPlanID = UUID(); nextPlan = plan }
+                    }
+                }
+                .accessibilityIdentifier("region.next")
+                .disabled(locked || model.totalRegions == 0 || dragStart != nil)
             }
         }
         .onAppear { externalOpen.beginRegionEditing() }
         .onDisappear { externalOpen.endRegionEditing() }
-        .task { await model.open() }
+        .task { if model.image == nil { await model.open() } }
         .onChange(of: model.busy) { _, busy in
             if busy { dragStart = nil; dragEnd = nil }
         }
-        .confirmationDialog("删除这个区域？", isPresented: Binding(
-            get: { regionPendingDeletion != nil },
-            set: { if !$0 { regionPendingDeletion = nil } }
-        ), titleVisibility: .visible) {
-            if let id = regionPendingDeletion {
+        .onChange(of: model.message) { _, value in
+            if let value { present(.message(value)); model.message = nil }
+        }
+        .alert(dialogTitle, isPresented: $showDialog, presenting: dialog) { target in
+            switch target {
+            case let .delete(id):
                 Button("删除区域", role: .destructive) {
                     Task { await model.removeRegion(id) }
-                    regionPendingDeletion = nil
                 }
+                .accessibilityIdentifier("region.confirmDelete")
+                Button("取消", role: .cancel) { }
+            case .discard:
+                Button("放弃并返回", role: .destructive) { leaveEditor() }
+                Button("继续处理", role: .cancel) { }
+            case .message:
+                Button("好", role: .cancel) { }
             }
-            Button("取消", role: .cancel) { regionPendingDeletion = nil }
-        } message: {
-            Text("删除后需要重新画框。")
+        } message: { target in
+            switch target {
+            case .delete: Text("仅删除选中的框，其余框自动重新编号；素材图片不变。")
+            case .discard: Text("尚未应用或保存的修改将被放弃。")
+            case let .message(text): Text(text)
+            }
         }
-        .confirmationDialog("放弃未保存的区域操作？", isPresented: $confirmDiscard, titleVisibility: .visible) {
-            Button("放弃并返回", role: .destructive) { leaveEditor() }
-            Button("继续处理", role: .cancel) { }
+        .navigationDestination(isPresented: Binding(
+            get: { nextPlan != nil }, set: { if !$0 { nextPlan = nil } }
+        )) {
+            if let plan = nextPlan {
+                ScoreSequenceEditorView(plan: plan, isSaved: false,
+                    pageNumbers: Dictionary(uniqueKeysWithValues: plan.entries.map { ($0.reference, $0.number) }),
+                    materialURLs: [model.source.lastPathComponent: model.source]) { updated in
+                        try await ScoreSequenceStore(id: nextPlanID).save(updated)
+                    }
+            }
         }
-        .alert("手动框选", isPresented: Binding(
-            get: { model.message != nil },
-            set: { if !$0 { model.message = nil } }
-        )) { Button("好") { model.message = nil } } message: { Text(model.message ?? "") }
+    }
+
+    private var dialogTitle: String {
+        switch dialog {
+        case let .delete(id): "删除方框 \(model.number(for: id) ?? 0)？"
+        case .discard: "放弃未保存的修改？"
+        default: "手动框选"
+        }
+    }
+
+    private func present(_ value: Dialog) { editingInput = nil; dialog = value; showDialog = true }
+
+    private func regionButton(_ region: ScoreRegion, size: CGSize) -> some View {
+        let selected = model.selectedID == region.id
+        let number = model.number(for: region.id) ?? 0
+        return Button { editingInput = nil; model.select(region.id) } label: {
+            Rectangle().fill(selected ? Color.orange.opacity(0.16) : Color.blue.opacity(0.04))
+                .overlay { Rectangle().stroke(selected ? Color.orange : Color.blue, lineWidth: selected ? 3 : 2) }
+                .overlay(alignment: .topLeading) {
+                    Text("\(number)").font(.body.bold()).padding(4)
+                        .foregroundStyle(.white).background(selected ? Color.orange : Color.blue)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(width: size.width * region.width, height: size.height * region.height)
+        .offset(x: size.width * region.x, y: size.height * region.y)
+        .disabled(model.busy || model.hasPendingChange)
+        .accessibilityLabel("方框 \(number)")
+        .accessibilityValue(selected ? "已选中，后接 \(model.gap(for: region.id)) 个空白小节" : "未选中")
+        .accessibilityIdentifier("region-\(region.id.uuidString)")
+    }
+
+    private var selectedRegionControls: some View {
+        VStack(spacing: 4) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 12) {
+                    Text(model.selectedID == nil ? "请先点击一个框" : "编号")
+                    TextField("编号", text: $model.numberInput)
+                        .frame(width: 58, height: 44).focused($editingInput, equals: .number).accessibilityIdentifier("region.number")
+                    Text("后接空白小节")
+                    TextField("间隔", text: $model.gapInput)
+                        .frame(width: 58, height: 44).focused($editingInput, equals: .gap).accessibilityIdentifier("region.gap")
+                    Button("应用") { editingInput = nil; Task { await model.applyInputs() } }
+                        .accessibilityIdentifier("region.apply")
+                        .disabled(!model.hasUnappliedInputs)
+                    Button("恢复") { editingInput = nil; model.resetInputs() }
+                        .disabled(!model.hasUnappliedInputs)
+                    Button("删除选中框", role: .destructive) {
+                        if let id = model.selectedID { present(.delete(id)) }
+                    }
+                    .accessibilityIdentifier("region.delete")
+                    .disabled(model.hasUnappliedInputs)
+                }
+                .textFieldStyle(.roundedBorder).keyboardType(.numberPad)
+                .buttonStyle(.bordered).controlSize(.large)
+                .disabled(model.selectedID == nil || model.busy || model.hasPendingChange)
+                .padding(.horizontal)
+            }
+            .frame(height: 60)
+            Text("共 \(model.totalRegions) 个框 · 间隔 0 表示连续；最后一个框不追加空白小节。修改后点“应用”。")
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("region.help")
+        }
+        .padding(.bottom, 8)
     }
 
     private func leaveEditor() {
@@ -393,7 +545,7 @@ struct ScoreRegionEditorView: View {
     }
 
     private func drawGesture(size: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 3, coordinateSpace: .local)
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .onChanged { value in dragStart = value.startLocation; dragEnd = value.location }
             .onEnded { _ in
                 defer { dragStart = nil; dragEnd = nil }

@@ -34,6 +34,35 @@ struct ScoreRegionsPage: Codable, Equatable {
 struct ScoreRegionsSnapshot: Equatable {
     let sourceDigest: String
     let pages: [ScoreRegionsPage]
+    /// Array position is the displayed number, shared by every page of this material.
+    let layout: [ScoreRegionLayoutEntry]
+
+    func number(for location: ScoreRegionLocation) -> Int? {
+        layout.firstIndex { $0.location == location }.map { $0 + 1 }
+    }
+
+    func changing(_ location: ScoreRegionLocation, number: Int, gapAfter: Int) throws -> [ScoreRegionLayoutEntry] {
+        guard (1...max(1, layout.count)).contains(number), (0...99).contains(gapAfter),
+              let index = layout.firstIndex(where: { $0.location == location }) else {
+            throw ScoreRegionsError.invalidPage
+        }
+        var updated = layout
+        updated.remove(at: index)
+        updated.insert(ScoreRegionLayoutEntry(location: location, gapAfter: gapAfter), at: number - 1)
+        return updated
+    }
+}
+
+/// A UUID may occur on another PDF page in legacy documents.
+struct ScoreRegionLocation: Codable, Equatable, Hashable {
+    let pageIndex: Int
+    let rotation: Int
+    let regionID: UUID
+}
+
+struct ScoreRegionLayoutEntry: Codable, Equatable {
+    let location: ScoreRegionLocation
+    var gapAfter: Int
 }
 
 struct ScoreRegionsRemoval {
@@ -47,6 +76,21 @@ private struct ScoreRegionsDocument: Codable {
     let version: Int
     let sourceDigest: String
     var pages: [ScoreRegionsPage]
+    var layout: [ScoreRegionLayoutEntry]? = nil
+
+    var defaultLayout: [ScoreRegionLayoutEntry] {
+        pages.sorted { $0.index < $1.index }.flatMap { page in
+            page.regions.map {
+                ScoreRegionLayoutEntry(location: ScoreRegionLocation(pageIndex: page.index,
+                    rotation: page.rotation, regionID: $0.id), gapAfter: 1)
+            }
+        }
+    }
+
+    var snapshot: ScoreRegionsSnapshot {
+        ScoreRegionsSnapshot(sourceDigest: sourceDigest, pages: pages.sorted { $0.index < $1.index },
+                             layout: layout ?? defaultLayout)
+    }
 }
 
 enum ScoreRegionsError: LocalizedError {
@@ -93,22 +137,20 @@ actor ScoreRegionsStore {
         try ScoreMaterialAccess.synchronized { _ = try readDocument() }
     }
 
-    /// Returns a validated view in page order, preserving each page's box order.
+    /// Old documents retain page/drawing order and the original one-measure gap.
     func snapshot() throws -> ScoreRegionsSnapshot {
         try ScoreMaterialAccess.synchronized {
             let document = try readDocument()
-            return ScoreRegionsSnapshot(
-                sourceDigest: document.sourceDigest,
-                pages: document.pages.sorted { $0.index < $1.index }
-            )
+            return document.snapshot
         }
     }
 
-    func savePage(index: Int, rotation: Int, regions: [ScoreRegion], replacing expected: [ScoreRegion]? = nil) throws {
+    @discardableResult
+    func savePage(index: Int, rotation: Int, regions: [ScoreRegion], replacing expected: [ScoreRegion]? = nil) throws -> ScoreRegionsSnapshot {
         guard index >= 0, regions.allSatisfy(\.isValid), Set(regions.map(\.id)).count == regions.count else {
             throw ScoreRegionsError.invalidPage
         }
-        try ScoreMaterialAccess.synchronized {
+        return try ScoreMaterialAccess.synchronized {
             var doc = try readDocument()
             if let expected {
                 let current = doc.pages.first { $0.index == index }
@@ -117,10 +159,39 @@ actor ScoreRegionsStore {
             }
             doc.pages.removeAll { $0.index == index }
             doc.pages.append(ScoreRegionsPage(index: index, rotation: rotation, regions: regions))
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(doc)
-            try data.write(to: metadataURL(for: doc.sourceDigest), options: [.atomic])
+            if let layout = doc.layout {
+                let valid = Set(doc.defaultLayout.map(\.location))
+                let retained = layout.filter { valid.contains($0.location) }
+                let known = Set(retained.map(\.location))
+                doc.layout = retained + doc.defaultLayout.filter { !known.contains($0.location) }
+            }
+            try write(doc)
+            return doc.snapshot
         }
+    }
+
+    @discardableResult
+    func saveLayout(_ layout: [ScoreRegionLayoutEntry], replacing expected: ScoreRegionsSnapshot) throws -> ScoreRegionsSnapshot {
+        try ScoreMaterialAccess.synchronized {
+            var doc = try readDocument()
+            guard doc.snapshot == expected else { throw ScoreRegionsError.conflict }
+            guard Self.validLayout(layout, for: doc) else { throw ScoreRegionsError.invalidPage }
+            doc.layout = layout
+            try write(doc)
+            return doc.snapshot
+        }
+    }
+
+    private func write(_ document: ScoreRegionsDocument) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try JSONEncoder().encode(document).write(to: metadataURL(for: document.sourceDigest), options: [.atomic])
+    }
+
+    private static func validLayout(_ layout: [ScoreRegionLayoutEntry], for document: ScoreRegionsDocument) -> Bool {
+        let locations = layout.map(\.location)
+        return Set(locations).count == locations.count &&
+            Set(locations) == Set(document.defaultLayout.map(\.location)) &&
+            layout.allSatisfy { (0...99).contains($0.gapAfter) }
     }
 
     /// Call before deleting the source, while its content is still readable.
@@ -180,6 +251,9 @@ actor ScoreRegionsStore {
                       Set(page.regions.map(\.id)).count == page.regions.count
               }),
               Set(doc.pages.map(\.index)).count == doc.pages.count else {
+            throw ScoreRegionsError.invalidStoredData
+        }
+        if let layout = doc.layout, !Self.validLayout(layout, for: doc) {
             throw ScoreRegionsError.invalidStoredData
         }
         return doc

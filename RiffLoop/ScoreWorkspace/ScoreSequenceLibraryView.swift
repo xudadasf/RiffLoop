@@ -21,29 +21,39 @@ enum ScoreSequenceCreationError: LocalizedError {
 enum ScoreSequenceFactory {
     static func makePlan(from sources: [URL], regionsFolder: URL? = nil) async throws -> ScoreSequencePlan {
         guard !sources.isEmpty else { throw ScoreSequenceCreationError.noMaterials }
-        var materials: [ScoreSequenceMaterial] = []
-        var references: [ScoreSequenceRegionReference] = []
-        var missing: [String] = []
+        var saved: [(source: URL, snapshot: ScoreRegionsSnapshot)] = []
         for source in sources {
-            let snapshot: ScoreRegionsSnapshot
             do {
-                snapshot = try await ScoreRegionsStore(source: source, folder: regionsFolder).snapshot()
+                let snapshot = try await ScoreRegionsStore(source: source, folder: regionsFolder).snapshot()
+                saved.append((source, snapshot))
             } catch {
                 throw ScoreSequenceCreationError.unreadableMaterial(source.lastPathComponent, error.localizedDescription)
             }
+        }
+        return try makePlan(from: saved)
+    }
+
+    static func makePlan(from sources: [(source: URL, snapshot: ScoreRegionsSnapshot)]) throws -> ScoreSequencePlan {
+        guard !sources.isEmpty else { throw ScoreSequenceCreationError.noMaterials }
+        var materials: [ScoreSequenceMaterial] = []
+        var references: [ScoreSequenceRegionReference] = []
+        var gaps: [Int] = []
+        var missing: [String] = []
+        for (source, snapshot) in sources {
             let material = ScoreSequenceMaterial(name: source.lastPathComponent, sourceDigest: snapshot.sourceDigest)
             materials.append(material)
-            let boxes = snapshot.pages.flatMap { page in
-                page.regions.map { region in
-                    ScoreSequenceRegionReference(material: material, pageIndex: page.index,
-                                                 rotation: page.rotation, regionID: region.id)
-                }
+            let boxes = snapshot.layout.map { entry in
+                ScoreSequenceRegionReference(material: material, pageIndex: entry.location.pageIndex,
+                                             rotation: entry.location.rotation, regionID: entry.location.regionID)
             }
             if boxes.isEmpty { missing.append(material.name) }
             references.append(contentsOf: boxes)
+            gaps.append(contentsOf: snapshot.layout.map(\.gapAfter))
         }
         guard missing.isEmpty else { throw ScoreSequenceCreationError.withoutRegions(missing) }
-        return try ScoreSequencePlan(materials: materials, regions: references)
+        var plan = try ScoreSequencePlan(materials: materials, regions: references)
+        for (index, gap) in gaps.enumerated() { try plan.setGapAfter(gap, number: index + 1) }
+        return plan
     }
 
     /// Keep the caller's material, page and within-page order; dictionary order is not stable.
@@ -164,13 +174,11 @@ private final class ScoreSequenceLibraryModel: ObservableObject {
                     continue
                 }
                 materialURLs[material.name] = source
-                for page in snapshot.pages {
-                    for (index, region) in page.regions.enumerated() {
-                        let ref = ScoreSequenceRegionReference(material: material, pageIndex: page.index,
-                                                               rotation: page.rotation, regionID: region.id)
-                        numbers[ref] = index + 1
-                        available.append(ref)
-                    }
+                for (index, entry) in snapshot.layout.enumerated() {
+                    let ref = ScoreSequenceRegionReference(material: material, pageIndex: entry.location.pageIndex,
+                                                           rotation: entry.location.rotation, regionID: entry.location.regionID)
+                    numbers[ref] = index + 1
+                    available.append(ref)
                 }
             } catch {
                 issues.append("无法读取素材“\(material.name)”的区域：\(error.localizedDescription)")
@@ -198,7 +206,7 @@ struct ScoreSequenceLibraryView: View {
             Section {
                 Text("选择要拼接的素材。每个素材需要先画好区域，计划会使用这些已保存的框。")
                     .foregroundStyle(.secondary)
-                Text("初始顺序按素材名称排列，可在下一步调整；不按勾选先后排序。")
+                Text("素材按名称排列；每份素材按方框编号连接，并沿用每个框的间隔。已保存的计划保留原设置，需要采用新编号时请创建新计划。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("选择素材") {

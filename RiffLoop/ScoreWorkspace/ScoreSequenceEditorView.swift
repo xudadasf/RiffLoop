@@ -176,7 +176,7 @@ struct ScoreSequenceEditorView: View {
     private let pageNumbers: [ScoreSequenceRegionReference: Int]
     private let materialURLs: [String: URL]
 
-    /// `pageNumbers` maps references to the per-page numbers visible while drawing.
+    /// `pageNumbers` maps references to material-wide numbers visible while drawing.
     /// The separately assigned sequence numbers are stable only within this task.
     init(plan: ScoreSequencePlan, isSaved: Bool = true,
          pageNumbers: [ScoreSequenceRegionReference: Int] = [:],
@@ -192,7 +192,7 @@ struct ScoreSequenceEditorView: View {
         List {
             Section {
                 Text("输入另一个已采用的顺序表框编号并点“调整”，可交换两个写入位置。修改空白小节数后点“设置”。")
-                Text("顺序表框编号是本任务内的编号，可能与画框页面的页内编号不同。")
+                Text("新计划沿用画框页的顺序和间隔。多个素材合并后，顺序表框编号在本任务内连续排列；已保存的计划保留原设置。")
                 Text("0 表示连续，默认在区域之间插入 1 个空白小节；最后一个区域后不会插入。")
                 Text("PDF 缩略图显示首页；区域页码以文字为准。")
                 Text("请尽量每框一行完整六线谱。识别优先读取品位与弦位；未知内容和默认时值会保留待核对标记。")
@@ -337,7 +337,7 @@ struct ScoreSequenceEditorView: View {
 
 private func sourceDescription(_ entry: ScoreSequenceEntry, pageNumber: Int?) -> String {
     let prefix = "\(entry.reference.material.name) · 第 \(entry.reference.pageIndex + 1) 页"
-    return pageNumber.map { prefix + " · 页内框 \($0)" } ?? prefix + " · 页内框编号待确认"
+    return pageNumber.map { prefix + " · 素材框 \($0)" } ?? prefix + " · 素材框编号待确认"
 }
 
 private struct ScoreSequencePositionRow: View {
