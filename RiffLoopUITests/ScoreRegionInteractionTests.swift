@@ -26,7 +26,8 @@ final class ScoreRegionInteractionTests: XCTestCase {
     }
 
     private func capture(_ app: XCUIApplication, name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
+        // App-only snapshots crop the rotated window incorrectly on iPad.
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = name; shot.lifetime = .keepAlways; add(shot)
     }
 
@@ -77,7 +78,12 @@ final class ScoreRegionInteractionTests: XCTestCase {
 
     func testDrawingModeStillAllowsSelectionAndZoomDoesNotCreateExtraBoxes() {
         let app = launch()
-        app.switches["region.drawing"].tap()
+        let drawing = app.switches["region.drawing"]
+        print("Drawing switch frame: \(drawing.frame), initial value: \(drawing.value ?? "nil")")
+        // SwiftUI includes the label in the switch's accessibility element;
+        // tap its control end, and verify the mode before testing the drag.
+        drawing.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        expect(drawing, "value == %@", "1")
         app.buttons[firstID].tap()
         expect(app.buttons[firstID], "value CONTAINS %@", "已选中")
         let boxes = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "region-"))
@@ -88,7 +94,8 @@ final class ScoreRegionInteractionTests: XCTestCase {
         let end = canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.42, dy: 0.94))
         start.press(forDuration: 0.05, thenDragTo: end)
         XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "count == 3"), evaluatedWith: boxes)], timeout: 8), .completed)
-        app.switches["region.drawing"].tap()
+        drawing.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        expect(drawing, "value == %@", "0")
         app.buttons["放大"].tap()
         app.buttons[firstID].tap()
         expect(app.buttons[firstID], "value CONTAINS %@", "已选中")
