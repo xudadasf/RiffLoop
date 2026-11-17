@@ -1,0 +1,17 @@
+{
+  "run_id": 44055178156,
+  "run_number": 127,
+  "head_sha": "2830a3aa220f2abfc00aa3fe4b8f7ca55f8fc5bf",
+  "created_at": "2026-11-17T09:23:45.0000000Z",
+  "html_url": "https://github.com/xudadasf/RiffLoop/actions/runs/44055178156",
+  "artifact_name": "RiffLoop-iPad-0.25.76-unsigned-arm64",
+  "ipa_file": "RiffLoop-iPad-0.25.76-unsigned-arm64.ipa",
+  "sha256": "62794A1D1B3EEA9EC76A5AFB78A5948DE7C96D14A09E54ABC001AE4A97A6F03C",
+  "artifact_id": 14315253811,
+  "artifact_expires_at": "2026-12-17T09:28:45Z",
+  "ci_run_id": 44050480127,
+  "unit_tests": 351,
+  "ui_tests": 5,
+  "verified_resource_count": 30,
+  "arm64_verified": true
+}

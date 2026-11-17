@@ -15,3 +15,11 @@ Reference: user-provided Reflow screenshot `codex-clipboard-cf2e164a-fa3f-4dcf-8
 Real Chromium/alphaTab integration passed (including nonzero audio samples from the bundled soundfont): click TAB string 2, enter fret 13, insert rest, undo/redo, palm mute and full bend, insert local blank bars, load bundled SF3, play, pause, resume, stop, edit/reload MIDI and play again. Pause/stop mute the local audio gate immediately. MIDI position remains fixed within integer rounding; stop returns to the first tick. Single Save bridge replaces separate draft/export buttons.
 
 Native iPad simulator, persistence tests and device installation results are recorded in the release review once complete. Browser verification alone is not iPadOS audio-route or end-to-end device validation.
+
+## Final native validation
+
+Exact product commit: `2830a3aa220f2abfc00aa3fe4b8f7ca55f8fc5bf`. CI 44050480127 passed 351 unit and 5 UI tests. Inspected both native captures: `Electric-guitar-editor-mini` (two-note chord, palm mute, six-quarter incomplete bar saved without discarding edits) and `Recognition-editor-local-blank-measures` (recognized placeholder flow, audition and successful GP update). These are synthetic fixtures, not evidence of OCR accuracy. Native screenshot dimensions/orientation were normalized only for inspection.
+
+The full-score viewport, visible cyan selection, 44-pixel keypad, transport and single Save match the intended interaction. Actual native screenshots show explicit partial-save messaging when meter is incomplete and successful practice-file update when complete. The final browser test also verifies unknown frets omitted by Swift JSON still show a selectable question mark.
+
+The physical iPad mini 6 now runs 0.25.76 (120); launch and data preservation were independently checked. Long-session manual editing and audio-route behavior on iPadOS 27 have not been exhaustively tested. Local screenshot paths are temporary; CI attachments are the retained automated evidence.
