@@ -170,10 +170,16 @@ struct ScoreSequenceEditorView: View {
             do {
                 recognitionProgress = "正在核对素材和区域…"
                 let regions = try await TabRecognitionPipeline.regions(plan: plan, materialURLs: materialURLs)
+                let store = GuitarDraftStore()
+                let id = try GuitarRecognitionIdentity.id(regions: regions, settings: plan.effectiveSettings)
+                if try await store.listIDs().contains(id) {
+                    generated = .init(id: id, draft: try await store.load(id))
+                    return
+                }
                 let draft = try await TabRecognitionPipeline.shared.recognize(regions: regions, settings: plan.effectiveSettings) { current, total in
                     await MainActor.run { recognitionProgress = "正在识别第 \(current) / \(total) 个区域…" }
                 }
-                let id = try await GuitarDraftStore().create(draft)
+                try await store.create(draft, id: id)
                 generated = .init(id: id, draft: draft)
             } catch { model.message = "识别未完成：\(error.localizedDescription)" }
         }

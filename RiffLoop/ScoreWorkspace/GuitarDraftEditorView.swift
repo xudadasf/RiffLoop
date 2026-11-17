@@ -1,5 +1,7 @@
 import SwiftUI
 import WebKit
+import AVFAudio
+import Combine
 
 struct GuitarDraftDocument: Identifiable {
     let id: UUID
@@ -36,6 +38,8 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(context.coordinator, name: "guitarEditor")
         let web = WKWebView(frame: .zero, configuration: config)
         web.isOpaque = false
@@ -50,6 +54,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
     func updateUIView(_ web: WKWebView, context: Context) { }
     static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
         web.configuration.userContentController.removeScriptMessageHandler(forName: "guitarEditor")
+        web.evaluateJavaScript("window.disposeGuitarEditor?.()", completionHandler: nil)
         web.stopLoading()
     }
 
@@ -57,17 +62,27 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         weak var web: WKWebView?
         let document: GuitarDraftDocument
         var saved: GuitarDraft
-        let store = GuitarDraftStore()
         let close: () -> Void
         let closeDirty: () -> Void
         private var working = false
+        private let interruption = AudioInterruptionRecovery()
+        private var observers = Set<AnyCancellable>()
 
         init(document: GuitarDraftDocument, close: @escaping () -> Void, closeDirty: @escaping () -> Void) {
             self.document = document
             self.saved = document.draft
             self.close = close
             self.closeDirty = closeDirty
+            super.init()
+            interruption.onBegan = { [weak self] in self?.pause(); return nil }
+            interruption.onDisconnect = { [weak self] in self?.pause() }
+            NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+                .receive(on: RunLoop.main).sink { [weak self] _ in self?.pause() }.store(in: &observers)
+            NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)
+                .receive(on: RunLoop.main).sink { [weak self] _ in self?.pause() }.store(in: &observers)
         }
+
+        private func pause() { web?.evaluateJavaScript("window.pauseGuitarEditor?.()", completionHandler: nil) }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
@@ -77,7 +92,14 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                     let draft = try JSONEncoder().encode(document.draft).base64EncodedString()
                     let schema = try Data(contentsOf: root.appendingPathComponent("ScoreEditor/techniques.json")).base64EncodedString()
                     web?.evaluateJavaScript("loadGuitarDraft(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(draft)'),c=>c.charCodeAt(0)))),JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(schema)'),c=>c.charCodeAt(0)))))") { [weak self] _, error in
-                        if let error { self?.reply(["message": "编辑页加载失败：\(error.localizedDescription)"]) }
+                        if let error { self?.reply(["message": "编辑页加载失败：\(error.localizedDescription)"]); return }
+                        do {
+                            let audio = AVAudioSession.sharedInstance()
+                            try audio.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                            try audio.setActive(true)
+                            let soundFont = try Data(contentsOf: root.appendingPathComponent("GpWeb/soundfont/sonivox.sf3")).base64EncodedString()
+                            self?.web?.evaluateJavaScript("loadEditorSoundFont('\(soundFont)')", completionHandler: nil)
+                        } catch { self?.reply(["message": "曲谱已打开，音色加载失败：\(error.localizedDescription)"]) }
                     }
                 } catch { reply(["message": error.localizedDescription]) }
                 return
@@ -110,14 +132,9 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                     guard data.count <= 8 * 1024 * 1024 else { throw GuitarDraftStoreError.tooLarge }
                     let draft = try JSONDecoder().decode(GuitarDraft.self, from: data)
                     guard draft.isValidForStorage else { throw GuitarDraftStoreError.invalidDraft }
-                    try await store.update(draft, id: document.id, replacing: saved)
+                    let message = try await GuitarResultSaver.shared.save(draft, id: document.id, replacing: saved)
                     saved = draft
-                    if action == "export" {
-                        do {
-                            let url = try await ScoreDraftPracticePublisher.publish(draft)
-                            reply(["saved": true, "message": "已保存草稿，GP 副本已加入 Guitar Pro 练习列表：\(url.lastPathComponent)。未知品位在副本中按休止处理，草稿保留待核对内容。"])
-                        } catch { reply(["saved": true, "message": "草稿已保存；GP 生成失败：\(error.localizedDescription)"]) }
-                    } else { reply(["saved": true, "message": "草稿已保存，可随时重新打开继续编辑。"] ) }
+                    reply(["saved": true, "message": message])
                 } catch { reply(["message": "操作未完成：\(error.localizedDescription)"]) }
             }
         }
@@ -141,13 +158,13 @@ struct GuitarDraftLibraryView: View {
     var body: some View {
         List {
             Section {
-                Button("新建电吉他草稿") {
+                Button("新建电吉他曲谱") {
                     Task {
                         do { let draft = GuitarDraft(); let id = try await store.create(draft); selected = .init(id: id, draft: draft) }
                         catch { message = error.localizedDescription }
                     }
                 }
-                Text("识别完成后自动进入此编辑器；草稿与原素材、练习文件分别保存。")
+                Text("点谱面选音，编辑后试听；保存更新同一份曲谱，原素材保留。")
             }
             ForEach(documents) { document in
                 HStack {
@@ -163,7 +180,7 @@ struct GuitarDraftLibraryView: View {
             }
             if let message { Text(message).foregroundStyle(.orange) }
         }
-        .navigationTitle("电吉他草稿")
+        .navigationTitle("电吉他曲谱")
         .task { await refresh() }
         .fullScreenCover(item: $selected, onDismiss: { Task { await refresh() } }) { GuitarDraftEditorView(document: $0) }
         .confirmationDialog("仅删除这份编辑草稿，已生成的 GP 和原素材会保留。请确认修正结果已另存。", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {

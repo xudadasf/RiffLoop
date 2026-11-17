@@ -156,10 +156,17 @@ final class ScoreRegionInteractionTests: XCTestCase {
         replace(count, with: "2")
         app.webViews.buttons["在本小节前插入"].tap()
         XCTAssertTrue(app.webViews.buttons["在本小节前插入"].waitForNonExistence(timeout: 5))
-        let save = app.webViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "保存草稿")).firstMatch
+        let play = app.webViews.buttons["播放"]
+        XCTAssertTrue(play.waitForExistence(timeout: 30))
+        play.tap()
+        let pause = app.webViews.buttons["暂停"]
+        XCTAssertTrue(pause.waitForExistence(timeout: 10))
+        pause.tap()
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        let save = app.webViews.buttons["保存"]
         XCTAssertTrue(save.exists)
         save.tap()
-        XCTAssertTrue(app.webViews.buttons["已保存"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.webViews.buttons["已保存"].waitForExistence(timeout: 30))
         capture(app, name: "Recognition-editor-local-blank-measures")
     }
 
