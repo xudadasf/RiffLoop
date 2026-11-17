@@ -30,19 +30,21 @@ actor GuitarPracticeFileStore {
         let fm = FileManager.default, target = folder.appendingPathComponent(Self.fileName(id))
         let receiptURL = receipts.appendingPathComponent(id.uuidString + ".json")
         var receipt: Receipt?
+        var ownedHash: String?
         if (try? fm.attributesOfItem(atPath: receiptURL.path)) != nil {
             receipt = try JSONDecoder().decode(Receipt.self, from: readRegular(receiptURL, maximum: 2048))
         }
         if (try? fm.attributesOfItem(atPath: target.path)) != nil {
             let actual = digest(try readRegular(target, maximum: 8 * 1024 * 1024))
             guard let receipt, actual == receipt.current || actual == receipt.pending else { throw GuitarDraftStoreError.conflict }
+            ownedHash = actual
         }
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         try fm.createDirectory(at: receipts, withIntermediateDirectories: true)
         let newHash = digest(data)
         // The pending hash also recognizes a completed GP write after a crash
         // before the receipt's final write; retry still uses the same filename.
-        try JSONEncoder().encode(Receipt(current: receipt?.current, pending: newHash)).write(to: receiptURL, options: .atomic)
+        try JSONEncoder().encode(Receipt(current: ownedHash, pending: newHash)).write(to: receiptURL, options: .atomic)
         try data.write(to: target, options: .atomic)
         try JSONEncoder().encode(Receipt(current: newHash, pending: nil)).write(to: receiptURL, options: .atomic)
         return target
