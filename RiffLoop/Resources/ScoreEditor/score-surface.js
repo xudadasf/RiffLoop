@@ -49,7 +49,7 @@ class GuitarScoreSurface {
         target.className='scoreTarget';target.dataset.bar=bi;target.dataset.beat=ti;target.dataset.string=string;
         target.setAttribute('aria-label',`第 ${bi+1} 小节 第 ${ti+1} 拍位 第 ${string} 弦 ${n?(n.fret??'待核对'):'空'}`);
         Object.assign(target.style,{left:`${tab.onNotesX-15}px`,top:`${rect.y+(string-1)*spacing-spacing/2}px`,width:'30px',height:`${Math.max(10,spacing)}px`});
-        if(n?.fret===null){target.textContent='?';target.classList.add('unknown');}
+        if(n&&n.fret==null){target.textContent='?';target.classList.add('unknown');}
         target.onclick=()=>this.pick(bi,ti,string);this.overlay.append(target);
       }
     }
