@@ -74,6 +74,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  diagnostic-write-budget:
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Replay routine diagnostics against the real store
+        run: |
+          xcrun swiftc -parse-as-library RiffLoop/Diagnostics/ReproductionStore.swift scripts/test-reproduction-write-budget.swift -o "$RUNNER_TEMP/reproduction-write-budget"
+          "$RUNNER_TEMP/reproduction-write-budget"
+
   build-and-test:
     runs-on: macos-15
     timeout-minutes: 30

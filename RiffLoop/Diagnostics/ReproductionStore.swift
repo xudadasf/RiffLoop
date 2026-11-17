@@ -61,12 +61,15 @@ final class ReproductionStore: @unchecked Sendable {
     private var reservedBytes: Int64 = 0
     private var captures: [String: String] = [:]
     private var loadedSnapshots: [String: (relative: String, bytes: Int64)] = [:] // material queue only
+    private let uptimeClock: @Sendable () -> Double
 
-    init(root: URL? = nil, partLimit: Int = 500_000, materialLimit: Int64 = 128_000_000) {
+    init(root: URL? = nil, partLimit: Int = 500_000, materialLimit: Int64 = 128_000_000,
+         uptimeClock: @escaping @Sendable () -> Double = { ProcessInfo.processInfo.systemUptime }) {
         self.root = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Reproduction", isDirectory: true)
         self.partLimit = partLimit
         self.materialLimit = materialLimit
+        self.uptimeClock = uptimeClock
     }
 
     func start(environment: [String: String]) {
@@ -104,7 +107,7 @@ final class ReproductionStore: @unchecked Sendable {
                 for old in self.readSessions() where old.incidents == 0 {
                     try? FileManager.default.removeItem(at: self.directory(old.id))
                 }
-                self.origin = ProcessInfo.processInfo.systemUptime
+                self.origin = self.uptimeClock()
                 let session = ReproductionSession(id: UUID().uuidString, started: Date(), environment: environment)
                 self.session = session
                 try FileManager.default.createDirectory(at: self.directory(session.id), withIntermediateDirectories: true)
@@ -129,7 +132,7 @@ final class ReproductionStore: @unchecked Sendable {
 
     func record(_ kind: String = "action", _ name: String, _ details: [String: String] = [:]) {
         let date = Date()
-        let uptime = ProcessInfo.processInfo.systemUptime
+        let uptime = uptimeClock()
         io.async { self.writeEvent(kind, name, details, date: date, uptime: uptime) }
     }
 
@@ -239,7 +242,8 @@ final class ReproductionStore: @unchecked Sendable {
 
     private func directory(_ id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
 
-    private func writeEvent(_ kind: String, _ name: String, _ details: [String: String], date: Date = Date(), uptime: Double = ProcessInfo.processInfo.systemUptime) {
+    private func writeEvent(_ kind: String, _ name: String, _ details: [String: String], date: Date = Date(), uptime capturedUptime: Double? = nil) {
+        let uptime = capturedUptime ?? uptimeClock()
         guard var current = session else { return }
         current.lastSequence += 1
         current.lastState = context
