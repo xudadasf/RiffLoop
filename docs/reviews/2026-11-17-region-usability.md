@@ -34,4 +34,11 @@ USB 安装前回读为 0.25.74（118），21 个 Documents/ScoreWorkspace 文件
 
 ## 清理
 
-本轮临时目录及安装日志将在文档推送后单独清理；以前被拒绝的目录和共享临时文件不重试、不通过父目录删除或归档工作树绕过。最终清理结果待补。
+文档已推送后，对本轮新建目标先核对绝对路径、目录范围、普通文件及无重解析点，再请求原生 PowerShell 删除。自动审批整体拒绝，只有 `blocked by policy`，没有给出更具体原因。命令未执行，没有分拆、换工具或通过父目录删除重试。以下本轮目标仍在本地：
+
+- 本工作树 `output/region-usability-20261117/`：38 个临时测试/设备核对文件，包含私有截图、哈希清单及当前任务修改前备份。
+- 本工作树 `output/release-0.25.75-build119-0c6b0e5/`：本次 IPA 与构建记录。
+- `C:/Users/sadada/AppData/Local/Temp/sideloadly-install-20261117-153239.log` 及同名 `.log.err`。
+- `C:/Users/sadada/AppData/Local/Temp/sdl-verify-20261117-153359.db`。
+
+下载脚本自己的临时 ZIP 已按其正常流程清理。以前被拒绝的目录、共享 `sdl-verify.py` 和续签缓存未纳入本次删除。后续不能把本次或历史拒绝改为父目录删除、目录移动或工作树归档来绕过。
