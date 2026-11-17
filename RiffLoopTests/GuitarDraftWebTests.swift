@@ -24,12 +24,13 @@ final class GuitarDraftWebTests: XCTestCase {
         var web: WKWebView?
         while Date() < deadline {
             web = find(host.view)
-            if let web, (try? await eval("typeof session !== 'undefined' && !!session", web)) as? Bool == true { break }
+            if let web, (try? await eval("Boolean(window.scoreEditor?.ready && document.querySelector('.scoreTarget')) && !document.body.hasAttribute('data-loading')", web)) as? Bool == true { break }
             try await Task.sleep(for: .milliseconds(100))
         }
         let editor = try XCTUnwrap(web)
-        let ready = try await eval("!!session", editor)
+        let ready = try await eval("Boolean(window.scoreEditor?.ready && document.querySelector('.scoreTarget'))", editor)
         XCTAssertEqual(ready as? Bool, true)
+        guard ready as? Bool == true else { return }
         let value = try await eval("""
             (()=>{session.setFret(13);session.string=2;session.setFret(11);
             session.insertBeat();session.insertBeat();session.undo();session.redo();
@@ -41,14 +42,14 @@ final class GuitarDraftWebTests: XCTestCase {
         var saved = draft
         for _ in 0..<100 {
             saved = try await store.load(id)
-            if saved != draft { break }
+            if saved != draft, (try? await eval("!document.body.inert && document.querySelectorAll('.scoreTarget').length===36", editor)) as? Bool == true { break }
             try await Task.sleep(for: .milliseconds(50))
         }
         XCTAssertEqual(saved.bars[0].beats.count,6)
         XCTAssertEqual(saved.bars[0].beats[2].notes.map(\.fret),[13,11])
         XCTAssertEqual(saved.bars[0].beats[2].notes[0].effects["isPalmMute"],1)
         host.view.layoutIfNeeded()
-        let layout=try await eval("innerWidth >= 700 && document.documentElement.scrollWidth <= innerWidth && document.querySelector('.cell').getBoundingClientRect().height >= 44",editor)
+        let layout=try await eval("innerWidth >= 700 && document.documentElement.scrollWidth <= innerWidth && document.querySelector('#keypad button').getBoundingClientRect().height >= 44 && document.querySelector('.scoreTarget.selected').getBoundingClientRect().height >= 10",editor)
         XCTAssertEqual(layout as? Bool,true,"Native iPad editor must retain touch targets and fit the viewport")
         let image:UIImage = try await withCheckedThrowingContinuation { continuation in
             editor.takeSnapshot(with:nil) { image,error in

@@ -184,6 +184,17 @@ jobs:
           -only-testing:RiffLoopUITests
           CODE_SIGNING_ALLOWED=NO
 
+      - name: Restart simulator between UI and hosted unit tests
+        run: |
+          set -euo pipefail
+          # Do not retain a UI-test app or WebKit process across xcodebuild's
+          # replacement install. A stale host can retain a Dead/ bundle URL and
+          # lose every resource when containermanagerd removes the old container.
+          xcrun simctl shutdown "$IPAD_DEVICE_ID"
+          xcrun simctl boot "$IPAD_DEVICE_ID"
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
+            xcrun simctl bootstatus "$IPAD_DEVICE_ID" -b
+
       - name: Build and run unit tests on iPad mini
         run: >-
           xcodebuild test
