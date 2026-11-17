@@ -1,25 +1,34 @@
-# Score editor design QA — 2026-11-17
+# Reflow-style TAB input — 2026-11-17
 
-Reference: user-provided Reflow screenshot `codex-clipboard-cf2e164a-fa3f-4dcf-8821-1fe16054ef3f.png` (2266 × 1488). Implementation captured at the matching 1133 × 744 CSS-pixel viewport, 2× scale: local `output/score-editor-20261117/editor-mini.png`. The private reference is not committed. Synthetic notes are used instead of copying the reference music.
+Source visual truth: user screenshot `C:/Users/sadada/AppData/Local/Temp/codex-clipboard-93740c0a-5f3d-4261-b06a-927769b95565.png` (2266 × 1488). Private image is not committed. Official interaction references: [entering notes](https://reflow.app/help/writing-tab/entering-notes/), [beats](https://reflow.app/help/writing-tab/beats/), [effects](https://reflow.app/help/techniques/effects/), [moving around](https://reflow.app/help/writing-tab/moving-around/).
 
-## Visual comparison
+## Captures and comparison
 
-- Full white staff + TAB score replaces the cell grid. Selected TAB string/fret is highlighted cyan; title, tempo, technique marks and multiple systems remain engraved.
-- Floating dark controls follow the reference's arrangement: return/undo/redo/save at top left; source/settings/view/zoom at top right; editing categories on the left; navigation at bottom left; rhythm actions at bottom; numeric keypad and transport at bottom right.
-- Uses native system text labels rather than unfamiliar icon-only buttons. Main controls have 44-pixel targets. Note targets track actual engraved string positions; zoom and string/beat navigation provide precise alternatives.
-- Eight-bar synthetic score checked visually at the reference dimensions. Portrait 744 × 1133 was also checked after the renderer completed rotation. Bar navigation and rotation keep the selected note visible above floating controls. No page-level horizontal overflow. Bottom controls intentionally float above the scrolling page, as in the reference; reading mode hides editing controls. The last system can scroll above the controls.
-- Intentional differences: original RiffLoop branding/typography and concise Chinese labels; no copied reference title, score, watermark or decorative imagery. Technique categories are in a scrollable dialog rather than permanently covering the page.
+Implementation: `output/reflow-controls-20261117/editor-mini.png`, 1133 × 744 CSS px, deviceScaleFactor 2, 2266 × 1488 pixels. Source and implementation normalized to 1133 × 744 each in `comparison.png`; lower-control crops aligned in `controls-comparison.png`. Portrait: 744 × 1133 CSS px, 2×. These are temporary local evidence; native CI attachments are retained with the run. Synthetic score content, not the user's music.
 
-## Interaction evidence
+State: effect category open, second-string fret selected, playback stopped. Full-view and focused bottom controls compared together; portrait also inspected.
 
-Real Chromium/alphaTab integration passed (including nonzero audio samples from the bundled soundfont): click TAB string 2, enter fret 13, insert rest, undo/redo, palm mute and full bend, insert local blank bars, load bundled SF3, play, pause, resume, stop, edit/reload MIDI and play again. Pause/stop mute the local audio gate immediately. MIDI position remains fixed within integer rounding; stop returns to the first tick. Single Save bridge replaces separate draft/export buttons.
+## Findings and iterations
 
-Native iPad simulator, persistence tests and device installation results are recorded in the release review once complete. Browser verification alone is not iPadOS audio-route or end-to-end device validation.
+- P1 resolved: old giant technique form replaced by eight persistent categories with horizontally scrolling buttons above. H/P, slides, vibrato, palm mute, articulation, harmonics, dynamics and bend presets apply immediately; toggled state remains visible. Only custom parameters use a sheet.
+- P1 resolved: insertion now explicitly appears under Beat, selects the new empty beat, and leaves it ready for fret entry. Keypad delete first removes the note, then the empty beat. Split, grouped tuplets and undo preserve note content. Cursor crosses bars; digit entry is not time-limited; Shift selects beats for batch effects and copy.
+- P2 resolved: initial browser fixture served SVG as generic binary, producing broken icon captures. Server MIME corrected; browser and native tests assert every visible bundled icon loaded. Assets are unmodified licensed Lucide SVGs; music symbols use existing Bravura.
+- P2 resolved: portrait category hint overlapped transport. Dock raised to 310 px above bottom; post-fix portrait capture shows separated controls and the selected note above them.
 
-## Final native validation
+## Fidelity surfaces
 
-Exact product commit: `2830a3aa220f2abfc00aa3fe4b8f7ca55f8fc5bf`. CI 44050480127 passed 351 unit and 5 UI tests. Inspected both native captures: `Electric-guitar-editor-mini` (two-note chord, palm mute, six-quarter incomplete bar saved without discarding edits) and `Recognition-editor-local-blank-measures` (recognized placeholder flow, audition and successful GP update). These are synthetic fixtures, not evidence of OCR accuracy. Native screenshot dimensions/orientation were normalized only for inspection.
+- Typography: native system UI type, 11–14 px control labels and 21 px keypad; Bravura musical symbols. No copied proprietary icon designs. Fret/score engraving uses the existing alphaTab renderer.
+- Spacing/layout: dark floating top actions, left editing modes, left thumb navigation, center eight categories with tool strip, right four-column keypad and transport. Minimum primary controls 44 px. Horizontal strip scroll is intentional and does not overflow the page. Portrait rearranges the tool strip above the lower controls.
+- Colors: charcoal floating controls, white score, orange editing mode, cyan note selection and active techniques. Selected range is visibly highlighted across all six strings.
+- Assets: sharp SVG UI icons and music font; no raster placeholders. No private reference image or third-party score redistributed.
+- Copy: Chinese category labels match the supplied workflow. Explicit H/P origin vs tie destination hints. Numerical TAB keypad stays numeric; the screenshot's accidental keys belong to Reflow's staff-entry mode, which is outside this TAB-focused change.
 
-The full-score viewport, visible cyan selection, 44-pixel keypad, transport and single Save match the intended interaction. Actual native screenshots show explicit partial-save messaging when meter is incomplete and successful practice-file update when complete. The final browser test also verifies unknown frets omitted by Swift JSON still show a selectable question mark.
+## Validation
 
-The physical iPad mini 6 now runs 0.25.76 (120); launch and data preservation were independently checked. Long-session manual editing and audio-route behavior on iPadOS 27 have not been exhaustively tested. Local screenshot paths are temporary; CI attachments are the retained automated evidence.
+Browser tests cover actual score hit targets, slow two-digit fret entry, add/insert/undo/redo, direct technique toggle and bend, two-stage deletion, range selection, thumb drag, local blank bars, audible soundfont output, immediate pause/stop, replay after editing, save bridge, landscape/portrait and loaded icons. Console errors: none. State tests cover chord preservation, wrapping strings, cross-bar navigation, end-of-score extension, atomic invalid tuplets, split, range effects and undo. Existing 127 technique round trips retained.
+
+Intentional differences: concise text labels accompany or replace specialized technique symbols; the standard staff is an engraved view and TAB is the input surface. No claim of complete Reflow feature parity (multiple voices, engraving design and staff accidental entry are not added). Existing practice playback, OCR and single-save identity are unchanged.
+
+Native CI and physical-device release checks are recorded in the release note after completion.
+
+final result: passed

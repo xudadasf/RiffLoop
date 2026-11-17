@@ -10,9 +10,10 @@ def verify(app: Path):
     if hashlib.sha256(model.read_bytes()).hexdigest() != "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884":
         raise ValueError("Packaged OCR model is not the verified offline weight")
     source = repo / "RiffLoop/Resources/ScoreEditor"
-    for path in source.iterdir():
-        if path.is_file() and (app / "ScoreEditor" / path.name).read_bytes() != path.read_bytes():
-            raise ValueError(f"Packaged editor resource differs: {path.name}")
+    for path in source.rglob("*"):
+        relative = path.relative_to(source)
+        if path.is_file() and (app / "ScoreEditor" / relative).read_bytes() != path.read_bytes():
+            raise ValueError(f"Packaged editor resource differs: {relative}")
     for relative in ["GpWeb/alphaTab.min.js", "ScoreDraft.html", "draft-core.js", "draft-v2.cjs"]:
         if not (app / relative).is_file():
             raise ValueError(f"Missing existing score resource: {relative}")

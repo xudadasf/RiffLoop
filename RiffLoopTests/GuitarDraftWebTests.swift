@@ -32,9 +32,11 @@ final class GuitarDraftWebTests: XCTestCase {
         XCTAssertEqual(ready as? Bool, true)
         guard ready as? Bool == true else { return }
         let value = try await eval("""
-            (()=>{session.setFret(13);session.string=2;session.setFret(11);
-            session.insertBeat();session.insertBeat();session.undo();session.redo();
-            session.beat=2;session.string=1;session.change(()=>session.currentNote.effects.isPalmMute=1);
+            (()=>{const tapDigit=n=>[...document.querySelectorAll('#keypad button')].find(b=>b.textContent===String(n)).click();
+            tapDigit(1);tapDigit(3);document.getElementById('stringDown').click();tapDigit(1);tapDigit(1);
+            document.getElementById('tab-beat').click();document.getElementById('insertBefore').click();document.getElementById('insertBefore').click();document.getElementById('undo').click();document.getElementById('redo').click();
+            session.beat=2;session.string=1;render();document.getElementById('techniques').click();
+            [...document.querySelectorAll('#toolStrip button')].find(b=>b.textContent==='掌根闷音 P.M.').click();
             render();document.getElementById('save').click();
             return session.currentBar.beats.length===6 && session.currentBeat.notes.length===2;})()
             """, editor)
@@ -49,6 +51,8 @@ final class GuitarDraftWebTests: XCTestCase {
         XCTAssertEqual(saved.bars[0].beats[2].notes.map(\.fret),[13,11])
         XCTAssertEqual(saved.bars[0].beats[2].notes[0].effects["isPalmMute"],1)
         host.view.layoutIfNeeded()
+        let icons = try await eval("[...document.querySelectorAll('img.toolIcon')].every(i=>i.complete && i.naturalWidth>0) && !document.querySelector('#panel').open && document.querySelectorAll('#toolTabs [role=tab]').length===8", editor)
+        XCTAssertEqual(icons as? Bool,true,"Native tools must load their icons and edit without a modal")
         let layout=try await eval("innerWidth >= 700 && document.documentElement.scrollWidth <= innerWidth && document.querySelector('#keypad button').getBoundingClientRect().height >= 44 && document.querySelector('.scoreTarget.selected').getBoundingClientRect().height >= 10",editor)
         XCTAssertEqual(layout as? Bool,true,"Native iPad editor must retain touch targets and fit the viewport")
         let image:UIImage = try await withCheckedThrowingContinuation { continuation in

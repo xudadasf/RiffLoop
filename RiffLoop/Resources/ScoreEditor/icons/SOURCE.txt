@@ -1,0 +1,1 @@
+Lucide icons; upstream commit 6f674729c39d1f2bfaf0c7caab641895fb2fe7b1. Unmodified SVG assets. https://github.com/lucide-icons/lucide

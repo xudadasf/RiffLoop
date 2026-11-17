@@ -30,7 +30,7 @@ class GuitarScoreSurface {
   configureOutput(){window.RiffLoopAudio.install(this.api.player?.output);}
   loadSoundFont(bytes){this.api.loadSoundFont(bytes,false);}
   update(draft,selection,schema){
-    this.selection={bar:selection.bar,beat:selection.beat,string:selection.string};this.draft=draft;
+    this.selection={bar:selection.bar,beat:selection.beat,string:selection.string};this.editSession=selection;this.draft=draft;
     const encoded=JSON.stringify(draft);
     if(encoded!==this.serialized){
       this.pause();this.serialized=encoded;this.ready=false;this.onState({ready:false,playing:false});
@@ -55,7 +55,7 @@ class GuitarScoreSurface {
     }
     this.highlight();if(!this.wantsPlay)this.revealSelection();
   }
-  highlight(){for(const target of this.overlay.children){const active=+target.dataset.bar===this.selection.bar&&+target.dataset.beat===this.selection.beat&&+target.dataset.string===this.selection.string;target.classList.toggle('selected',active);target.setAttribute('aria-pressed',String(active));}}
+  highlight(){for(const target of this.overlay.children){const active=+target.dataset.bar===this.selection.bar&&+target.dataset.beat===this.selection.beat&&+target.dataset.string===this.selection.string;target.classList.toggle('selected',active);target.classList.toggle('inRange',!!this.editSession?.isSelected(+target.dataset.bar,+target.dataset.beat));target.setAttribute('aria-pressed',String(active));}}
   pick(bar,beat,string){this.pause();this.onSelect(bar,beat,string);}
   seekSelection(){const b=this.score?.tracks[0].staves[0].bars[this.selection.bar]?.voices[0].beats[this.selection.beat];if(b){this.pauseTick=b.absolutePlaybackStart;this.api.tickPosition=this.pauseTick;this.revealSelection();}}
   revealSelection(){

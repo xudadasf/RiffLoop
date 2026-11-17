@@ -1,15 +1,15 @@
 'use strict';
-let session,schema,busy=false,digitTime=0,digitText='',savedHere=false;
+let session,schema,busy=false,savedHere=false;
 const $=id=>document.getElementById(id),core=GuitarDraftCore;
 const send=(action,payload={})=>window.webkit?.messageHandlers.guitarEditor.postMessage({action,...payload});
 const status=text=>{$('status').textContent=text;};
-function perform(fn,keepDigits=false){if(busy)return;surface?.pause();if(!keepDigits)digitTime=0;try{fn();render();}catch(e){status(e.message);}}
+function perform(fn,keepDigits=false){if(busy)return;surface?.pause();if(!keepDigits)session?.endDigits();try{fn();render();}catch(e){status(e.message);}}
 function button(text,action,parent){const el=document.createElement('button');el.textContent=text;el.onclick=()=>perform(action,parent.id==='keypad'&&/^\d$/.test(text));parent.append(el);return el;}
 function field(label,value,change,options){const row=document.createElement('label');row.append(document.createTextNode(label));const input=document.createElement(options?'select':'input');input.setAttribute('aria-label',label);if(options){for(const [name,val] of options){const o=document.createElement('option');o.value=val;o.textContent=name;input.append(o);}}else input.type=typeof value==='number'?'number':'text';input.value=value;input.onchange=()=>perform(()=>change(options||input.type==='number'?Number(input.value):input.value));row.append(input);$('panelBody').append(row);return input;}
 function panel(title){surface?.pause();$('panelTitle').textContent=title;$('panelBody').replaceChildren();$('panel').showModal();}
 function heading(text){const h=document.createElement('h3');h.textContent=text;$('panelBody').append(h);}
 function text(value){const p=document.createElement('p');p.textContent=value;$('panelBody').append(p);}
-function select(b,s){surface?.pause();session.beat=b;session.string=s;digitText='';digitTime=0;render();}
+function select(b,s,bar=session.bar){surface?.pause();if(selecting)session.startSelection();else session.clearSelection();session.bar=bar;session.beat=b;session.string=s;session.endDigits();render();}
 function markers(b){let names=[];if(b.tupletNumerator!==b.tupletDenominator)names.push(`${b.tupletNumerator}:${b.tupletDenominator}`);for(const spec of schema){let val=spec.scope==='beat'?b.effects[spec.id]:null;if(spec.scope==='note'){if(b.notes.some(n=>n.effects[spec.id]!==undefined&&n.effects[spec.id]!==0&&n.effects[spec.id]!==spec.default))names.push(spec.label);}else if(val!==undefined&&val!==0&&val!==spec.default)names.push(spec.label);}if(b.notes.some(n=>n.bend.length))names.push('推弦');if(b.whammy.length)names.push('摇把');if(b.tremolo)names.push('震音');return [...new Set(names)].join(' · ');}
 function render(){if(!session)return;session.clamp();const d=session.draft,bar=session.currentBar;
   $('undo').disabled=!session.undoStack.length||busy;$('redo').disabled=!session.redoStack.length||busy;
@@ -20,13 +20,13 @@ function render(){if(!session)return;session.clamp();const d=session.draft,bar=s
   $('timing').textContent=`${bar.numerator??d.numerator}/${bar.denominator??d.denominator} · ${Number((actual/960).toFixed(3))} / ${expected/960} 拍${Math.abs(actual-expected)>.01?' · 时值未齐':''}`;
   $('source').disabled=!bar.source;
   const review=[...bar.review,...session.currentBeat.review,...session.currentBeat.notes.flatMap(n=>n.review)];status(review.length?review.join('；'):'点谱面选音，数字键盘改品位；播放试听后保存。');
-  $('fretValue').value=session.currentNote?.fret??'';for(const el of $('rhythm').querySelectorAll('[data-duration]'))el.classList.toggle('active',Number(el.dataset.duration)===session.currentBeat.duration);$('dots').textContent=`附点 ${session.currentBeat.dots}`;
+  refreshTools();
   surface.update(d,session,schema);if(!playing)surface.seekSelection();
 }
 let surface,playing=false;
 window.loadGuitarDraft=(draft,techniques)=>{
   schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>core.validate(d,schema,false));
-  surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{session.bar=bar;select(beat,string);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status);
+  surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{select(beat,string,bar);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status);
   window.scoreEditor=surface;render();document.body.removeAttribute('data-loading');
 };
 window.loadEditorSoundFont=base64=>surface.loadSoundFont(Uint8Array.from(atob(base64),c=>c.charCodeAt(0)));
@@ -38,24 +38,27 @@ $('close').onclick=()=>window.guitarRequestClose();
 
 $('undo').onclick=()=>perform(()=>session.undo());$('redo').onclick=()=>perform(()=>session.redo());
 $('save').onclick=()=>{if(busy)return;surface.pause();busy=true;document.body.inert=true;send('save',{draft:session.draft});};
-$('prev').onclick=()=>perform(()=>{session.bar--;session.beat=0;});$('next').onclick=()=>perform(()=>{session.bar++;session.beat=0;});$('barChoice').onchange=e=>perform(()=>{session.bar=Number(e.target.value);session.beat=0;});
+$('prev').onclick=()=>perform(()=>{session.clearSelection();session.bar--;session.beat=0;});$('next').onclick=()=>perform(()=>{session.clearSelection();session.bar++;session.beat=0;});$('barChoice').onchange=e=>perform(()=>{session.clearSelection();session.bar=Number(e.target.value);session.beat=0;});
 $('source').onclick=()=>{if(!busy&&session.currentBar.source){busy=true;document.body.inert=true;send('source',{source:session.currentBar.source});}};$('hideSource').onclick=()=>{$('reference').hidden=true;};
 $('preview').onclick=()=>{document.body.classList.toggle('reading');$('preview').textContent=document.body.classList.contains('reading')?'编辑':'阅读';surface.api.render();};
 $('play').onclick=()=>{if(playing)surface.pause();else{send('activateAudio');surface.play();}};$('stop').onclick=()=>surface.stop();
 $('loop').onclick=()=>{const enabled=$('loop').getAttribute('aria-pressed')!=='true';$('loop').setAttribute('aria-pressed',String(enabled));surface.loop(enabled);};
 $('zoomIn').onclick=()=>surface.zoom(.15);$('zoomOut').onclick=()=>surface.zoom(-.15);
 $('keypadToggle').onclick=()=>document.body.classList.toggle('hideKeypad');
-$('rhythmMenu').onclick=()=>{$('rhythm').scrollIntoView({block:'nearest'});};
-$('stringUp').onclick=()=>select(session.beat,Math.max(1,session.string-1));$('stringDown').onclick=()=>select(session.beat,Math.min(6,session.string+1));
-$('beatLeft').onclick=()=>select(Math.max(0,session.beat-1),session.string);$('beatRight').onclick=()=>select(Math.min(session.currentBar.beats.length-1,session.beat+1),session.string);
-for(const [id,fn] of Object.entries({rest:()=>session.rest(),insertBefore:()=>session.insertBeat(),insertAfter:()=>session.insertBeat(true),deleteNote:()=>session.deleteNote(),deleteBeat:()=>session.deleteBeat(),fill:()=>session.fill(core),review:()=>session.change(()=>{session.currentBar.review=[];session.currentBar.beats.forEach(b=>{b.review=[];b.notes.forEach(n=>{if(n.fret!=null)n.review=[];});});})}))$(id).onclick=()=>perform(fn);
-for(const n of [1,2,4,8,16,32,64]){const b=button(`1/${n}`,()=>session.change(()=>{session.currentBeat.duration=n;session.currentBeat.review=session.currentBeat.review.filter(x=>!x.includes('时值'));}),$('rhythm'));b.dataset.duration=n;}
-const dots=button('附点 0',()=>session.change(()=>session.currentBeat.dots=(session.currentBeat.dots+1)%3),$('rhythm'));dots.id='dots';
-button('连音',()=>{panel('连音与拍位');field('几个音',session.currentBeat.tupletNumerator,v=>session.change(()=>session.currentBeat.tupletNumerator=v));field('占几个音的时间',session.currentBeat.tupletDenominator,v=>session.change(()=>session.currentBeat.tupletDenominator=v));button('三连音 3:2',()=>session.change(()=>{session.currentBeat.tupletNumerator=3;session.currentBeat.tupletDenominator=2;}),$('panelBody'));button('普通时值',()=>session.change(()=>{session.currentBeat.tupletNumerator=1;session.currentBeat.tupletDenominator=1;}),$('panelBody'));text('连音设置作用于当前拍位，请对组内其他拍位设置相同比例。');},$('rhythm'));
-for(const i of [7,8,9,4,5,6,1,2,3,0])button(String(i),()=>{const now=Date.now();digitText=now-digitTime<1200?digitText+String(i):String(i);if(digitText.length>2||Number(digitText)>36)digitText=String(i);digitTime=now;session.setFret(Number(digitText));},$('keypad'));
-button('删除',()=>session.deleteNote(),$('keypad'));button('休止',()=>session.rest(),$('keypad'));
-const fret=document.createElement('input');fret.id='fretValue';fret.type='number';fret.min=0;fret.max=36;fret.setAttribute('aria-label','当前品位');fret.onchange=()=>perform(()=>session.setFret(fret.value===''?null:Number(fret.value)));$('keypad').append(fret);
-button('清空',()=>session.setFret(null),$('keypad'));
+function move(dx,dy,event){perform(()=>session.move(dx,dy,altMove||!!event?.altKey,selecting||!!event?.shiftKey));}
+$('stringUp').onclick=e=>move(0,-1,e);$('stringDown').onclick=e=>move(0,1,e);
+$('beatLeft').onclick=e=>move(-1,0,e);$('beatRight').onclick=e=>move(1,0,e);
+function setSelecting(on){selecting=on;if(on)session.startSelection();else session.clearSelection();render();}
+$('selectMode').onclick=()=>setSelecting(true);$('editMode').onclick=()=>setSelecting(false);
+$('review').onclick=()=>perform(()=>session.change(()=>{session.currentBar.review=[];session.currentBar.beats.forEach(b=>{b.review=[];b.notes.forEach(n=>{if(n.fret!=null)n.review=[];});});}));
+$('copyBeat').onclick=()=>perform(()=>session.copy('beat'));$('pasteBeat').onclick=()=>perform(()=>{session.clearSelection();session.paste();});
+for(const value of [7,8,9,'erase',4,5,6,'shorter',1,2,3,'longer',0,'dot','alt','shift']){
+  if(typeof value==='number'){button(String(value),()=>session.inputDigit(value),$('keypad'));continue;}
+  const spec={erase:['删除',()=>session.erase(),'delete'],shorter:['缩短时值',()=>session.setDuration(Math.min(64,session.currentBeat.duration*2)),'minus'],longer:['延长时值',()=>session.setDuration(Math.max(1,session.currentBeat.duration/2)),'plus'],dot:['附点',()=>session.toggleDots(1)],alt:['Alt',()=>{altMove=!altMove;}],shift:['选择范围',()=>setSelecting(!selecting),'arrow-big-up']}[value];
+  const b=button(spec[0],spec[1],$('keypad'));b.id={erase:'deleteNote',shorter:'shorter',longer:'longer',dot:'dotKey',alt:'altKey',shift:'shiftKey'}[value];
+  if(spec[2]){b.setAttribute('aria-label',spec[0]);b.title=spec[0];b.replaceChildren(icon(spec[2]));}else if(value==='dot')b.textContent='.';
+}
+for(const [id,name] of [['selectMode','mouse-pointer-2'],['editMode','pencil'],['copyBeat','copy'],['pasteBeat','clipboard-paste']])decorated($(id),$(id).textContent,name);
 $('panelClose').onclick=()=>{$('panel').close();render();};
 $('settings').onclick=()=>{panel('曲谱设置');field('曲名',session.draft.title,v=>session.change(d=>d.title=v));field('速度 BPM',session.draft.tempo,v=>session.change(d=>d.tempo=v));field('拍号分子',session.draft.numerator,v=>session.change(d=>d.numerator=v));field('拍号分母',session.draft.denominator,v=>session.change(d=>d.denominator=v),[1,2,4,8,16,32].map(n=>[String(n),n]));field('变调夹',session.draft.capo,v=>session.change(d=>d.capo=v));field('音色',session.draft.program,v=>session.change(d=>d.program=v),[['电吉他清音',27],['电吉他爵士',26],['电吉他闷音',28],['过载',29],['失真',30],['泛音',31]]);text('调弦使用 MIDI 音高：标准 E2 A2 D3 G3 B3 E4 = 40 45 50 55 59 64。修改拍号保留全部音符，请再核对各小节时值。');for(let i=0;i<6;i++)field(`第 ${6-i} 弦`,session.draft.tuning[i],v=>session.change(d=>d.tuning[i]=v));};
 $('bars').onclick=()=>{
@@ -76,8 +79,22 @@ $('bars').onclick=()=>{
   field('本小节拍号分子',session.currentBar.numerator??session.draft.numerator,v=>session.change(()=>session.currentBar.numerator=v));
   field('本小节拍号分母',session.currentBar.denominator??session.draft.denominator,v=>session.change(()=>session.currentBar.denominator=v),[1,2,4,8,16,32].map(n=>[String(n),n]));
 };
-function curves(scope){const isNote=scope==='note',target=()=>isNote?session.currentNote:session.currentBeat,key=isNote?'bend':'whammy';heading(isNote?'推弦曲线':'摇把曲线');const presets=isNote?[['无',[]],['半音',[{offset:0,value:0},{offset:60,value:2}]],['全音',[{offset:0,value:0},{offset:60,value:4}]],['推弦后释放',[{offset:0,value:0},{offset:30,value:4},{offset:60,value:0}]],['预推弦释放',[{offset:0,value:4},{offset:60,value:0}]]]:[['无',[]],['下压全音',[{offset:0,value:0},{offset:60,value:-4}]],['下压后返回',[{offset:0,value:0},{offset:30,value:-4},{offset:60,value:0}]]];for(const [label,points] of presets)button(label,()=>session.change(()=>target()[key]=GuitarEdit.copy(points)),$('panelBody'));field('自定义位置:半音数',target()[key].map(p=>`${p.offset}:${p.value/2}`).join(', '),v=>session.change(()=>{target()[key]=v.trim()?v.split(',').map(pair=>{const [offset,tone]=pair.trim().split(':').map(Number);return {offset,value:tone*2};}):[];}));text('自定义示例：0:0, 30:2, 60:0 表示起点原音、中间升两个半音、终点回原音。位置从 0 到 60。');}
-$('techniques').onclick=()=>{panel('电吉他技巧');text('音符技巧作用于当前弦；拍位技巧作用于同时发声的音符。延音选后一个同弦同品音；击勾弦选起音。');for(const scope of ['note','beat']){heading(scope==='note'?`第 ${session.string} 弦音符`:'当前拍位');if(scope==='note'&&!session.currentNote){text('当前弦没有音符，先输入品位。');continue;}let category='';for(const spec of schema.filter(x=>x.scope===scope)){if(spec.category!==category){heading(spec.category);category=spec.category;}const target=()=>scope==='note'?session.currentNote:session.currentBeat;const current=target().effects[spec.id]??spec.default??0;const input=field(spec.label,current,v=>session.change(()=>target().effects[spec.id]=v),spec.kind==='toggle'?[['关闭',0],['开启',1]]:spec.choices);if(spec.kind==='number'){input.min=spec.min;input.max=spec.max;input.step=spec.step||1;}}curves(scope);}field('震音拨弦',session.currentBeat.tremolo,v=>session.change(()=>session.currentBeat.tremolo=v),[['关闭',0],['八分',8],['十六分',16],['三十二分',32],['六十四分',64]]);field('文字标记',session.currentBeat.text||'',v=>session.change(()=>session.currentBeat.text=v));};
-document.addEventListener('keydown',e=>{if(!session||busy||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)||$('panel').open)return;if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();perform(()=>e.shiftKey?session.redo():session.undo());return;}if(/^\d$/.test(e.key)){e.preventDefault();[...$('keypad').querySelectorAll('button')].find(b=>b.textContent===e.key)?.click();}if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();perform(()=>{session.beat=Math.max(0,Math.min(session.currentBar.beats.length-1,session.beat+(e.key==='ArrowRight'?1:-1)));digitTime=0;});}if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();perform(()=>{session.string=Math.max(1,Math.min(6,session.string+(e.key==='ArrowDown'?1:-1)));digitTime=0;});}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();perform(()=>session.deleteNote());}});
+function curves(scope){const isNote=scope==='note',target=()=>session.targets(scope)[0],key=isNote?'bend':'whammy';heading(isNote?'推弦曲线':'摇把曲线');const presets=isNote?[['无',[]],['半音',[{offset:0,value:0},{offset:60,value:2}]],['全音',[{offset:0,value:0},{offset:60,value:4}]],['推弦后释放',[{offset:0,value:0},{offset:30,value:4},{offset:60,value:0}]],['预推弦释放',[{offset:0,value:4},{offset:60,value:0}]]]:[['无',[]],['下压全音',[{offset:0,value:0},{offset:60,value:-4}]],['下压后返回',[{offset:0,value:0},{offset:30,value:-4},{offset:60,value:0}]]];for(const [label,points] of presets)button(label,()=>session.change(()=>session.targets(scope).forEach(t=>t[key]=GuitarEdit.copy(points))),$('panelBody'));field('自定义位置:半音数',target()[key].map(p=>`${p.offset}:${p.value/2}`).join(', '),v=>session.change(()=>{const points=v.trim()?v.split(',').map(pair=>{const [offset,tone]=pair.trim().split(':').map(Number);return {offset,value:tone*2};}):[];session.targets(scope).forEach(t=>t[key]=GuitarEdit.copy(points));}));text('自定义示例：0:0, 30:2, 60:0 表示起点原音、中间升两个半音、终点回原音。位置从 0 到 60。');}
+function openAdvanced(ids){panel('更多技巧设置');text('设置作用于当前音符；选中一段时，作用于整段。常用技巧可直接在底部点选。');for(const scope of ['note','beat']){const ts=session.targets(scope);if(!ts.length)continue;heading(scope==='note'?'音符':'拍位');for(const spec of schema.filter(x=>x.scope===scope&&(!ids||ids.includes(x.id)))){const input=field(spec.label,ts[0].effects[spec.id]??spec.default??0,v=>session.change(()=>session.targets(scope).forEach(t=>t.effects[spec.id]=v)),spec.kind==='toggle'?[['关闭',0],['开启',1]]:spec.choices);if(spec.kind==='number'){input.min=spec.min;input.max=spec.max;input.step=spec.step||1;}}}}
+document.addEventListener('keydown',e=>{
+  if(!session||busy||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)||$('panel').open)return;
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();perform(()=>e.shiftKey?session.redo():session.undo());return;}
+  if(e.metaKey||e.ctrlKey)return;
+  if(/^\d$/.test(e.key)){e.preventDefault();perform(()=>session.inputDigit(Number(e.key)),true);return;}
+  const actions={ArrowLeft:()=>move(-1,0,e),ArrowRight:()=>move(1,0,e),ArrowUp:()=>move(0,-1,e),ArrowDown:()=>move(0,1,e),Delete:()=>perform(()=>session.erase()),Backspace:()=>perform(()=>session.erase()),'-':()=>$('shorter').click(),'+':()=>$('longer').click(),',':()=>$('dotKey').click(),'.':()=>$('dotKey').click(),'/':()=>perform(()=>session.split()),Insert:()=>perform(()=>{session.clearSelection();session.insertBeat();}),Escape:()=>setSelecting(false)};
+  const effects={l:['note','isHammerPullOrigin'],t:['note','isTieDestination'],p:['note','isPalmMute'],s:['note','isStaccato'],a:['note','accentuated'],v:['note','vibrato']};
+  if(actions[e.key]){e.preventDefault();actions[e.key]();}else if(effects[e.key.toLowerCase()]){e.preventDefault();perform(()=>session.toggleEffect(...effects[e.key.toLowerCase()]));}else if(e.key.toLowerCase()==='x'){e.preventDefault();perform(()=>{if(!session.currentNote)session.setFret(0);session.toggleEffect('note','isDead');});}
+});
+for(const [id,name] of [['stringUp','chevron-up'],['stringDown','chevron-down'],['beatLeft','chevron-left'],['beatRight','chevron-right']])$(id).replaceChildren(icon(name));
+let drag=null;
+$('thumbPad').onpointerdown=e=>{if(busy||!session)return;e.preventDefault();$('thumbPad').setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY};};
+$('thumbPad').onpointermove=e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.max(Math.abs(dx),Math.abs(dy))<28)return;const horizontal=Math.abs(dx)>Math.abs(dy);move(horizontal?Math.sign(dx):0,horizontal?0:Math.sign(dy),e);drag={x:e.clientX,y:e.clientY};};
+$('thumbPad').onpointerup=$('thumbPad').onpointercancel=()=>{drag=null;};
+initTools();
 document.addEventListener('visibilitychange',()=>{if(document.hidden)surface?.pause();});window.addEventListener('pagehide',()=>surface?.stop());
 send('ready');
