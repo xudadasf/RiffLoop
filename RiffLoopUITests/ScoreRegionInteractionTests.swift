@@ -166,6 +166,9 @@ final class ScoreRegionInteractionTests: XCTestCase {
     func testDoubleTapResizesEachCornerAndPersistsAfterRelaunch() {
         let id = UUID().uuidString
         var app = launch(id: id)
+        let drawing = app.switches["region.drawing"]
+        drawing.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        expect(drawing, "value == %@", "1")
         app.buttons[firstID].doubleTap()
         let names = ["topLeft", "topRight", "bottomLeft", "bottomRight"]
         for name in names {
