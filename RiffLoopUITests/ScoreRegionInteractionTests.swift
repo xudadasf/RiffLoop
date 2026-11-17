@@ -77,11 +77,22 @@ final class ScoreRegionInteractionTests: XCTestCase {
         XCTAssertTrue(back.exists && back.isHittable, "Recognition settings must have a visible return control")
         capture(app, name: "Region-next-recognition-settings")
         back.tap()
-        XCTAssertTrue(app.buttons["继续编辑"].waitForExistence(timeout: 5))
-        app.buttons["继续编辑"].tap()
+        let discard = app.buttons["放弃修改"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        // iPad confirmation popovers omit the cancel-role button. Dismissing
+        // their outside region is the native way to continue editing.
+        if app.buttons["继续编辑"].exists {
+            app.buttons["继续编辑"].tap()
+        } else {
+            let outside = app.otherElements["PopoverDismissRegion"]
+            XCTAssertTrue(outside.exists)
+            outside.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.98)).tap()
+        }
+        XCTAssertTrue(discard.waitForNonExistence(timeout: 5))
         XCTAssertTrue(back.isHittable)
         back.tap()
-        app.buttons["放弃修改"].tap()
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        discard.tap()
         XCTAssertTrue(app.buttons["region.next"].waitForExistence(timeout: 5))
         expect(app.buttons[secondID], "label == %@", "方框 1")
         expect(app.textFields["region.gap"], "value == %@", "0")
