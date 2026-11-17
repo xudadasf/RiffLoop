@@ -24,7 +24,7 @@ function render(){if(!session)return;session.clamp();const d=session.draft,bar=s
   $('engraving').hidden=true;grid.hidden=false;
   grid.querySelector('.cell.selected')?.scrollIntoView({block:'nearest',inline:'nearest'});
 }
-window.loadGuitarDraft=(draft,techniques)=>{schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>core.validate(d,schema,false));render();};
+window.loadGuitarDraft=(draft,techniques)=>{schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>core.validate(d,schema,false));render();document.body.removeAttribute('data-loading');};
 window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved){session.saved=JSON.stringify(session.draft);render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
 window.guitarRequestClose=()=>{if(session?.dirty)send('closeDirty');else send('close');};
 $('close').onclick=()=>window.guitarRequestClose();
