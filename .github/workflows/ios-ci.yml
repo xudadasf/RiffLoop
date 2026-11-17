@@ -180,6 +180,7 @@ jobs:
           -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
           -derivedDataPath DerivedData
           -only-testing:RiffLoopTests/ScoreRegionLayoutTests
+          -only-testing:RiffLoopTests/ScoreSequenceInteractionRegressionTests
           -only-testing:RiffLoopUITests
           CODE_SIGNING_ALLOWED=NO
 
@@ -193,6 +194,7 @@ jobs:
           -derivedDataPath DerivedData
           -skip-testing:RiffLoopUITests
           -skip-testing:RiffLoopTests/ScoreRegionLayoutTests
+          -skip-testing:RiffLoopTests/ScoreSequenceInteractionRegressionTests
           ${{ inputs.run_vision_comparison != true && '-skip-testing:RiffLoopTests/SyntheticVisionTabPreprocessingBenchmarkTests/testIndependentSyntheticVisionPreprocessingComparison' || '' }}
           CODE_SIGNING_ALLOWED=NO
 
