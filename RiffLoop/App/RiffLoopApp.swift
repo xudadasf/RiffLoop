@@ -11,7 +11,7 @@ struct RiffLoopApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            appContent
                 .preferredColorScheme(.dark)
                 .environmentObject(recentProjects)
                 .environmentObject(displayNames)
@@ -23,5 +23,18 @@ struct RiffLoopApp: App {
                     try? RiffLoopDocumentStore().prepareDirectories()
                 }
         }
+    }
+
+    @ViewBuilder private var appContent: some View {
+        #if DEBUG
+        if let value = ProcessInfo.processInfo.environment["RIFFLOOP_REGION_UI_TEST_CASE"],
+           let id = UUID(uuidString: value) {
+            ScoreRegionUITestFixture(id: id)
+        } else {
+            HomeView()
+        }
+        #else
+        HomeView()
+        #endif
     }
 }

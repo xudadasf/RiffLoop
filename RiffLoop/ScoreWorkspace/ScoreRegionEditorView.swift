@@ -256,8 +256,8 @@ struct ScoreRegionEditorView: View {
     @State private var regionPendingDeletion: UUID?
     @State private var confirmDiscard = false
 
-    init(source: URL) {
-        _model = StateObject(wrappedValue: ScoreRegionEditorModel(source: source))
+    init(source: URL, store: ScoreRegionsStore? = nil) {
+        _model = StateObject(wrappedValue: ScoreRegionEditorModel(source: source, store: store))
     }
 
     var body: some View {

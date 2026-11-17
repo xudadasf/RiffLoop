@@ -6,6 +6,7 @@ on:
     paths:
       - "RiffLoop/**"
       - "RiffLoopTests/**"
+      - "RiffLoopUITests/**"
       - "experiments/gp-draft-editor/**"
       - "experiments/gp-draft-v2/**"
       - "project.yml"
@@ -38,6 +39,7 @@ on:
     paths:
       - "RiffLoop/**"
       - "RiffLoopTests/**"
+      - "RiffLoopUITests/**"
       - "experiments/gp-draft-editor/**"
       - "experiments/gp-draft-v2/**"
       - "project.yml"

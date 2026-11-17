@@ -63,6 +63,7 @@ targets:
     scheme:
       testTargets:
         - RiffLoopTests
+        - RiffLoopUITests
 
   RiffLoopTests:
     type: bundle.unit-test
@@ -80,3 +81,15 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.prototype.tests
         GENERATE_INFOPLIST_FILE: YES
+
+  RiffLoopUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [RiffLoopUITests]
+    dependencies:
+      - target: RiffLoop
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.riffloop.prototype.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: RiffLoop
