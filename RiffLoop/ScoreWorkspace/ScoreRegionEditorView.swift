@@ -461,15 +461,19 @@ struct ScoreRegionEditorView: View {
             case let .message(text): Text(text)
             }
         }
-        .navigationDestination(isPresented: Binding(
+        .fullScreenCover(isPresented: Binding(
             get: { nextPlan != nil }, set: { if !$0 { nextPlan = nil } }
         )) {
             if let plan = nextPlan {
-                ScoreSequenceEditorView(plan: plan, isSaved: false,
-                    pageNumbers: Dictionary(uniqueKeysWithValues: plan.entries.map { ($0.reference, $0.number) }),
-                    materialURLs: [model.source.lastPathComponent: model.source]) { updated in
-                        try await ScoreSequenceStore(id: nextPlanID).save(updated)
-                    }
+                // Give the plan its own navigation controls. Reusing this stack
+                // hides the destination's custom Back button on iPad.
+                NavigationStack {
+                    ScoreSequenceEditorView(plan: plan, isSaved: false,
+                        pageNumbers: Dictionary(uniqueKeysWithValues: plan.entries.map { ($0.reference, $0.number) }),
+                        materialURLs: [model.source.lastPathComponent: model.source]) { updated in
+                            try await ScoreSequenceStore(id: nextPlanID).save(updated)
+                        }
+                }
             }
         }
     }

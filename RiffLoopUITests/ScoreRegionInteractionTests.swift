@@ -73,7 +73,19 @@ final class ScoreRegionInteractionTests: XCTestCase {
         app.buttons["region.next"].tap()
         XCTAssertTrue(app.navigationBars["区域顺序与间隔"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["识别并进入编辑"].exists)
+        let back = app.navigationBars["区域顺序与间隔"].buttons["返回"]
+        XCTAssertTrue(back.exists && back.isHittable, "Recognition settings must have a visible return control")
         capture(app, name: "Region-next-recognition-settings")
+        back.tap()
+        XCTAssertTrue(app.buttons["继续编辑"].waitForExistence(timeout: 5))
+        app.buttons["继续编辑"].tap()
+        XCTAssertTrue(back.isHittable)
+        back.tap()
+        app.buttons["放弃修改"].tap()
+        XCTAssertTrue(app.buttons["region.next"].waitForExistence(timeout: 5))
+        expect(app.buttons[secondID], "label == %@", "方框 1")
+        expect(app.textFields["region.gap"], "value == %@", "0")
+        capture(app, name: "Returned-to-region-with-saved-settings")
     }
 
     func testDrawingModeStillAllowsSelectionAndZoomDoesNotCreateExtraBoxes() {
