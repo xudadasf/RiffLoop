@@ -10,7 +10,7 @@ class GuitarScoreSurface {
       display:{layoutMode:alphaTab.LayoutMode.Page,staveProfile:alphaTab.StaveProfile.ScoreTab,scale:this.scale},
       player:{playerMode:alphaTab.PlayerMode.EnabledSynthesizer,soundFont:null,enableCursor:true,enableUserInteraction:false,enableElementHighlighting:true,scrollElement:'#scoreViewport',scrollMode:alphaTab.ScrollMode.Off}
     });
-    this.api.renderFinished.on(()=>this.drawTargets());
+    this.api.renderFinished.on(()=>requestAnimationFrame(()=>this.drawTargets()));
     this.api.playerReady.on(()=>{this.ready=true;this.configureOutput();this.onState({ready:true,playing:false});});
     this.api.playerStateChanged.on(e=>{
       if(e.state===1&&!this.wantsPlay){this.pause();return;}
