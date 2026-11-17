@@ -28,7 +28,7 @@ param(
 )
 
 function Test-SelectedAppleId([string]$Selected, [string]$Expected) {
-    $selectedId = $Selected.Trim() -replace '\s+\[\d+\s+App IDs? Remaining(?:,\s*updates\s+\d+[dhm])?\]$', ''
+    $selectedId = $Selected.Trim() -replace '\s+\[(?:>\s*)?\d+\s+App IDs? Remaining(?:,\s*updates\s+\d+[dhm])?\]$', ''
     return $selectedId -eq $Expected.Trim()
 }
 
@@ -67,8 +67,10 @@ $stderrLog = "$stdoutLog.err"
 Get-Process -Name Sideloadly -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Write-Host "等待 40 秒释放旧的设备连接…"
 Start-Sleep -Seconds 40
+# This is the interactive signing installer: its window must exist for device selection
+# and any Apple verification prompt. Background helpers should still stay hidden.
 $proc = Start-Process -FilePath $sideloadlyExe -ArgumentList "`"$IpaPath`"" -PassThru `
-    -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Hidden
+    -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -WindowStyle Normal
 try {
 Write-Host "Sideloadly PID: $($proc.Id), log: $stdoutLog"
 
