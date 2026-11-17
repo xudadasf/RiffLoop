@@ -25,10 +25,10 @@ State: effect category open, second-string fret selected, playback stopped. Full
 
 ## Validation
 
-Browser tests cover actual score hit targets, slow two-digit fret entry, add/insert/undo/redo, direct technique toggle and bend, two-stage deletion, range selection, thumb drag, local blank bars, audible soundfont output, immediate pause/stop, replay after editing, save bridge, landscape/portrait and loaded icons. Console errors: none. State tests cover chord preservation, wrapping strings, cross-bar navigation, end-of-score extension, atomic invalid tuplets, split, range effects and undo. Existing 127 technique round trips retained.
+Browser tests cover actual score hit targets, slow two-digit fret entry, add/insert/undo/redo, direct technique toggle and bend, two-stage deletion, range selection, thumb drag, local blank bars, audible soundfont output, immediate pause/stop, replay after editing, save bridge, landscape/portrait and loaded icons. Uncaught JavaScript errors: none. State tests cover chord preservation, wrapping strings, cross-bar navigation, end-of-score extension, atomic invalid tuplets, split, range effects and undo. Existing 127 technique round trips retained.
 
 Intentional differences: concise text labels accompany or replace specialized technique symbols; the standard staff is an engraved view and TAB is the input surface. No claim of complete Reflow feature parity (multiple voices, engraving design and staff accidental entry are not added). Existing practice playback, OCR and single-save identity are unchanged.
 
-Native CI and physical-device release checks are recorded in the release note after completion.
+Native CI 44070733742 passed 351 unit and 5 UI tests. The dedicated WKWebView capture `native-editor.png` is 2266 × 1440 (status area excluded), showing the active P.M. control, engraved chord, keypad and saved incomplete draft. The full-device flow capture is 1488 × 2266 with landscape content, rotated 90° only for review; it confirms recognition-to-editor, audition and same-file save. These captures were inspected alongside the browser comparison. Native assertions verify all SVG assets loaded. Physical iPad mini 6 installed 0.25.77 (121) and independently launched; before/after/post-launch fingerprints match. Details in `docs/releases/0.25.77.md`.
 
 final result: passed
