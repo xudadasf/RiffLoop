@@ -1,0 +1,10 @@
+{
+  "run_id": 44228374389,
+  "run_number": 129,
+  "head_sha": "e440adcaa6728a9ea5a955291109a031a4822301",
+  "created_at": "2026-11-18T03:09:15.0000000Z",
+  "html_url": "https://github.com/xudadasf/RiffLoop/actions/runs/44228374389",
+  "artifact_name": "RiffLoop-iPad-0.25.78-unsigned-arm64",
+  "ipa_file": "RiffLoop-iPad-0.25.78-unsigned-arm64.ipa",
+  "sha256": "1D66D1E45D532D22E0ADDE038AA7616B6ED3F70442751C4CC7EF59CFFAABF0A4"
+}

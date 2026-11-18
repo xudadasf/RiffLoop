@@ -1,3 +1,15 @@
+# 0.25.78 installed validation — 2026-11-18
+
+Final product commit `e440adcaa6728a9ea5a955291109a031a4822301`. The upstream dependency block is resolved using the unchanged official 1.24.2 release bindings and the originally pinned binary checksum. No editor interaction change was made during the packaging fix.
+
+CI 44225173349 passed 351 unit and 5 UI tests, including native editor insertion, applied-technique remove/undo, same-document save, actual digit-model inference and GP round-trip. Its current native editor capture was extracted and inspected at `output/install-editor-20261118/native-editor.png` (2266 × 1440) and an inspection thumbnail; controls and saved incomplete score remain visible. This replaces the previous commit-only qualification below.
+
+IPA 44228374389 matches the final product commit. The user's iPad mini 6 received the USB update on 2026-11-18 at 11:15–11:17 +08:00. Installed version 0.25.78 (122), independent PID query and home-screen capture confirm launch. Before/after/post-launch fingerprints match for 27 files and 22 preferences. Private device captures are not committed. Physical-device validation is installation, launch and preservation, not exhaustive manual technique testing.
+
+Current result: passed for the stated automated/native validation and device install scope. Details: `docs/releases/0.25.78.md` and `docs/reviews/2026-11-18-editor-install.md`.
+
+---
+
 # Score touch and techniques — 2026-11-18
 
 Latest product commit: `822e69260f4446f05700215cb7b80ea9c2c5a93d`, 0.25.78 (122). See `docs/reviews/2026-11-17-editor-touch-techniques.md` for scope and compatibility boundaries.
