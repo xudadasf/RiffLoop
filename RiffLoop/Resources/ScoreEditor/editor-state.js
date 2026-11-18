@@ -26,6 +26,40 @@ class Session {
     this.beat=0;
     this.endDigits();
   }
+  selectNotes(first,last){
+    this.anchor={bar:first.bar,beat:first.beat,string:first.string};
+    this.bar=last.bar;
+    this.beat=last.beat;
+    this.string=last.string;
+    this.endDigits();
+  }
+  get noteRange(){return this.anchor?.string!=null;}
+  includesString(bar,beat,string){
+    const picks=this.anchor?.picks;
+    if(picks)return !!(picks[bar+':'+beat] & (1<<string));
+    if(!this.noteRange||this.draft.bars[bar].beats[beat].notes.length===1)return true;
+    return string>=Math.min(this.anchor.string,this.string)&&string<=Math.max(this.anchor.string,this.string);
+  }
+  togglePickedNote(bar,beat,string){
+    if(!this.draft.bars[bar].beats[beat].notes.some(n=>n.string===string))return;
+    // Each beat stores a six-string bitmask. Copy before toggling so undo retains its selection.
+    const picks={...this.anchor?.picks};
+    if(!this.anchor?.picks){
+      for(const {bar:i,beat:j,value} of this.rangeEntries()){
+        for(const n of value.notes){
+          if(this.includesString(i,j,n.string))picks[i+':'+j]=(picks[i+':'+j]||0)|(1<<n.string);
+        }
+      }
+    }
+    const key=bar+':'+beat;
+    picks[key]=(picks[key]||0)^(1<<string);
+    if(!picks[key])delete picks[key];
+    const positions=Object.keys(picks).map(k=>k.split(':').map(Number)).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    if(!positions.length){this.clearSelection();return;}
+    const point=([bar,beat])=>({bar,beat,string:this.draft.bars[bar].beats[beat].notes.find(n=>picks[bar+':'+beat]&(1<<n.string)).string});
+    this.selectNotes(point(positions[0]),point(positions.at(-1)));
+    this.anchor.picks=picks;
+  }
   get firstBar(){return Math.min(this.bar,this.anchor?.bar??this.bar);}
   get lastBar(){return Math.max(this.bar,this.anchor?.bar??this.bar);}
   get firstBeat(){
@@ -44,19 +78,50 @@ class Session {
     if(!this.anchor||bar<this.firstBar||bar>this.lastBar)return false;
     return (bar!==this.firstBar||beat>=this.firstBeat)&&(bar!==this.lastBar||beat<=this.lastBeat);
   }
+  *rangeEntries(){
+    for(let bar=this.firstBar;bar<=this.lastBar;bar++){
+      const beats=this.draft.bars[bar].beats;
+      const first=bar===this.firstBar?this.firstBeat:0,last=bar===this.lastBar?this.lastBeat:beats.length-1;
+      for(let beat=first;beat<=last;beat++)yield {bar,beat,value:beats[beat]};
+    }
+  }
   get selectedBeats(){
     if(!this.anchor)return [this.currentBeat];
-    return this.draft.bars.slice(this.firstBar,this.lastBar+1).flatMap((bar,i)=>
-      this.anchor.wholeBars?bar.beats:bar.beats.filter((b,ti)=>this.isSelected(this.firstBar+i,ti)));
+    return Array.from(this.rangeEntries()).filter(({bar,beat,value})=>
+      !this.noteRange||value.notes.some(n=>this.includesString(bar,beat,n.string))).map(entry=>entry.value);
   }
-  targets(scope){return scope==='beat'?this.selectedBeats:this.anchor?this.selectedBeats.flatMap(b=>b.notes):this.currentNote?[this.currentNote]:[];}
+  targets(scope){
+    if(scope==='beat')return this.selectedBeats;
+    if(!this.anchor)return this.currentNote?[this.currentNote]:[];
+    return Array.from(this.rangeEntries()).flatMap(({bar,beat,value})=>
+      value.notes.filter(n=>this.includesString(bar,beat,n.string)));
+  }
+  removeSelectedNotes(){
+    const selected=new Set(this.targets('note'));
+    this.change(()=>{
+      for(const b of this.selectedBeats)b.notes=b.notes.filter(n=>!selected.has(n));
+      this.clearSelection();
+    });
+  }
   toggleEffect(scope,id,value=1,defaultValue=0){const targets=this.targets(scope);if(!targets.length)throw Error('先在当前弦输入品位，或选中已有音符。');const next=targets.every(t=>(t.effects[id]??defaultValue)===value)?defaultValue:value;this.change(()=>targets.forEach(t=>{t.effects[id]=next;}));}
   removeEffect(scope,id){this.change(()=>this.targets(scope).forEach(t=>{delete t.effects[id];const dependent={harmonicType:'harmonicValue',trillValue:'trillSpeed',brushType:'brushDuration'}[id];if(dependent)delete t.effects[dependent];}));}
   setCurve(scope,points){const targets=this.targets(scope);if(!targets.length)throw Error('先选中已有音符。');this.change(()=>targets.forEach(t=>{t[scope==='note'?'bend':'whammy']=copy(points);if(!points.length)delete t.effects[scope==='note'?'bendStyle':'whammyStyle'];}));}
-  clearTechniques(){this.change(()=>{this.targets('note').forEach(n=>{n.effects={};n.bend=[];});this.targets('beat').forEach(b=>{const grace=b.effects.graceType;b.effects=grace?{graceType:grace}:{};b.whammy=[];b.tremolo=0;});});}
+  clearTechniques(){
+    this.change(()=>{
+      const selected=new Set(this.targets('note'));
+      for(const n of selected){n.effects={};n.bend=[];}
+      for(const b of this.selectedBeats){
+        if(this.noteRange&&b.notes.some(n=>!selected.has(n)))continue;
+        const grace=b.effects.graceType;
+        b.effects=grace?{graceType:grace}:{};
+        b.whammy=[];b.tremolo=0;
+      }
+    });
+  }
   setDuration(duration){this.change(()=>this.selectedBeats.forEach(b=>{b.duration=duration;b.review=b.review.filter(x=>!x.includes('时值'));}));}
   toggleDots(dots=1){const value=this.selectedBeats.every(b=>b.dots===dots)?0:dots;this.change(()=>this.selectedBeats.forEach(b=>b.dots=value));}
   move(dx,dy,byBar=false,extend=false){
+    if(this.anchor?.picks)this.clearSelection();
     if(extend)this.startSelection();else this.clearSelection();this.endDigits();
     if(dy)this.string=(this.string-1+dy+6)%6+1;
     if(!dx)return;
@@ -81,6 +146,7 @@ class Session {
     const start=this.firstBeat;
     let group=this.anchor?this.selectedBeats:this.currentBar.beats.slice(start,start+n);
     const removing=group.length===n&&group.every(b=>b.tupletNumerator===n&&b.tupletDenominator===denominator);
+    if(this.noteRange&&group.length!==this.lastBeat-start+1)throw Error('连音组需要连续的拍位。');
     if(this.anchor&&group.length!==n)throw Error(`请选择 ${n} 个拍位。`);
     if(group.some(b=>b.duration!==group[0].duration||b.dots!==group[0].dots))throw Error('连音组内的时值和附点必须相同。');
     this.change(()=>{while(group.length<n){const b=beat(group[0].duration);b.dots=group[0].dots;this.currentBar.beats.push(b);group.push(b);}group.forEach(b=>{b.tupletNumerator=removing?1:n;b.tupletDenominator=removing?1:denominator;});
@@ -88,11 +154,17 @@ class Session {
       if(!removing&&this.currentBar.beats.reduce((sum,b)=>sum+core.ticks(b),0)>capacity+.01)throw Error('这组连音放不进本小节，请先调整时值。');
     });
   }
-  setFret(fret){if(this.anchor?.wholeBars)throw Error('请轻点要输入品位的弦位。整段移调可在“音符”中升降半音。');this.change(()=>{let n=this.currentNote;if(!n){n=note(this.string,fret);this.currentBeat.notes.push(n);}n.fret=fret;n.review=[];});}
+  setFret(fret){
+    if(this.noteRange){
+      this.change(()=>this.targets('note').forEach(n=>{n.fret=fret;n.review=[];}));
+      return;
+    }
+    if(this.anchor?.wholeBars)throw Error('请轻点要输入品位的弦位。整段移调可在“音符”中升降半音。');this.change(()=>{let n=this.currentNote;if(!n){n=note(this.string,fret);this.currentBeat.notes.push(n);}n.fret=fret;n.review=[];});}
   rest(){this.change(()=>{this.currentBeat.notes=[];});}
   deleteNote(){this.change(()=>{this.currentBeat.notes=this.currentBeat.notes.filter(n=>n.string!==this.string);});}
   insertBeat(after=false,noteEntry=false){this.change(()=>{if(this.anchor){const at=after?this.lastBeat:this.firstBeat;this.bar=after?this.lastBar:this.firstBar;this.beat=at;}this.clearSelection();const old=this.currentBeat,b=beat(old.duration);b.dots=old.dots;b.tupletNumerator=old.tupletNumerator;b.tupletDenominator=old.tupletDenominator;if(noteEntry){const n=note(this.string,null);n.review=['请输入新音符的品位'];b.notes=[n];}this.currentBar.beats.splice(this.beat+(after?1:0),0,b);if(after)this.beat++;});}
   deleteBeat(){
+    if(this.noteRange){this.removeSelectedNotes();return;}
     if(this.anchor?.wholeBars){this.deleteBar();return;}
     if(this.anchor){
       this.change(()=>{
@@ -135,6 +207,17 @@ class Session {
       this.clearSelection();
     });
   }
+  beatsForClipboard(bar){
+    const result=[];
+    this.draft.bars[bar].beats.forEach((b,beat)=>{
+      if(this.anchor?!this.isSelected(bar,beat):beat!==this.beat)return;
+      if(!this.noteRange){result.push(b);return;}
+      const notes=b.notes.filter(n=>this.includesString(bar,beat,n.string));
+      if(notes.length)result.push({...b,notes});
+      else result.push({...b,notes:[],effects:b.effects.graceType?{graceType:b.effects.graceType}:{},whammy:[],tremolo:0,text:'',review:[]});
+    });
+    return result;
+  }
   copy(scope){
     if(scope==='bar'||this.anchor?.wholeBars){
       const first=this.anchor?.wholeBars?this.firstBar:this.bar;
@@ -142,10 +225,10 @@ class Session {
       this.clipboard={scope:'bars',value:copy(this.draft.bars.slice(first,last+1))};
     }else if(this.anchor&&this.firstBar!==this.lastBar){
       const parts=this.draft.bars.slice(this.firstBar,this.lastBar+1).map((bar,i)=>({
-        ...bar,beats:bar.beats.filter((_,beat)=>this.isSelected(this.firstBar+i,beat))
+        ...bar,beats:this.beatsForClipboard(this.firstBar+i)
       }));
       this.clipboard={scope:'fragment',value:copy(parts)};
-    }else this.clipboard={scope:'beat',value:copy(this.selectedBeats)};
+    }else this.clipboard={scope:'beat',value:copy(this.beatsForClipboard(this.bar))};
   }
   paste(){
     if(!this.clipboard)return;

@@ -3,23 +3,34 @@ let session,schema,busy=false,savedHere=false;
 const $=id=>document.getElementById(id),core=GuitarDraftCore;
 const send=(action,payload={})=>window.webkit?.messageHandlers.guitarEditor.postMessage({action,...payload});
 const status=text=>{$('status').textContent=text;};
-function perform(fn,keepDigits=false){if(busy)return;surface?.pause();if(!keepDigits)session?.endDigits();const before=session&&[session.revision,session.bar,session.beat,session.string].join(':');try{fn();render(!session.anchor?.wholeBars&&before!==[session.revision,session.bar,session.beat,session.string].join(':'));}catch(e){status(e.message);if($('panel').open)$('panelError').textContent=e.message;}}
+function perform(fn,keepDigits=false){if(busy)return;surface?.pause();if(!keepDigits)session?.endDigits();const before=session&&[session.revision,session.bar,session.beat,session.string].join(':');try{fn();render(!session.noteRange&&!session.anchor?.wholeBars&&before!==[session.revision,session.bar,session.beat,session.string].join(':'));}catch(e){status(e.message);if($('panel').open)$('panelError').textContent=e.message;}}
 function button(text,action,parent){const el=document.createElement('button');el.textContent=text;el.onclick=()=>perform(action,parent.id==='keypad'&&/^\d$/.test(text));parent.append(el);return el;}
 function field(label,value,change,options){const row=document.createElement('label');row.append(document.createTextNode(label));const input=document.createElement(options?'select':'input');input.setAttribute('aria-label',label);if(options){for(const [name,val] of options){const o=document.createElement('option');o.value=val;o.textContent=name;input.append(o);}}else input.type=typeof value==='number'?'number':'text';input.value=value;input.onchange=()=>perform(()=>change(options||input.type==='number'?Number(input.value):input.value));row.append(input);$('panelBody').append(row);return input;}
 function panel(title){surface?.pause();$('panelTitle').textContent=title;$('panelBody').replaceChildren();$('panelError').textContent='';if(!$('panel').open)$('panel').showModal();}
 function heading(text){const h=document.createElement('h3');h.textContent=text;$('panelBody').append(h);}
 function text(value){const p=document.createElement('p');p.textContent=value;$('panelBody').append(p);}
-function select(b,s,bar=session.bar){surface?.pause();if(selecting)session.startSelection();else session.clearSelection();session.bar=bar;session.beat=b;session.string=s;session.endDigits();render();}
+function select(beat,string,bar=session.bar){
+  surface?.pause();
+  if(selecting&&session.noteRange){
+    session.togglePickedNote(bar,beat,string);
+    if(!session.noteRange)selecting=false;
+  }else{
+    if(selecting)session.startSelection();else session.clearSelection();
+    Object.assign(session,{bar,beat,string});
+    session.endDigits();
+  }
+  render();
+}
 function markers(b){let names=[];if(b.tupletNumerator!==b.tupletDenominator)names.push(`${b.tupletNumerator}:${b.tupletDenominator}`);for(const spec of schema){let val=spec.scope==='beat'?b.effects[spec.id]:null;if(spec.scope==='note'){if(b.notes.some(n=>n.effects[spec.id]!==undefined&&n.effects[spec.id]!==0&&n.effects[spec.id]!==spec.default))names.push(spec.label);}else if(val!==undefined&&val!==0&&val!==spec.default)names.push(spec.label);}if(b.notes.some(n=>n.bend.length))names.push('推弦');if(b.whammy.length)names.push('摇把');if(b.tremolo)names.push('震音');return [...new Set(names)].join(' · ');}
 function render(reveal=false){if(!session)return;session.clamp();const d=session.draft,bar=session.currentBar;
   $('undo').disabled=!session.undoStack.length||busy;$('redo').disabled=!session.redoStack.length||busy;
   $('save').textContent=session.dirty||!savedHere?'保存':'已保存';$('prev').disabled=session.bar===0;$('next').disabled=session.bar===d.bars.length-1;
   const choice=$('barChoice');choice.replaceChildren();d.bars.forEach((b,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`第 ${i+1} 小节${b.review.length?' · 待核对':''}`;choice.append(o);});choice.value=session.bar;
-  $('selection').textContent=session.anchor?.wholeBars?barRangeLabel():`第 ${session.beat+1} 拍位 · 第 ${session.string} 弦`;
+  $('selection').textContent=session.noteRange?noteRangeLabel():session.anchor?.wholeBars?barRangeLabel():`第 ${session.beat+1} 拍位 · 第 ${session.string} 弦`;
   const actual=bar.beats.reduce((n,b)=>n+core.ticks(b),0),expected=(bar.numerator??d.numerator)*3840/(bar.denominator??d.denominator);
   $('timing').textContent=`${bar.numerator??d.numerator}/${bar.denominator??d.denominator} · ${Number((actual/960).toFixed(3))} / ${expected/960} 拍${Math.abs(actual-expected)>.01?' · 时值未齐':''}`;
   $('source').disabled=!bar.source;
-  const review=[...bar.review,...session.currentBeat.review,...session.currentBeat.notes.flatMap(n=>n.review)];status(review.length?review.join('；'):'轻点改音，长按小节并拖动选择段落。');
+  const review=[...bar.review,...session.currentBeat.review,...session.currentBeat.notes.flatMap(n=>n.review)];status(review.length?review.join('；'):'长按音符拖选多个音，长按小节空白处拖选整段。');
   refreshTools();
   surface.update(d,session,schema,reveal);if(!playing)surface.seekSelection();
 }
@@ -29,17 +40,21 @@ function barRangeLabel(){
   const first=session.firstBar+1,last=session.lastBar+1;
   return first===last?`已选第 ${first} 小节`:`已选第 ${first}–${last} 小节`;
 }
-function previewBarRange(first,last){
-  session.selectBars(first,last);
+function noteRangeLabel(){return `已选 ${session.targets('note').length} 个音符`;}
+function previewRange(first,last){
+  if(typeof first==='number')session.selectBars(first,last);
+  else session.selectNotes(first,last);
   surface.paintBarRange();
-  $('selection').textContent=barRangeLabel();
+  surface.paintNoteRange();
+  $('selection').textContent=session.noteRange?noteRangeLabel():barRangeLabel();
 }
-const barSelection={
+const rangeSelection={
   begin(first){
     previousCursor={bar:session.bar,beat:session.beat,string:session.string,anchor:session.anchor};
-    previewBarRange(first,first);
+    surface.clearCursorHighlight();
+    previewRange(first,first);
   },
-  extend:previewBarRange,
+  extend:previewRange,
   end(cancel){
     if(cancel)Object.assign(session,previousCursor);
     else selecting=false;
@@ -49,7 +64,7 @@ const barSelection={
 };
 window.loadGuitarDraft=(draft,techniques)=>{
   schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>core.validate(d,schema,false));
-  surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{select(beat,string,bar);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status,barSelection);
+  surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{select(beat,string,bar);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status,rangeSelection);
   window.scoreEditor=surface;render(true);document.body.removeAttribute('data-loading');
 };
 window.loadEditorSoundFont=base64=>surface.loadSoundFont(Uint8Array.from(atob(base64),c=>c.charCodeAt(0)));
@@ -71,11 +86,18 @@ $('keypadToggle').onclick=()=>document.body.classList.toggle('hideKeypad');
 function move(dx,dy,event){perform(()=>session.move(dx,dy,altMove||!!event?.altKey,selecting||!!event?.shiftKey));}
 $('stringUp').onclick=e=>move(0,-1,e);$('stringDown').onclick=e=>move(0,1,e);
 $('beatLeft').onclick=e=>move(-1,0,e);$('beatRight').onclick=e=>move(1,0,e);
-function setSelecting(on){selecting=on;if(on){if(session.anchor?.wholeBars)session.clearSelection();session.startSelection();}else session.clearSelection();render();}
+function setSelecting(on){
+  selecting=on;
+  if(on){
+    if(session.anchor?.wholeBars)session.clearSelection();
+    session.startSelection();
+  }else if(!session.noteRange)session.clearSelection();
+  render();
+}
 $('selectMode').onclick=()=>setSelecting(true);$('editMode').onclick=()=>setSelecting(false);
-$('review').onclick=()=>perform(()=>session.change(()=>{for(const bar of session.draft.bars.slice(session.firstBar,session.lastBar+1)){if(session.anchor?.wholeBars||!session.anchor)bar.review=[];}(session.anchor?session.selectedBeats:session.currentBar.beats).forEach(b=>{b.review=[];b.notes.forEach(n=>{if(n.fret!=null)n.review=[];});});}));
+$('review').onclick=()=>perform(()=>session.change(()=>{if(session.noteRange){session.targets('note').forEach(n=>{if(n.fret!=null)n.review=[];});return;}for(const bar of session.draft.bars.slice(session.firstBar,session.lastBar+1)){if(session.anchor?.wholeBars||!session.anchor)bar.review=[];}(session.anchor?session.selectedBeats:session.currentBar.beats).forEach(b=>{b.review=[];b.notes.forEach(n=>{if(n.fret!=null)n.review=[];});});}));
 
-$('copyBeat').onclick=()=>perform(()=>session.copy('beat'));$('pasteBeat').onclick=()=>perform(()=>session.paste());
+$('copyBeat').onclick=()=>perform(()=>{session.copy('beat');if(session.noteRange)selecting=false;});$('pasteBeat').onclick=()=>perform(()=>session.paste());
 for(const value of [7,8,9,'erase',4,5,6,'shorter',1,2,3,'longer',0,'dot','alt','shift']){
   if(typeof value==='number'){button(String(value),()=>session.inputDigit(value),$('keypad'));continue;}
   const spec={erase:['删除',()=>session.erase(),'delete'],shorter:['缩短时值',()=>session.setDuration(Math.min(64,session.currentBeat.duration*2)),'minus'],longer:['延长时值',()=>session.setDuration(Math.max(1,session.currentBeat.duration/2)),'plus'],dot:['附点',()=>session.toggleDots(1)],alt:['Alt',()=>{altMove=!altMove;}],shift:['选择范围',()=>setSelecting(!selecting),'arrow-big-up']}[value];

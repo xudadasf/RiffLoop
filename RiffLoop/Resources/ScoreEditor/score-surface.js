@@ -2,7 +2,7 @@
 // The same score model drives engraving, hit targets and audition; selection
 // never changes the stored note/string and edits always stop the old MIDI first.
 class GuitarScoreSurface {
-  constructor(element, overlay, onSelect, onState, onError, onBarSelection) {
+  constructor(element, overlay, onSelect, onState, onError, onRangeSelection) {
     this.element=element;this.overlay=overlay;this.onSelect=onSelect;this.onState=onState;this.onError=onError;
     this.serialized='';this.selection={bar:0,beat:0,string:1};this.ready=false;this.wantsPlay=false;this.scale=1.1;
     this.api=new alphaTab.AlphaTabApi(element,{
@@ -13,8 +13,8 @@ class GuitarScoreSurface {
     this.revealPending=false;
     this.tapGuard=new GuitarTapGuard(document.getElementById('scoreViewport'));
     this.barRects=[];
-    this.barDrag=new GuitarBarDrag(document.getElementById('paper'),document.getElementById('scoreViewport'),{
-      hit:(x,y,nearest)=>this.barAt(x,y,nearest),
+    this.rangeDrag=new GuitarRangeDrag(document.getElementById('paper'),document.getElementById('scoreViewport'),{
+      hit:(x,y,nearest,first)=>this.rangeHit(x,y,nearest,first),
       tap:(x,y)=>{
         if(!this.tapGuard.gesture?.moved)this.tapAt(x,y,document.elementFromPoint(x,y));
       },
@@ -22,10 +22,10 @@ class GuitarScoreSurface {
         this.pause();
         this.revealPending=false;
         if(this.tapGuard.gesture)this.tapGuard.gesture.moved=true;
-        onBarSelection.begin(first);
+        onRangeSelection.begin(first);
       },
-      extend:(first,last)=>onBarSelection.extend(first,last),
-      end:cancel=>onBarSelection.end(cancel)
+      extend:(first,last)=>onRangeSelection.extend(first,last),
+      end:cancel=>onRangeSelection.end(cancel)
     });
     this.onPaperClick=e=>{
       if(!e.target.closest('.scoreTarget'))this.tapAt(e.clientX,e.clientY,e.target);
@@ -75,6 +75,45 @@ class GuitarScoreSurface {
     }
     return best;
   }
+  rangeHit(clientX,clientY,nearest=false,first=null){
+    const bar=this.barAt(clientX,clientY,nearest);
+    if(bar==null||typeof first==='number')return bar;
+    const rect=this.element.getBoundingClientRect();
+    const x=clientX-rect.left,y=clientY-rect.top;
+    let hit=null,distance=Infinity;
+    for(const note of this.notesByBar?.[bar]||[]){
+      for(const box of note.boxes){
+        const dx=x-box.x,dy=y-box.y;
+        if(!nearest&&(Math.abs(dx)>box.w/2+2||Math.abs(dy)>box.h/2+1))continue;
+        const d=dx*dx+dy*dy;
+        if(d<distance){hit=note;distance=d;}
+      }
+    }
+    // Holding a blank part of the measure keeps whole-bar selection available.
+    return hit??(nearest?null:bar);
+  }
+  clearCursorHighlight(){
+    for(const target of this.overlay.querySelectorAll('.scoreTarget.selected,.scoreTarget.inRange')){
+      target.classList.remove('selected','inRange');
+      target.setAttribute('aria-pressed','false');
+    }
+  }
+  paintNoteRange(){
+    const session=this.editSession;
+    const next=session?.noteRange?[session.firstBar,session.lastBar]:null;
+    for(const range of [this.paintedNotes,next]){
+      if(!range)continue;
+      for(let i=range[0];i<=range[1];i++){
+        for(const n of this.notesByBar?.[i]||[]){
+          const selected=!!next&&session.isSelected(i,n.beat)&&session.includesString(i,n.beat,n.string);
+          n.target.classList.toggle('noteInRange',selected);
+          if(n.head)n.head.hidden=!selected;
+        }
+      }
+      if(next&&range[0]===next[0]&&range[1]===next[1])break;
+    }
+    this.paintedNotes=next;
+  }
   paintBarRange(){
     const session=this.editSession;
     for(const {bar,shade} of this.barRects){
@@ -100,6 +139,8 @@ class GuitarScoreSurface {
     ranges.className='barRanges';
     this.overlay.append(ranges);
     this.barRects=[];
+    this.notesByBar=[];
+    this.paintedNotes=null;
     for(let bar=0;bar<this.score.masterBars.length;bar++){
       const bounds=lookup.findMasterBarByIndex(bar)?.realBounds;
       if(!bounds)continue;
@@ -117,13 +158,27 @@ class GuitarScoreSurface {
         target.setAttribute('aria-label',`第 ${bi+1} 小节 第 ${ti+1} 拍位 第 ${string} 弦 ${n?(n.fret??'待核对'):'空'}`);
         Object.assign(target.style,{left:`${tab.onNotesX-15}px`,top:`${rect.y+(string-1)*spacing-spacing/2}px`,width:'30px',height:`${Math.max(10,spacing)}px`});
         if(n&&n.fret==null){target.textContent='?';target.classList.add('unknown');}
+        if(n){
+          const boxes=[{x:tab.onNotesX,y:rect.y+(string-1)*spacing,w:30,h:spacing}];
+          const staff=bounds.find(b=>b!==tab);
+          const headBox=staff?.notes?.find(b=>7-b.note.string===string)?.noteHeadBounds;
+          let head=null;
+          if(headBox){
+            boxes.push({x:headBox.x+headBox.w/2,y:headBox.y+headBox.h/2,w:headBox.w,h:headBox.h});
+            head=document.createElement('span');
+            head.className='selectedHead';head.hidden=true;
+            Object.assign(head.style,{left:(headBox.x-2)+'px',top:(headBox.y-2)+'px',width:(headBox.w+4)+'px',height:(headBox.h+4)+'px'});
+            this.overlay.append(head);
+          }
+          (this.notesByBar[bi]??=[]).push({bar:bi,beat:ti,string,boxes,head,target});
+        }
         target.onclick=()=>this.pick(bi,ti,string);this.overlay.append(target);
       }
     }
     this.highlight();this.finishReveal();
   }
   finishReveal(){if(this.revealPending&&!this.wantsPlay){this.revealPending=false;this.revealSelection();}}
-  highlight(){this.paintBarRange();for(const target of this.overlay.querySelectorAll('.scoreTarget')){const active=+target.dataset.bar===this.selection.bar&&+target.dataset.beat===this.selection.beat&&+target.dataset.string===this.selection.string;target.classList.toggle('selected',active);target.classList.toggle('inRange',!this.editSession?.anchor?.wholeBars&&!!this.editSession?.isSelected(+target.dataset.bar,+target.dataset.beat));target.setAttribute('aria-pressed',String(active));}}
+  highlight(){this.paintBarRange();this.paintNoteRange();for(const target of this.overlay.querySelectorAll('.scoreTarget')){const active=+target.dataset.bar===this.selection.bar&&+target.dataset.beat===this.selection.beat&&+target.dataset.string===this.selection.string;target.classList.toggle('selected',active);target.classList.toggle('inRange',!this.editSession?.noteRange&&!this.editSession?.anchor?.wholeBars&&!!this.editSession?.isSelected(+target.dataset.bar,+target.dataset.beat));target.setAttribute('aria-pressed',String(active||target.classList.contains('noteInRange')));}}
   pick(bar,beat,string){this.pause();this.onSelect(bar,beat,string);}
   seekSelection(){const b=this.score?.tracks[0].staves[0].bars[this.selection.bar]?.voices[0].beats[this.selection.beat];if(b){this.pauseTick=b.absolutePlaybackStart;this.api.tickPosition=this.pauseTick;}}
   revealSelection(){
@@ -148,6 +203,6 @@ class GuitarScoreSurface {
   stop(){this.pause();this.pauseTick=0;this.api.stop();this.api.tickPosition=0;}
   loop(enabled){this.api.isLooping=enabled;}
   zoom(delta){this.pause();this.scale=Math.max(.7,Math.min(2,this.scale+delta));this.api.settings.display.scale=this.scale;this.api.updateSettings();this.api.render();}
-  destroy(){window.removeEventListener('resize',this.onResize);document.getElementById('paper').removeEventListener('click',this.onPaperClick);this.barDrag.destroy();this.tapGuard.destroy();this.stop();this.api.destroy();}
+  destroy(){window.removeEventListener('resize',this.onResize);document.getElementById('paper').removeEventListener('click',this.onPaperClick);this.rangeDrag.destroy();this.tapGuard.destroy();this.stop();this.api.destroy();}
 }
 window.GuitarScoreSurface=GuitarScoreSurface;

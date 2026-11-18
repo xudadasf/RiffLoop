@@ -23,8 +23,8 @@ class GuitarTapGuard {
 window.GuitarTapGuard=GuitarTapGuard;
 
 /* A passive start leaves ordinary scrolling to WebKit. Only consume move
-   events once a stationary finger has held a bar long enough to select it. */
-class GuitarBarDrag {
+   events once a stationary finger has held a score position long enough to select it. */
+class GuitarRangeDrag {
   constructor(paper,viewport,callbacks){
     this.paper=paper;
     this.viewport=viewport;
@@ -84,7 +84,7 @@ class GuitarBarDrag {
   }
   updateEnd(){
     const g=this.gesture;
-    const last=this.callbacks.hit(g.x,g.y,true);
+    const last=this.callbacks.hit(g.x,g.y,true,g.first);
     if(last!=null&&last!==g.last){g.last=last;this.callbacks.extend(g.first,last);}
   }
   scrollEdge(){

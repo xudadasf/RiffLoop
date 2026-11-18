@@ -75,20 +75,48 @@ await page.locator('#play').click();await page.locator('#stop').click();await pa
 await page.locator('#keypad button').filter({hasText:/^5$/}).click();await page.waitForFunction(()=>!document.getElementById('play').disabled);await page.locator('#play').click();await page.waitForFunction(()=>scoreEditor.api.playerState===1&&scoreEditor.api.tickPosition>100);await page.locator('#stop').click();
 await page.locator('#save').click();assert.equal(await page.evaluate(()=>messages.at(-1).action),'save');await page.evaluate(()=>guitarReply({saved:true,message:'已保存同一份曲谱'}));assert.equal(await page.locator('#save').textContent(),'已保存');assert.equal(await page.locator('#export').count(),0);
 // A synthetic multi-system score checks hit positions and the real mini layout.
-await page.evaluate(()=>{session.change(d=>{d.title='电吉他编辑与试听';d.bars=Array.from({length:8},(_,i)=>({...GuitarEdit.bar(),section:i===0?'前奏':i===4?'主歌':'',beats:Array.from({length:8},(_,j)=>({...GuitarEdit.beat(8),notes:[GuitarEdit.note(j<4?2:3,[8,10,8,10,6,8,6,8][j])]}))}));d.bars[2].beats[0].notes=[{string:4,effects:{},bend:[],review:['待核对']}];d.bars[0].beats[0].notes[0].effects.isHammerPullOrigin=1;d.bars[1].beats[3].notes[0].effects.vibrato=1;});session.bar=0;session.beat=1;session.string=2;render();});
+await page.evaluate(()=>{session.change(d=>{d.title='电吉他编辑与试听';d.bars=Array.from({length:8},(_,i)=>({...GuitarEdit.bar(),section:i===0?'前奏':i===4?'主歌':'',beats:Array.from({length:8},(_,j)=>({...GuitarEdit.beat(8),notes:[GuitarEdit.note(j<4?2:3,[8,10,8,10,6,8,6,8][j])]}))}));d.bars[0].beats[2].notes.push(GuitarEdit.note(4,19));d.bars[2].beats[0].notes=[{string:4,effects:{},bend:[],review:['待核对']}];d.bars[0].beats[0].notes[0].effects.isHammerPullOrigin=1;d.bars[1].beats[3].notes[0].effects.vibrato=1;});session.bar=0;session.beat=1;session.string=2;render();});
 await page.waitForSelector('.scoreTarget[data-bar="7"]');assert.equal(await target(2,0,4).textContent(),'?', 'Swift omitted nil frets remain visible as unknown notes');await target(0,1,2).click();assert.equal(await page.evaluate(()=>session.currentNote.fret),10);
 await page.waitForFunction(()=>!document.getElementById('play').disabled);await page.locator('#techniques').click();
 // Replay a real touch scroll over an engraved note. Pointer-down must not pick.
 const touch=await page.context().newCDPSession(page);const hit=await target(0,2,2).boundingBox();
-const barPoint=async bar=>{
-  const bounds=await target(bar,2,2).boundingBox();
+const barPoint=async(bar,beat=2,string=6)=>{
+  const bounds=await target(bar,beat,string).boundingBox();
   return {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2};
 };
 const firstPoint=await barPoint(0),secondPoint=await barPoint(1);
-const startHold=async point=>{
+const startHold=async(point,mode='bars')=>{
   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});
-  await page.waitForFunction(()=>session.anchor?.wholeBars);
+  await page.waitForFunction(mode=>mode==='notes'?session.noteRange:session.anchor?.wholeBars,mode);
 };
+// Drag backwards over three printed frets; the simultaneous fourth-string note stays out.
+await startHold(await barPoint(0,3,2),'notes');
+await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[await barPoint(0,1,2)]});
+await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+assert.equal(await page.locator('#selection').textContent(),'已选 3 个音符');
+assert.equal(await page.locator('.scoreTarget.noteInRange').count(),3);
+assert.equal(await page.locator('.selectedHead:visible').count(),3);
+await page.locator('#selectMode').tap();
+await target(0,2,2).tap();
+assert.equal(await page.locator('#selection').textContent(),'已选 2 个音符');
+await target(0,2,4).tap();
+assert.equal(await page.locator('#selection').textContent(),'已选 3 个音符');
+await page.locator('#editMode').tap();
+assert.equal(await page.locator('#selection').textContent(),'已选 3 个音符');
+await page.getByRole('button',{name:'掌根闷音 P.M.',exact:true}).tap();
+assert.deepEqual(await page.evaluate(()=>session.currentBar.beats.slice(0,4).map(b=>b.notes.map(n=>n.effects.isPalmMute||0))),[[0],[1],[0,1],[1]]);
+await page.locator('#undo').tap();
+await target(0,1,2).tap();
+// A staff notehead starts the same note selection.
+const headPoint=await page.evaluate(()=>{
+  const note=scoreEditor.notesByBar[0].find(n=>n.beat===1&&n.string===2).boxes[1];
+  const rect=document.querySelector('#engraving').getBoundingClientRect();
+  return {x:rect.left+note.x,y:rect.top+note.y};
+});
+await startHold(headPoint,'notes');
+await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+assert.equal(await page.locator('#selection').textContent(),'已选 1 个音符');
+await target(0,1,2).tap();
 await startHold(secondPoint);
 await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[firstPoint]});
 await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});

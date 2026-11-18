@@ -26,7 +26,7 @@ function techniqueField(spec){
   if(spec.id==='harmonicValue')text('先选择泛音类型，再调整泛音音高。');
 }
 function openAdvanced(ids){
-  panel('技巧参数');text(session.anchor?'设置作用于已选拍位的所有弦。':'音符技巧作用于当前弦；拍位技巧作用于整个拍位。');
+  panel('技巧参数');text(session.noteRange?'音符技巧只改高亮音；时值、力度等拍位属性由同拍音符共用。':session.anchor?'设置作用于已选拍位的所有弦。':'音符技巧作用于当前弦；拍位技巧作用于整个拍位。');
   const keys=ids||techniqueGroups[activeTool]||[];
   for(const scope of ['note','beat']){
     const specs=schema.filter(s=>s.scope===scope&&keys.some(k=>k===s.id||k===`${scope}:${s.id}`));

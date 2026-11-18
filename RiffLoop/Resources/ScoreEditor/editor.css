@@ -53,3 +53,11 @@ button img{-webkit-user-drag:none}
 #panelBody input,#panelBody select{font-size:16px}
 #panelBody label:has([aria-label="插入空白小节数"]){grid-column:1/-1}
 #panelBody input[aria-label="插入空白小节数"]{width:5em}
+
+.scoreTarget.noteInRange,.selectedHead{
+  border-radius:3px;
+  background:#45c5d765;
+  outline:1.5px solid #218a9b;
+}
+.selectedHead{position:absolute;pointer-events:none;border-radius:50%}
+body.reading .selectedHead{display:none}

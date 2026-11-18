@@ -31,8 +31,8 @@ struct RiffLoopApp: App {
            let id = UUID(uuidString: value) {
             ScoreRegionUITestFixture(id: id)
         } else if ProcessInfo.processInfo.environment["RIFFLOOP_EDITOR_TOUCH_TEST"] == "1" {
-            let bars = [7, 11].map { fret in
-                GuitarBar(beats: Array(repeating: GuitarBeat(notes: [GuitarNote(string: 2, fret: fret)]), count: 4))
+            let bars = [[16, 17, 18, 19], [11, 12, 13, 14]].map { frets in
+                GuitarBar(beats: frets.map { GuitarBeat(notes: [GuitarNote(string: 2, fret: $0)]) })
             }
             GuitarDraftEditorView(document: .init(id: UUID(), draft: GuitarDraft(bars: bars)))
                 .environmentObject(ScoreExternalOpenCoordinator())

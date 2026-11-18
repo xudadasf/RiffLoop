@@ -41,7 +41,7 @@ function buildTools(){
     tool('附点',()=>session.toggleDots(1),{id:'dots',active:()=>session.selectedBeats.every(b=>b.dots===1)});
     tool('双附点',()=>session.toggleDots(2),{active:()=>session.selectedBeats.every(b=>b.dots===2)});
     effect('延音','note','isTieDestination');
-    tool('变休止',()=>session.change(()=>session.selectedBeats.forEach(b=>b.notes=[])),{id:'rest',symbol:0xE4E5});
+    tool('变休止',()=>session.noteRange?session.removeSelectedNotes():session.change(()=>session.selectedBeats.forEach(b=>b.notes=[])),{id:'rest',symbol:0xE4E5});
   }else if(activeTool==='dynamics'){
     ['ppp','pp','p','mp','mf','f','ff','fff'].forEach((name,i)=>effect(name,'beat','dynamics',i,5));
     effect('渐强','beat','crescendo',1);effect('渐弱','beat','crescendo',2);effect('音量渐入','beat','fade',1);effect('音量渐出','beat','fade',2);effect('音量起伏','beat','fade',3);
@@ -71,7 +71,7 @@ function buildTools(){
     tool('左手指法',()=>openAdvanced(['leftHandFinger']));tool('右手指法',()=>openAdvanced(['rightHandFinger']));effect('显示弦号','note','showStringNumber');tool('小节设置',()=>$('bars').click());
   }else if(activeTool==='note'){
     effect('连奏','beat','isLegatoOrigin');tool('颤音 / 回音',()=>openAdvanced(['note:trillValue','note:trillSpeed','note:ornament']));
-    tool('加前倚音', ()=>{session.clearSelection();session.change(()=>{if(!session.currentBeat.notes.length)throw Error('先选中音符。');const b=GuitarEdit.copy(session.currentBeat);b.duration=8;b.dots=0;b.tupletNumerator=1;b.tupletDenominator=1;b.effects={graceType:2};b.notes.forEach(n=>{n.effects={};n.bend=[];});b.whammy=[];b.tremolo=0;b.text='';session.currentBar.beats.splice(session.beat,0,b);});},{disabled:()=>session.anchor?.wholeBars||noteReady()});
+    tool('加前倚音', ()=>{session.clearSelection();session.change(()=>{if(!session.currentBeat.notes.length)throw Error('先选中音符。');const b=GuitarEdit.copy(session.currentBeat);b.duration=8;b.dots=0;b.tupletNumerator=1;b.tupletDenominator=1;b.effects={graceType:2};b.notes.forEach(n=>{n.effects={};n.bend=[];});b.whammy=[];b.tremolo=0;b.text='';session.currentBar.beats.splice(session.beat,0,b);});},{disabled:()=>session.noteRange||session.anchor?.wholeBars||noteReady()});
     preset('半音推弦','note','bend',[{offset:0,value:0},{offset:60,value:2}]);preset('全音推弦','note','bend',[{offset:0,value:0},{offset:60,value:4}]);
     preset('推弦释放','note','bend',[{offset:0,value:0},{offset:30,value:4},{offset:60,value:0}]);preset('预推释放','note','bend',[{offset:0,value:4},{offset:60,value:0}]);
     tool('升半音',()=>session.transpose(1),{disabled:noteReady});tool('降半音',()=>session.transpose(-1),{disabled:noteReady});
@@ -81,9 +81,9 @@ function buildTools(){
   }
   if(!['beat','rhythm','attach'].includes(activeTool))tool('更多设置',()=>openAdvanced());
 }
-function refreshTools(){for(const update of toolRefresh)update();$('toolHint').textContent=session.anchor?.wholeBars?barRangeLabel()+' · 全弦':session.anchor?`已选 ${session.selectedBeats.length} 个拍位 · 全弦`:(activeTool==='effect'?'起音加 H/P、滑音 · 再点取消':activeTool==='beat'?'前插保留原音 · 数字键输入新音品位':activeTool==='rhythm'?'后音加延音 · 左右滑动工具条':'点选应用 · 左右滑动工具条');$('selectMode').setAttribute('aria-pressed',String(selecting));$('editMode').setAttribute('aria-pressed',String(!selecting));$('shiftKey').setAttribute('aria-pressed',String(selecting));$('altKey').setAttribute('aria-pressed',String(altMove));$('pasteBeat').disabled=!session.clipboard;
+function refreshTools(){for(const update of toolRefresh)update();$('toolHint').textContent=session.noteRange?(selecting?'轻点音符增减 · 编辑退出':'点「选择」逐音增减 · 时值按拍'):session.anchor?.wholeBars?barRangeLabel()+' · 全弦':session.anchor?`已选 ${session.selectedBeats.length} 个拍位 · 全弦`:(activeTool==='effect'?'起音加 H/P、滑音 · 再点取消':activeTool==='beat'?'前插保留原音 · 数字键输入新音品位':activeTool==='rhythm'?'后音加延音 · 左右滑动工具条':'点选应用 · 左右滑动工具条');$('selectMode').setAttribute('aria-pressed',String(selecting));$('editMode').setAttribute('aria-pressed',String(!selecting));$('shiftKey').setAttribute('aria-pressed',String(selecting));$('altKey').setAttribute('aria-pressed',String(altMove));$('pasteBeat').disabled=!session.clipboard;
   const remove=$('deleteBeat');
-  if(remove)remove.textContent=session.anchor?.wholeBars?'删除所选小节':session.anchor?'删除所选拍位':'删除拍';
+  if(remove)remove.textContent=session.noteRange?'删除所选音符':session.anchor?.wholeBars?'删除所选小节':session.anchor?'删除所选拍位':'删除拍';
   const duplicate=$('duplicateBeat');
   if(duplicate)duplicate.textContent=session.anchor?'原位复制选区':'原位复制拍';
   $('copyBeat').title=session.anchor?'复制选区':'复制当前拍';
