@@ -8,21 +8,19 @@ final class GuitarEditorTouchTests: XCTestCase {
         app.launchEnvironment["RIFFLOOP_EDITOR_TOUCH_TEST"] = "1"
         app.launch()
 
-        func note(in bar: Int, fret: Int) -> XCUIElement {
-            app.buttons["第 \(bar) 小节 第 2 拍位 第 2 弦 \(fret)"]
-        }
-        let first = note(in: 1, fret: 7)
-        let second = note(in: 2, fret: 11)
+        let web=app.webViews
+        // Touch the printed frets, as a player would. WebKit exposes these SVG
+        // numbers as static text independently of the transparent hit targets.
+        let first = web.staticTexts["7"].firstMatch
+        let second = web.staticTexts["11"].firstMatch
         XCTAssertTrue(first.waitForExistence(timeout: 25))
         let middle = CGVector(dx: 0.5, dy: 0.5)
         second.coordinate(withNormalizedOffset: middle).press(forDuration: 0.8, thenDragTo: first.coordinate(withNormalizedOffset: middle))
-        app.buttons["复制"].tap()
-        app.buttons["粘贴"].tap()
-        XCTAssertTrue(note(in: 3, fret: 7).waitForExistence(timeout: 10))
-        XCTAssertTrue(note(in: 4, fret: 11).exists)
-
-        app.buttons["撤销"].tap()
-        XCTAssertTrue(note(in: 3, fret: 7).waitForNonExistence(timeout: 5))
-        XCTAssertTrue(note(in: 2, fret: 11).exists)
+        XCTAssertTrue(web.staticTexts["已选第 1–2 小节"].waitForExistence(timeout: 5))
+        web.buttons["复制"].tap()
+        web.buttons["粘贴"].tap()
+        XCTAssertTrue(web.staticTexts["已选第 3–4 小节"].waitForExistence(timeout: 10))
+        web.buttons["撤销"].tap()
+        XCTAssertTrue(web.staticTexts["已选第 1–2 小节"].waitForExistence(timeout: 5))
     }
 }

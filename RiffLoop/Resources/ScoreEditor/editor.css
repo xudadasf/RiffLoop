@@ -48,3 +48,8 @@ button img{-webkit-user-drag:none}
 }
 
 #toolStrip .toolButton[aria-pressed=true] .musicSymbol{filter:invert(1)}
+
+/* Keep the iPad keyboard from zooming the viewport or covering the insert row. */
+#panelBody input,#panelBody select{font-size:16px}
+#panelBody label:has([aria-label="插入空白小节数"]){grid-column:1/-1}
+#panelBody input[aria-label="插入空白小节数"]{width:5em}

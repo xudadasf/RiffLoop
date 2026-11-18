@@ -87,10 +87,8 @@ $('panelClose').onclick=()=>{$('panel').close();render();};
 $('settings').onclick=()=>{panel('曲谱设置');field('曲名',session.draft.title,v=>session.change(d=>d.title=v));field('速度 BPM',session.draft.tempo,v=>session.change(d=>d.tempo=v));field('拍号分子',session.draft.numerator,v=>session.change(d=>d.numerator=v));field('拍号分母',session.draft.denominator,v=>session.change(d=>d.denominator=v),[1,2,4,8,16,32].map(n=>[String(n),n]));field('变调夹',session.draft.capo,v=>session.change(d=>d.capo=v));field('音色',session.draft.program,v=>session.change(d=>d.program=v),[['电吉他清音',27],['电吉他爵士',26],['电吉他闷音',28],['过载',29],['失真',30],['泛音',31]]);text('调弦使用 MIDI 音高：标准 E2 A2 D3 G3 B3 E4 = 40 45 50 55 59 64。修改拍号保留全部音符，请再核对各小节时值。');for(let i=0;i<6;i++)field(`第 ${6-i} 弦`,session.draft.tuning[i],v=>session.change(d=>d.tuning[i]=v));};
 $('bars').onclick=()=>{
   panel('小节与空白间隔');
-  heading(`第 ${session.bar+1} 小节 · 局部间隔`);
-  text(session.anchor?.wholeBars?barRangeLabel()+'。空白小节可插在整段之前或之后。':'在当前位置插入空白小节，操作可撤销。');
-  const count=field('插入空白小节数',1,()=>{});count.min=1;count.max=99;count.step=1;
-  const error=document.createElement('p');error.setAttribute('role','alert');$('panelBody').append(error);
+  const count=field('插入空白小节数',1,()=>{});count.min=1;count.max=99;count.step=1;count.onchange=null;
+  const error=$('panelError');
   for(const [label,before] of [['在本小节前插入',true],['在本小节后插入',false]]){
     button(session.anchor?.wholeBars?label.replace('本小节','选区'):label,()=>{try{session.insertEmptyBars(Number(count.value),before);$('panel').close();}catch(e){error.textContent=e.message;}},$('panelBody'));
   }
