@@ -1,4 +1,18 @@
-# Reflow-style TAB input — 2026-11-17
+# Score touch and techniques — 2026-11-18
+
+Latest product commit: `822e69260f4446f05700215cb7b80ea9c2c5a93d`, 0.25.78 (122). See `docs/reviews/2026-11-17-editor-touch-techniques.md` for scope and compatibility boundaries.
+
+- Touch scroll, cancelled pointer/compatibility click and navigation-pad drags no longer move or extend selection. Category switching and save replies retain manual scroll position. Single taps select TAB frets and staff note heads. Explicit navigation still reveals the selected position.
+- Insertion has a persistent left-side entry and separate before/after note/rest controls. New notes show an explicit unknown fret until entered, preserving the original note.
+- Applied techniques have individual edit/remove actions. Bend/whammy panels show a graph, presets and numeric point controls. Each point edit checks GP round-trip compatibility before changing the draft.
+- Browser captures inspected: `output/editor-touch-techniques-20261117/editor-mini.png`, `editor-portrait.png`, `curve-editor.png`, `applied-techniques.png`. Landscape 1133 × 744, portrait 744 × 1133 CSS px, 2× scale. Panels and controls fit; the two-line applied-techniques sidebar label is readable but not a pixel-exact Reflow match.
+- Native capture `native-editor-previous.png` from passing CI 44093630868 was inspected. It covers b8d4bbf, including the new front insertion and technique removal, not the final staff-tap follow-up. The latest full CI is blocked during upstream dependency download; local browser success does not replace that check. No physical-device install or validation this time, per user request.
+
+Status: interaction and local visual checks passed; final full iOS verification pending upstream dependency availability.
+
+---
+
+# Previous Reflow-style TAB input — 2026-11-17
 
 Source visual truth: user screenshot `C:/Users/sadada/AppData/Local/Temp/codex-clipboard-93740c0a-5f3d-4261-b06a-927769b95565.png` (2266 × 1488). Private image is not committed. Official interaction references: [entering notes](https://reflow.app/help/writing-tab/entering-notes/), [beats](https://reflow.app/help/writing-tab/beats/), [effects](https://reflow.app/help/techniques/effects/), [moving around](https://reflow.app/help/writing-tab/moving-around/).
 
