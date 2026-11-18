@@ -12,6 +12,15 @@ class GuitarScoreSurface {
     });
     this.revealPending=false;
     this.tapGuard=new GuitarTapGuard(document.getElementById('scoreViewport'));
+    this.onPaperClick=e=>{
+      if(document.body.classList.contains('reading')||e.target.closest('.scoreTarget'))return;
+      const rect=this.element.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top,lookup=this.api.renderer.boundsLookup;
+      const b=lookup?.getBeatAtPos(x,y);if(!b)return;
+      const n=lookup.getNoteAtPos(b,x,y);
+      if(n)this.pick(b.voice.bar.index,b.index,7-n.string);
+      else if(b.isRest&&lookup.findBeats(b)?.some(bounds=>y>=bounds.barBounds.visualBounds.y&&y<=bounds.barBounds.visualBounds.y+bounds.barBounds.visualBounds.h))this.pick(b.voice.bar.index,b.index,this.selection.string);
+    };
+    document.getElementById('paper').addEventListener('click',this.onPaperClick);
     this.onResize=()=>{const selected=this.overlay.querySelector('.selected');if(selected){const r=selected.getBoundingClientRect();if(r.bottom>0&&r.top<innerHeight)this.revealPending=true;}};
     window.addEventListener('resize',this.onResize);
     this.api.renderFinished.on(()=>requestAnimationFrame(()=>this.drawTargets()));
@@ -29,7 +38,7 @@ class GuitarScoreSurface {
     });
     this.api.error.on(e=>{this.pause();this.onError(e.message||String(e));});
     // The renderer must never select on finger-down: that may be a scroll.
-    // TAB overlay clicks are the sole pointer-based selection entry point.
+    // TAB targets and staff note heads only select after a completed click.
   }
   configureOutput(){window.RiffLoopAudio.install(this.api.player?.output);}
   loadSoundFont(bytes){this.api.loadSoundFont(bytes,false);}
@@ -86,6 +95,6 @@ class GuitarScoreSurface {
   stop(){this.pause();this.pauseTick=0;this.api.stop();this.api.tickPosition=0;}
   loop(enabled){this.api.isLooping=enabled;}
   zoom(delta){this.pause();this.scale=Math.max(.7,Math.min(2,this.scale+delta));this.api.settings.display.scale=this.scale;this.api.updateSettings();this.api.render();}
-  destroy(){window.removeEventListener('resize',this.onResize);this.tapGuard.destroy();this.stop();this.api.destroy();}
+  destroy(){window.removeEventListener('resize',this.onResize);document.getElementById('paper').removeEventListener('click',this.onPaperClick);this.tapGuard.destroy();this.stop();this.api.destroy();}
 }
 window.GuitarScoreSurface=GuitarScoreSurface;
