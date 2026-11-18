@@ -17,6 +17,8 @@ def verify(app: Path):
     for relative in ["GpWeb/alphaTab.min.js", "ScoreDraft.html", "draft-core.js", "draft-v2.cjs"]:
         if not (app / relative).is_file():
             raise ValueError(f"Missing existing score resource: {relative}")
+    if (app / 'LICENSE').read_bytes() != (repo / 'Vendor/ONNXRuntime/LICENSE').read_bytes():
+        raise ValueError('Missing or changed ONNX Runtime license')
     print("Verified packaged offline recognition and score editor resources")
 
 

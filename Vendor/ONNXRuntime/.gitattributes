@@ -1,0 +1,3 @@
+# Preserve the official archive bytes on every checkout platform.
+objectivec/** -text
+LICENSE -text

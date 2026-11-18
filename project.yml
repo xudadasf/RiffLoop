@@ -14,8 +14,7 @@ settings:
 
 packages:
   ONNXRuntime:
-    url: https://github.com/microsoft/onnxruntime-swift-package-manager
-    exactVersion: 1.24.2
+    path: Vendor/ONNXRuntime
 
 targets:
   RiffLoop:
@@ -35,6 +34,8 @@ targets:
         buildPhase: resources
       - path: RiffLoop/Resources/ScoreEditor
         type: folder
+        buildPhase: resources
+      - path: Vendor/ONNXRuntime/LICENSE
         buildPhase: resources
       - path: .cache/score-ocr/PP-OCRv6_rec_small.onnx
         buildPhase: resources

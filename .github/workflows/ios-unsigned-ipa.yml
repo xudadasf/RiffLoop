@@ -37,6 +37,7 @@ jobs:
 
       - name: Generate Xcode project
         run: |
+          python3 scripts/verify-onnx-package.py
           python3 scripts/prepare-score-ocr.py
           xcodegen generate
 
