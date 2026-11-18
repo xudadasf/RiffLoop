@@ -3,14 +3,14 @@
 #keypad button:nth-child(11),#keypad button:nth-child(12){font-size:14px;white-space:nowrap;padding:6px}
 
 @font-face{font-family:EditorMusic;src:url('../GpWeb/font/Bravura.woff2') format('woff2');font-display:swap}
-.toolIcon{width:24px;height:24px;filter:invert(1);pointer-events:none}.musicSymbol{font-family:EditorMusic;font-size:28px;line-height:36px;min-height:36px;display:block;font-weight:normal}
+.toolIcon{width:24px;height:24px;filter:invert(1);pointer-events:none}.musicSymbol{display:block;width:32px;height:32px;flex:none}
 .sidebar button{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px}.sidebar button:first-of-type{background:transparent}.sidebar button[aria-pressed=true]{background:#805337}.sidebar{gap:7px}
 .editDock{left:266px;right:274px;padding:8px;bottom:16px}.rightDock{width:246px}.navigator{width:168px}
-#toolStrip{display:flex;gap:4px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding:0 0 8px;align-items:stretch;min-height:66px;scroll-snap-type:x proximity}
-#toolStrip .toolButton{flex:0 0 auto;min-width:60px;max-width:124px;padding:7px 10px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff0b;scroll-snap-align:start;line-height:1.35}
-#toolStrip .toolButton[aria-pressed=true]{background:#9ccbd0;color:#132e32}#toolStrip .musicSymbol{font-size:28px;line-height:32px;min-height:32px}
+#toolStrip{display:flex;gap:4px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding:0 0 8px;align-items:stretch;min-height:66px;scroll-snap-type:none}
+#toolStrip .toolButton{flex:0 0 auto;min-width:60px;max-width:124px;padding:7px 10px;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff0b;line-height:1.35}
+#toolStrip .toolButton[aria-pressed=true]{background:#9ccbd0;color:#132e32}
 #toolTabs{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border-top:1px solid #ffffff24;padding-top:6px;gap:2px}
-#toolTabs button{min-width:0;padding:4px 1px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:58px}#toolTabs .musicSymbol{font-size:27px;line-height:27px;min-height:27px}
+#toolTabs button{min-width:0;padding:4px 1px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:58px}#toolTabs .musicSymbol{width:27px;height:27px}
 .dockHint{display:flex;gap:8px;justify-content:space-between;padding:6px 2px 0;font-size:10px;color:#ddd;line-height:1.4}.editDock #timing{font-size:10px;padding:0}.dockHint span{max-width:55%}
 #keypad{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:8px}#keypad button,#keypad button:last-child,#keypad button:nth-child(11),#keypad button:nth-child(12){height:48px;min-height:48px;padding:6px;font-size:21px}#keypad button[aria-pressed=true]{background:#805337}#keypad #altKey{font-size:16px}
 .scoreTarget.inRange{background:#87dbe440;outline:1px solid #65cdd955}#toolStrip:empty{display:none}
@@ -27,3 +27,24 @@
 .sidebar{overflow-y:auto;gap:3px;padding-top:16px}.sidebar strong{margin-bottom:6px}.sidebar button{flex-shrink:0;min-height:48px}
 .appliedTechnique{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px;background:#edf1f2;border-radius:10px}.appliedTechnique span{flex:1}.appliedTechnique button{flex-shrink:0}
 .curvePresets,.curvePoints,.curveGraph{grid-column:1/-1}.curvePresets{display:flex;flex-wrap:wrap;gap:6px}.curveGraph{width:100%;height:160px;border-radius:8px}.curvePoint{display:flex;align-items:center;gap:6px;margin:6px 0}.curvePoint label{flex:1;min-width:0}#panelBody .curvePoint input{width:90px}.curvePoint button{flex-shrink:0}#panelError{color:#ac340f}#panelError:empty{display:none}
+
+.barRanges{pointer-events:none}
+.barRanges>div{position:absolute;background:#60bdcf30;border:1.5px solid #398fa2;border-radius:3px}
+body.reading .barRanges{display:none}
+
+button,button *{
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+}
+button{
+  -webkit-appearance:none;
+  appearance:none;
+  line-height:1.25;
+}
+button img{-webkit-user-drag:none}
+.sidebar button span,#toolStrip button span:not(.musicSymbol),#toolTabs button span:not(.musicSymbol){
+  overflow-wrap:anywhere;
+}
+
+#toolStrip .toolButton[aria-pressed=true] .musicSymbol{filter:invert(1)}
