@@ -42,7 +42,11 @@ class GuitarRangeDrag {
       this.finish(true);
       const g=this.gesture={id:point.identifier,x:point.clientX,y:point.clientY,first,last:first,active:false};
       g.timer=setTimeout(()=>{
-        if(this.gesture!==g||callbacks.hit(g.x,g.y)!==first)return;
+        if(this.gesture!==g)return;
+        const current=callbacks.hit(g.x,g.y);
+        const sameNote=first&&current&&typeof first==='object'&&typeof current==='object'&&
+          current.bar===first.bar&&current.beat===first.beat&&current.string===first.string;
+        if(current!==first&&!sameNote)return;
         g.active=true;
         callbacks.begin(first);
       },450);
@@ -67,7 +71,10 @@ class GuitarRangeDrag {
       const g=this.gesture;
       const point=Array.from(e.changedTouches).find(t=>t.identifier===g.id);
       if(!point)return;
-      if(g.active&&e.cancelable)e.preventDefault();
+      if(g.active){
+        if(e.cancelable)e.preventDefault();
+        if(point.clientX!==g.x||point.clientY!==g.y){g.x=point.clientX;g.y=point.clientY;this.updateEnd();}
+      }
       if(!g.active&&e.cancelable&&Math.hypot(point.clientX-g.x,point.clientY-g.y)<=8){
         // A compatibility click may be omitted after a cancelled gesture.
         // Deliver this completed tap once, after excluding pans and pinches.
@@ -108,6 +115,7 @@ class GuitarRangeDrag {
     cancelAnimationFrame(this.frame);
     this.frame=0;
     if(g.active)this.callbacks.end(cancel);
+    this.callbacks.settled?.();
   }
   destroy(){this.finish(true);this.listeners.abort();}
 }

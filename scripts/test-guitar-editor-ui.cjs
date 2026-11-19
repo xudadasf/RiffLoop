@@ -90,7 +90,9 @@ const startHold=async(point,mode='bars')=>{
   await page.waitForFunction(mode=>mode==='notes'?session.noteRange:session.anchor?.wholeBars,mode);
 };
 // Drag backwards over three printed frets; the simultaneous fourth-string note stays out.
-await startHold(await barPoint(0,3,2),'notes');
+await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[await barPoint(0,3,2)]});
+await page.evaluate(()=>scoreEditor.drawTargets());
+await page.waitForFunction(()=>session.noteRange);
 await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[await barPoint(0,1,2)]});
 await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 assert.equal(await page.locator('#selection').textContent(),'已选 3 个音符');

@@ -26,6 +26,7 @@ class GuitarScoreSurface {
         onRangeSelection.begin(first);
       },
       extend:(first,last)=>onRangeSelection.extend(first,last),
+      settled:()=>{if(this.targetsPending)this.drawTargets();},
       end:cancel=>onRangeSelection.end(cancel)
     });
     this.onPaperClick=e=>{
@@ -134,6 +135,10 @@ class GuitarScoreSurface {
     }else {this.highlight();this.finishReveal();}
   }
   drawTargets(){
+    // WebKit dispatches later touch events to the original DOM element. Keep
+    // that target alive through the gesture even if the renderer finishes again.
+    if(this.rangeDrag?.gesture){this.targetsPending=true;return;}
+    this.targetsPending=false;
     this.overlay.replaceChildren();if(!this.score)return;
     const lookup=this.api.renderer.boundsLookup;
     const ranges=document.createElement('div');
