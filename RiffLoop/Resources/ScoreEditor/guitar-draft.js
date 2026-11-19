@@ -118,12 +118,13 @@ function portableBeats(beat){
   }
   return parts;
 }
-function makeScore(a,draft,schema,complete=true,portable=false){
+function makeScore(a,draft,schema,complete=true,portable=false,sourceStaff=null){
   validate(draft,schema,complete);
   const m=a.model,score=new m.Score(),track=new m.Track(),staff=new m.Staff();
   score.title=draft.title;score.addTrack(track);track.addStaff(staff);
   track.name='Electric Guitar';track.shortName='E.Gtr.';
   track.playbackInfo.program=draft.program;track.playbackInfo.primaryChannel=0;track.playbackInfo.secondaryChannel=1;
+  if(sourceStaff){staff.transpositionPitch=sourceStaff.transpositionPitch;staff.displayTranspositionPitch=sourceStaff.displayTranspositionPitch;}
   staff.stringTuning.tunings=[...draft.tuning].reverse();staff.capo=draft.capo;
   for(const [i,source] of draft.bars.entries()){
     const master=new m.MasterBar(),bar=new m.Bar(),voice=new m.Voice();
@@ -150,7 +151,10 @@ function makeScore(a,draft,schema,complete=true,portable=false){
         picking.marks=Math.max(1,Math.log2(value.tremolo/value.duration));
         beat.tremoloPicking=picking;
         // Absolute training divisions also apply to dotted and tuplet beats.
-        if(!portable)picking.getDurationAsTicks=()=>3840/value.tremolo;
+        if(!portable){
+          const factor=(2-Math.pow(.5,value.dots))*value.tupletDenominator/value.tupletNumerator;
+          picking.getDurationAsTicks=()=>3840/(value.tremolo*factor);
+        }
       }
       for(const p of value.whammy)beat.addWhammyBarPoint(new m.BendPoint(p.offset,p.value));
       if(value.text)beat.text=value.text;

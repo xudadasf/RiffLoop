@@ -109,10 +109,11 @@ const GuitarGP=(()=>{
   function check(session,d){
     if(!same(structural(session.draft),structural(d)))throw Error('整谱编辑保留原有小节结构和全局设置，可在小节内编辑拍位与音符。');
   }
-  function canonical(d,schema){
-    const score=GuitarDraftCore.makeScore(alphaTab,d,schema,false,true);
+  function canonical(d,schema,staff){
+    const score=GuitarDraftCore.makeScore(alphaTab,d,schema,false,true,staff);
     const bytes=new alphaTab.exporter.Gp7Exporter().export(score,new alphaTab.Settings());
     const tables=xmlTables(GuitarArchive.xml(bytes));
+    tables.score=score;
     tables.positions=d.bars.map((bar,i)=>{
       const refs=ids(child(tables.voiceAt(i,0,0),'Beats'));let pos=0;
       return bar.beats.map(b=>GuitarDraftCore.portableBeats(b).map(()=>tables.Beat.get(refs[pos++])));
@@ -123,7 +124,7 @@ const GuitarGP=(()=>{
     const {file,option,draft:base}=session,{slot,voice}=option;
     if(same(base,d))return file.bytes;
     GuitarDraftCore.validateLinks(d.bars.flatMap(b=>b.beats));
-    const src=xmlTables(file.xml),old=canonical(base,file.schema),fresh=canonical(d,file.schema);
+    const src=xmlTables(file.xml),old=canonical(base,file.schema,option.staff),fresh=canonical(d,file.schema,option.staff);
     const rhythmCache=new Map(),changed=[];
     function fingerprint(t,b){
       const clean=n=>{const x=n.cloneNode(true);x.removeAttribute('id');return x;};
@@ -200,10 +201,22 @@ const GuitarGP=(()=>{
     for(const [i] of changed){
       const actual=staff.bars[i].voices[voice].beats,expected=d.bars[i].beats.flatMap(GuitarDraftCore.portableBeats);
       if(actual.length!==expected.length)throw Error('重读后拍数不一致，原谱已保留。');
+      const desiredBar=fresh.score.tracks[0].staves[0].bars[i];
       expected.forEach((b,j)=>{
+        const wantedBeat=desiredBar.voices[0].beats[j];
+        if(actual[j].duration!==wantedBeat.duration||actual[j].dots!==wantedBeat.dots||
+          actual[j].tupletNumerator!==wantedBeat.tupletNumerator||actual[j].tupletDenominator!==wantedBeat.tupletDenominator)
+          throw Error('重读后时值发生变化，原谱已保留。');
+        for(const id of Object.keys(b.effects)){
+          if(id!=='sustainPedal'&&actual[j][id]!==wantedBeat[id])throw Error('重读后拍位技巧 '+id+' 变化，原谱已保留。');
+        }
         for(const n of b.notes.filter(n=>n.fret!=null)){
           const saved=actual[j].notes.find(x=>7-x.string===n.string);
           if(!saved||saved.fret!==n.fret)throw Error('重读后弦位或品位变化，原谱已保留。');
+          const want=desiredBar.voices[0].beats[j].notes.find(x=>7-x.string===n.string);
+          for(const id of Object.keys(n.effects)){
+            if(want&&saved[id]!==want[id])throw Error('重读后音符技巧 '+id+' 变化，原谱已保留。');
+          }
         }
       });
     }

@@ -129,7 +129,7 @@ class GuitarScoreSurface {
     const encoded=JSON.stringify(draft);
     if(encoded!==this.serialized){
       this.barRects=[];this.pause();this.serialized=encoded;this.ready=false;this.onState({ready:false,playing:false});
-      this.score=GuitarDraftCore.makeScore(alphaTab,draft,schema,false);
+      this.score=GuitarDraftCore.makeScore(alphaTab,draft,schema,false,false,selection.sourceStaff);
       this.api.renderScore(this.score,[0]);
     }else {this.highlight();this.finishReveal();}
   }

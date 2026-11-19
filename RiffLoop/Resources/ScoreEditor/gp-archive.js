@@ -32,7 +32,7 @@ const GuitarArchive=(()=>{
   }
   function replace(bytes,xmlText){
     const raw=new TextEncoder().encode(xmlText);if(raw.length>limit)throw Error('谱面过大。');
-    const original=parse(bytes),fresh=parse(fflate.zipSync({[path]:raw},{level:6})),parts=[];
+    const original=parse(bytes),fresh=parse(fflate.zipSync({[path]:raw},{level:6,mtime:new Date(1980,0,1)})),parts=[];
     let size=0;
     function add(data){parts.push(data);size+=data.length;}
     add(bytes.subarray(0,original.records[0].offset));

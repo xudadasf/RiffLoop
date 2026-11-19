@@ -76,10 +76,14 @@
             const staff = track.staves.find(s => s.bars.some(b => b.sustainPedals.length));
             if (!staff || !lookup) continue;
             const channels = new Set([track.playbackInfo.primaryChannel, track.playbackInfo.secondaryChannel]);
+            const holds = [];
             let down = false;
             function change(tick, next) {
                 if (down === next) return;
                 down = next;
+                const atTick = Math.round(tick) + file.tickShift;
+                if (down) holds.push({ start: atTick, end: atTick });
+                else holds[holds.length - 1].end = atTick;
                 for (const channel of channels) {
                     file.addEvent(new at.midi.ControlChangeEvent(track.index, Math.round(tick) + file.tickShift, channel, 64, next ? 127 : 0));
                 }
@@ -94,6 +98,24 @@
                 }
             }
             if (lookup.masterBars.length) change(lookup.masterBars.at(-1).end, false);
+            // The bundled synth does not sustain guitar samples on CC64 alone.
+            // Delay the actual release, stopping before a same-key re-attack.
+            for (const midiTrack of file.tracks) {
+                const releases = new Set(), nextAttack = new Map();
+                let interval = holds.length - 1;
+                for (let i = midiTrack.events.length - 1; i >= 0 && interval >= 0; i--) {
+                    const event = midiTrack.events[i];
+                    if (event.track !== track.index || !channels.has(event.channel)) continue;
+                    const key = event.channel * 128 + event.noteKey;
+                    if (event instanceof at.midi.NoteOnEvent) nextAttack.set(key, event.tick);
+                    if (!(event instanceof at.midi.NoteOffEvent)) continue;
+                    while (interval >= 0 && event.tick < holds[interval].start) interval--;
+                    if (interval < 0 || event.tick >= holds[interval].end) continue;
+                    const end = Math.min(holds[interval].end, nextAttack.get(key) ?? Infinity);
+                    if (end > event.tick) { event.tick = end; releases.add(event); }
+                }
+                if (releases.size) midiTrack.events.sort((a,b) => a.tick-b.tick || Number(releases.has(b))-Number(releases.has(a)));
+            }
         }
     }
     function installPedal(api, at) {

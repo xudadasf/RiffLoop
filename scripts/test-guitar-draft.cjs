@@ -124,3 +124,28 @@ require('node:vm').runInNewContext(require('node:fs').readFileSync(require.resol
 win.RiffLoopAudio.applyPedals(performance.midi,pedScore,performance.lookup,a);
 assert.deepEqual(performance.midi.tracks.flatMap(t=>t.events).filter(e=>e.controller===64&&e.channel===0).map(e=>[e.tick,e.value]),[[0,127],[5760,0]]);
 console.log('Audition and GP re-open agree on harmonic pitch, alternating trills, picking attacks, chord sustain and pedal release.');
+
+function pedalAudio(enabled) {
+  const b=beat(4,[note(1,7)]);
+  if(enabled)b.effects.sustainPedal=1;
+  const release=beat(4);if(enabled)release.effects.sustainPedal=2;
+  const source=draft([[b,beat(4),release,beat(4)]]);source.tempo=120;
+  const score=reopen(source),{midi,lookup}=audio(score);
+  win.RiffLoopAudio.applyPedals(midi,score,lookup,a);
+  const options=new a.synth.AudioExportOptions();options.sampleRate=44100;
+  options.soundFonts=[require('node:fs').readFileSync(require.resolve('../RiffLoop/Resources/GpWeb/soundfont/sonivox.sf3'))];
+  const renderer=a.synth.AlphaSynth.prototype.exportAudio.call(null,options,midi,[],new Map());
+  const samples=renderer.render(66000).samples;
+  const rms=(from,to)=>{const frame=samples.subarray(Math.round(88200*from),Math.round(88200*to));return Math.sqrt(frame.reduce((n,v)=>n+v*v,0)/frame.length);};
+  return {held:rms(.72,.86),released:rms(1.35,1.48)};
+}
+const dry=pedalAudio(false),held=pedalAudio(true);
+assert.ok(held.held>dry.held*8,'Pedal must audibly extend the guitar past note-off');
+assert.ok(held.released<held.held*.05,'Releasing the pedal must end the sustained sample');
+console.log('Shipped guitar soundfont held/released RMS:',dry,held);
+
+for(const b of [beat(4,[note(1,7)],{dots:1,tremolo:64}),beat(8,[note(1,7)],{tupletNumerator:3,tupletDenominator:2,tremolo:64})]){
+  const beats=b.dots?[b,beat(8),beat(2)]:[b,structuredClone(b),structuredClone(b),beat(4),beat(2)];
+  const d=draft([beats]);
+  assert.deepEqual(audio(core.makeScore(a,d,schema,false)).notes.map(e=>e.tick),audio(reopen(d)).notes.map(e=>e.tick));
+}

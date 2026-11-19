@@ -64,6 +64,7 @@ const rangeSelection={
 };
 window.loadGuitarDraft=(draft,techniques)=>{
   schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>{core.validate(d,schema,false);if(existingGP)GuitarGP.check(existingGP,d);});
+  session.sourceStaff=existingGP?.option.staff;
   surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{select(beat,string,bar);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status,rangeSelection);
   window.scoreEditor=surface;render(true);document.body.removeAttribute('data-loading');
 };

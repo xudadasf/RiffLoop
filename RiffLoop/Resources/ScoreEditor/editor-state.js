@@ -106,6 +106,7 @@ class Session {
   effectTargets(scope,id,value){
     const selected=this.targets(scope);
     if(!this.anchor)return selected;
+    if(id==='sustainPedal'&&selected.length)return [value===2?selected.at(-1):selected[0]];
     const ties=id==='isTieDestination',legato=id==='isLegatoOrigin';
     if(!ties&&!legato&&id!=='isHammerPullOrigin'&&!(id==='slideOutType'&&[1,2].includes(value)))return selected;
     const picks=new Set(selected),eligible=[],previous=new Map();
@@ -126,7 +127,13 @@ class Session {
     this.change(()=>targets.forEach(t=>{t.effects[id]=value;}));
   }
   toggleEffect(scope,id,value=1,defaultValue=0){const targets=this.effectTargets(scope,id,value);if(this.anchor&&!targets.length)throw Error('请选择连续的同弦音符，延音还需要同品。');if(!targets.length)throw Error('先在当前弦输入品位，或选中已有音符。');const next=targets.every(t=>(t.effects[id]??defaultValue)===value)?defaultValue:value;this.change(()=>targets.forEach(t=>{t.effects[id]=next;}));}
-  removeEffect(scope,id){this.change(()=>this.targets(scope).forEach(t=>{delete t.effects[id];const dependent={harmonicType:'harmonicValue',trillValue:'trillSpeed',brushType:'brushDuration'}[id];if(dependent)delete t.effects[dependent];}));}
+  removeEffect(scope,id){
+    let targets=this.targets(scope);
+    if(this.anchor&&['isTieDestination','isHammerPullOrigin','isLegatoOrigin','slideOutType'].includes(id)){
+      const internal=new Set(this.effectTargets(scope,id,1));
+      targets=targets.filter(t=>internal.has(t)||id==='slideOutType'&&![1,2].includes(t.effects[id]));
+    }
+    this.change(()=>targets.forEach(t=>{delete t.effects[id];const dependent={harmonicType:'harmonicValue',trillValue:'trillSpeed',brushType:'brushDuration'}[id];if(dependent)delete t.effects[dependent];}));}
   setCurve(scope,points){const targets=this.targets(scope);if(!targets.length)throw Error('先选中已有音符。');this.change(()=>targets.forEach(t=>{t[scope==='note'?'bend':'whammy']=copy(points);if(!points.length)delete t.effects[scope==='note'?'bendStyle':'whammyStyle'];}));}
   clearTechniques(){
     this.change(()=>{
