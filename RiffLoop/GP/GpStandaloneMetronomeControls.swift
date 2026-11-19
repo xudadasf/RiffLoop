@@ -56,6 +56,14 @@ struct GpStandaloneMetronomeControls: View {
                         .accessibilityLabel("独立节拍器第 \(index + 1) 拍，\(viewModel.standaloneBeatAccents[index].label)，点按切换强度")
                     }
                 }
+                Divider()
+                Toggle("响／静小节", isOn: gapBinding(\.enabled))
+                if viewModel.standaloneGap.enabled {
+                    Stepper("响 \(viewModel.standaloneGap.soundBars) 小节", value: gapBinding(\.soundBars), in: 1...99)
+                    Stepper("静 \(viewModel.standaloneGap.silentBars) 小节", value: gapBinding(\.silentBars), in: 1...99)
+                    Text("静音时继续数拍。开启提速阶梯时，静音小节也计入阶段时长。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 HStack {
                     Image(systemName: "speaker.wave.2")
                     Slider(value: Binding(
@@ -68,5 +76,12 @@ struct GpStandaloneMetronomeControls: View {
             }
             .padding(16)
         }
+    }
+    private func gapBinding<Value>(_ key: WritableKeyPath<MetronomeGapPattern, Value>) -> Binding<Value> {
+        Binding(get: { viewModel.standaloneGap[keyPath: key] }, set: { value in
+            var pattern = viewModel.standaloneGap
+            pattern[keyPath: key] = value
+            viewModel.setStandaloneGap(pattern)
+        })
     }
 }

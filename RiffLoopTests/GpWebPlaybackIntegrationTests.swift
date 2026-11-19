@@ -234,6 +234,7 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         model.setStandaloneStages(.init(stages: [.init(bpm: 240, unit: .seconds, length: 1),
                                                  .init(bpm: 100, unit: .seconds, length: 10)]))
         model.setStandaloneStagesEnabled(true)
+        model.setStandaloneGap(.init(enabled: true, soundBars: 1, silentBars: 1))
         model.toggleStandaloneMetronome()
         try await waitUntil("Standalone clock reaches the next stage without starting GP") { model.playingStandaloneBpm == 100 }
 
@@ -253,6 +254,7 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         }
         XCTAssertEqual(model.currentBpm, 53, accuracy: 0.01)
         model.setStandaloneStagesEnabled(false)
+        model.setStandaloneGap(.init())
         model.pause()
         model.resetBaseBpm()
         model.setPlaybackSpeed(0.9)

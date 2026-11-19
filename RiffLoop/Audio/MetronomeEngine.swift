@@ -57,6 +57,8 @@ final class MetronomeEngine {
     private var schedulerGeneration: UInt64?
     private var timeline: BeatTimeline?
     private var anchor: TransportAnchor?
+    private var gap = MetronomeGapPattern()
+    private var pendingGap: MetronomeGapPattern?
     private var stageSchedule: MetronomeStageSchedule?
     private var rhythmMode: RhythmMode = .click
     private var nextEventIndex: Int64 = 0
@@ -88,12 +90,15 @@ final class MetronomeEngine {
         anchor: TransportAnchor,
         rhythmMode: RhythmMode = .click,
         volume: Float = 1,
-        stageSchedule: MetronomeStageSchedule? = nil
+        stageSchedule: MetronomeStageSchedule? = nil,
+        gap: MetronomeGapPattern = .init()
     ) throws {
         try prepare()
 
         schedulingQueue.sync {
             generation &+= 1
+            self.gap = gap
+            pendingGap = nil
             self.stageSchedule = stageSchedule
             self.timeline = timeline
             self.anchor = anchor
@@ -111,6 +116,10 @@ final class MetronomeEngine {
             playerNode.play()
             startSchedulerIfNeeded()
         }
+    }
+
+    func setGapOnNextMeasure(_ pattern: MetronomeGapPattern) {
+        schedulingQueue.sync { pendingGap = pattern }
     }
 
     func stop() {
@@ -159,9 +168,14 @@ final class MetronomeEngine {
             let eventHostTime = anchor.hostTime(forMediaTime: mediaTime)
 
             if eventHostTime > horizon { break }
+            if event.isMeasureAccent, let pendingGap {
+                gap = pendingGap
+                self.pendingGap = nil
+            }
             nextEventIndex += 1
 
             if eventHostTime < now + schedulingLead { continue }
+            if gap.enabled && !gap.sounds(in: timeline.measureIndex(event.index)) { continue }
             if !timeline.shouldPlay(event.index, mode: rhythmMode) { continue }
 
             let buffer = clickBuffer(for: event.index, timeline: timeline)

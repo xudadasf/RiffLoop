@@ -25,11 +25,14 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var standaloneVolume = 1.0
     @Published private(set) var standaloneSubdivisionFactor = 1
     @Published private(set) var standaloneBeatAccents: [GpBeatAccent] = [.strong, .normal, .normal, .normal]
-    @Published private(set) var gpStages = TempoStagePlan.initial(bpm: 80, unit: .loops)
-    @Published private(set) var standaloneStages = TempoStagePlan.initial(bpm: 80, unit: .seconds)
+    @Published private(set) var gpStages = TempoStagePlan.initial(bpm: 120, unit: .loops)
+    @Published private(set) var standaloneStages = TempoStagePlan.initial(bpm: 120, unit: .seconds)
     @Published private(set) var gpStagesEnabled = false
     @Published private(set) var standaloneStagesEnabled = false
     @Published private(set) var gpProgress = LoopStageProgress()
+    @Published private(set) var standaloneGap = MetronomeGapPattern()
+    private var hasGpPlan = false
+    private var hasStandalonePlan = false
     private var gpRangeStartTempo: Double?
     private var standaloneStageOffset = 0.0
     private var standaloneStageAnchor: TransportAnchor?
@@ -119,6 +122,7 @@ final class GpWebViewModel: ObservableObject {
     func setGpStagesEnabled(_ enabled: Bool) {
         guard enabled != gpStagesEnabled, !enabled || (rangeLoopingEnabled && loopRange != nil) else { return }
         if enabled && speedLadderEnabled { restoreSpeedBeforeLadder() }
+        if enabled { hasGpPlan = true }
         gpStagesEnabled = enabled
         restartGpStages()
         saveProfile()
@@ -128,6 +132,7 @@ final class GpWebViewModel: ObservableObject {
         guard plan.valid(in: stageBpmRange, timedOnly: false), plan != gpStages else { return }
         gpProgress = LoopStageProgress()
         gpStages = plan
+        hasGpPlan = true
         if gpStagesEnabled { restartGpStages() }
         saveProfile()
     }
@@ -393,6 +398,7 @@ final class GpWebViewModel: ObservableObject {
         standaloneSchedule = nil
         standaloneStageOffset = 0
         standaloneStages = plan
+        hasStandalonePlan = true
         saveProfile()
     }
 
@@ -402,6 +408,14 @@ final class GpWebViewModel: ObservableObject {
         standaloneStageOffset = 0
         standaloneSchedule = nil
         standaloneStagesEnabled = enabled
+        if enabled { hasStandalonePlan = true }
+        saveProfile()
+    }
+
+    func setStandaloneGap(_ pattern: MetronomeGapPattern) {
+        guard pattern.valid, pattern != standaloneGap else { return }
+        standaloneGap = pattern
+        if isStandaloneMetronomePlaying { standaloneMetronome.setGapOnNextMeasure(pattern) }
         saveProfile()
     }
 
@@ -419,15 +433,15 @@ final class GpWebViewModel: ObservableObject {
             }
             let schedule = standaloneStagesEnabled ? MetronomeStageSchedule(plan: standaloneStages,
                 beats: standaloneBeatsPerMeasure, subdivisions: standaloneSubdivisionFactor) : nil
-            let offset = schedule == nil ? 0 : standaloneElapsed
+            let offset = schedule != nil || standaloneGap.enabled ? standaloneElapsed : 0
             let anchor = TransportAnchor(mediaTime: offset, hostTime: CACurrentMediaTime() + 0.1, mediaRate: 1)
             try standaloneMetronome.synchronize(
                 timeline: BeatTimeline(bpm: standaloneBpm, beatOffset: 0, subdivision: subdivision,
                     quarterNotesPerMeasure: standaloneBeatsPerMeasure, beatAccents: accents),
-                anchor: anchor, volume: Float(standaloneVolume), stageSchedule: schedule)
+                anchor: anchor, volume: Float(standaloneVolume), stageSchedule: schedule, gap: standaloneGap)
             standaloneSchedule = schedule
             standaloneStageOffset = offset
-            standaloneStageAnchor = schedule == nil ? nil : anchor
+            standaloneStageAnchor = anchor
             isStandaloneMetronomePlaying = true
             updatePracticeClock(isPlaying: true)
         } catch {
@@ -452,6 +466,7 @@ final class GpWebViewModel: ObservableObject {
     func setStandaloneBpm(_ value: Double) {
         guard value.isFinite else { return }
         standaloneBpm = min(300, max(30, value.rounded()))
+        if !hasStandalonePlan { standaloneStages = .initial(bpm: Int(standaloneBpm), unit: .seconds) }
         if isStandaloneMetronomePlaying { startStandaloneMetronome() }
         saveProfile()
     }
@@ -546,6 +561,11 @@ final class GpWebViewModel: ObservableObject {
         call("seekTick", arguments: [tick, userInitiated])
     }
 
+    private func updateSuggestedGpStages() {
+        guard !hasGpPlan, !gpStagesEnabled else { return }
+        gpStages = .initial(bpm: Int(practiceStartBpm.rounded()), unit: .loops, range: stageBpmRange)
+    }
+
     func setPlaybackSpeed(_ speed: Double) {
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setPlaybackSpeed", details: ["speed": String(describing: speed)])
@@ -561,6 +581,7 @@ final class GpWebViewModel: ObservableObject {
         speedLadderTarget = max(speedLadderTarget, playbackSpeed)
         completedLoops = 0
         highestPracticeSpeed = max(highestPracticeSpeed, playbackSpeed)
+        updateSuggestedGpStages()
         applyEffectivePlaybackSpeed()
         saveProfile()
     }
@@ -592,6 +613,7 @@ final class GpWebViewModel: ObservableObject {
         }
         speedLadderTarget = min(max(speedLadderTarget, playbackSpeed), practiceSpeedRange.upperBound)
         completedLoops = 0
+        updateSuggestedGpStages()
         applyEffectivePlaybackSpeed()
         saveProfile()
     }
@@ -605,6 +627,7 @@ final class GpWebViewModel: ObservableObject {
         }
         baseBpm = originalBaseBpm
         completedLoops = 0
+        updateSuggestedGpStages()
         applyEffectivePlaybackSpeed()
         saveProfile()
     }
@@ -1339,13 +1362,16 @@ final class GpWebViewModel: ObservableObject {
         )
         playbackSpeed = min(max(playbackSpeed, practiceSpeedRange.lowerBound), practiceSpeedRange.upperBound)
         standaloneBpm = min(300, max(30, pendingProfile.standaloneBpm ?? 120))
-        let initial = TempoStagePlan.initial(bpm: Int(practiceStartBpm.rounded()), unit: .loops)
+        let initial = TempoStagePlan.initial(bpm: Int(practiceStartBpm.rounded()), unit: .loops, range: stageBpmRange)
         gpStages = pendingProfile.gpStages.flatMap { $0.valid(in: 30...300, timedOnly: false) ? $0 : nil } ?? initial
         for index in gpStages.stages.indices {
             gpStages.stages[index].bpm = min(stageBpmRange.upperBound, max(stageBpmRange.lowerBound, gpStages.stages[index].bpm))
         }
         standaloneStages = pendingProfile.standaloneStages.flatMap { $0.valid(in: 30...300, timedOnly: true) ? $0 : nil }
             ?? .initial(bpm: Int(standaloneBpm), unit: .seconds)
+        hasGpPlan = pendingProfile.gpStages?.valid(in: 30...300, timedOnly: false) == true
+        hasStandalonePlan = pendingProfile.standaloneStages?.valid(in: 30...300, timedOnly: true) == true
+        standaloneGap = pendingProfile.standaloneGap.flatMap { $0.valid ? $0 : nil } ?? .init()
         standaloneStagesEnabled = pendingProfile.standaloneStagesEnabled ?? false
         standaloneBeatsPerMeasure = min(16, max(1, pendingProfile.standaloneBeatsPerMeasure ?? 4))
         standaloneVolume = PracticeAudioVolume.clamp(pendingProfile.standaloneVolume ?? 1)
@@ -1504,8 +1530,9 @@ final class GpWebViewModel: ObservableObject {
         guard let currentFileName, didApplyPendingProfile else { return }
         try? settingsStore.save(
             GpPracticeProfile(
-                gpStages: gpStages,
-                standaloneStages: standaloneStages,
+                gpStages: hasGpPlan ? gpStages : nil,
+                standaloneStages: hasStandalonePlan ? standaloneStages : nil,
+                standaloneGap: standaloneGap,
                 standaloneStagesEnabled: standaloneStagesEnabled,
                 standaloneBpm: standaloneBpm,
                 standaloneBeatsPerMeasure: standaloneBeatsPerMeasure,

@@ -58,6 +58,26 @@ final class TempoStagePlanTests: XCTestCase {
         }
     }
 
+    func testGapBarsSilenceAllSubdivisionsAndKeepTheirPlaceAcrossTempoChanges() {
+        // One bar takes 2s, then 1s. The second stage starts inside a silent bar.
+        let plan = TempoStagePlan(stages: [TempoStage(bpm: 120, unit: .seconds, length: 4),
+                                          TempoStage(bpm: 240, unit: .seconds, length: 3)])
+        let schedule = MetronomeStageSchedule(plan: plan, beats: 4, subdivisions: 4)
+        let gap = MetronomeGapPattern(enabled: true, soundBars: 2, silentBars: 1)
+        let beats = BeatTimeline(bpm: 120, beatOffset: 0, subdivision: .sixteenth, quarterNotesPerMeasure: 4)
+        let heard = (Int64(0)..<96).filter { gap.sounds(in: beats.measureIndex($0)) && beats.shouldPlay($0, mode: .click) }
+        XCTAssertTrue(heard.contains(31))
+        XCTAssertTrue(heard.filter { (32..<48).contains($0) }.isEmpty)
+        XCTAssertEqual(schedule.position(at: 4).stage, 1)
+        XCTAssertEqual(schedule.time(of: 48), 5, accuracy: 1e-8)
+        XCTAssertTrue(heard.contains(48))
+        XCTAssertTrue(heard.filter { (80..<96).contains($0) }.isEmpty)
+        XCTAssertTrue((0..<5).allSatisfy { MetronomeGapPattern().sounds(in: Int64($0)) })
+        XCTAssertFalse(MetronomeGapPattern(enabled: true, soundBars: 0, silentBars: 0).valid)
+        XCTAssertEqual(TempoStagePlan.initial(bpm: 87, unit: .loops).stages.map(\.bpm), [87,92,97])
+        XCTAssertEqual(TempoStagePlan.initial(bpm: 298, unit: .seconds).stages.map(\.bpm), [298,300])
+    }
+
     @MainActor
     func testGpRequiresAnABRangeAndRestoresManualTempo() {
         let model = GpWebViewModel()
@@ -94,12 +114,14 @@ final class TempoStagePlanTests: XCTestCase {
         let store = FilePracticeSettingsStore(defaults: defaults)
         let gp = TempoStagePlan.initial(bpm: 75, unit: .loops)
         let solo = TempoStagePlan.initial(bpm: 110, unit: .seconds)
-        let profile = GpPracticeProfile(gpStages: gp, standaloneStages: solo, standaloneStagesEnabled: true)
+        let gap = MetronomeGapPattern(enabled: true, soundBars: 3, silentBars: 2)
+        let profile = GpPracticeProfile(gpStages: gp, standaloneStages: solo, standaloneGap: gap, standaloneStagesEnabled: true)
         try store.save(profile, kind: .guitarPro, fileName: "a.gp")
         let a = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "a.gp"))
         let b = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "b.gp"))
         XCTAssertEqual(a.gpStages, gp)
         XCTAssertNil(b.gpStages)
+        XCTAssertEqual(b.standaloneGap, gap)
         XCTAssertEqual(b.standaloneStages, solo)
         XCTAssertEqual(b.standaloneStagesEnabled, true)
         XCTAssertFalse(gp.valid(in: 30...300, timedOnly: true))

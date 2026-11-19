@@ -14,10 +14,14 @@ struct TempoStagePlan: Codable, Equatable {
     var stages: [TempoStage]
     var order: TempoStageOrder = .wrap
 
-    static func initial(bpm: Int, unit: TempoStageUnit) -> Self {
-        Self(stages: [0, 10].map {
-            TempoStage(bpm: min(300, max(30, bpm + $0)), unit: unit, length: unit == .loops ? 3 : 30)
-        })
+    static func initial(bpm: Int, unit: TempoStageUnit, range: ClosedRange<Int> = 30...300) -> Self {
+        let first = min(range.upperBound, max(range.lowerBound, bpm))
+        let speeds = [first, min(range.upperBound, first + 5), min(range.upperBound, first + 10)]
+        var stages: [TempoStage] = []
+        for speed in speeds where stages.last?.bpm != speed {
+            stages.append(TempoStage(bpm: speed, unit: unit, length: unit == .loops ? 3 : 30))
+        }
+        return Self(stages: stages)
     }
 
     func valid(in range: ClosedRange<Int>, timedOnly: Bool) -> Bool {
@@ -109,5 +113,17 @@ struct MetronomeStageSchedule {
         let segment = segments.last { $0.start <= local }!
         let offset = Int64(ceil((local - segment.start) / segment.interval - 1e-9))
         return (segment.index, Int64(cycle) * cycleEvents + segment.firstEvent + offset)
+    }
+}
+
+struct MetronomeGapPattern: Codable, Equatable {
+    var enabled = false
+    var soundBars = 2
+    var silentBars = 1
+
+    var valid: Bool { (1...99).contains(soundBars) && (1...99).contains(silentBars) }
+
+    func sounds(in measure: Int64) -> Bool {
+        !enabled || measure % Int64(soundBars + silentBars) < Int64(soundBars)
     }
 }
