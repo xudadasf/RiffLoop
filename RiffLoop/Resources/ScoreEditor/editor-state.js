@@ -6,7 +6,14 @@ const beat=(duration=4)=>({duration,dots:0,tupletNumerator:1,tupletDenominator:1
 const bar=()=>({beats:[beat(1)],review:[],repeatStart:false,repeatCount:0,alternateEndings:0,section:''});
 class Session {
   constructor(draft,validate){this.draft=copy(draft);this.validate=validate;this.undoStack=[];this.redoStack=[];this.bar=0;this.beat=0;this.string=1;this.clipboard=null;this.saved=JSON.stringify(draft);this.anchor=null;this.pendingDigit='';this.revision=0;}
-  get dirty(){return JSON.stringify(this.draft)!==this.saved;}
+  get serializedDraft(){
+    if(this.serializedRevision!==this.revision){
+      this.serialized=JSON.stringify(this.draft);
+      this.serializedRevision=this.revision;
+    }
+    return this.serialized;
+  }
+  get dirty(){return this.serializedDraft!==this.saved;}
   get currentBar(){return this.draft.bars[this.bar];}
   get currentBeat(){return this.currentBar.beats[this.beat];}
   get currentNote(){return this.currentBeat.notes.find(n=>n.string===this.string);}

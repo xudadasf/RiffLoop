@@ -20,15 +20,19 @@ actor GuitarExistingFile {
         guard edited.count <= Self.maximum, edited.starts(with: [0x50, 0x4b, 0x03, 0x04]) else {
             throw GuitarDraftStoreError.invalidFile
         }
-        var coordinationError: NSError?
-        var failure: Error?
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
-            do {
-                guard try Self.read(target) == original else { throw GuitarDraftStoreError.conflict }
-                if edited != original { try edited.write(to: target, options: .atomic) }
-            } catch { failure = error }
+        try Self.coordinatingReplacement(at: url) { target in
+            guard try Self.read(target) == original else { throw GuitarDraftStoreError.conflict }
+            if edited != original { try edited.write(to: target, options: .atomic) }
         }
-        if let failure { throw failure }
+    }
+
+    static func coordinatingReplacement<T>(at url: URL, _ operation: (URL) throws -> T) throws -> T {
+        var coordinationError: NSError?
+        var result: Result<T, Error> = .failure(GuitarDraftStoreError.invalidFile)
+        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { target in
+            result = Result { try operation(target) }
+        }
         if let coordinationError { throw coordinationError }
+        return try result.get()
     }
 }

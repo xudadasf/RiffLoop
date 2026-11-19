@@ -30,8 +30,8 @@ final class GuitarPracticeFileStoreTests: XCTestCase {
         let first = try await store.publish(data(1), id: id)
         let second = try await store.publish(data(2), id: id)
         let third = try await GuitarPracticeFileStore(folder: gp, receipts: receipts).publish(data(2), id: id)
-        XCTAssertEqual(first, second); XCTAssertEqual(first, third)
-        XCTAssertEqual(try Data(contentsOf: first), data(2))
+        XCTAssertEqual(first.url, second.url); XCTAssertEqual(first.url, third.url)
+        XCTAssertEqual(try Data(contentsOf: first.url), data(2))
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: gp.path).count, 1)
     }
 
@@ -42,7 +42,7 @@ final class GuitarPracticeFileStoreTests: XCTestCase {
         try data(9).write(to: unowned)
         do { _ = try await store.publish(data(1), id: unownedID); XCTFail("Must reject an imported file") } catch { }
         XCTAssertEqual(try Data(contentsOf: unowned), data(9))
-        let id = UUID(), file = try await store.publish(data(1), id: id)
+        let id = UUID(), file = try await store.publish(data(1), id: id).url
         try data(8).write(to: file)
         do { _ = try await store.publish(data(2), id: id); XCTFail("Must preserve external edits") } catch { }
         XCTAssertEqual(try Data(contentsOf: file), data(8))
@@ -51,14 +51,62 @@ final class GuitarPracticeFileStoreTests: XCTestCase {
     func testInterruptedReceiptCanRecoverWithoutAnotherFile() async throws {
         let root = try folder(); defer { try? FileManager.default.removeItem(at: root) }
         let receipts = root.appendingPathComponent("receipts"), store = GuitarPracticeFileStore(folder: root, receipts: receipts), id = UUID()
-        let file = try await store.publish(data(1), id: id)
+        let file = try await store.publish(data(1), id: id).url
         let old = SHA256.hash(data: data(1)).map { String(format: "%02x", $0) }.joined()
         let pending = SHA256.hash(data: data(2)).map { String(format: "%02x", $0) }.joined()
         try JSONEncoder().encode(GuitarPracticeFileStore.Receipt(current: old, pending: pending))
             .write(to: receipts.appendingPathComponent(id.uuidString + ".json"))
         try data(2).write(to: file)
         let recovered = try await store.publish(data(3), id: id)
-        XCTAssertEqual(recovered, file); XCTAssertEqual(try Data(contentsOf: file), data(3))
+        XCTAssertEqual(recovered.url, file); XCTAssertEqual(try Data(contentsOf: file), data(3))
+    }
+
+    func testOpeningPublishedFileRejectsStaleOrDeletedLibraryEntry() async throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let drafts = GuitarDraftStore(folder: root.appendingPathComponent("drafts"))
+        let store = GuitarPracticeFileStore(folder: root.appendingPathComponent("scores"),
+                                            receipts: root.appendingPathComponent("receipts"), drafts: drafts)
+        let id = try await drafts.create(GuitarDraft())
+        let first = try await store.publish(data(1), id: id)
+        let document = await store.editableDocument(for: first.url)
+        let openedHash = try XCTUnwrap(document?.publishedHash)
+        XCTAssertEqual(openedHash, first.hash)
+        let second = try await store.publish(data(2), id: id, replacing: openedHash)
+        do {
+            _ = try await store.publish(data(3), id: id, replacing: openedHash)
+            XCTFail("Another editor's saved change was overwritten")
+        } catch GuitarDraftStoreError.conflict { }
+        XCTAssertEqual(try Data(contentsOf: second.url), data(2))
+        try FileManager.default.removeItem(at: second.url)
+        do {
+            _ = try await store.publish(data(3), id: id, replacing: second.hash)
+            XCTFail("A deleted library file was recreated")
+        } catch { }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: second.url.path))
+        let republished = try await store.publish(data(3), id: id)
+        XCTAssertEqual(republished.url, first.url)
+        XCTAssertEqual(try Data(contentsOf: first.url), data(3))
+    }
+
+    func testCommittedGPAdvancesEditorHashWhenFinalReceiptCannotBeWritten() async throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let scores = root.appendingPathComponent("scores"), receipts = root.appendingPathComponent("receipts")
+        let store = GuitarPracticeFileStore(folder: scores, receipts: receipts)
+        let id = UUID(), first = try await store.publish(data(1), id: id)
+        let interrupted = GuitarPracticeFileStore(folder: scores, receipts: receipts) { receipt, url in
+            guard receipt.pending != nil else { throw CocoaError(.fileWriteOutOfSpace) }
+            try receipt.write(to: url)
+        }
+        let committed = try await interrupted.publish(data(2), id: id, replacing: first.hash)
+        XCTAssertEqual(try Data(contentsOf: committed.url), data(2))
+        let pending = try JSONDecoder().decode(GuitarPracticeFileStore.Receipt.self,
+                                              from: Data(contentsOf: receipts.appendingPathComponent(id.uuidString + ".json")))
+        XCTAssertEqual(pending.current, first.hash)
+        XCTAssertEqual(pending.pending, committed.hash)
+        let next = try await store.publish(data(3), id: id, replacing: committed.hash)
+        XCTAssertEqual(try Data(contentsOf: next.url), data(3))
     }
 
     func testSymlinkCannotReplaceAnotherScore() async throws {

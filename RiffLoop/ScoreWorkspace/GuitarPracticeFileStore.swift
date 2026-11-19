@@ -5,11 +5,20 @@ import Foundation
 /// A receipt prevents replacing an imported file or an externally edited GP.
 actor GuitarPracticeFileStore {
     private static let lock = NSLock()
-    struct Receipt: Codable { var current: String?; var pending: String? }
+    struct Receipt: Codable, Sendable {
+        var current: String?
+        var pending: String?
+        func write(to url: URL) throws { try JSONEncoder().encode(self).write(to: url, options: .atomic) }
+    }
     private let folder: URL
     private let receipts: URL
-    init(folder: URL, receipts: URL? = nil) {
+    private let drafts: GuitarDraftStore
+    private let writeReceipt: @Sendable (Receipt, URL) throws -> Void
+    init(folder: URL, receipts: URL? = nil, drafts: GuitarDraftStore = GuitarDraftStore(),
+         writeReceipt: @escaping @Sendable (Receipt, URL) throws -> Void = { try $0.write(to: $1) }) {
         self.folder = folder
+        self.drafts = drafts
+        self.writeReceipt = writeReceipt
         self.receipts = receipts ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ScoreWorkspace/GuitarPublished", isDirectory: true)
     }
@@ -32,14 +41,28 @@ actor GuitarPracticeFileStore {
               let receipt = try? JSONDecoder().decode(Receipt.self, from: bytes) else { return nil }
         let hash = digest(data)
         guard hash == receipt.current || hash == receipt.pending,
-              let draft = try? await GuitarDraftStore().load(id) else { return nil }
-        return GuitarDraftDocument(id: id, draft: draft)
+              let draft = try? await drafts.load(id) else { return nil }
+        return GuitarDraftDocument(id: id, draft: draft, publishedHash: hash)
     }
-    func publish(_ data: Data, id: UUID) throws -> URL {
+    struct Publication: Sendable {
+        let url: URL
+        let hash: String
+    }
+    func publish(_ data: Data, id: UUID, replacing expectedHash: String? = nil) throws -> Publication {
         Self.lock.lock()
         defer { Self.lock.unlock() }
         guard data.count <= 8 * 1024 * 1024, data.starts(with: [0x50,0x4b,0x03,0x04]) else { throw ScoreDraftGPFileStoreError.invalidData }
         let fm = FileManager.default, target = folder.appendingPathComponent(Self.fileName(id))
+        if expectedHash != nil || fm.fileExists(atPath: target.path) {
+            return try GuitarExistingFile.coordinatingReplacement(at: target) { coordinatedURL in
+                guard coordinatedURL.lastPathComponent == target.lastPathComponent else { throw GuitarDraftStoreError.conflict }
+                return try write(data, id: id, to: coordinatedURL, replacing: expectedHash)
+            }
+        }
+        return try write(data, id: id, to: target, replacing: nil)
+    }
+    private func write(_ data: Data, id: UUID, to target: URL, replacing expectedHash: String?) throws -> Publication {
+        let fm = FileManager.default
         let receiptURL = receipts.appendingPathComponent(id.uuidString + ".json")
         var receipt: Receipt?
         var ownedHash: String?
@@ -51,15 +74,16 @@ actor GuitarPracticeFileStore {
             guard let receipt, actual == receipt.current || actual == receipt.pending else { throw GuitarDraftStoreError.conflict }
             ownedHash = actual
         }
+        if let expectedHash, ownedHash != expectedHash { throw GuitarDraftStoreError.conflict }
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         try fm.createDirectory(at: receipts, withIntermediateDirectories: true)
         let newHash = digest(data)
-        // The pending hash also recognizes a completed GP write after a crash
-        // before the receipt's final write; retry still uses the same filename.
-        try JSONEncoder().encode(Receipt(current: ownedHash, pending: newHash)).write(to: receiptURL, options: .atomic)
+        try writeReceipt(Receipt(current: ownedHash, pending: newHash), receiptURL)
         try data.write(to: target, options: .atomic)
-        try JSONEncoder().encode(Receipt(current: newHash, pending: nil)).write(to: receiptURL, options: .atomic)
-        return target
+        // At this point the GP contains newHash and its pending receipt is durable.
+        // Failure to retire the old hash must not return a stale revision to the editor.
+        try? writeReceipt(Receipt(current: newHash, pending: nil), receiptURL)
+        return Publication(url: target, hash: newHash)
     }
 }
 
@@ -72,17 +96,17 @@ final class GuitarResultSaver {
 
     /// Keep an incomplete editable result, and never claim the practice file
     /// was updated when its round-trip validation did not pass.
-    func save(_ draft: GuitarDraft, id: UUID, replacing expected: GuitarDraft) async throws -> String {
+    func save(_ draft: GuitarDraft, id: UUID, replacing expected: GuitarDraft, publishedHash: String?) async throws -> (message: String, publishedHash: String?) {
         guard saving.insert(id).inserted else { throw ScoreDraftExportError.busy }
         defer { saving.remove(id) }
         try await store.update(draft, id: id, replacing: expected)
         do {
             let data = try await ScoreDraftExporter.export(draft)
-            let url = try await practice.publish(data, id: id)
-            DocumentDisplayNameStore().setDisplayName(draft.title, for: .guitarPro, fileName: url.lastPathComponent)
-            return "已保存。同一份曲谱已更新，可继续编辑或到练习列表播放。"
+            let result = try await practice.publish(data, id: id, replacing: publishedHash)
+            DocumentDisplayNameStore().setDisplayName(draft.title, for: .guitarPro, fileName: result.url.lastPathComponent)
+            return ("已保存。同一份曲谱已更新，可继续编辑或到练习列表播放。", result.hash)
         } catch {
-            return "编辑内容已保存；练习谱尚未更新：\(error.localizedDescription) 请继续核对后再保存，不会新增副本。"
+            return ("编辑内容已保存；练习谱尚未更新：\(error.localizedDescription) 请继续核对后再保存，不会新增副本。", nil)
         }
     }
 }

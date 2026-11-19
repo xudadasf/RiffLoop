@@ -118,6 +118,22 @@ for(const duration of [2,4,8,16]){
 const natural=draft([[beat(1,[note(1,7,{harmonicType:1})])]]);
 assert.equal(audio(reopen(natural)).notes[0].noteKey,83);natural.bars[0].beats[0].notes[0].effects.harmonicValue=12;
 assert.equal(audio(reopen(natural)).notes[0].noteKey,76);
+const attacksAndReleases=file=>file.tracks.flatMap(t=>t.events)
+  .filter(e=>e instanceof a.midi.NoteOnEvent||e instanceof a.midi.NoteOffEvent)
+  .map(e=>[e instanceof a.midi.NoteOnEvent?'on':'off',e.tick,e.noteKey]);
+for(const extra of [{isPalmMute:1},{isStaccato:1},{harmonicType:1}]){
+  const d=draft([[beat(4,[note(1,7,{trillValue:9,trillSpeed:32,...extra}),note(2,5)]),beat(4,[note(1,8)]),beat(2)]]);
+  const printed=core.makeScore(a,d,schema,false),preview=audio(printed).midi;
+  core.auditionMidi(a,preview,d,schema,null,new a.Settings());
+  const heard=attacksAndReleases(preview);
+  assert.deepEqual(heard,attacksAndReleases(audio(reopen(d)).midi));
+  if(extra.harmonicType)assert.deepEqual(heard.filter(([type,tick,key])=>type==='on'&&tick<960&&key!==64).map(x=>x[2]),[83,73,83,73,83,73,83,73]);
+  assert.equal(printed.tracks[0].staves[0].bars[0].voices[0].beats.length,3,'Keep original beats selectable');
+}
+const dryPreview=audio(core.makeScore(a,natural,schema,false)).midi;
+const originalTracks=dryPreview.tracks;
+core.auditionMidi(a,dryPreview,natural,schema,null,new a.Settings());
+assert.equal(dryPreview.tracks,originalTracks,'Scores without expanded ornaments retain their original MIDI');
 const ped=draft([[beat(2,[note(1,7)],{effects:{sustainPedal:1}}),beat(2)],[beat(2),beat(2,[],{effects:{sustainPedal:2}})]]);
 const pedScore=reopen(ped),performance=audio(pedScore),win={};
 require('node:vm').runInNewContext(require('node:fs').readFileSync(require.resolve('../RiffLoop/Resources/GpWeb/riffloop-audio.js'),'utf8'),{window:win});

@@ -5,6 +5,13 @@ import XCTest
 
 @MainActor
 final class GuitarDraftWebTests: XCTestCase {
+    func testEditorBridgeAcceptsOnlyItsBundledPage() throws {
+        let editor = try XCTUnwrap(GuitarEditorPage.url)
+        XCTAssertTrue(GuitarEditorPage.matches(editor))
+        XCTAssertFalse(GuitarEditorPage.matches(editor.deletingLastPathComponent().appendingPathComponent("editor.js")))
+        XCTAssertFalse(GuitarEditorPage.matches(FileManager.default.temporaryDirectory.appendingPathComponent("editor.html")))
+        XCTAssertFalse(GuitarEditorPage.matches(nil))
+    }
     func testNativeEditorKeypadRestAndTechniquesSaveRoundTrip() async throws {
         let store = GuitarDraftStore()
         var draft = GuitarDraft(title: "原生编辑测试")

@@ -3,11 +3,20 @@ import WebKit
 import AVFAudio
 import Combine
 
-struct GuitarDraftDocument: Identifiable {
+struct GuitarDraftDocument: Identifiable, Sendable {
     let id: UUID
     let draft: GuitarDraft
     var gpURL: URL? = nil
-    var didSaveGP: (() -> Void)? = nil
+    var publishedHash: String? = nil
+    var didSaveGP: (@MainActor @Sendable () -> Void)? = nil
+}
+
+enum GuitarEditorPage {
+    static let url = Bundle.main.url(forResource: "editor", withExtension: "html", subdirectory: "ScoreEditor")
+    static func matches(_ candidate: URL?) -> Bool {
+        guard let candidate, candidate.isFileURL, let url else { return false }
+        return candidate.standardizedFileURL.resolvingSymlinksInPath().path == url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
 }
 
 struct GuitarDraftEditorView: View {
@@ -48,8 +57,8 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         web.backgroundColor = .systemBackground
         web.navigationDelegate = context.coordinator
         context.coordinator.web = web
-        if let root = Bundle.main.resourceURL {
-            web.loadFileURL(root.appendingPathComponent("ScoreEditor/editor.html"), allowingReadAccessTo: root)
+        if let page = GuitarEditorPage.url, let root = Bundle.main.resourceURL {
+            web.loadFileURL(page, allowingReadAccessTo: root)
         }
         return web
     }
@@ -67,6 +76,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         let close: () -> Void
         let closeDirty: () -> Void
         private var originalGP: Data?
+        private var publishedHash: String?
         private var working = false
         private let interruption = AudioInterruptionRecovery()
         private var observers = Set<AnyCancellable>()
@@ -74,6 +84,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         init(document: GuitarDraftDocument, close: @escaping () -> Void, closeDirty: @escaping () -> Void) {
             self.document = document
             self.saved = document.draft
+            self.publishedHash = document.publishedHash
             self.close = close
             self.closeDirty = closeDirty
             super.init()
@@ -88,7 +99,9 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         private func pause() { web?.evaluateJavaScript("window.pauseGuitarEditor?.()", completionHandler: nil) }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
+            guard let web, message.webView === web, message.frameInfo.isMainFrame,
+                  GuitarEditorPage.matches(message.frameInfo.request.url),
+                  let body = message.body as? [String: Any], let action = body["action"] as? String else { return }
             if action == "ready" {
                 do {
                     guard let root = Bundle.main.resourceURL else { return }
@@ -102,7 +115,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                     } else {
                         load = "loadGuitarDraft(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(draft)'),c=>c.charCodeAt(0)))),JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(schema)'),c=>c.charCodeAt(0)))))"
                     }
-                    web?.evaluateJavaScript(load) { [weak self] _, error in
+                    web.evaluateJavaScript(load) { [weak self] _, error in
                         if let error { self?.reply(["message": "编辑页加载失败：\(error.localizedDescription)"]); return }
                         do {
                             let audio = AVAudioSession.sharedInstance()
@@ -136,7 +149,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                         reply(["saved": true, "message": "整份 GP 已保存。"])
                         return
                     }
-                    if action == "source", let value = body["source"] {
+                    if action == "source", document.gpURL == nil, let value = body["source"] {
                         let data = try JSONSerialization.data(withJSONObject: value)
                         let source = try JSONDecoder().decode(GuitarSource.self, from: data)
                         let files = try await ScoreWorkspaceStore().files()
@@ -152,15 +165,19 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                         reply(["source": jpeg.base64EncodedString(), "message": "原图仅供对照，编辑不会改变素材。"])
                         return
                     }
-                    guard let value = body["draft"] else { throw GuitarDraftStoreError.invalidDraft }
+                    guard action == "save", document.gpURL == nil, let value = body["draft"] else { throw GuitarDraftStoreError.invalidDraft }
                     let data = try JSONSerialization.data(withJSONObject: value)
                     guard data.count <= 8 * 1024 * 1024 else { throw GuitarDraftStoreError.tooLarge }
                     let draft = try JSONDecoder().decode(GuitarDraft.self, from: data)
                     guard draft.isValidForStorage else { throw GuitarDraftStoreError.invalidDraft }
-                    let message = try await GuitarResultSaver.shared.save(draft, id: document.id, replacing: saved)
-                    if message.hasPrefix("已保存。") { document.didSaveGP?() }
+                    let result = try await GuitarResultSaver.shared.save(draft, id: document.id, replacing: saved, publishedHash: publishedHash)
+                    if let hash = result.publishedHash {
+                        if publishedHash != nil { publishedHash = hash }
+                        document.didSaveGP?()
+                    }
                     saved = draft
-                    reply(["saved": true, "message": message])
+                    let savedForThisEditor = document.publishedHash == nil || result.publishedHash != nil
+                    reply(["saved": savedForThisEditor, "message": result.message])
                 } catch { reply(["message": "操作未完成：\(error.localizedDescription)"]) }
             }
         }
@@ -170,7 +187,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         }
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             // The editor has no remote pages or script sources.
-            decisionHandler(navigationAction.request.url?.isFileURL == true ? .allow : .cancel)
+            decisionHandler(navigationAction.targetFrame?.isMainFrame == true && GuitarEditorPage.matches(navigationAction.request.url) ? .allow : .cancel)
         }
     }
 }

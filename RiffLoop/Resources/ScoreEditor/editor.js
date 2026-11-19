@@ -1,5 +1,5 @@
 'use strict';
-let session,schema,busy=false,savedHere=false,existingGP,pendingFont;
+let session,schema,busy=false,savedHere=false,existingGP,pendingFont,barMenuRevision;
 const $=id=>document.getElementById(id),core=GuitarDraftCore;
 const send=(action,payload={})=>window.webkit?.messageHandlers.guitarEditor.postMessage({action,...payload});
 const status=text=>{$('status').textContent=text;};
@@ -25,7 +25,18 @@ function markers(b){let names=[];if(b.tupletNumerator!==b.tupletDenominator)name
 function render(reveal=false){if(!session)return;session.clamp();const d=session.draft,bar=session.currentBar;
   $('undo').disabled=!session.undoStack.length||busy;$('redo').disabled=!session.redoStack.length||busy;
   $('save').textContent=session.dirty||!savedHere?'保存':'已保存';$('prev').disabled=session.bar===0;$('next').disabled=session.bar===d.bars.length-1;
-  const choice=$('barChoice');choice.replaceChildren();d.bars.forEach((b,i)=>{const o=document.createElement('option');o.value=i;o.textContent=`第 ${i+1} 小节${b.review.length?' · 待核对':''}`;choice.append(o);});choice.value=session.bar;
+  const choice=$('barChoice');
+  if(barMenuRevision!==session.revision){
+    while(choice.options.length>d.bars.length)choice.remove(choice.options.length-1);
+    d.bars.forEach((b,i)=>{
+      const label=`第 ${i+1} 小节${b.review.length?' · 待核对':''}`;
+      const option=choice.options[i];
+      if(!option)choice.add(new Option(label,String(i)));
+      else if(option.text!==label)option.text=label;
+    });
+    barMenuRevision=session.revision;
+  }
+  choice.value=session.bar;
   $('selection').textContent=session.noteRange?noteRangeLabel():session.anchor?.wholeBars?barRangeLabel():`第 ${session.beat+1} 拍位 · 第 ${session.string} 弦`;
   const actual=bar.beats.reduce((n,b)=>n+core.ticks(b),0),expected=(bar.numerator??d.numerator)*3840/(bar.denominator??d.denominator);
   $('timing').textContent=`${bar.numerator??d.numerator}/${bar.denominator??d.denominator} · ${Number((actual/960).toFixed(3))} / ${expected/960} 拍${Math.abs(actual-expected)>.01?' · 时值未齐':''}`;
@@ -64,6 +75,7 @@ const rangeSelection={
 };
 window.loadGuitarDraft=(draft,techniques)=>{
   schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>{core.validate(d,schema,false);if(existingGP)GuitarGP.check(existingGP,d);});
+  barMenuRevision=undefined;
   session.sourceStaff=existingGP?.option.staff;
   surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{select(beat,string,bar);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status,rangeSelection);
   window.scoreEditor=surface;render(true);document.body.removeAttribute('data-loading');
@@ -89,7 +101,7 @@ window.loadExistingGuitarGP=(encoded,techniques)=>{
 };
 window.pauseGuitarEditor=()=>surface?.pause();
 window.disposeGuitarEditor=()=>surface?.destroy();
-window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved&&session){session.saved=JSON.stringify(session.draft);savedHere=true;render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
+window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved&&session){session.saved=session.serializedDraft;savedHere=true;render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
 window.guitarRequestClose=()=>{surface?.pause();if(session?.dirty)send('closeDirty');else send('close');};
 $('close').onclick=()=>window.guitarRequestClose();
 
@@ -131,6 +143,9 @@ for(const value of [7,8,9,'erase',4,5,6,'shorter',1,2,3,'longer',0,'dot','alt','
   if(spec[2]){b.setAttribute('aria-label',spec[0]);b.title=spec[0];b.replaceChildren(icon(spec[2]));}else if(value==='dot')b.textContent='.';
 }
 for(const [id,name] of [['selectMode','mouse-pointer-2'],['editMode','pencil'],['copyBeat','copy'],['pasteBeat','clipboard-paste']])decorated($(id),$(id).textContent,name);
+$('panel').addEventListener('cancel',event=>{
+  if(!session){event.preventDefault();send('close');}
+});
 $('panelClose').onclick=()=>{if(!session){send('close');return;}$('panel').close();render();};
 $('settings').onclick=()=>{panel('曲谱设置');field('曲名',session.draft.title,v=>session.change(d=>d.title=v));field('速度 BPM',session.draft.tempo,v=>session.change(d=>d.tempo=v));field('拍号分子',session.draft.numerator,v=>session.change(d=>d.numerator=v));field('拍号分母',session.draft.denominator,v=>session.change(d=>d.denominator=v),[1,2,4,8,16,32].map(n=>[String(n),n]));field('变调夹',session.draft.capo,v=>session.change(d=>d.capo=v));field('音色',session.draft.program,v=>session.change(d=>d.program=v),[['电吉他清音',27],['电吉他爵士',26],['电吉他闷音',28],['过载',29],['失真',30],['泛音',31]]);text('调弦使用 MIDI 音高：标准 E2 A2 D3 G3 B3 E4 = 40 45 50 55 59 64。修改拍号保留全部音符，请再核对各小节时值。');for(let i=0;i<6;i++)field(`第 ${6-i} 弦`,session.draft.tuning[i],v=>session.change(d=>d.tuning[i]=v));};
 $('bars').onclick=()=>{

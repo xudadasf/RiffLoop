@@ -16,15 +16,54 @@ const GuitarGP=(()=>{
     const master=[...child(root,'MasterBars').children];
     const tables={};
     for(const type of ['Bar','Voice','Beat','Note','Rhythm','Track']){
-      const parent=child(root,type==='Bar'?'Bars':type+'s'),items=new Map();let next=0;
-      for(const n of parent.children){const id=n.getAttribute('id');if(items.has(id))throw Error('GP 对象编号重复。');items.set(id,n);next=Math.max(next,Number(id)+1);}
-      tables[type]={get:id=>items.get(String(id)),add:node=>{
-        const copy=doc.importNode(node,true),id=String(next++);copy.setAttribute('id',id);parent.append(copy);items.set(id,copy);return copy;
-      }};
+      const parent=child(root,type==='Bar'?'Bars':type+'s'),items=new Map(),copies=new Map();let next=0;
+      for(const n of parent.children){
+        const id=n.getAttribute('id'),number=Number(id);
+        if(!id)throw Error('GP 对象编号无效。');
+        if(items.has(id))throw Error('GP 对象编号重复。');
+        items.set(id,n);if(Number.isSafeInteger(number))next=Math.max(next,number+1);
+      }
+      tables[type]={get:id=>items.get(String(id)),add:(node,original)=>{
+        if(!Number.isSafeInteger(next))throw Error('GP 对象编号超出范围。');
+        const copy=doc.importNode(node,true),id=String(next++);copy.setAttribute('id',id);parent.append(copy);items.set(id,copy);
+        if(original)copies.set(id,original.getAttribute('id'));
+        return copy;
+      },copies,items};
     }
     function barAt(i,slot){return tables.Bar.get(ids(child(master[i],'Bars'))[slot]);}
     function voiceAt(i,slot,v){return tables.Voice.get(ids(child(barAt(i,slot),'Voices'))[v]);}
-    return {doc,root,master,...tables,barAt,voiceAt};
+    // After all copies have been resolved, an exclusively replaced record can
+    // keep its original ID. Shared records and unrelated extensions stay intact.
+    function reuseOriginalIds(){
+      function reuse(type,parents,tag,attribute){
+        const {copies,items}=tables[type];if(!copies.size)return;
+        const fields=[],used=new Set();
+        for(const parent of parents){
+          const field=child(parent,tag);if(!field)continue;
+          const values=attribute?[field.getAttribute(attribute)]:ids(field);
+          fields.push([field,values]);for(const id of values)used.add(id);
+        }
+        const remap=new Map();
+        for(const [copiedId,originalId] of copies){
+          if(!used.has(copiedId)||used.has(originalId))continue;
+          const copy=items.get(copiedId);
+          copy.setAttribute('id',originalId);items.get(originalId).replaceWith(copy);
+          items.delete(copiedId);items.set(originalId,copy);used.add(originalId);remap.set(copiedId,originalId);
+        }
+        if(!remap.size)return;
+        for(const [field,values] of fields){
+          if(!values.some(id=>remap.has(id)))continue;
+          if(attribute)field.setAttribute(attribute,remap.get(values[0]));
+          else field.textContent=values.map(id=>remap.get(id)??id).join(' ');
+        }
+      }
+      reuse('Bar',master,'Bars');
+      reuse('Voice',tables.Bar.items.values(),'Voices');
+      reuse('Beat',tables.Voice.items.values(),'Beats');
+      reuse('Note',tables.Beat.items.values(),'Notes');
+      reuse('Rhythm',tables.Beat.items.values(),'Rhythm','ref');
+    }
+    return {doc,root,master,...tables,barAt,voiceAt,reuseOriginalIds};
   }
   function noteByString(t,beat){
     return new Map(ids(child(beat,'Notes')).map(id=>{
@@ -60,6 +99,9 @@ const GuitarGP=(()=>{
         if(v==null)continue;
         if(spec.kind==='toggle')v=Number(v);
         if(spec.id==='trillValue'&&v>=0)v=item.trillFret;
+        // GP serializes the derived touch node. Leave it implicit so a later
+        // fret edit also changes the pitch. Keep an independently chosen node.
+        if(spec.id==='harmonicValue'&&item.harmonicType===1&&v===item.fret)continue;
         if(v===(spec.default??0)||spec.id==='trillSpeed'&&!item.isTrill)continue;
         result[spec.id]=v;
       }return result;
@@ -83,25 +125,27 @@ const GuitarGP=(()=>{
       tuning:[...staff.stringTuning.tunings].reverse(),capo:staff.capo,program:track.playbackInfo.program,bars};
   }
   function open(bytes,schema){
-    const xml=GuitarArchive.xml(bytes),src=xmlTables(xml),score=alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes,new alphaTab.Settings());
+    const xml=GuitarArchive.xml(bytes),sourceTables=xmlTables(xml);
+    const score=alphaTab.importer.ScoreLoader.loadScoreFromBytes(GuitarArchive.forEditor(bytes),new alphaTab.Settings());
     const options=[];let slot=0;
     for(const track of score.tracks)for(const staff of track.staves){
       if(!staff.isPercussion&&staff.stringTuning.tunings.length===6){
         const count=Math.max(...staff.bars.map(b=>b.voices.length));
-        for(let v=0;v<count;v++)if(staff.bars.some(b=>b.voices[v]?.beats.some(x=>x.notes.length)))
+        for(let v=0;v<count;v++)if(v===0||staff.bars.some(b=>b.voices[v]?.beats.some(x=>!x.isEmpty)))
           options.push({track,staff,voice:v,slot,label:(track.name||'吉他')+' · 声部 '+(v+1)+(track.staves.length>1?' · 谱表 '+(staff.index+1):'')});
       }slot++;
     }
     if(!options.length)throw Error('这份谱没有可编辑的六弦吉他声部。');
-    return {bytes,xml,schema,score,options};
+    return {bytes,xml,schema,score,options,sourceTables};
   }
   function select(file,option){
-    const {track,staff,voice,slot}=option,draft=draftFrom(file.score,track,staff,voice,file.schema),src=xmlTables(file.xml);
+    const {track,staff,voice,slot}=option,draft=draftFrom(file.score,track,staff,voice,file.schema),src=file.sourceTables??xmlTables(file.xml);
     GuitarDraftCore.validate(draft,file.schema,false);
     for(const [i,bar] of draft.bars.entries()){
       const refs=ids(child(src.voiceAt(i,slot,voice),'Beats'));
       if(refs.length&&refs.length!==bar.beats.length)throw Error('此声部含暂不能安全定位的节拍。');
     }
+    file.sourceTables=null;
     return {file,option,draft};
   }
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -142,9 +186,9 @@ const GuitarGP=(()=>{
       return left.length===right.length&&left.every((beat,k)=>fingerprint(old,beat)===fingerprint(fresh,right[k]));
     }
     const rhythm=(t,b)=>t.Rhythm.get(child(b,'Rhythm')?.getAttribute('ref'));
-    const rhythmId=b=>{
+    const rhythmId=(b,original)=>{
       const ref=child(b,'Rhythm').getAttribute('ref');
-      if(!rhythmCache.has(ref))rhythmCache.set(ref,src.Rhythm.add(fresh.Rhythm.get(ref)).getAttribute('id'));
+      if(!rhythmCache.has(ref))rhythmCache.set(ref,src.Rhythm.add(fresh.Rhythm.get(ref),original).getAttribute('id'));
       return rhythmCache.get(ref);
     };
     for(const [i,bar] of d.bars.entries()){
@@ -154,23 +198,23 @@ const GuitarGP=(()=>{
       const length=total(bar),expected=bar.numerator*3840/bar.denominator;
       if(Math.abs(length-expected)>.01&&Math.abs(length-total(base.bars[i]))>.01)throw Error('第 '+(i+1)+' 小节时值未齐，补齐后再保存。');
       const origBar=src.barAt(i,slot),originalVoice=src.voiceAt(i,slot,voice);
-      const vb=src.Bar.add(origBar),vv=src.Voice.add(originalVoice||src.doc.createElement('Voice')),beatRefs=[];
+      const vb=src.Bar.add(origBar,origBar),vv=src.Voice.add(originalVoice||src.doc.createElement('Voice'),originalVoice),beatRefs=[];
       for(const [j,b] of bar.beats.entries()){
         const origin=b.origin,prior=origin&&base.bars[origin[0]]?.beats[origin[1]];
         const original=origin&&src.Beat.get(ids(child(src.voiceAt(origin[0],slot,voice),'Beats'))[origin[1]]);
         if(prior&&original&&unchanged[j]){beatRefs.push(original.getAttribute('id'));continue;}
         for(const [k,desired] of fresh.positions[i][j].entries()){
           const older=origin&&old.positions[origin[0]][origin[1]][0];
-          const sourceBeat=src.Beat.add(original||desired);
+          const sourceBeat=src.Beat.add(original||desired,original);
           if(original&&older)merge(sourceBeat,older,desired,['Notes','Rhythm']);
           if(!original||!older||!rhythm(old,older).isEqualNode(rhythm(fresh,desired)))
-            child(sourceBeat,'Rhythm').setAttribute('ref',rhythmId(desired));
+            child(sourceBeat,'Rhythm').setAttribute('ref',rhythmId(desired,original&&rhythm(src,original)));
           const priorNotes=original?noteByString(src,original):new Map(),baseline=older?noteByString(old,older):new Map();
           const notes=[];
           for(const [str,wanted] of noteByString(fresh,desired)){
             const was=baseline.get(str),source=priorNotes.get(str);
             if(was&&source){
-              const n=src.Note.add(source);merge(n,was,wanted);notes.push(n.getAttribute('id'));
+              const n=src.Note.add(source,source);merge(n,was,wanted);notes.push(n.getAttribute('id'));
             }else notes.push(src.Note.add(wanted).getAttribute('id'));
           }
           setText(sourceBeat,'Notes',notes.join(' '));beatRefs.push(sourceBeat.getAttribute('id'));
@@ -195,8 +239,9 @@ const GuitarGP=(()=>{
       for(const [p,action] of next){const n=src.doc.createElement('Automation');autos.append(n);
         for(const [tag,val] of Object.entries({Type:'SustainPedal',Linear:'false',Bar:String(i),Position:String(p),Visible:'true',Value:action===1?'0 1':'0 3'}))setText(n,tag,val);}
     }
+    src.reuseOriginalIds();
     const bytes=GuitarArchive.replace(file.bytes,new XMLSerializer().serializeToString(src.doc));
-    const reopened=alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes,new alphaTab.Settings());
+    const reopened=alphaTab.importer.ScoreLoader.loadScoreFromBytes(GuitarArchive.forEditor(bytes),new alphaTab.Settings());
     const staff=reopened.tracks[option.track.index].staves[option.staff.index];
     for(const [i] of changed){
       const actual=staff.bars[i].voices[voice].beats,expected=d.bars[i].beats.flatMap(GuitarDraftCore.portableBeats);

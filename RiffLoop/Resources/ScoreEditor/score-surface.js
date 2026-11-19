@@ -10,6 +10,9 @@ class GuitarScoreSurface {
       display:{layoutMode:alphaTab.LayoutMode.Page,staveProfile:alphaTab.StaveProfile.ScoreTab,scale:this.scale},
       player:{playerMode:alphaTab.PlayerMode.EnabledSynthesizer,soundFont:null,enableCursor:true,enableUserInteraction:false,enableElementHighlighting:true,scrollElement:'#scoreViewport',scrollMode:alphaTab.ScrollMode.Off}
     });
+    this.api.midiLoad.on(file=>{
+      if(this.draft)GuitarDraftCore.auditionMidi(alphaTab,file,this.draft,this.schema,this.editSession.sourceStaff,this.api.settings);
+    });
     window.RiffLoopAudio.installPedal(this.api,alphaTab);
     this.revealPending=false;
     this.tapGuard=new GuitarTapGuard(document.getElementById('scoreViewport'));
@@ -126,8 +129,8 @@ class GuitarScoreSurface {
   loadSoundFont(bytes){this.api.loadSoundFont(bytes,false);}
   update(draft,selection,schema,reveal=false){
     if(reveal)this.revealPending=true;
-    this.selection={bar:selection.bar,beat:selection.beat,string:selection.string};this.editSession=selection;this.draft=draft;
-    const encoded=JSON.stringify(draft);
+    this.selection={bar:selection.bar,beat:selection.beat,string:selection.string};this.editSession=selection;this.draft=draft;this.schema=schema;
+    const encoded=selection.serializedDraft;
     if(encoded!==this.serialized){
       this.barRects=[];this.pause();this.serialized=encoded;this.ready=false;this.onState({ready:false,playing:false});
       this.score=GuitarDraftCore.makeScore(alphaTab,draft,schema,false,false,selection.sourceStaff);

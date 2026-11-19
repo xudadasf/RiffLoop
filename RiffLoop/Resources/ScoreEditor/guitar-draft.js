@@ -89,13 +89,15 @@ function rhythmForTicks(length,source){
 }
 // GP7's Trill element has no speed in this writer. Write measured notes when
 // a compact symbol would change the performance in other GP readers.
-function portableBeats(beat){
+function needsMeasuredBeats(beat){
   const fast=beat.notes.some(n=>(n.effects.trillValue??-1)>=0&&(n.effects.trillSpeed??16)!==16);
   const marks=Math.log2(beat.tremolo/beat.duration);
   const expandPicking=beat.tremolo>0&&(marks<1||marks>3||beat.dots||beat.tupletNumerator!==beat.tupletDenominator);
-  if(!fast&&!expandPicking)return [beat];
+  return (fast||expandPicking)&&ticks(beat)>0;
+}
+function portableBeats(beat){
+  if(!needsMeasuredBeats(beat))return [beat];
   const total=ticks(beat);
-  if(!total)return [beat];
   const rates=beat.notes.map(n=>(n.effects.trillValue??-1)>=0?n.effects.trillSpeed??16:beat.tremolo);
   const rate=Math.max(beat.tremolo,...rates,1),step=3840/rate,parts=[];
   for(let offset=0;offset<total-.001;offset+=step){
@@ -108,7 +110,10 @@ function portableBeats(beat){
     for(const [i,n] of beat.notes.entries()){
       const speed=rates[i],phase=speed?offset*speed/3840:0,attack=first||speed&&Math.abs(phase-Math.round(phase))<.000001;
       const effects={...n.effects},trill=(effects.trillValue??-1)>=0;
-      const fret=trill&&Math.floor(phase+.000001)%2?effects.trillValue:n.fret;
+      const alternate=trill&&Math.floor(phase+.000001)%2===1;
+      const fret=alternate?effects.trillValue:n.fret;
+      // The trill target is a fretted pitch even when the principal note is a harmonic.
+      if(alternate){delete effects.harmonicType;delete effects.harmonicValue;}
       delete effects.trillValue;delete effects.trillSpeed;
       if(!first){delete effects.slideInType;if(attack)delete effects.isTieDestination;else effects.isTieDestination=1;}
       if(!last){delete effects.isHammerPullOrigin;delete effects.slideOutType;}
@@ -196,6 +201,18 @@ function snapshot(score,schema){
         notes:b.notes.map(n=>({string:n.string,fret:n.fret,pitch:n.realValue,effects:effects(n,'note'),bend:points(n.bendPoints)})).sort((x,y)=>x.string-y.string)}))
     }))};
 }
+function auditionMidi(a,file,draft,schema,sourceStaff,settings){
+  if(!draft.bars.some(bar=>bar.beats.some(needsMeasuredBeats)))return;
+  const score=makeScore(a,draft,schema,false,true,sourceStaff);
+  const measured=new a.midi.MidiFile();
+  const generator=new a.midi.MidiFileGenerator(score,settings,new a.midi.AlphaSynthMidiFileHandler(measured));
+  // The live player applies transposition separately after loading the MIDI.
+  generator.applyTranspositionPitches=false;
+  generator.generate();
+  // Keep the engraved score's beat lookup for touch selection, seeking and the cursor.
+  file.tracks=measured.tracks;
+  file.tickShift=measured.tickShift;
+}
 function exportDraft(a,draft,schema){
   const score=makeScore(a,draft,schema,true,true),settings=new a.Settings();
   const data=new a.exporter.Gp7Exporter().export(score,settings);
@@ -207,5 +224,5 @@ function exportDraft(a,draft,schema){
   }
   return data;
 }
-return {ticks,validate,validateLinks,harmonicNode,portableBeats,makeScore,snapshot,exportDraft};
+return {ticks,validate,validateLinks,harmonicNode,portableBeats,makeScore,auditionMidi,snapshot,exportDraft};
 });

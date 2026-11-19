@@ -127,6 +127,7 @@ jobs:
           node experiments/gp-draft-v2/test.cjs
           node scripts/test-guitar-draft.cjs
           node scripts/test-guitar-input.cjs
+          node scripts/test-guitar-archive.cjs
           python3 scripts/test-gp-roundtrip-audit.py
 
       - name: Show tool versions

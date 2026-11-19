@@ -37,7 +37,10 @@ assert.equal(await page.locator('#close').isVisible(),true,'Return remains avail
 await page.evaluate(({fixture,schema})=>loadGuitarDraft(fixture,schema),{fixture,schema});
 await page.waitForSelector('.scoreTarget');
 const target=(bar,beat,string)=>page.locator(`.scoreTarget[data-bar="${bar}"][data-beat="${beat}"][data-string="${string}"]`);
-await target(0,0,2).click();await page.locator('#keypad button').filter({hasText:/^1$/}).click();await page.waitForTimeout(1350);await page.locator('#keypad button').filter({hasText:/^3$/}).click();
+await page.evaluate(()=>{window.firstBarOption=document.querySelector('#barChoice option');});
+await target(0,0,2).click();
+assert.ok(await page.evaluate(()=>firstBarOption===document.querySelector('#barChoice option')),'Moving the cursor keeps the bar menu intact');
+await page.locator('#keypad button').filter({hasText:/^1$/}).click();await page.waitForTimeout(1350);await page.locator('#keypad button').filter({hasText:/^3$/}).click();
 assert.equal(await page.evaluate(()=>session.currentNote.fret),13);assert.equal(await page.evaluate(()=>session.currentNote.string),2);
 await page.locator('#beatRight').click();
 await page.waitForFunction(()=>scoreEditor.api.renderer.boundsLookup.findBeats(scoreEditor.score.tracks[0].staves[0].bars[0].voices[0].beats[0])?.some(b=>b.notes?.length));
@@ -199,6 +202,22 @@ assert.equal(await page.locator('#tab-beat span').evaluate(el=>el.dispatchEvent(
 assert.equal(await page.locator('img.toolIcon').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth>0)),true,'All bundled icons load');assert.deepEqual(errors,[]);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(overflow,false,'No page-level horizontal overflow');
 console.log('iPad mini: direct score/string selection, frets, techniques, local bars, real playback/pause/stop and one Save passed');
 
+// The player hears the same attacks as the saved GP; touch targets still follow written beats.
+await page.evaluate(()=>{
+  scoreEditor.api.midiLoad.on(file=>{window.trillNotes=file.tracks.flatMap(t=>t.events)
+    .filter(e=>e instanceof alphaTab.midi.NoteOnEvent).map(e=>[e.tick,e.noteKey]);});
+  session.change(d=>{d.bars=[{...GuitarEdit.bar(),beats:[7,8,10,12].map(f=>({...GuitarEdit.beat(),notes:[GuitarEdit.note(1,f)]}))}];
+    d.bars[0].beats[0].notes[0].effects={trillValue:9,trillSpeed:32,harmonicType:1};});
+  session.clearSelection();session.bar=0;session.beat=0;session.string=1;render();
+});
+await page.waitForFunction(()=>window.trillNotes?.some(([tick,key])=>tick===120&&key===73)&&!document.getElementById('play').disabled);
+assert.deepEqual(await page.evaluate(()=>trillNotes.filter(n=>n[0]<960)),[83,73,83,73,83,73,83,73].map((key,i)=>[i*120,key]));
+await page.waitForFunction(()=>document.querySelectorAll('.scoreTarget[data-string="1"]').length===4);
+await target(0,1,1).tap();
+assert.equal(await page.evaluate(()=>scoreEditor.api.tickPosition),960,'Tapping the note after the trill seeks to the second written beat');
+await page.locator('#play').tap();await page.waitForFunction(()=>scoreEditor.api.playerState===1&&scoreEditor.api.tickPosition>960);
+await page.locator('#stop').tap();assert.deepEqual(errors,[]);
+
 const gpPage=await browser.newPage({viewport:{width:1133,height:744},hasTouch:true});
 await gpPage.addInitScript(()=>{window.messages=[];window.webkit={messageHandlers:{guitarEditor:{postMessage:m=>messages.push(m)}}};});
 await gpPage.goto(page.url());await gpPage.waitForFunction(()=>window.messages.some(m=>m.action==='ready'));
@@ -215,6 +234,9 @@ await gpPage.evaluate(({fixture,schema})=>{
   const encoded=fflate.zipSync(zip);window.fixtureGP=encoded;
   loadExistingGuitarGP(btoa(String.fromCharCode(...encoded)),schema);
 },{fixture,schema});
+await gpPage.keyboard.press('Escape');
+await gpPage.waitForFunction(()=>messages.some(m=>m.action==='close'),{},{timeout:2000});
+await gpPage.evaluate(schema=>loadExistingGuitarGP(btoa(String.fromCharCode(...fixtureGP)),schema),schema);
 await gpPage.getByRole('button',{name:'Electric Guitar · 声部 1',exact:true}).tap();
 await gpPage.locator('.scoreTarget[data-beat="1"][data-string="1"]').first().tap();
 await gpPage.locator('#keypad button').filter({hasText:/^7$/}).tap();
