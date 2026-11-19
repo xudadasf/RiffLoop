@@ -141,7 +141,12 @@ document.addEventListener('keydown',e=>{
   if(actions[e.key]){e.preventDefault();actions[e.key]();}else if(effects[e.key.toLowerCase()]){e.preventDefault();perform(()=>session.toggleEffect(...effects[e.key.toLowerCase()]));}else if(e.key.toLowerCase()==='x'){e.preventDefault();perform(()=>{if(!session.anchor&&!session.currentNote)session.setFret(0);session.toggleEffect('note','isDead');});}
 });
 for(const [id,name] of [['stringUp','chevron-up'],['stringDown','chevron-down'],['beatLeft','chevron-left'],['beatRight','chevron-right']])$(id).replaceChildren(icon(name));
-new GuitarTapGuard($('thumbPad'));
+new GuitarJoystick(document.querySelector('.navButtons'),(dx,dy)=>{
+  if(!session||busy||$('panel').open||document.body.classList.contains('reading'))return;
+  if(dy&&!(session.string+dy>=1&&session.string+dy<=6))return;
+  if(dx>0&&session.bar===session.draft.bars.length-1&&(altMove||session.beat===session.currentBar.beats.length-1))return;
+  move(dx,dy);
+},()=>surface?.revealSelection());
 $('thumbPad').onclick=()=>surface?.revealSelection();
 // Keep long-press menus off controls while retaining standard text-field editing.
 document.addEventListener('contextmenu',e=>{

@@ -111,3 +111,58 @@ class GuitarRangeDrag {
   }
   destroy(){this.finish(true);this.listeners.abort();}
 }
+
+class GuitarJoystick {
+  constructor(pad,step,locate){
+    const knob=pad.querySelector('#thumbPad');
+    let pointer=null, timer=0, direction='', reach=0, moved=false;
+    const vectors={left:[-1,0],right:[1,0],up:[0,-1],down:[0,1]};
+    const reset=()=>{
+      clearTimeout(timer);
+      pointer=null;direction='';reach=0;
+      knob.style.transform='';
+      delete pad.dataset.direction;
+    };
+    const repeat=()=>{
+      if(!direction||pointer===null)return;
+      step(...vectors[direction]);
+      timer=setTimeout(repeat,Math.round(340-175*reach));
+    };
+    const update=e=>{
+      const box=pad.getBoundingClientRect();
+      const x=(e.clientX-box.left-box.width/2)/(box.width/2);
+      const y=(e.clientY-box.top-box.height/2)/(box.height/2);
+      const distance=Math.hypot(x,y);
+      const scale=Math.max(1,distance);
+      knob.style.transform='translate('+x/scale*box.width*.25+'px,'+y/scale*box.height*.25+'px)';
+      reach=Math.max(0,Math.min(1,(distance-.25)/.75));
+      let next='';
+      if(distance>(direction ? .19 : .25)){
+        const horizontal=Math.abs(x)>Math.abs(y);
+        const diagonal=Math.abs(Math.abs(x)-Math.abs(y))<distance*.15;
+        const keepAxis=diagonal&&direction;
+        const useX=keepAxis?(direction==='left'||direction==='right'):horizontal;
+        next=useX?(x<0?'left':'right'):(y<0?'up':'down');
+      }
+      if(next===direction)return;
+      clearTimeout(timer);
+      direction=next;pad.dataset.direction=next;
+      if(direction){moved=true;step(...vectors[direction]);timer=setTimeout(repeat,450);}
+    };
+    pad.addEventListener('pointerdown',e=>{
+      if(pointer!==null||!e.isPrimary||e.button!==0)return;
+      e.preventDefault();pointer=e.pointerId;moved=false;
+      pad.setPointerCapture(pointer);update(e);
+    });
+    pad.addEventListener('pointermove',e=>{if(e.pointerId===pointer)update(e);});
+    pad.addEventListener('pointerup',e=>{
+      if(e.pointerId!==pointer)return;
+      const centerTap=!moved;reset();
+      if(centerTap)locate();
+    });
+    for(const event of ['pointercancel','lostpointercapture'])pad.addEventListener(event,e=>{if(e.pointerId===pointer)reset();});
+    pad.addEventListener('click',e=>{if(e.detail>0){e.preventDefault();e.stopImmediatePropagation();}},true);
+    window.addEventListener('blur',reset);
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
+  }
+}

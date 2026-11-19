@@ -57,6 +57,7 @@ final class MetronomeEngine {
     private var schedulerGeneration: UInt64?
     private var timeline: BeatTimeline?
     private var anchor: TransportAnchor?
+    private var stageSchedule: MetronomeStageSchedule?
     private var rhythmMode: RhythmMode = .click
     private var nextEventIndex: Int64 = 0
     private var generation: UInt64 = 0
@@ -86,21 +87,24 @@ final class MetronomeEngine {
         timeline: BeatTimeline,
         anchor: TransportAnchor,
         rhythmMode: RhythmMode = .click,
-        volume: Float = 1
+        volume: Float = 1,
+        stageSchedule: MetronomeStageSchedule? = nil
     ) throws {
         try prepare()
 
         schedulingQueue.sync {
             generation &+= 1
+            self.stageSchedule = stageSchedule
             self.timeline = timeline
             self.anchor = anchor
             self.rhythmMode = rhythmMode
             playerNode.volume = min(max(volume, 0), 1)
             clickBoost = metronomeClickBoost(volume: volume)
+            let shortestInterval = stageSchedule?.segments.map(\.interval).min() ?? timeline.eventInterval
             rebuildClickBuffers(
-                duration: min(0.035, max(0.004, timeline.eventInterval / anchor.mediaRate / 2))
+                duration: min(0.035, max(0.004, shortestInterval / anchor.mediaRate / 2))
             )
-            nextEventIndex = timeline.eventIndex(atOrAfter: anchor.mediaTime)
+            nextEventIndex = stageSchedule?.position(at: anchor.mediaTime).nextEvent ?? timeline.eventIndex(atOrAfter: anchor.mediaTime)
 
             playerNode.stop()
             scheduleAvailableEvents(generation: generation)
@@ -112,6 +116,7 @@ final class MetronomeEngine {
     func stop() {
         schedulingQueue.sync {
             generation &+= 1
+            stageSchedule = nil
             timeline = nil
             anchor = nil
             playerNode.stop()
@@ -150,7 +155,8 @@ final class MetronomeEngine {
 
         while true {
             let event = timeline.event(at: nextEventIndex)
-            let eventHostTime = anchor.hostTime(forMediaTime: event.mediaTime)
+            let mediaTime = stageSchedule?.time(of: nextEventIndex) ?? event.mediaTime
+            let eventHostTime = anchor.hostTime(forMediaTime: mediaTime)
 
             if eventHostTime > horizon { break }
             nextEventIndex += 1

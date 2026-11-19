@@ -20,6 +20,9 @@ enum GpTrackTimbre: Int, CaseIterable, Identifiable {
 }
 
 struct GpPracticeProfile: Codable, Equatable, Sendable {
+    var gpStages: TempoStagePlan?
+    var standaloneStages: TempoStagePlan?
+    var standaloneStagesEnabled: Bool?
     var standaloneBpm: Double?
     var standaloneBeatsPerMeasure: Int?
     var standaloneVolume: Double?
@@ -58,6 +61,9 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
     var highestPracticeSpeed = 1.0
 
     init(
+        gpStages: TempoStagePlan? = nil,
+        standaloneStages: TempoStagePlan? = nil,
+        standaloneStagesEnabled: Bool? = nil,
         standaloneBpm: Double? = nil,
         standaloneBeatsPerMeasure: Int? = nil,
         standaloneVolume: Double? = nil,
@@ -95,6 +101,9 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
         totalCompletedLoops: Int = 0,
         highestPracticeSpeed: Double = 1.0
     ) {
+        self.gpStages = gpStages
+        self.standaloneStages = standaloneStages
+        self.standaloneStagesEnabled = standaloneStagesEnabled
         self.standaloneBpm = standaloneBpm
         self.standaloneBeatsPerMeasure = standaloneBeatsPerMeasure
         self.standaloneVolume = standaloneVolume
@@ -135,6 +144,9 @@ struct GpPracticeProfile: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        gpStages = try? values.decode(TempoStagePlan.self, forKey: .gpStages)
+        standaloneStages = try? values.decode(TempoStagePlan.self, forKey: .standaloneStages)
+        standaloneStagesEnabled = try values.decodeIfPresent(Bool.self, forKey: .standaloneStagesEnabled)
         standaloneBpm = try values.decodeIfPresent(Double.self, forKey: .standaloneBpm)
         standaloneBeatsPerMeasure = try values.decodeIfPresent(Int.self, forKey: .standaloneBeatsPerMeasure)
         standaloneVolume = try values.decodeIfPresent(Double.self, forKey: .standaloneVolume)

@@ -107,7 +107,11 @@ struct GpPracticeView: View {
                     Button { activePanel = activePanel == .standalone ? nil : .standalone } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "metronome")
-                            Text(viewModel.isStandaloneMetronomePlaying ? "\(Int(viewModel.standaloneBpm)) BPM" : "独立节拍")
+                            if viewModel.isStandaloneMetronomePlaying && viewModel.standaloneStagesEnabled {
+                                TimelineView(.periodic(from: .now, by: 0.25)) { _ in Text("\(viewModel.playingStandaloneBpm) BPM") }
+                            } else {
+                                Text(viewModel.isStandaloneMetronomePlaying ? "\(Int(viewModel.standaloneBpm)) BPM" : "独立节拍")
+                            }
                         }
                         .font(.subheadline)
                         .fixedSize()
@@ -207,9 +211,10 @@ struct GpPracticeView: View {
             return ("正在选择循环范围", .blue)
         }
         if viewModel.isStandaloneMetronomePlaying {
-            return ("独立节拍器 · \(Int(viewModel.standaloneBpm)) BPM", .green)
+            return (viewModel.standaloneStagesEnabled ? "独立节拍器 · 自定义阶梯" : "独立节拍器 · \(Int(viewModel.standaloneBpm)) BPM", .green)
         }
         if viewModel.isPlaying {
+            if viewModel.gpStagesEnabled { return (viewModel.gpStageSummary, .green) }
             let loopSuffix = viewModel.rangeLoopingEnabled && viewModel.loopRange != nil
                 ? (viewModel.speedLadderEnabled ? " · 提速第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮" : " · 区间循环")
                 : ""
@@ -435,7 +440,22 @@ struct GpPracticeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("循环阶梯") {
+            .disabled(viewModel.gpStagesEnabled)
+
+            Section {
+                Toggle("启用自定义阶梯", isOn: Binding(
+                    get: { viewModel.gpStagesEnabled }, set: { viewModel.setGpStagesEnabled($0) }
+                )).disabled(!viewModel.rangeLoopingEnabled || viewModel.loopRange == nil)
+                TempoStageEditorButton(plan: viewModel.gpStages, bpmRange: viewModel.stageBpmRange,
+                                       timedOnly: false, apply: viewModel.setGpStages)
+                if viewModel.gpStagesEnabled {
+                    Text(viewModel.gpStageSummary).font(.subheadline.monospacedDigit())
+                }
+            } header: { Text("自定义阶梯") } footer: {
+                Text("选好 A/B 区间后即可启用。每个阶段都从区间起点开始。")
+            }
+
+            Section("固定步长提速") {
                 Toggle("启用循环阶梯", isOn: Binding(
                     get: { viewModel.speedLadderEnabled },
                     set: { viewModel.setSpeedLadderEnabled($0) }
@@ -697,6 +717,7 @@ struct GpPracticeView: View {
     private var loopDetail: String {
         if viewModel.loopPreview != nil { return "选择中 · 松手确认" }
         guard viewModel.rangeLoopingEnabled, viewModel.loopRange != nil else { return "循环已关闭" }
+        if viewModel.gpStagesEnabled { return viewModel.gpStageSummary }
         return (viewModel.speedLadderEnabled ? "提速第 \(viewModel.currentSpeedLadderRound)/\(viewModel.loopsPerSpeedStep) 轮 · " : "") + (viewModel.loopCountInEnabled ? "预备开启" : "无预备")
     }
 

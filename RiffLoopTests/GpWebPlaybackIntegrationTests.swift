@@ -216,8 +216,27 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         model.setPracticeStartBpm(53)
         model.seek(to: 0)
         try await Task.sleep(for: .milliseconds(300))
+        let firstBeat = GpBarHit(index: 0, startTick: 0, endTick: 3840, seekTick: 0, seekEndTick: 960)
+        model.receive(.pointerDown(firstBeat))
+        model.receive(.pointerUp)
+        model.setLoopCountInEnabled(false)
+        model.setGpStages(.init(stages: [.init(bpm: 160, unit: .loops, length: 1),
+                                         .init(bpm: 90, unit: .seconds, length: 2)]))
+        model.setGpStagesEnabled(true)
+        model.togglePlayback()
+        try await waitUntil("Custom tempo must switch on a real A/B completion") { model.gpProgress.index == 1 }
+        XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
+        model.pause()
+        model.clearLoop()
+        model.seek(to: 0)
+        try await Task.sleep(for: .milliseconds(300))
         model.setStandaloneBpm(87)
+        model.setStandaloneStages(.init(stages: [.init(bpm: 240, unit: .seconds, length: 1),
+                                                 .init(bpm: 100, unit: .seconds, length: 10)]))
+        model.setStandaloneStagesEnabled(true)
         model.toggleStandaloneMetronome()
+        try await waitUntil("Standalone clock reaches the next stage without starting GP") { model.playingStandaloneBpm == 100 }
+
         XCTAssertTrue(model.isStandaloneMetronomePlaying)
         let stationaryTick = model.position.currentTick
         try await Task.sleep(for: .milliseconds(600))
@@ -233,6 +252,7 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
             model.isPlaying && model.position.currentTick >= 8640
         }
         XCTAssertEqual(model.currentBpm, 53, accuracy: 0.01)
+        model.setStandaloneStagesEnabled(false)
         model.pause()
         model.resetBaseBpm()
         model.setPlaybackSpeed(0.9)

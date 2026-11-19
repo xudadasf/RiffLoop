@@ -15,9 +15,21 @@ struct GpStandaloneMetronomeControls: View {
                 .disabled(!viewModel.playerReady)
                 .accessibilityIdentifier("gp.standalone.play")
 
+                Toggle("启用自定义阶梯", isOn: Binding(
+                    get: { viewModel.standaloneStagesEnabled }, set: { viewModel.setStandaloneStagesEnabled($0) }
+                ))
+                TempoStageEditorButton(plan: viewModel.standaloneStages, bpmRange: 30...300,
+                                       timedOnly: true, apply: viewModel.setStandaloneStages)
+                if viewModel.standaloneStagesEnabled {
+                    TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+                        Text("阶段 \(viewModel.standaloneStageIndex + 1)/\(viewModel.standaloneStages.stages.count) · \(viewModel.playingStandaloneBpm) BPM")
+                            .font(.subheadline.monospacedDigit())
+                    }
+                }
                 TempoInputControl(bpm: Binding(
                     get: { viewModel.standaloneBpm }, set: { viewModel.setStandaloneBpm($0) }
                 ), onChange: {})
+                .disabled(viewModel.standaloneStagesEnabled)
                 Stepper("每小节 \(viewModel.standaloneBeatsPerMeasure) 拍", value: Binding(
                     get: { viewModel.standaloneBeatsPerMeasure }, set: { viewModel.setStandaloneBeats($0) }
                 ), in: 1...16)

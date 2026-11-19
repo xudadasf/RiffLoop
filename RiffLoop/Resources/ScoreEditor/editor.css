@@ -61,3 +61,7 @@ button img{-webkit-user-drag:none}
 }
 .selectedHead{position:absolute;pointer-events:none;border-radius:50%}
 body.reading .selectedHead{display:none}
+
+.navButtons,.navButtons button,.navButtons #thumbPad{touch-action:none;-webkit-touch-callout:none;user-select:none}
+.navButtons #thumbPad{position:relative;z-index:1;background:#656b6c;border:1px solid #ffffff38;box-shadow:0 2px 4px #0004}
+.navButtons[data-direction]:not([data-direction=""]) #thumbPad{background:#55727b}
