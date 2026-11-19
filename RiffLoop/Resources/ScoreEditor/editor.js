@@ -144,8 +144,8 @@ for(const [id,name] of [['stringUp','chevron-up'],['stringDown','chevron-down'],
 new GuitarJoystick(document.querySelector('.navButtons'),(dx,dy)=>{
   if(!session||busy||$('panel').open||document.body.classList.contains('reading'))return;
   if(dy&&!(session.string+dy>=1&&session.string+dy<=6))return;
-  if(dx>0&&session.bar===session.draft.bars.length-1&&(altMove||session.beat===session.currentBar.beats.length-1))return;
-  move(dx,dy);
+  if(dx>0&&session.bar===session.draft.bars.length-1&&session.beat===session.currentBar.beats.length-1)return;
+  perform(()=>session.move(dx,dy,false,selecting));
 },()=>surface?.revealSelection());
 $('thumbPad').onclick=()=>surface?.revealSelection();
 // Keep long-press menus off controls while retaining standard text-field editing.

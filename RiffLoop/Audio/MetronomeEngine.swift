@@ -58,6 +58,7 @@ final class MetronomeEngine {
     private var timeline: BeatTimeline?
     private var anchor: TransportAnchor?
     private var gap = MetronomeGapPattern()
+    private var gapFirstMeasure: Int64 = 0
     private var pendingGap: MetronomeGapPattern?
     private var stageSchedule: MetronomeStageSchedule?
     private var rhythmMode: RhythmMode = .click
@@ -91,13 +92,15 @@ final class MetronomeEngine {
         rhythmMode: RhythmMode = .click,
         volume: Float = 1,
         stageSchedule: MetronomeStageSchedule? = nil,
-        gap: MetronomeGapPattern = .init()
+        gap: MetronomeGapPattern = .init(),
+        gapFirstMeasure: Int64 = 0
     ) throws {
         try prepare()
 
         schedulingQueue.sync {
             generation &+= 1
             self.gap = gap
+            self.gapFirstMeasure = gapFirstMeasure
             pendingGap = nil
             self.stageSchedule = stageSchedule
             self.timeline = timeline
@@ -118,8 +121,13 @@ final class MetronomeEngine {
         }
     }
 
-    func setGapOnNextMeasure(_ pattern: MetronomeGapPattern) {
-        schedulingQueue.sync { pendingGap = pattern }
+    func setGapOnNextMeasure(_ pattern: MetronomeGapPattern) -> Int64 {
+        schedulingQueue.sync {
+            guard let timeline else { return 0 }
+            pendingGap = pattern
+            let count = Int64(timeline.eventsPerMeasure)
+            return (nextEventIndex + count - 1) / count
+        }
     }
 
     func stop() {
@@ -169,13 +177,14 @@ final class MetronomeEngine {
 
             if eventHostTime > horizon { break }
             if event.isMeasureAccent, let pendingGap {
+                gapFirstMeasure = timeline.measureIndex(event.index)
                 gap = pendingGap
                 self.pendingGap = nil
             }
             nextEventIndex += 1
 
             if eventHostTime < now + schedulingLead { continue }
-            if gap.enabled && !gap.sounds(in: timeline.measureIndex(event.index)) { continue }
+            if gap.enabled && !gap.sounds(in: timeline.measureIndex(event.index), startingAt: gapFirstMeasure) { continue }
             if !timeline.shouldPlay(event.index, mode: rhythmMode) { continue }
 
             let buffer = clickBuffer(for: event.index, timeline: timeline)

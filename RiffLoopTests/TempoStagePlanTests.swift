@@ -66,6 +66,7 @@ final class TempoStagePlanTests: XCTestCase {
         let gap = MetronomeGapPattern(enabled: true, soundBars: 2, silentBars: 1)
         let beats = BeatTimeline(bpm: 120, beatOffset: 0, subdivision: .sixteenth, quarterNotesPerMeasure: 4)
         let heard = (Int64(0)..<96).filter { gap.sounds(in: beats.measureIndex($0)) && beats.shouldPlay($0, mode: .click) }
+        XCTAssertEqual((8..<14).map { gap.sounds(in: Int64($0), startingAt: 8) }, [true,true,false,true,true,false])
         XCTAssertTrue(heard.contains(31))
         XCTAssertTrue(heard.filter { (32..<48).contains($0) }.isEmpty)
         XCTAssertEqual(schedule.position(at: 4).stage, 1)

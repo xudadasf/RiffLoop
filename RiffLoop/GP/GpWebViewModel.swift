@@ -34,6 +34,7 @@ final class GpWebViewModel: ObservableObject {
     private var hasGpPlan = false
     private var hasStandalonePlan = false
     private var gpRangeStartTempo: Double?
+    private var gapFirstMeasure: Int64 = 0
     private var standaloneStageOffset = 0.0
     private var standaloneStageAnchor: TransportAnchor?
     private var standaloneSchedule: MetronomeStageSchedule?
@@ -300,6 +301,7 @@ final class GpWebViewModel: ObservableObject {
         gpProgress = LoopStageProgress()
         standaloneStagesEnabled = false
         standaloneStageOffset = 0
+        gapFirstMeasure = 0
         standaloneSchedule = nil
         currentFileName = fileName
         pendingProfile = (try? settingsStore.load(
@@ -397,6 +399,7 @@ final class GpWebViewModel: ObservableObject {
         if standaloneStagesEnabled { stopStandaloneMetronome() }
         standaloneSchedule = nil
         standaloneStageOffset = 0
+        gapFirstMeasure = 0
         standaloneStages = plan
         hasStandalonePlan = true
         saveProfile()
@@ -406,6 +409,7 @@ final class GpWebViewModel: ObservableObject {
         guard standaloneStagesEnabled != enabled else { return }
         stopStandaloneMetronome()
         standaloneStageOffset = 0
+        gapFirstMeasure = 0
         standaloneSchedule = nil
         standaloneStagesEnabled = enabled
         if enabled { hasStandalonePlan = true }
@@ -415,7 +419,14 @@ final class GpWebViewModel: ObservableObject {
     func setStandaloneGap(_ pattern: MetronomeGapPattern) {
         guard pattern.valid, pattern != standaloneGap else { return }
         standaloneGap = pattern
-        if isStandaloneMetronomePlaying { standaloneMetronome.setGapOnNextMeasure(pattern) }
+        if isStandaloneMetronomePlaying {
+            gapFirstMeasure = standaloneMetronome.setGapOnNextMeasure(pattern)
+        } else if pattern.enabled {
+            let eventsPerBar = Int64(standaloneBeatsPerMeasure * standaloneSubdivisionFactor)
+            let next = standaloneSchedule?.position(at: standaloneElapsed).nextEvent
+                ?? Int64(ceil(standaloneElapsed * standaloneBpm * Double(standaloneSubdivisionFactor) / 60 - 1e-9))
+            gapFirstMeasure = (next + eventsPerBar - 1) / eventsPerBar
+        }
         saveProfile()
     }
 
@@ -438,7 +449,7 @@ final class GpWebViewModel: ObservableObject {
             try standaloneMetronome.synchronize(
                 timeline: BeatTimeline(bpm: standaloneBpm, beatOffset: 0, subdivision: subdivision,
                     quarterNotesPerMeasure: standaloneBeatsPerMeasure, beatAccents: accents),
-                anchor: anchor, volume: Float(standaloneVolume), stageSchedule: schedule, gap: standaloneGap)
+                anchor: anchor, volume: Float(standaloneVolume), stageSchedule: schedule, gap: standaloneGap, gapFirstMeasure: gapFirstMeasure)
             standaloneSchedule = schedule
             standaloneStageOffset = offset
             standaloneStageAnchor = anchor

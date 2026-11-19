@@ -123,7 +123,7 @@ struct MetronomeGapPattern: Codable, Equatable {
 
     var valid: Bool { (1...99).contains(soundBars) && (1...99).contains(silentBars) }
 
-    func sounds(in measure: Int64) -> Bool {
-        !enabled || measure % Int64(soundBars + silentBars) < Int64(soundBars)
+    func sounds(in measure: Int64, startingAt first: Int64 = 0) -> Bool {
+        !enabled || measure < first || (measure - first) % Int64(soundBars + silentBars) < Int64(soundBars)
     }
 }
