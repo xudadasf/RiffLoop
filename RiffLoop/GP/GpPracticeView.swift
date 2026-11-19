@@ -298,7 +298,7 @@ struct GpPracticeView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(viewModel.playbackSpeed == value ? .accentColor : .secondary)
-                        .disabled(!viewModel.playerReady || !viewModel.practiceSpeedRange.contains(value))
+                        .disabled(!viewModel.playerReady || viewModel.gpStagesEnabled || !viewModel.practiceSpeedRange.contains(value))
                     }
                 }
             }
@@ -439,7 +439,6 @@ struct GpPracticeView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
             .disabled(viewModel.gpStagesEnabled)
 
             Section {
@@ -777,7 +776,8 @@ struct GpPracticeView: View {
     }
 
     private var tempoSummary: String {
-        String(
+        if viewModel.gpStagesEnabled { return viewModel.gpStageSummary }
+        return String(
             format: "基准 %.0f BPM · 当前 %.0f BPM · %.2f×",
             viewModel.baseBpm,
             viewModel.currentBpm,

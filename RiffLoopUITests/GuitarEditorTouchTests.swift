@@ -1,6 +1,24 @@
 import XCTest
 
 final class GuitarEditorTouchTests: XCTestCase {
+    func testHoldingJoystickMovesAcrossStringsAndStopsAtLastString() {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchEnvironment["RIFFLOOP_EDITOR_TOUCH_TEST"] = "1"
+        app.launch()
+        let web = app.webViews
+        let center = web.buttons["定位当前音符"].firstMatch
+        let down = web.buttons["下弦"].firstMatch
+        XCTAssertTrue(web.staticTexts["17"].firstMatch.waitForExistence(timeout: 25))
+        XCTAssertTrue(center.exists && down.exists)
+        let middle = CGVector(dx: 0.5, dy: 0.5)
+        center.coordinate(withNormalizedOffset: middle).press(forDuration: 0.1,
+            thenDragTo: down.coordinate(withNormalizedOffset: middle),
+            withVelocity: .default, thenHoldForDuration: 1.8)
+        XCTAssertTrue(web.staticTexts["第 1 拍位 · 第 6 弦"].waitForExistence(timeout: 5))
+    }
+
     func testHoldAndDragCopiesOnlyTwoNotesInABar() {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .landscapeLeft
