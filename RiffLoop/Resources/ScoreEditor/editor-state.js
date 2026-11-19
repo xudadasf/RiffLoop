@@ -103,7 +103,29 @@ class Session {
       this.clearSelection();
     });
   }
-  toggleEffect(scope,id,value=1,defaultValue=0){const targets=this.targets(scope);if(!targets.length)throw Error('先在当前弦输入品位，或选中已有音符。');const next=targets.every(t=>(t.effects[id]??defaultValue)===value)?defaultValue:value;this.change(()=>targets.forEach(t=>{t.effects[id]=next;}));}
+  effectTargets(scope,id,value){
+    const selected=this.targets(scope);
+    if(!this.anchor)return selected;
+    const ties=id==='isTieDestination',legato=id==='isLegatoOrigin';
+    if(!ties&&!legato&&id!=='isHammerPullOrigin'&&!(id==='slideOutType'&&[1,2].includes(value)))return selected;
+    const picks=new Set(selected),eligible=[],previous=new Map();
+    for(const {value:beat} of this.rangeEntries()){
+      if(!beat.notes.length){previous.clear();continue;}
+      for(const item of legato?[beat]:beat.notes){
+        const key=legato?0:item.string,prior=previous.get(key);
+        if(picks.has(item)&&picks.has(prior)&&(legato||item.fret!=null&&prior.fret!=null)&&(!ties||item.fret===prior.fret))
+          eligible.push(ties?item:prior);
+        previous.set(key,item);
+      }
+    }
+    return eligible;
+  }
+  setEffect(scope,id,value){
+    const targets=this.effectTargets(scope,id,value);
+    if(!targets.length)throw Error('请选择连续的同弦音符，延音还需要同品。');
+    this.change(()=>targets.forEach(t=>{t.effects[id]=value;}));
+  }
+  toggleEffect(scope,id,value=1,defaultValue=0){const targets=this.effectTargets(scope,id,value);if(this.anchor&&!targets.length)throw Error('请选择连续的同弦音符，延音还需要同品。');if(!targets.length)throw Error('先在当前弦输入品位，或选中已有音符。');const next=targets.every(t=>(t.effects[id]??defaultValue)===value)?defaultValue:value;this.change(()=>targets.forEach(t=>{t.effects[id]=next;}));}
   removeEffect(scope,id){this.change(()=>this.targets(scope).forEach(t=>{delete t.effects[id];const dependent={harmonicType:'harmonicValue',trillValue:'trillSpeed',brushType:'brushDuration'}[id];if(dependent)delete t.effects[dependent];}));}
   setCurve(scope,points){const targets=this.targets(scope);if(!targets.length)throw Error('先选中已有音符。');this.change(()=>targets.forEach(t=>{t[scope==='note'?'bend':'whammy']=copy(points);if(!points.length)delete t.effects[scope==='note'?'bendStyle':'whammyStyle'];}));}
   clearTechniques(){

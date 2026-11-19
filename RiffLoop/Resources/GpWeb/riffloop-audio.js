@@ -71,5 +71,33 @@
         context.addEventListener?.("statechange", () => report({ event: "statechange", state: context.state,
             time: context.currentTime, sampleRate: context.sampleRate }));
     };
-    window.RiffLoopAudio = { limit, latency, install };
+    function applyPedals(file, score, lookup, at) {
+        for (const track of score?.tracks || []) {
+            const staff = track.staves.find(s => s.bars.some(b => b.sustainPedals.length));
+            if (!staff || !lookup) continue;
+            const channels = new Set([track.playbackInfo.primaryChannel, track.playbackInfo.secondaryChannel]);
+            let down = false;
+            function change(tick, next) {
+                if (down === next) return;
+                down = next;
+                for (const channel of channels) {
+                    file.addEvent(new at.midi.ControlChangeEvent(track.index, Math.round(tick) + file.tickShift, channel, 64, next ? 127 : 0));
+                }
+            }
+            for (const occurrence of lookup.masterBars) {
+                const bar = staff.bars[occurrence.masterBar.index];
+                const markers = bar.sustainPedals;
+                if (down && !markers.length) change(occurrence.start, false);
+                for (const marker of markers) {
+                    const tick = occurrence.start + marker.ratioPosition * (occurrence.end - occurrence.start);
+                    change(tick, marker.pedalType !== at.model.SustainPedalMarkerType.Up);
+                }
+            }
+            if (lookup.masterBars.length) change(lookup.masterBars.at(-1).end, false);
+        }
+    }
+    function installPedal(api, at) {
+        api.midiLoad.on(file => applyPedals(file, api.score, api.tickCache, at));
+    }
+    window.RiffLoopAudio = { limit, latency, install, applyPedals, installPedal };
 })();

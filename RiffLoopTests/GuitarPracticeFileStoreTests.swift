@@ -8,6 +8,19 @@ final class GuitarPracticeFileStoreTests: XCTestCase {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+    func testExistingGPIsUpdatedInPlaceAndRejectsAStaleSave() async throws {
+        let root = try folder()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let target = root.appendingPathComponent("practice.gp")
+        try data(1).write(to: target)
+        try await GuitarExistingFile.shared.replace(target, original: data(1), edited: data(2))
+        do {
+            try await GuitarExistingFile.shared.replace(target, original: data(1), edited: data(3))
+            XCTFail("A stale editor overwrote another save")
+        } catch GuitarDraftStoreError.conflict { }
+        XCTAssertEqual(try GuitarExistingFile.read(target), data(2))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), ["practice.gp"])
+    }
     private func data(_ byte: UInt8) -> Data { Data([0x50,0x4b,0x03,0x04,byte]) }
 
     func testRepeatedSaveAndTitleChangesHaveOneStableFile() async throws {

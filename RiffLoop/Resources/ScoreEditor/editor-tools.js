@@ -28,7 +28,7 @@ function glyph(symbol){
 function icon(name){const img=document.createElement('img');img.src=`icons/${name}.svg`;img.alt='';img.className='toolIcon';return img;}
 function decorated(el,label,visual){el.setAttribute('aria-label',label);el.title=label;el.replaceChildren();if(typeof visual==='number')el.append(glyph(visual));else if(visual)el.append(icon(visual));const caption=document.createElement('span');caption.textContent=label;el.append(caption);return el;}
 function tool(label,action,options={}){const b=button(label,action,$('toolStrip'));if(options.id)b.id=options.id;b.classList.add('toolButton');if(options.symbol)decorated(b,label,options.symbol);if(options.active||options.disabled)toolRefresh.push(()=>{b.disabled=!!options.disabled?.();if(options.active)b.setAttribute('aria-pressed',String(!!options.active()));});return b;}
-function effect(label,scope,id,value=1,defaultValue=0,symbol){return tool(label,()=>session.toggleEffect(scope,id,value,defaultValue),{symbol,active:()=>{const ts=session.targets(scope);return ts.length&&ts.every(t=>(t.effects[id]??defaultValue)===value);},disabled:()=>!session.targets(scope).length});}
+function effect(label,scope,id,value=1,defaultValue=0,symbol){return tool(label,()=>session.toggleEffect(scope,id,value,defaultValue),{symbol,active:()=>{const ts=session.effectTargets(scope,id,value);return ts.length&&ts.every(t=>(t.effects[id]??defaultValue)===value);},disabled:()=>!session.targets(scope).length});}
 function preset(label,scope,key,value){return tool(label,()=>{const ts=session.targets(scope),clear=ts.every(t=>JSON.stringify(t[key])===JSON.stringify(value));session.setCurve(scope,clear?[]:value);},{active:()=>{const ts=session.targets(scope);return ts.length&&ts.every(t=>JSON.stringify(t[key])===JSON.stringify(value));},disabled:()=>!session.targets(scope).length});}
 function chooseTool(name){if(busy)return;activeTool=name;session?.endDigits();buildTools();if(session){refreshTools();}}
 function buildTools(){
@@ -53,10 +53,11 @@ function buildTools(){
     effect('击勾弦 H/P','note','isHammerPullOrigin');effect('滑音','note','slideOutType',1);effect('连滑音','note','slideOutType',2);
     effect('揉弦','note','vibrato',1);effect('宽揉弦','note','vibrato',2);effect('掌根闷音 P.M.','note','isPalmMute');effect('持续发声','note','isLetRing');
     effect('向上滑出','note','slideOutType',3);effect('向下滑出','note','slideOutType',4);effect('从低音滑入','note','slideInType',1);effect('从高音滑入','note','slideInType',2);
+    effect('踏板踩下 Ped.','beat','sustainPedal',1);effect('踏板松开 ✱','beat','sustainPedal',2);
     tool('摇把曲线',()=>{panel('摇把曲线');curves('beat');});effect('摇把轻揉','beat','vibrato',1);effect('摇把宽揉','beat','vibrato',2);effect('左手点弦','note','isLeftHandTapped');effect('向下刮弦','note','slideOutType',5);effect('向上刮弦','note','slideOutType',6);effect('拍击闷音','beat','deadSlapped');effect('拇指敲击','beat','golpe',1);effect('手指敲击','beat','golpe',2);effect('点弦','beat','tap');effect('Slap','beat','slap');effect('Pop','beat','pop');
   }else if(activeTool==='harmonic'){
     ['自然泛音','人工泛音','拨片泛音','点弦泛音','半泛音','反馈泛音'].forEach((label,i)=>effect(label,'note','harmonicType',i+1));
-    tool('泛音音高',()=>{panel('泛音音高');field('泛音音高',session.targets('note')[0].effects.harmonicValue??12,v=>session.change(()=>session.targets('note').forEach(n=>n.effects.harmonicValue=v)));},{disabled:noteReady});
+    tool('泛音音高',()=>{panel('泛音音高');field('泛音音高',core.harmonicNode(session.targets('note')[0]),v=>session.change(()=>session.targets('note').forEach(n=>n.effects.harmonicValue=v)));},{disabled:noteReady});
   }else if(activeTool==='beat'){
     for(const [label,after,noteEntry,id] of [['前插音符',false,true,'insertBefore'],['前插休止',false,false,'insertRestBefore'],['后插音符',true,true,'insertAfter'],['后插休止',true,false,'insertRestAfter']])tool(label,()=>{selecting=false;session.insertBeat(after,noteEntry);},{id});
     tool('拆分',()=>session.split(),{id:'splitBeat'});
@@ -77,7 +78,7 @@ function buildTools(){
     tool('升半音',()=>session.transpose(1),{disabled:noteReady});tool('降半音',()=>session.transpose(-1),{disabled:noteReady});
     tool('品位 / 待核对',()=>{panel('当前音符');field('当前品位（留空待核对）',String(session.currentNote?.fret??''),v=>session.setFret(v.trim()===''?null:Number(v)));});
     tool('推弦曲线',()=>{panel('推弦曲线');curves('note');},{disabled:noteReady});
-    [8,16,32].forEach((v,i)=>tool(`震音 ${i+1}`,()=>{const next=session.selectedBeats.every(b=>b.tremolo===v)?0:v;session.change(()=>session.selectedBeats.forEach(b=>b.tremolo=next));},{symbol:0xE220+i,active:()=>session.selectedBeats.every(b=>b.tremolo===v)}));
+    [8,16,32,64].forEach((v,i)=>tool(`震音 ${i+1}`,()=>{const next=session.selectedBeats.every(b=>b.tremolo===v)?0:v;session.change(()=>session.selectedBeats.forEach(b=>b.tremolo=next));},{symbol:0xE220+i,active:()=>session.selectedBeats.every(b=>b.tremolo===v)}));
   }
   if(!['beat','rhythm','attach'].includes(activeTool))tool('更多设置',()=>openAdvanced());
 }

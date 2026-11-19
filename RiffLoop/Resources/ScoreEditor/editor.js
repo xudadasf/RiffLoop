@@ -1,5 +1,5 @@
 'use strict';
-let session,schema,busy=false,savedHere=false;
+let session,schema,busy=false,savedHere=false,existingGP,pendingFont;
 const $=id=>document.getElementById(id),core=GuitarDraftCore;
 const send=(action,payload={})=>window.webkit?.messageHandlers.guitarEditor.postMessage({action,...payload});
 const status=text=>{$('status').textContent=text;};
@@ -63,19 +63,44 @@ const rangeSelection={
   }
 };
 window.loadGuitarDraft=(draft,techniques)=>{
-  schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>core.validate(d,schema,false));
+  schema=techniques;core.validate(draft,schema,false);session=new GuitarEdit.Session(draft,d=>{core.validate(d,schema,false);if(existingGP)GuitarGP.check(existingGP,d);});
   surface=new GuitarScoreSurface($('engraving'),$('noteTargets'),(bar,beat,string)=>{select(beat,string,bar);surface.seekSelection();},state=>{playing=state.playing;$('play').disabled=!state.ready;$('play').textContent=state.ready?(playing?'暂停':'播放'):'加载音色';},status,rangeSelection);
   window.scoreEditor=surface;render(true);document.body.removeAttribute('data-loading');
 };
-window.loadEditorSoundFont=base64=>surface.loadSoundFont(Uint8Array.from(atob(base64),c=>c.charCodeAt(0)));
+window.loadEditorSoundFont=base64=>{
+  if(surface)surface.loadSoundFont(Uint8Array.from(atob(base64),c=>c.charCodeAt(0)));else pendingFont=base64;
+};
+window.loadExistingGuitarGP=(encoded,techniques)=>{
+  const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+  const file=GuitarGP.open(bytes,techniques);
+  function select(option){
+    existingGP=GuitarGP.select(file,option);
+    $('panel').close();$('panelClose').textContent='完成';loadGuitarDraft(existingGP.draft,techniques);
+    $('settings').disabled=true;$('bars').disabled=true;
+    $('selection').title=option.label;
+    if(pendingFont){loadEditorSoundFont(pendingFont);pendingFont=null;}
+    status('正在编辑 '+option.label+'，保存将更新整份 GP。');
+  }
+  if(file.options.length===1){select(file.options[0]);return;}
+  panel('选择要编辑的吉他声部');text('保存会更新整份 GP，其他轨道和声部保留。');
+  for(const option of file.options)button(option.label,()=>select(option),$('panelBody'));
+  $('panelClose').textContent='返回';
+};
 window.pauseGuitarEditor=()=>surface?.pause();
 window.disposeGuitarEditor=()=>surface?.destroy();
-window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved){session.saved=JSON.stringify(session.draft);savedHere=true;render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
+window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved&&session){session.saved=JSON.stringify(session.draft);savedHere=true;render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
 window.guitarRequestClose=()=>{surface?.pause();if(session?.dirty)send('closeDirty');else send('close');};
 $('close').onclick=()=>window.guitarRequestClose();
 
 $('undo').onclick=()=>perform(()=>session.undo());$('redo').onclick=()=>perform(()=>session.redo());
-$('save').onclick=()=>{if(busy)return;surface.pause();busy=true;document.body.inert=true;send('save',{draft:session.draft});};
+$('save').onclick=()=>{if(busy)return;surface.pause();
+  if(existingGP){
+    try{
+      const bytes=GuitarGP.save(existingGP,session.draft),chunks=[];
+      for(let i=0;i<bytes.length;i+=8192)chunks.push(String.fromCharCode(...bytes.subarray(i,i+8192)));
+      busy=true;document.body.inert=true;send('saveGP',{file:btoa(chunks.join(''))});
+    }catch(e){busy=false;document.body.inert=false;status(e.message);}
+  }else{busy=true;document.body.inert=true;send('save',{draft:session.draft});}};
 $('prev').onclick=()=>perform(()=>{session.clearSelection();session.bar--;session.beat=0;});$('next').onclick=()=>perform(()=>{session.clearSelection();session.bar++;session.beat=0;});$('barChoice').onchange=e=>perform(()=>{session.clearSelection();session.bar=Number(e.target.value);session.beat=0;});
 $('source').onclick=()=>{if(!busy&&session.currentBar.source){busy=true;document.body.inert=true;send('source',{source:session.currentBar.source});}};$('hideSource').onclick=()=>{$('reference').hidden=true;};
 $('preview').onclick=()=>{document.body.classList.toggle('reading');$('preview').textContent=document.body.classList.contains('reading')?'编辑':'阅读';surface.api.render();};
@@ -105,7 +130,7 @@ for(const value of [7,8,9,'erase',4,5,6,'shorter',1,2,3,'longer',0,'dot','alt','
   if(spec[2]){b.setAttribute('aria-label',spec[0]);b.title=spec[0];b.replaceChildren(icon(spec[2]));}else if(value==='dot')b.textContent='.';
 }
 for(const [id,name] of [['selectMode','mouse-pointer-2'],['editMode','pencil'],['copyBeat','copy'],['pasteBeat','clipboard-paste']])decorated($(id),$(id).textContent,name);
-$('panelClose').onclick=()=>{$('panel').close();render();};
+$('panelClose').onclick=()=>{if(!session){send('close');return;}$('panel').close();render();};
 $('settings').onclick=()=>{panel('曲谱设置');field('曲名',session.draft.title,v=>session.change(d=>d.title=v));field('速度 BPM',session.draft.tempo,v=>session.change(d=>d.tempo=v));field('拍号分子',session.draft.numerator,v=>session.change(d=>d.numerator=v));field('拍号分母',session.draft.denominator,v=>session.change(d=>d.denominator=v),[1,2,4,8,16,32].map(n=>[String(n),n]));field('变调夹',session.draft.capo,v=>session.change(d=>d.capo=v));field('音色',session.draft.program,v=>session.change(d=>d.program=v),[['电吉他清音',27],['电吉他爵士',26],['电吉他闷音',28],['过载',29],['失真',30],['泛音',31]]);text('调弦使用 MIDI 音高：标准 E2 A2 D3 G3 B3 E4 = 40 45 50 55 59 64。修改拍号保留全部音符，请再核对各小节时值。');for(let i=0;i<6;i++)field(`第 ${6-i} 弦`,session.draft.tuning[i],v=>session.change(d=>d.tuning[i]=v));};
 $('bars').onclick=()=>{
   panel('小节与空白间隔');

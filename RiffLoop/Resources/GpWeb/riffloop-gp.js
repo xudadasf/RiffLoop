@@ -466,6 +466,8 @@
             window.RiffLoopTimbre.apply(midiFile, api.score, trackTimbres, alphaTab);
         });
     };
+    window.RiffLoopAudio.installPedal(api,alphaTab);
+    window.RiffLoopAudio.installPedal(synthApi,alphaTab);
     configureMetronomeEvents(api);
     applyMetronomeVolume();
     const canUseBacking = () => Boolean(api.score?.backingTrack);

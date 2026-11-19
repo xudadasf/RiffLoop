@@ -141,7 +141,9 @@ struct GpPracticeView: View {
                 }
             }
             .sheet(isPresented: $isLibraryPresented) {
-                DocumentLibraryView(kind: .guitarPro, onSelect: importScore)
+                DocumentLibraryView(kind: .guitarPro, onSelect: importScore, beforeGPEdit: { viewModel.pause() }, afterGPEdit: { url in
+                    if url.lastPathComponent == currentFileName { importScore(from: url) }
+                })
             }
             .alert(
                 "RiffLoop",

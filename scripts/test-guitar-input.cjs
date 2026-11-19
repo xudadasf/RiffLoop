@@ -109,3 +109,16 @@ assert.equal(melody.draft.bars[0].beats[2].notes[1].effects.isPalmMute,undefined
 melody.selectNotes(point(0,2),point(0,2,4));
 assert.deepEqual(melody.targets('note').map(n=>n.string),[2,4]);
 console.log('Note selection: chord voices, sparse picks, batch edit, undo, and timed cross-bar copy passed');
+
+const links=make();
+links.draft.bars=[{...edit.bar(),beats:[6,8,8,12].map(f=>({...edit.beat(),notes:[edit.note(1,f)]}))}];
+const selectPair=(first,last)=>links.selectNotes({bar:0,beat:first,string:1},{bar:0,beat:last,string:1});
+selectPair(2,1);
+links.toggleEffect('note','isTieDestination');
+assert.deepEqual(links.currentBar.beats.map(b=>!!b.notes[0].effects.isTieDestination),[false,false,true,false]);
+links.undo();selectPair(2,3);links.toggleEffect('note','isHammerPullOrigin');
+assert.deepEqual(links.currentBar.beats.map(b=>!!b.notes[0].effects.isHammerPullOrigin),[false,false,true,false]);
+links.undo();links.toggleEffect('note','slideOutType',2);
+assert.deepEqual(links.currentBar.beats.map(b=>b.notes[0].effects.slideOutType||0),[0,0,2,0]);
+links.undo();links.togglePickedNote(0,1,1);links.togglePickedNote(0,2,1);
+assert.throws(()=>links.toggleEffect('note','isHammerPullOrigin'),/连续|同弦/);

@@ -23,6 +23,18 @@ actor GuitarPracticeFileStore {
         guard data.count <= maximum else { throw GuitarDraftStoreError.tooLarge }
         return data
     }
+    func editableDocument(for url: URL) async -> GuitarDraftDocument? {
+        let stem = url.deletingPathExtension().lastPathComponent
+        guard stem.hasPrefix("编辑结果-"), let id = UUID(uuidString: String(stem.dropFirst(5))),
+              url.lastPathComponent == Self.fileName(id),
+              let data = try? readRegular(url, maximum: 8 * 1024 * 1024),
+              let bytes = try? readRegular(receipts.appendingPathComponent(id.uuidString + ".json"), maximum: 2048),
+              let receipt = try? JSONDecoder().decode(Receipt.self, from: bytes) else { return nil }
+        let hash = digest(data)
+        guard hash == receipt.current || hash == receipt.pending,
+              let draft = try? await GuitarDraftStore().load(id) else { return nil }
+        return GuitarDraftDocument(id: id, draft: draft)
+    }
     func publish(_ data: Data, id: UUID) throws -> URL {
         Self.lock.lock()
         defer { Self.lock.unlock() }

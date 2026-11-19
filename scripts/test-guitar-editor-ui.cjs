@@ -196,4 +196,41 @@ assert.equal(await page.evaluate(()=>window.getSelection().toString()),'','Doubl
 assert.equal(await page.locator('#tab-beat span').evaluate(el=>el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}))),false);
 assert.equal(await page.locator('img.toolIcon').evaluateAll(images=>images.every(i=>i.complete&&i.naturalWidth>0)),true,'All bundled icons load');assert.deepEqual(errors,[]);const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);assert.equal(overflow,false,'No page-level horizontal overflow');
 console.log('iPad mini: direct score/string selection, frets, techniques, local bars, real playback/pause/stop and one Save passed');
+
+const gpPage=await browser.newPage({viewport:{width:1133,height:744},hasTouch:true});
+await gpPage.addInitScript(()=>{window.messages=[];window.webkit={messageHandlers:{guitarEditor:{postMessage:m=>messages.push(m)}}};});
+await gpPage.goto(page.url());await gpPage.waitForFunction(()=>window.messages.some(m=>m.action==='ready'));
+await gpPage.evaluate(({fixture,schema})=>{
+  const a=alphaTab,m=a.model;
+  const d={...fixture,bars:[{...GuitarEdit.bar(),beats:[8,8,11,8].map(f=>({...GuitarEdit.beat(),notes:[GuitarEdit.note(1,f)]}))}]};
+  const score=GuitarDraftCore.makeScore(a,d,schema),other=GuitarDraftCore.makeScore(a,d,schema).tracks[0];
+  other.name='Bass reference';score.addTrack(other);
+  const v=new m.Voice();score.tracks[0].staves[0].bars[0].addVoice(v);
+  const b=new m.Beat();v.addBeat(b);b.duration=1;const n=new m.Note();n.string=4;n.fret=9;b.addNote(n);
+  score.finish(new a.Settings());
+  const bytes=new a.exporter.Gp7Exporter().export(score,new a.Settings()),zip=fflate.unzipSync(bytes);
+  zip['Content/keep.bin']=new Uint8Array([255,0,13,87,71]);
+  const encoded=fflate.zipSync(zip);window.fixtureGP=encoded;
+  loadExistingGuitarGP(btoa(String.fromCharCode(...encoded)),schema);
+},{fixture,schema});
+await gpPage.getByRole('button',{name:'Electric Guitar · 声部 1',exact:true}).tap();
+await gpPage.locator('.scoreTarget[data-beat="1"][data-string="1"]').first().tap();
+await gpPage.locator('#keypad button').filter({hasText:/^7$/}).tap();
+await gpPage.locator('#tab-harmonic').tap();await gpPage.getByRole('button',{name:'自然泛音',exact:true}).tap();
+await gpPage.getByRole('button',{name:'泛音音高',exact:true}).tap();assert.equal(await gpPage.getByLabel('泛音音高',{exact:true}).inputValue(),'7');await gpPage.locator('#panelClose').tap();
+await gpPage.locator('#techniques').tap();await gpPage.getByRole('button',{name:'踏板踩下 Ped.',exact:true}).tap();
+await gpPage.locator('.scoreTarget[data-beat="3"][data-string="1"]').first().tap();await gpPage.getByRole('button',{name:'踏板松开 ✱',exact:true}).tap();
+await gpPage.locator('#save').tap();
+const inspected=await gpPage.evaluate(()=>{
+  const msg=messages.findLast(x=>x.action==='saveGP');if(!msg)throw Error(document.getElementById('status').textContent);
+  const bytes=Uint8Array.from(atob(msg.file),c=>c.charCodeAt(0)),score=alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes,new alphaTab.Settings());
+  const zip=fflate.unzipSync(bytes),original=fflate.unzipSync(fixtureGP);
+  for(const key of Object.keys(original))if(key!=='Content/score.gpif'&&String(zip[key])!==String(original[key]))throw Error('Changed '+key);
+  const bars=score.tracks.map(t=>t.staves[0].bars[0]);
+  return [bars[0].voices[0].beats.map(b=>b.notes[0].fret),bars[1].voices[0].beats.map(b=>b.notes[0].fret),bars[0].voices[1].beats[0].notes[0].fret,bars[0].voices[0].beats[1].notes[0].realValue,bars[0].sustainPedals.map(p=>[p.ratioPosition,p.pedalType])];
+});
+assert.deepEqual(inspected,[[8,7,11,8],[8,8,11,8],9,83,[[.25,0],[.75,2]]]);
+await gpPage.evaluate(()=>guitarReply({saved:true}));await gpPage.locator('#save').tap();
+assert.equal(await gpPage.evaluate(()=>{const saved=messages.filter(x=>x.action==='saveGP');return saved.length===2&&saved[0].file===saved[1].file;}),true);
+await gpPage.close();console.log('Existing GP: touch edit, save twice, harmonic pitch, pedals, second voice, other track and ZIP attachments passed');
 }finally{if(browser){const active=browser.contexts()[0]?.pages()[0];if(active){await capture(active,'editor-latest.png').catch(()=>{});}await browser.close();}await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e.stack);process.exitCode=1;});

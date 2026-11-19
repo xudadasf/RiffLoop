@@ -70,7 +70,7 @@ for(const spec of schema){
     if(spec.id==='whammyStyle')target.whammy=[{offset:0,value:0},{offset:60,value:-4}];
     if(spec.id==='harmonicValue')target.effects.harmonicType=2;
     if(spec.id==='trillValue')target.effects.trillSpeed=16;
-    if(spec.id==='trillSpeed'){target.effects.trillValue=9;if(value!==16){assert.throws(()=>reopen(draft([bs])),/颤音/);continue;}}
+    if(spec.id==='trillSpeed')target.effects.trillValue=9;
     if(spec.id==='graceType'&&value>0)bs.push(beat(4));
     try {
       const source=draft([bs]);reopen(source);techniques++;
@@ -94,3 +94,33 @@ sections.bars[0].repeatStart=true;sections.bars[0].section='A';sections.bars[1].
 const sectionScore=reopen(sections);assert.equal(sectionScore.masterBars[1].repeatCount,2);assert.equal(sectionScore.masterBars[1].tempoAutomations[0].value,80);
 for(const bend of [[{offset:0,value:0},{offset:30,value:4},{offset:60,value:0}],[{offset:0,value:4},{offset:60,value:0}]])reopen(draft([[beat(1,[note(1,7,{},bend)])]]));
 console.log('Guitar connections: cross-bar tie, invalid target rejection, repeat/section/tempo and bend curves passed');
+
+function audio(score){
+  const midi=new a.midi.MidiFile();
+  const gen=new a.midi.MidiFileGenerator(score,new a.Settings(),new a.midi.AlphaSynthMidiFileHandler(midi));
+  gen.generate();
+  return {midi,lookup:gen.tickLookup,notes:midi.tracks.flatMap(t=>t.events).filter(e=>e instanceof a.midi.NoteOnEvent)};
+}
+for(const speed of [16,32,64]){
+  const chord=[note(1,7,{trillValue:11,trillSpeed:speed}),note(2,5)];
+  const d=draft([[beat(4,chord),beat(4),beat(2)]]);
+  const expected=Array.from({length:speed/4},(_,i)=>[i*3840/speed,i%2?75:71]);
+  for(const score of [core.makeScore(a,d,schema,false),reopen(d)]){
+    const events=audio(score).notes;
+    assert.deepEqual(events.filter(e=>e.noteKey>=71).map(e=>[e.tick,e.noteKey]),expected);
+    assert.equal(events.filter(e=>e.noteKey===64).length,1,'The other chord string must sustain');
+  }
+}
+for(const duration of [2,4,8,16]){
+  const d=draft([[...Array.from({length:duration},()=>beat(duration,[note(1,7)],{tremolo:64}))]]);
+  for(const score of [core.makeScore(a,d,schema,false),reopen(d)])assert.deepEqual(audio(score).notes.map(e=>e.tick),Array.from({length:64},(_,i)=>i*60));
+}
+const natural=draft([[beat(1,[note(1,7,{harmonicType:1})])]]);
+assert.equal(audio(reopen(natural)).notes[0].noteKey,83);natural.bars[0].beats[0].notes[0].effects.harmonicValue=12;
+assert.equal(audio(reopen(natural)).notes[0].noteKey,76);
+const ped=draft([[beat(2,[note(1,7)],{effects:{sustainPedal:1}}),beat(2)],[beat(2),beat(2,[],{effects:{sustainPedal:2}})]]);
+const pedScore=reopen(ped),performance=audio(pedScore),win={};
+require('node:vm').runInNewContext(require('node:fs').readFileSync(require.resolve('../RiffLoop/Resources/GpWeb/riffloop-audio.js'),'utf8'),{window:win});
+win.RiffLoopAudio.applyPedals(performance.midi,pedScore,performance.lookup,a);
+assert.deepEqual(performance.midi.tracks.flatMap(t=>t.events).filter(e=>e.controller===64&&e.channel===0).map(e=>[e.tick,e.value]),[[0,127],[5760,0]]);
+console.log('Audition and GP re-open agree on harmonic pitch, alternating trills, picking attacks, chord sustain and pedal release.');

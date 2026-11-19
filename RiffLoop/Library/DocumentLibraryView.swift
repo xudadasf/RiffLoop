@@ -79,17 +79,24 @@ struct DocumentLibraryView: View {
     @State private var isImporterPresented = false
     @State private var filePendingDeletion: URL?
     @State private var filePendingRename: URL?
+    @State private var savedGPURL: URL?
+    @State private var guitarEditor: GuitarDraftDocument?
+    var beforeGPEdit: () -> Void = {}
+    var afterGPEdit: (URL) -> Void = { _ in }
     let onSelect: (URL) -> Void
     let onDelete: (URL) -> Void
 
     init(
         kind: PracticeKind,
         onSelect: @escaping (URL) -> Void,
-        onDelete: @escaping (URL) -> Void = { _ in }
+        onDelete: @escaping (URL) -> Void = { _ in },
+        beforeGPEdit: @escaping () -> Void = {}, afterGPEdit: @escaping (URL) -> Void = { _ in }
     ) {
         _model = StateObject(wrappedValue: DocumentLibraryModel(kind: kind))
         self.onSelect = onSelect
         self.onDelete = onDelete
+        self.beforeGPEdit = beforeGPEdit
+        self.afterGPEdit = afterGPEdit
     }
 
     var body: some View {
@@ -132,6 +139,17 @@ struct DocumentLibraryView: View {
                             .buttonStyle(.plain)
 
                             Menu {
+                                if model.kind == .guitarPro && fileURL.pathExtension.lowercased() == "gp" {
+                                    Button("编辑曲谱", systemImage: "pencil.and.outline") {
+                                        beforeGPEdit()
+                                        Task {
+                                            var document = await GuitarPracticeFileStore(folder: model.folderURL).editableDocument(for: fileURL)
+                                                ?? GuitarDraftDocument(id: UUID(), draft: GuitarDraft(), gpURL: fileURL)
+                                            document.didSaveGP = { savedGPURL = fileURL }
+                                            guitarEditor = document
+                                        }
+                                    }
+                                }
                                 Button("修改显示名称", systemImage: "pencil") { filePendingRename = fileURL }
                                 Button("删除文件", systemImage: "trash", role: .destructive) { filePendingDeletion = fileURL }
                             } label: {
@@ -164,6 +182,9 @@ struct DocumentLibraryView: View {
         .onChange(of: isImporterPresented) { _, shown in
             ReproductionStore.shared.record("action", "library.importer", ["visible": String(shown), "kind": model.kind.rawValue])
         }
+        .fullScreenCover(item: $guitarEditor, onDismiss: {
+            if let savedGPURL { afterGPEdit(savedGPURL); self.savedGPURL = nil }
+        }) { GuitarDraftEditorView(document: $0) }
         .fileImporter(
             isPresented: $isImporterPresented,
             allowedContentTypes: [.data],

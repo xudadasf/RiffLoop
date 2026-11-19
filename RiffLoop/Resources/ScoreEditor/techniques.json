@@ -569,6 +569,14 @@
     ]
   },
   {
+    "id": "sustainPedal",
+    "scope": "beat",
+    "category": "效果",
+    "label": "延音踏板",
+    "kind": "choice",
+    "choices": [["无", 0], ["踩下 Ped.", 1], ["松开 ✱", 2]]
+  },
+  {
     "id": "wahPedal",
     "scope": "beat",
     "category": "奏法",

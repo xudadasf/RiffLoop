@@ -42,28 +42,83 @@ function validate(draft,schema,complete=true){
       for(const note of beat.notes){
         if(!integer(note.string,1,6)||(note.fret!=null&&!integer(note.fret,0,36)))fail('Invalid note');
         validateEffects(note.effects,'note',schema);curve(note.bend);
-        if(complete&&(note.effects.trillValue??-1)>=0&&(note.effects.trillSpeed??16)!==16)fail('GP 格式的颤音仅保存 1/16 速度；请改为 1/16 或保留当前草稿。');
       }
     }
     const actual=bar.beats.reduce((s,b)=>s+ticks(b),0),expected=numerator*3840/denominator;
     if(complete&&Math.abs(actual-expected)>0.01)fail(`第 ${i+1} 小节有 ${actual/960} 拍，应为 ${expected/960} 拍，请先调整时值或补休止。`);
   }
-  if(complete){
-    const beats=draft.bars.flatMap(b=>b.beats);
-    for(let i=0;i<beats.length;i++)for(const note of beats[i].notes){
-      const previous=beats.slice(0,i).reverse().flatMap(b=>b.notes).find(n=>n.string===note.string);
-      const next=beats.slice(i+1).flatMap(b=>b.notes).find(n=>n.string===note.string);
-      if(note.effects.isTieDestination&&(!previous||previous.fret==null||note.fret!==previous.fret))fail('延音需要前面已有同弦同品音符，请检查连接目标。');
-      if((note.effects.isHammerPullOrigin||[1,2].includes(note.effects.slideOutType))&&(!next||next.fret==null||note.fret==null))fail('击勾弦或连接滑音需要后面已有同弦音符，请检查连接目标。');
-    }
+  if(complete)validateLinks(draft.bars.flatMap(b=>b.beats));
+}
+function validateLinks(beats){
+  const prev=new Map(),next=new Map();
+  for(const b of beats)for(const n of b.notes){
+    const p=prev.get(n.string);
+    if(n.effects.isTieDestination&&(!p||p.fret==null||p.fret!==n.fret))fail('延音需要前面已有同弦同品音符，请检查连接目标。');
+    prev.set(n.string,n);
+  }
+  for(let i=beats.length-1;i>=0;i--)for(const n of beats[i].notes){
+    const dest=next.get(n.string);
+    if((n.effects.isHammerPullOrigin||[1,2].includes(n.effects.slideOutType))&&(!dest||dest.fret==null||n.fret==null))
+      fail('击勾弦或连接滑音需要后面已有同弦音符，请检查连接目标。');
+    next.set(n.string,n);
   }
 }
 function applyEffects(target,effects,scope,schema){
   for(const spec of schema.filter(s=>s.scope===scope)){
-    if(Object.hasOwn(effects,spec.id))target[spec.id]=spec.kind==='toggle'?Boolean(effects[spec.id]):effects[spec.id];
+    if(spec.id!=='sustainPedal'&&Object.hasOwn(effects,spec.id))target[spec.id]=spec.kind==='toggle'?Boolean(effects[spec.id]):effects[spec.id];
   }
 }
-function makeScore(a,draft,schema,complete=true){
+// A missing node in older drafts means the touched fret for a natural harmonic.
+function harmonicNode(note){
+  return note.effects.harmonicValue??(note.effects.harmonicType===1?note.fret??12:12);
+}
+function rhythmForTicks(length,source){
+  for(const den of [source.duration,1,2,4,8,16,32,64,128,256].filter(Boolean)){
+    for(const dots of [0,1,2]){
+      const unit=3840/den*(2-Math.pow(.5,dots));
+      if(Math.abs(length-unit)<.00001)return {duration:den,dots,tupletNumerator:1,tupletDenominator:1};
+    }
+  }
+  for(const den of [64,32,16,8,4,2,1,128,256]){
+    for(let n=2;n<=64;n++){
+      const d=length*den*n/3840;
+      if(d>=1&&d<=64&&Math.abs(d-Math.round(d))<.000001)return {duration:den,dots:0,tupletNumerator:n,tupletDenominator:Math.round(d)};
+    }
+  }
+  fail('这组连音的时值无法准确写入 GP。');
+}
+// GP7's Trill element has no speed in this writer. Write measured notes when
+// a compact symbol would change the performance in other GP readers.
+function portableBeats(beat){
+  const fast=beat.notes.some(n=>(n.effects.trillValue??-1)>=0&&(n.effects.trillSpeed??16)!==16);
+  const marks=Math.log2(beat.tremolo/beat.duration);
+  const expandPicking=beat.tremolo>0&&(marks<1||marks>3||beat.dots||beat.tupletNumerator!==beat.tupletDenominator);
+  if(!fast&&!expandPicking)return [beat];
+  const total=ticks(beat);
+  if(!total)return [beat];
+  const rates=beat.notes.map(n=>(n.effects.trillValue??-1)>=0?n.effects.trillSpeed??16:beat.tremolo);
+  const rate=Math.max(beat.tremolo,...rates,1),step=3840/rate,parts=[];
+  for(let offset=0;offset<total-.001;offset+=step){
+    const first=parts.length===0,last=offset+step>=total-.001;
+    const rhythm=rhythmForTicks(Math.min(step,total-offset),beat);
+    const part={...beat,...rhythm,tremolo:0,text:first?beat.text:'',effects:{...beat.effects},
+      whammy:first?beat.whammy:[],notes:[]};
+    if(!first)delete part.effects.sustainPedal;
+    if(!last)delete part.effects.isLegatoOrigin;
+    for(const [i,n] of beat.notes.entries()){
+      const speed=rates[i],phase=speed?offset*speed/3840:0,attack=first||speed&&Math.abs(phase-Math.round(phase))<.000001;
+      const effects={...n.effects},trill=(effects.trillValue??-1)>=0;
+      const fret=trill&&Math.floor(phase+.000001)%2?effects.trillValue:n.fret;
+      delete effects.trillValue;delete effects.trillSpeed;
+      if(!first){delete effects.slideInType;if(attack)delete effects.isTieDestination;else effects.isTieDestination=1;}
+      if(!last){delete effects.isHammerPullOrigin;delete effects.slideOutType;}
+      part.notes.push({...n,fret,effects,bend:first?n.bend:[]});
+    }
+    parts.push(part);
+  }
+  return parts;
+}
+function makeScore(a,draft,schema,complete=true,portable=false){
   validate(draft,schema,complete);
   const m=a.model,score=new m.Score(),track=new m.Track(),staff=new m.Staff();
   score.title=draft.title;score.addTrack(track);track.addStaff(staff);
@@ -78,11 +133,25 @@ function makeScore(a,draft,schema,complete=true){
     if(source.section){master.section=new m.Section();master.section.text=source.section;master.section.marker='';}
     if(i===0||source.tempo)master.tempoAutomations.push(m.Automation.buildTempoAutomation(false,0,source.tempo||draft.tempo,2));
     score.addMasterBar(master);staff.addBar(bar);bar.addVoice(voice);
-    for(const value of source.beats){
+    let offset=0;
+    const barTicks=master.timeSignatureNumerator*3840/master.timeSignatureDenominator;
+    for(const value of portable?source.beats.flatMap(portableBeats):source.beats){
       const beat=new m.Beat();beat.duration=value.duration;beat.dots=value.dots;voice.addBeat(beat);
       if(value.tupletNumerator!==value.tupletDenominator){beat.tupletNumerator=value.tupletNumerator;beat.tupletDenominator=value.tupletDenominator;}
       applyEffects(beat,value.effects,'beat',schema);
-      if(value.tremolo)beat.tremoloSpeed=value.tremolo;
+      if(value.effects.sustainPedal){
+        const p=new m.SustainPedalMarker();p.ratioPosition=offset/barTicks;
+        p.pedalType=value.effects.sustainPedal===1?m.SustainPedalMarkerType.Down:m.SustainPedalMarkerType.Up;
+        bar.sustainPedals.push(p);
+      }
+      offset+=ticks(value);
+      if(value.tremolo){
+        const picking=new m.TremoloPickingEffect();
+        picking.marks=Math.max(1,Math.log2(value.tremolo/value.duration));
+        beat.tremoloPicking=picking;
+        // Absolute training divisions also apply to dotted and tuplet beats.
+        if(!portable)picking.getDurationAsTicks=()=>3840/value.tremolo;
+      }
       for(const p of value.whammy)beat.addWhammyBarPoint(new m.BendPoint(p.offset,p.value));
       if(value.text)beat.text=value.text;
       for(const input of value.notes){
@@ -90,6 +159,7 @@ function makeScore(a,draft,schema,complete=true){
         if(input.fret==null&&!input.effects.isDead)continue;
         const note=new m.Note();note.string=7-input.string;note.fret=input.fret??0;
         applyEffects(note,input.effects,'note',schema);note.dynamics=beat.dynamics;
+        if(note.harmonicType)note.harmonicValue=harmonicNode(input);
         if((input.effects.trillValue??-1)>=0){note.trillValue=input.effects.trillValue+draft.tuning[6-input.string]+draft.capo;note.trillSpeed=input.effects.trillSpeed??16;}
         for(const p of input.bend)note.addBendPoint(new m.BendPoint(p.offset,p.value));
         beat.addNote(note);
@@ -112,6 +182,7 @@ function snapshot(score,schema){
   const points=values=>(values||[]).map(p=>[p.offset,p.value]);
   return {title:score.title,tempo:score.tempo,program:score.tracks[0].playbackInfo.program,tuning:score.tracks[0].staves[0].stringTuning.tunings,
     capo:score.tracks[0].staves[0].capo,bars:score.tracks[0].staves[0].bars.map((bar,i)=>({
+      pedal:bar.sustainPedals.map(p=>[p.pedalType,p.ratioPosition]),
       meter:[score.masterBars[i].timeSignatureNumerator,score.masterBars[i].timeSignatureDenominator],
       repeatStart:score.masterBars[i].isRepeatStart,repeatCount:score.masterBars[i].repeatCount,alternateEndings:score.masterBars[i].alternateEndings,
       section:score.masterBars[i].section?.text||'',tempos:score.masterBars[i].tempoAutomations.map(a=>a.value),
@@ -122,7 +193,7 @@ function snapshot(score,schema){
     }))};
 }
 function exportDraft(a,draft,schema){
-  const score=makeScore(a,draft,schema),settings=new a.Settings();
+  const score=makeScore(a,draft,schema,true,true),settings=new a.Settings();
   const data=new a.exporter.Gp7Exporter().export(score,settings);
   const restored=a.importer.ScoreLoader.loadScoreFromBytes(data,settings);
   const before=snapshot(score,schema),after=snapshot(restored,schema);
@@ -132,5 +203,5 @@ function exportDraft(a,draft,schema){
   }
   return data;
 }
-return {ticks,validate,makeScore,snapshot,exportDraft};
+return {ticks,validate,validateLinks,harmonicNode,portableBeats,makeScore,snapshot,exportDraft};
 });

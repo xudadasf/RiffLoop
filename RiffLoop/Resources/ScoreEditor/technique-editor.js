@@ -3,7 +3,7 @@
 const techniqueGroups={
   rhythm:['note:isTieDestination'],dynamics:['beat:dynamics','beat:crescendo','beat:fade'],
   articulation:['note:accentuated','note:isStaccato','note:isGhost','note:isDead','beat:pickStroke','beat:brushType','beat:brushDuration','beat:rasgueado'],
-  effect:['note:isHammerPullOrigin','note:slideInType','note:slideOutType','note:vibrato','note:isPalmMute','note:isLetRing','note:isLeftHandTapped','beat:tap','beat:slap','beat:pop','beat:deadSlapped','beat:vibrato','beat:wahPedal','beat:golpe'],
+  effect:['note:isHammerPullOrigin','note:slideInType','note:slideOutType','note:vibrato','note:isPalmMute','note:isLetRing','note:isLeftHandTapped','beat:tap','beat:slap','beat:pop','beat:deadSlapped','beat:vibrato','beat:sustainPedal','beat:wahPedal','beat:golpe'],
   harmonic:['note:harmonicType','note:harmonicValue'],
   attach:['note:leftHandFinger','note:rightHandFinger','note:showStringNumber'],
   note:['beat:isLegatoOrigin','beat:graceType','note:trillValue','note:trillSpeed','note:ornament']
@@ -16,10 +16,10 @@ function effectPresent(spec,target){
 function techniqueField(spec){
   const targets=session.targets(spec.scope);if(!targets.length)return;
   let choices=spec.kind==='toggle'?[['关闭',0],['开启',1]]:spec.choices;
-  if(spec.id==='trillSpeed'){choices=choices.filter(c=>c[1]===16||c[1]===targets[0].effects.trillSpeed);text('颤音速度保存到 GP 时使用 1/16。');}
-  const input=field(spec.label,targets[0].effects[spec.id]??spec.default??0,v=>{
-    if(v===(spec.default??0))session.removeEffect(spec.scope,spec.id);
-    else session.change(()=>session.targets(spec.scope).forEach(t=>t.effects[spec.id]=v));
+  const input=field(spec.label,spec.id==='harmonicValue'?core.harmonicNode(targets[0]):(targets[0].effects[spec.id]??spec.default??0),v=>{
+    if(spec.id==='harmonicValue')session.setEffect(spec.scope,spec.id,v);
+    else if(v===(spec.default??0))session.removeEffect(spec.scope,spec.id);
+    else session.setEffect(spec.scope,spec.id,v);
   },choices);
   if(spec.kind==='number'){input.min=spec.min;input.max=spec.max;input.step=spec.step||1;}
   input.dataset.technique=`${spec.scope}:${spec.id}`;

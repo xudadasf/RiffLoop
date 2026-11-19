@@ -79,6 +79,46 @@ final class GuitarDraftWebTests: XCTestCase {
         XCTAssertTrue(data.starts(with:[0x50,0x4b,0x03,0x04]))
     }
 
+    func testOpenExistingFileEditAndSaveFromNativeWebView() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("study.gp")
+        let model = GuitarDraft(bars: [GuitarBar(beats: [GuitarBeat(duration: 1, notes: [GuitarNote(string: 1, fret: 7)])])])
+        let original = try await ScoreDraftExporter.export(model)
+        try original.write(to: url)
+        let host = UIHostingController(rootView: GuitarDraftEditorView(document: .init(id: UUID(), draft: GuitarDraft(), gpURL: url)).environmentObject(ScoreExternalOpenCoordinator()))
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = host; window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil; previous?.makeKey() }
+        func findWeb(_ view: UIView) -> WKWebView? {
+            if let web = view as? WKWebView { return web }
+            return view.subviews.compactMap(findWeb).first
+        }
+        let deadline = Date().addingTimeInterval(45)
+        var active: WKWebView?
+        while Date() < deadline {
+            if let web = findWeb(host.view),
+               (try? await eval("window.scoreEditor?.ready === true && session.currentNote?.fret === 7", web)) as? Bool == true {
+                active = web; break
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let web = try XCTUnwrap(active)
+        _ = try await eval("document.querySelector('#tab-harmonic').click(); [...document.querySelectorAll('#toolStrip button')].find(b=>b.textContent==='自然泛音').click(); document.querySelector('#save').click(); true", web)
+        let saveDeadline = Date().addingTimeInterval(15)
+        while Date() < saveDeadline && (try? Data(contentsOf: url)) == original {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let saved = try Data(contentsOf: url)
+        XCTAssertNotEqual(original, saved)
+        let script = "alphaTab.importer.ScoreLoader.loadScoreFromBytes(Uint8Array.from(atob('\(saved.base64EncodedString())'),c=>c.charCodeAt(0)),new alphaTab.Settings()).tracks[0].staves[0].bars[0].voices[0].beats[0].notes[0].realValue"
+        let pitch = try await eval(script, web)
+        XCTAssertEqual(pitch as? Int, 83)
+    }
+
     private func eval(_ source: String, _ web: WKWebView) async throws -> Any? {
         try await ScoreDraftWebReply.wait(timeout:10) { reply in web.evaluateJavaScript(source,completionHandler:reply) }
     }

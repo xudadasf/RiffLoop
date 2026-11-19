@@ -6,6 +6,8 @@ import Combine
 struct GuitarDraftDocument: Identifiable {
     let id: UUID
     let draft: GuitarDraft
+    var gpURL: URL? = nil
+    var didSaveGP: (() -> Void)? = nil
 }
 
 struct GuitarDraftEditorView: View {
@@ -64,6 +66,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         var saved: GuitarDraft
         let close: () -> Void
         let closeDirty: () -> Void
+        private var originalGP: Data?
         private var working = false
         private let interruption = AudioInterruptionRecovery()
         private var observers = Set<AnyCancellable>()
@@ -91,7 +94,15 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                     guard let root = Bundle.main.resourceURL else { return }
                     let draft = try JSONEncoder().encode(document.draft).base64EncodedString()
                     let schema = try Data(contentsOf: root.appendingPathComponent("ScoreEditor/techniques.json")).base64EncodedString()
-                    web?.evaluateJavaScript("loadGuitarDraft(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(draft)'),c=>c.charCodeAt(0)))),JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(schema)'),c=>c.charCodeAt(0)))))") { [weak self] _, error in
+                    let load: String
+                    if let url = document.gpURL {
+                        let data = try GuitarExistingFile.read(url)
+                        originalGP = data
+                        load = "loadExistingGuitarGP('\(data.base64EncodedString())',JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(schema)'),c=>c.charCodeAt(0)))))"
+                    } else {
+                        load = "loadGuitarDraft(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(draft)'),c=>c.charCodeAt(0)))),JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(schema)'),c=>c.charCodeAt(0)))))"
+                    }
+                    web?.evaluateJavaScript(load) { [weak self] _, error in
                         if let error { self?.reply(["message": "编辑页加载失败：\(error.localizedDescription)"]); return }
                         do {
                             let audio = AVAudioSession.sharedInstance()
@@ -116,6 +127,15 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
             Task {
                 defer { working = false }
                 do {
+                    if action == "saveGP", let url = document.gpURL, let originalGP,
+                       let encoded = body["file"] as? String, encoded.utf8.count <= 90 * 1024 * 1024,
+                       let data = Data(base64Encoded: encoded) {
+                        try await GuitarExistingFile.shared.replace(url, original: originalGP, edited: data)
+                        self.originalGP = data
+                        document.didSaveGP?()
+                        reply(["saved": true, "message": "整份 GP 已保存。"])
+                        return
+                    }
                     if action == "source", let value = body["source"] {
                         let data = try JSONSerialization.data(withJSONObject: value)
                         let source = try JSONDecoder().decode(GuitarSource.self, from: data)
@@ -138,6 +158,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                     let draft = try JSONDecoder().decode(GuitarDraft.self, from: data)
                     guard draft.isValidForStorage else { throw GuitarDraftStoreError.invalidDraft }
                     let message = try await GuitarResultSaver.shared.save(draft, id: document.id, replacing: saved)
+                    if message.hasPrefix("已保存。") { document.didSaveGP?() }
                     saved = draft
                     reply(["saved": true, "message": message])
                 } catch { reply(["message": "操作未完成：\(error.localizedDescription)"]) }

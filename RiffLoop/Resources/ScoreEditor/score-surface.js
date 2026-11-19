@@ -10,6 +10,7 @@ class GuitarScoreSurface {
       display:{layoutMode:alphaTab.LayoutMode.Page,staveProfile:alphaTab.StaveProfile.ScoreTab,scale:this.scale},
       player:{playerMode:alphaTab.PlayerMode.EnabledSynthesizer,soundFont:null,enableCursor:true,enableUserInteraction:false,enableElementHighlighting:true,scrollElement:'#scoreViewport',scrollMode:alphaTab.ScrollMode.Off}
     });
+    window.RiffLoopAudio.installPedal(this.api,alphaTab);
     this.revealPending=false;
     this.tapGuard=new GuitarTapGuard(document.getElementById('scoreViewport'));
     this.barRects=[];
