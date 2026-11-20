@@ -31,6 +31,8 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var standaloneStagesEnabled = false
     @Published private(set) var gpProgress = LoopStageProgress()
     @Published private(set) var standaloneGap = MetronomeGapPattern()
+    // When both ladders are armed, a pause keeps the last transport's readout on the deck.
+    private var lastStageTransport: TempoStageTransport = .gp
     private var hasGpPlan = false
     private var hasStandalonePlan = false
     private var gpRangeStartTempo: Double?
@@ -114,16 +116,30 @@ final class GpWebViewModel: ObservableObject {
         return Int(range.lowerBound)...Int(range.upperBound)
     }
 
-    var gpStageSummary: String {
-        let stage = gpStages.stages[gpProgress.index]
-        let length = stage.unit == .loops ? "第 \(min(gpProgress.rounds + 1, stage.length))/\(stage.length) 轮" : "\(stage.length) 秒"
-        return "阶段 \(gpProgress.index + 1)/\(gpStages.stages.count) · \(stage.bpm) BPM · \(length)"
+    var deckStageTransport: TempoStageTransport? {
+        if isStandaloneMetronomePlaying { return standaloneStagesEnabled ? .standalone : nil }
+        if isPlaying { return gpStagesEnabled ? .gp : nil }
+        if lastStageTransport == .standalone && standaloneStagesEnabled { return .standalone }
+        if gpStagesEnabled { return .gp }
+        return standaloneStagesEnabled ? .standalone : nil
     }
+
+    func stageReadout(for transport: TempoStageTransport) -> TempoStageReadout {
+        switch transport {
+        case .gp: return gpProgress.readout(in: gpStages, now: ProcessInfo.processInfo.systemUptime)
+        case .standalone:
+            let position = standaloneSchedule?.position(at: standaloneElapsed)
+            return TempoStageReadout(plan: standaloneStages, index: position?.stage ?? 0,
+                                     secondsPlayed: position?.elapsedInStage ?? 0)
+        }
+    }
+
+    var gpStageSummary: String { stageReadout(for: .gp).stageLabel }
 
     func setGpStagesEnabled(_ enabled: Bool) {
         guard enabled != gpStagesEnabled, !enabled || (rangeLoopingEnabled && loopRange != nil) else { return }
         if enabled && speedLadderEnabled { restoreSpeedBeforeLadder() }
-        if enabled { hasGpPlan = true }
+        if enabled { hasGpPlan = true; lastStageTransport = .gp }
         gpStagesEnabled = enabled
         restartGpStages()
         saveProfile()
@@ -299,6 +315,7 @@ final class GpWebViewModel: ObservableObject {
         gpStagesEnabled = false
         gpRangeStartTempo = nil
         gpProgress = LoopStageProgress()
+        lastStageTransport = .gp
         standaloneStagesEnabled = false
         standaloneStageOffset = 0
         gapFirstMeasure = 0
@@ -389,9 +406,8 @@ final class GpWebViewModel: ObservableObject {
         return max(standaloneStageOffset, anchor.mediaTime(forHostTime: CACurrentMediaTime()))
     }
 
-    var standaloneStageIndex: Int { standaloneSchedule?.position(at: standaloneElapsed).stage ?? 0 }
     var playingStandaloneBpm: Int {
-        standaloneStagesEnabled ? standaloneStages.stages[standaloneStageIndex].bpm : Int(standaloneBpm)
+        standaloneStagesEnabled ? stageReadout(for: .standalone).bpm : Int(standaloneBpm)
     }
 
     func setStandaloneStages(_ plan: TempoStagePlan) {
@@ -412,7 +428,7 @@ final class GpWebViewModel: ObservableObject {
         gapFirstMeasure = 0
         standaloneSchedule = nil
         standaloneStagesEnabled = enabled
-        if enabled { hasStandalonePlan = true }
+        if enabled { hasStandalonePlan = true; lastStageTransport = .standalone }
         saveProfile()
     }
 
@@ -453,6 +469,7 @@ final class GpWebViewModel: ObservableObject {
             standaloneSchedule = schedule
             standaloneStageOffset = offset
             standaloneStageAnchor = anchor
+            lastStageTransport = .standalone
             isStandaloneMetronomePlaying = true
             updatePracticeClock(isPlaying: true)
         } catch {
@@ -1098,7 +1115,11 @@ final class GpWebViewModel: ObservableObject {
                 return
             }
             isPlaying = state.state == 1 || state.transitioning == true
-            if gpStagesEnabled { gpProgress.setPlaying(state.state == 1, now: ProcessInfo.processInfo.systemUptime) }
+            if isPlaying { lastStageTransport = .gp }
+            if gpStagesEnabled {
+                let scorePlaying = state.state == 1 && (state.scorePlaying ?? (state.transitioning != true))
+                gpProgress.setPlaying(scorePlaying, now: ProcessInfo.processInfo.systemUptime)
+            }
             if state.state == 1 {
                 if !nativeBackingPlaybackRequested {
                     nativeBackingAnchorMilliseconds = position.currentTime
@@ -1501,7 +1522,9 @@ final class GpWebViewModel: ObservableObject {
         totalCompletedLoops += 1
         if gpStagesEnabled {
             let previous = gpProgress.index
-            gpProgress.finishLoop(in: gpStages, now: ProcessInfo.processInfo.systemUptime)
+            let now = ProcessInfo.processInfo.systemUptime
+            gpProgress.finishLoop(in: gpStages, now: now)
+            if loopCountInEnabled { gpProgress.setPlaying(false, now: now) }
             completedLoops += 1
             if previous != gpProgress.index { applyEffectivePlaybackSpeed() }
         } else {

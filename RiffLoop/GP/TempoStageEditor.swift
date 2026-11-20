@@ -15,6 +15,7 @@ struct TempoStageEditorButton: View {
                 Text("\(plan.stages.count) 个阶段").foregroundStyle(.secondary)
             }
         }
+        .accessibilityIdentifier(timedOnly ? "stages.edit.standalone" : "stages.edit.gp")
         .sheet(isPresented: $open) {
             TempoStageEditor(plan: plan, bpmRange: bpmRange, timedOnly: timedOnly, apply: apply)
         }
@@ -22,107 +23,189 @@ struct TempoStageEditorButton: View {
 }
 
 private struct TempoStageEditor: View {
-    struct Row: Identifiable {
-        var id: UUID
-        var bpm: String
-        var length: String
-        var unit: TempoStageUnit
-
-        init(_ stage: TempoStage) {
-            id = stage.id
-            bpm = String(stage.bpm)
-            length = String(stage.length)
-            unit = stage.unit
-        }
-
-        var value: TempoStage? {
-            guard let bpm = Int(bpm), let length = Int(length) else { return nil }
-            return TempoStage(id: id, bpm: bpm, unit: unit, length: length)
-        }
-    }
-
-    let bpmRange: ClosedRange<Int>
-    let timedOnly: Bool
     let apply: (TempoStagePlan) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var rows: [Row]
-    @State private var order: TempoStageOrder
+    @State private var draft: TempoStageDraft
 
     init(plan: TempoStagePlan, bpmRange: ClosedRange<Int>, timedOnly: Bool, apply: @escaping (TempoStagePlan) -> Void) {
-        self.bpmRange = bpmRange
-        self.timedOnly = timedOnly
         self.apply = apply
-        _rows = State(initialValue: plan.stages.map(Row.init))
-        _order = State(initialValue: plan.order)
-    }
-
-    private var result: TempoStagePlan? {
-        let stages = rows.compactMap(\.value)
-        let plan = TempoStagePlan(stages: stages, order: order)
-        return stages.count == rows.count && plan.valid(in: bpmRange, timedOnly: timedOnly) ? plan : nil
+        _draft = State(initialValue: TempoStageDraft(plan: plan, bpmRange: bpmRange, timedOnly: timedOnly))
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Picker("循环方向", selection: $order) {
-                        Text("首尾相连").tag(TempoStageOrder.wrap)
-                        Text("往返循环").tag(TempoStageOrder.bounce)
-                    }.pickerStyle(.segmented)
-                } footer: {
-                    Text(timedOnly ? "达到设定秒数后，下一小节第一拍换速。" : "达到设定的秒数或轮数后，下一轮 A/B 循环换速。")
+            VStack(spacing: 8) {
+                Picker("循环方向", selection: $draft.order) {
+                    Text("首尾相连").tag(TempoStageOrder.wrap)
+                    Text("往返循环").tag(TempoStageOrder.bounce)
                 }
-                ForEach($rows) { $row in
-                    Section {
-                        LabeledContent("BPM") {
-                            TextField("BPM", text: $row.bpm).keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing).accessibilityLabel("阶段 BPM")
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                GeometryReader { size in
+                    if size.size.width >= 460 {
+                        HStack(alignment: .top, spacing: 12) {
+                            stageList
+                            Divider()
+                            ScrollView { keypad(compact: false) }
+                                .frame(width: min(210, size.size.width * 0.36))
                         }
-                        if !timedOnly {
-                            Picker("持续方式", selection: $row.unit) {
-                                Text("时间").tag(TempoStageUnit.seconds)
-                                Text("循环次数").tag(TempoStageUnit.loops)
-                            }.pickerStyle(.segmented)
-                        }
-                        let label = row.unit == .seconds ? "持续秒数" : "循环次数"
-                        LabeledContent(label) {
-                            TextField(label, text: $row.length).keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing).accessibilityLabel(label)
-                        }
-                    } header: {
-                        HStack {
-                            Text("阶段 \((rows.firstIndex { $0.id == row.id } ?? 0) + 1)")
-                            Spacer()
-                            Button("删除") {
-                                let id = row.id
-                                rows.removeAll { $0.id == id }
-                            }
-                                .disabled(rows.count == 1)
+                    } else {
+                        VStack(spacing: 6) {
+                            stageList
+                            Divider()
+                            keypad(compact: true)
                         }
                     }
                 }
-                Section {
-                    Button {
-                        guard var next = rows.last else { return }
-                        next.id = UUID()
-                        rows.append(next)
-                    } label: { Label("添加阶段", systemImage: "plus") }
-                    if result == nil {
-                        Text("请输入 \(bpmRange.lowerBound)–\(bpmRange.upperBound) BPM，秒数或轮数为 1–9999 的整数。")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+                .padding(.horizontal, 12)
             }
+            .padding(.vertical, 8)
+            .background(Color(.systemGroupedBackground))
+            .textSelection(.disabled)
             .navigationTitle("自定义阶梯")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { if let result { apply(result); dismiss() } }
-                        .disabled(result == nil)
+                    Button("保存") { if let plan = draft.plan { apply(plan); dismiss() } }
+                        .disabled(draft.plan == nil)
+                        .accessibilityIdentifier("stages.save")
                 }
             }
         }
+    }
+
+    private var stageList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(draft.rows.enumerated()), id: \.element.id) { index, row in
+                        stageRow(row, number: index + 1).id(row.id)
+                    }
+                    Button { draft.add() } label: {
+                        Label("添加阶段", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 36)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint("沿用最后一个阶段的数值，并选中新阶段的 BPM")
+                    .accessibilityIdentifier("stages.add")
+                    Text(draft.timedOnly ? "到时后，弹完整小节再换速。" : "到时或完成指定轮数后，弹完当前 A/B 循环再换速。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
+            }
+            .onChange(of: draft.selectedID) { _, id in proxy.scrollTo(id, anchor: .center) }
+        }
+    }
+
+    private func stageRow(_ row: TempoStageDraft.Row, number: Int) -> some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Text("阶段 \(number)").font(.subheadline.bold())
+                Spacer()
+                if !draft.timedOnly {
+                    Menu {
+                        Picker("持续方式", selection: Binding(get: { row.unit }, set: { draft.setUnit($0, for: row.id) })) {
+                            Text("按秒数").tag(TempoStageUnit.seconds)
+                            Text("按循环轮数").tag(TempoStageUnit.loops)
+                        }
+                    } label: {
+                        HStack(spacing: 3) { Text(row.unit == .seconds ? "按秒" : "按轮"); Image(systemName: "chevron.down") }
+                            .font(.subheadline).frame(minHeight: 44)
+                    }
+                    .accessibilityLabel("阶段 \(number) 持续方式")
+                }
+                Button { draft.remove(row.id) } label: {
+                    Image(systemName: "trash").frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
+                .disabled(draft.rows.count == 1)
+                .accessibilityLabel("删除阶段 \(number)")
+            }
+            HStack(spacing: 6) {
+                cell(.bpm, row: row, number: number)
+                cell(.length, row: row, number: number)
+            }
+        }
+        .padding(.horizontal, 10).padding(.bottom, 10)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func cell(_ field: TempoStageDraft.Field, row: TempoStageDraft.Row, number: Int) -> some View {
+        let selected = draft.selectedID == row.id && draft.field == field
+        let valid = draft.valid(field, in: row)
+        let title = field == .bpm ? "BPM" : row.lengthLabel
+        return Button { draft.select(row.id, field) } label: {
+            VStack(spacing: 2) {
+                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(row[field].isEmpty ? "—" : row[field]).font(.headline.monospacedDigit())
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(selected ? Color.accentColor.opacity(0.18) : Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 8))
+            .overlay { RoundedRectangle(cornerRadius: 8).stroke(!valid ? Color.orange : selected ? Color.accentColor : .clear, lineWidth: 2) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("阶段 \(number) \(title)")
+        .accessibilityValue(row[field].isEmpty ? "未填写" : row[field])
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("stages.\(number).\(field.rawValue)")
+    }
+
+    private func keypad(compact: Bool) -> some View {
+        let row = draft.selected
+        let title = draft.field == .bpm ? "BPM" : row.lengthLabel
+        let range = draft.activeRange
+        return VStack(spacing: 6) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("阶段 \(draft.selectedIndex + 1) · \(title)").font(.subheadline.bold())
+                    Text("\(range.lowerBound)–\(range.upperBound)").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button { draft.backspace() } label: {
+                    Image(systemName: "delete.left").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("退格").keyboardShortcut(.delete, modifiers: [])
+            }
+            Grid(horizontalSpacing: 4, verticalSpacing: 4) {
+                let layout = compact ? [[1,2,3,4,5,6], [7,8,9,-1,0,-2]] : [[1,2,3], [4,5,6], [7,8,9], [-1,0,-2]]
+                ForEach(layout, id: \.self) { line in
+                    GridRow { ForEach(line, id: \.self) { key in padKey(key) } }
+                }
+            }
+            HStack(spacing: 4) {
+                Button { draft.move(-1) } label: { Text("上一项").frame(maxWidth: .infinity, minHeight: 44) }
+                    .disabled(!draft.canMove(-1)).keyboardShortcut(.leftArrow, modifiers: [])
+                Button { draft.move(1) } label: { Text("下一项").frame(maxWidth: .infinity, minHeight: 44) }
+                    .disabled(!draft.canMove(1)).keyboardShortcut(.rightArrow, modifiers: [])
+                    .accessibilityIdentifier("stages.next")
+            }
+            .font(.subheadline)
+            if draft.field == .length {
+                Button(row.unit == .seconds ? "统一所有按秒阶段的秒数" : "统一所有按轮阶段的轮数") { draft.repeatLength() }
+                    .font(.footnote).frame(minHeight: 44).disabled(!draft.canRepeatLength)
+            }
+            if draft.plan == nil {
+                Text("橙框数值超出范围或尚未填完，修正后即可保存。")
+                    .font(.footnote).foregroundStyle(.orange)
+            } else if !compact {
+                Text("点数值后直接输入即可替换。用「下一项」连续填写。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func padKey(_ key: Int) -> some View {
+        let digit = key >= 0
+        let title = digit ? String(key) : key == -1 ? "−1" : "+1"
+        let shortcut: Character = digit ? Character(String(key)) : key == -1 ? "-" : "+"
+        return Button { if digit { draft.enter(key) } else { draft.nudge(key == -1 ? -1 : 1) } } label: {
+            Text(title).font(.title3.monospacedDigit())
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("stages.key.\(key)")
+        .keyboardShortcut(KeyEquivalent(shortcut), modifiers: [])
     }
 }

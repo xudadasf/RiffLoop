@@ -226,7 +226,10 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         model.togglePlayback()
         try await waitUntil("Custom tempo must switch on a real A/B completion") { model.gpProgress.index == 1 }
         XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
+        XCTAssertEqual(model.deckStageTransport, .gp)
+        XCTAssertTrue(model.gpProgress.clockRunning, "Real score playback must start the stage clock")
         model.pause()
+        XCTAssertFalse(model.gpProgress.clockRunning)
         model.clearLoop()
         model.seek(to: 0)
         try await Task.sleep(for: .milliseconds(300))
@@ -240,7 +243,14 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
 
         XCTAssertTrue(model.isStandaloneMetronomePlaying)
         let stationaryTick = model.position.currentTick
-        try await Task.sleep(for: .milliseconds(600))
+        try await waitUntil("The live countdown must use elapsed audio time") { model.stageReadout(for: .standalone).remaining < 10 }
+        model.toggleStandaloneMetronome()
+        let paused = model.stageReadout(for: .standalone)
+        XCTAssertEqual(model.deckStageTransport, .standalone)
+        try await Task.sleep(for: .milliseconds(1150))
+        XCTAssertEqual(model.stageReadout(for: .standalone), paused, "Pause freezes the stage, even during a silent bar")
+        model.toggleStandaloneMetronome()
+        try await waitUntil("Resuming continues the same countdown") { model.stageReadout(for: .standalone).remaining < paused.remaining }
         XCTAssertEqual(model.position.currentTick, stationaryTick, "Standalone beats must not advance the score")
         XCTAssertFalse(model.isPlaying)
         model.togglePlayback()

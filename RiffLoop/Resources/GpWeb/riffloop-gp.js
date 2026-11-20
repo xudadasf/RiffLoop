@@ -718,6 +718,7 @@
             if (playing && !countIn.active) playbackProgressAt = performance.now();
             post("playerStateChanged", {
                 state: playing && !countIn.active ? 1 : 0,
+                scorePlaying: playing && !countIn.active && api.playerState === alphaTab.synth.PlayerState.Playing,
                 transitioning: loopTransitioning || countIn.active,
                 stopped
             });
@@ -1206,6 +1207,7 @@
         rangeCountInRestarter.handlePlayerState(state);
         post("playerStateChanged", {
             state: transport.isPlayingIntent() && !countIn.active ? 1 : 0,
+            scorePlaying: transport.isPlayingIntent() && !countIn.active && state.state === alphaTab.synth.PlayerState.Playing,
             transitioning: loopTransitioning || countIn.active,
             stopped: Boolean(state.stopped) && !transport.isPlayingIntent()
         });

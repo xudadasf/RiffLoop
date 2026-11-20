@@ -306,13 +306,21 @@ struct GpPracticeView: View {
             }
             .controlSize(.small)
 
-            Button { activePanel = .loop } label: {
-                Text(tempoSummary).underline()
-            }
+            if let transport = viewModel.deckStageTransport {
+                Button { activePanel = transport == .gp ? .loop : .standalone } label: {
+                    TempoStageStatus(viewModel: viewModel, transport: transport, identifyStandalone: true)
+                        .font(.caption.weight(.semibold))
+                }
                 .buttonStyle(.plain)
-                .accessibilityLabel("调整练习 BPM")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .accessibilityHint("打开当前阶梯设置")
+                .accessibilityIdentifier("gp.deck.stage")
+            } else {
+                Button { activePanel = .loop } label: { Text(tempoSummary).underline() }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("调整练习 BPM")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -450,7 +458,7 @@ struct GpPracticeView: View {
                 TempoStageEditorButton(plan: viewModel.gpStages, bpmRange: viewModel.stageBpmRange,
                                        timedOnly: false, apply: viewModel.setGpStages)
                 if viewModel.gpStagesEnabled {
-                    Text(viewModel.gpStageSummary).font(.subheadline.monospacedDigit())
+                    TempoStageStatus(viewModel: viewModel, transport: .gp).font(.subheadline)
                 }
             } header: { Text("自定义阶梯") } footer: {
                 Text("选好 A/B 区间后即可启用。每个阶段都从区间起点开始。")
@@ -778,7 +786,6 @@ struct GpPracticeView: View {
     }
 
     private var tempoSummary: String {
-        if viewModel.gpStagesEnabled { return viewModel.gpStageSummary }
         return String(
             format: "基准 %.0f BPM · 当前 %.0f BPM · %.2f×",
             viewModel.baseBpm,

@@ -321,6 +321,7 @@ struct HomeView: View {
             .contentShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("home.practice.\(kind.rawValue)")
     }
 
     private var recentProjectsPage: some View {

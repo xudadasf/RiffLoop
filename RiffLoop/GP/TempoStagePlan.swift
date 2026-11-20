@@ -31,6 +31,38 @@ struct TempoStagePlan: Codable, Equatable {
     }
 }
 
+enum TempoStageTransport: Equatable { case gp, standalone }
+
+/// A read-only snapshot in the stage's own unit. Reading it never advances playback.
+struct TempoStageReadout: Equatable {
+    let index: Int
+    let count: Int
+    let bpm: Int
+    let unit: TempoStageUnit
+    let remaining: Int
+
+    init(plan: TempoStagePlan, index: Int, secondsPlayed: Double, loopsCompleted: Int = 0) {
+        let stage = plan.stages[index]
+        self.index = index
+        count = plan.stages.count
+        bpm = stage.bpm
+        unit = stage.unit
+        switch stage.unit {
+        case .seconds: remaining = Int(ceil(max(0, Double(stage.length) - max(0, secondsPlayed))))
+        case .loops: remaining = max(0, stage.length - loopsCompleted)
+        }
+    }
+
+    var stageLabel: String { "阶段 \(index + 1)/\(count) · \(bpm) BPM" }
+
+    func summary(for transport: TempoStageTransport) -> String {
+        if unit == .loops { return "\(stageLabel) · 剩 \(remaining) 轮" }
+        let clock = String(format: "%d:%02d", remaining / 60, remaining % 60)
+        let wait = remaining == 0 ? (transport == .gp ? " · 等本轮结束" : " · 等本小节结束") : ""
+        return "\(stageLabel) · 剩 \(clock)\(wait)"
+    }
+}
+
 /// GP advances exclusively on an A/B completion from the player.
 struct LoopStageProgress {
     private(set) var index = 0
@@ -38,6 +70,16 @@ struct LoopStageProgress {
     private var direction = 1
     private var elapsed = 0.0
     private var started: TimeInterval?
+
+    var clockRunning: Bool { started != nil }
+
+    private func secondsPlayed(at now: TimeInterval) -> Double {
+        elapsed + (started.map { max(0, now - $0) } ?? 0)
+    }
+
+    func readout(in plan: TempoStagePlan, now: TimeInterval) -> TempoStageReadout {
+        TempoStageReadout(plan: plan, index: index, secondsPlayed: secondsPlayed(at: now), loopsCompleted: rounds)
+    }
 
     mutating func setPlaying(_ playing: Bool, now: TimeInterval) {
         if playing {
@@ -52,8 +94,7 @@ struct LoopStageProgress {
         guard plan.stages.indices.contains(index) else { return }
         rounds += 1
         let stage = plan.stages[index]
-        let played = elapsed + (started.map { max(0, now - $0) } ?? 0)
-        guard stage.unit == .loops ? rounds >= stage.length : played >= Double(stage.length) else { return }
+        guard stage.unit == .loops ? rounds >= stage.length : secondsPlayed(at: now) >= Double(stage.length) else { return }
         if plan.stages.count > 1 {
             if plan.order == .wrap { index = (index + 1) % plan.stages.count }
             else {
@@ -106,13 +147,14 @@ struct MetronomeStageSchedule {
         return Double(event / cycleEvents) * cycleDuration + segment.start + Double(local - segment.firstEvent) * segment.interval
     }
 
-    func position(at time: Double) -> (stage: Int, nextEvent: Int64) {
+    func position(at time: Double) -> (stage: Int, nextEvent: Int64, elapsedInStage: Double) {
         let time = max(0, time)
         let cycle = floor(time / cycleDuration)
         let local = max(0, time - cycle * cycleDuration)
         let segment = segments.last { $0.start <= local }!
-        let offset = Int64(ceil((local - segment.start) / segment.interval - 1e-9))
-        return (segment.index, Int64(cycle) * cycleEvents + segment.firstEvent + offset)
+        let elapsedInStage = local - segment.start
+        let offset = Int64(ceil(elapsedInStage / segment.interval - 1e-9))
+        return (segment.index, Int64(cycle) * cycleEvents + segment.firstEvent + offset, elapsedInStage)
     }
 }
 

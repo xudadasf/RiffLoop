@@ -85,6 +85,8 @@ struct GpPlaybackState: Codable, Equatable, Sendable {
     let state: Int
     let stopped: Bool
     var transitioning: Bool? = nil
+    // The transport may already show Pause during a count-in or while the synth is starting.
+    var scorePlaying: Bool? = nil
 }
 
 struct GpBackingSyncPoint: Codable, Equatable, Sendable {

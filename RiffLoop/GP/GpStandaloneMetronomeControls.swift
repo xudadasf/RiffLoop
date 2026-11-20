@@ -18,13 +18,11 @@ struct GpStandaloneMetronomeControls: View {
                 Toggle("启用自定义阶梯", isOn: Binding(
                     get: { viewModel.standaloneStagesEnabled }, set: { viewModel.setStandaloneStagesEnabled($0) }
                 ))
+                .accessibilityIdentifier("stages.standalone.enabled")
                 TempoStageEditorButton(plan: viewModel.standaloneStages, bpmRange: 30...300,
                                        timedOnly: true, apply: viewModel.setStandaloneStages)
                 if viewModel.standaloneStagesEnabled {
-                    TimelineView(.periodic(from: .now, by: 0.25)) { _ in
-                        Text("阶段 \(viewModel.standaloneStageIndex + 1)/\(viewModel.standaloneStages.stages.count) · \(viewModel.playingStandaloneBpm) BPM")
-                            .font(.subheadline.monospacedDigit())
-                    }
+                    TempoStageStatus(viewModel: viewModel, transport: .standalone).font(.subheadline)
                 }
                 TempoInputControl(bpm: Binding(
                     get: { viewModel.standaloneBpm }, set: { viewModel.setStandaloneBpm($0) }

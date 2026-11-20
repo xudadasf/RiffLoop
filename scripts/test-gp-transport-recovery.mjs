@@ -148,11 +148,13 @@ console.log('GP replacement-player rejection and retry passed');
     }, (name, details) => reports.push({ name, details }), alphaTab);
     controller.pause(true);
     controller.play();
+    assert.equal(reports.at(-1).details.scorePlaying, false, 'Count-in must not run the GP stage clock');
     time += 4025;
     check();
     assert.equal(reports.some(e => e.name === 'error'), false, 'Count-in is not a stall');
     countIn.active = false;
     completeCountIn();
+    assert.equal(reports.at(-1).details.scorePlaying, false, 'The play request can precede the worker Playing receipt');
     time += 7;
     check();
     assert.equal(reports.some(e => e.name === 'error'), false,
