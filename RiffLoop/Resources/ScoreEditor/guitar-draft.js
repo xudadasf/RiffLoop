@@ -7,6 +7,20 @@ function ticks(beat){
   if((beat.effects?.graceType||0)>0)return 0;
   return 3840/beat.duration*(2-Math.pow(0.5,beat.dots))*beat.tupletDenominator/beat.tupletNumerator;
 }
+function barTiming(draft, index, sourceStaff) {
+  const bar = draft.bars[index];
+  const master = sourceStaff?.bars[index]?.masterBar;
+  const meter = (bar.numerator ?? draft.numerator) * 3840 / (bar.denominator ?? draft.denominator);
+  const length = master?.isAnacrusis ? master.calculateDuration() : meter;
+  const first = bar.beats[0];
+  // An imported GP can use a single whole rest for a full measure in any meter.
+  // Drafts store explicit rest durations, also used by the native exporter.
+  const measureRest = master && bar.beats.length === 1 && first.duration === 1 && first.notes.length === 0 &&
+    !first.dots && first.tupletNumerator === first.tupletDenominator && !first.effects?.graceType;
+  const actual = measureRest ? length : bar.beats.reduce((sum, beat) => sum + ticks(beat), 0);
+  const expected = master?.isFreeTime ? null : length;
+  return {actual, expected, mismatch: expected !== null && Math.abs(actual - expected) > 0.01};
+}
 function validateEffects(effects,scope,schema){
   if(!effects||typeof effects!=='object'||Array.isArray(effects))fail('Invalid effects');
   for(const [key,value] of Object.entries(effects)){
@@ -44,8 +58,10 @@ function validate(draft,schema,complete=true){
         validateEffects(note.effects,'note',schema);curve(note.bend);
       }
     }
-    const actual=bar.beats.reduce((s,b)=>s+ticks(b),0),expected=numerator*3840/denominator;
-    if(complete&&Math.abs(actual-expected)>0.01)fail(`第 ${i+1} 小节有 ${actual/960} 拍，应为 ${expected/960} 拍，请先调整时值或补休止。`);
+    if(complete){
+      const {actual,expected,mismatch}=barTiming(draft,i);
+      if(mismatch)fail(`第 ${i+1} 小节有 ${actual/960} 拍，应为 ${expected/960} 拍，请先调整时值或补休止。`);
+    }
   }
   if(complete)validateLinks(draft.bars.flatMap(b=>b.beats));
 }
@@ -224,5 +240,5 @@ function exportDraft(a,draft,schema){
   }
   return data;
 }
-return {ticks,validate,validateLinks,harmonicNode,portableBeats,makeScore,auditionMidi,snapshot,exportDraft};
+return {ticks,barTiming,validate,validateLinks,harmonicNode,portableBeats,makeScore,auditionMidi,snapshot,exportDraft};
 });

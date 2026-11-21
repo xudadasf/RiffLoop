@@ -38,6 +38,9 @@ final class GuitarDraftWebTests: XCTestCase {
         let ready = try await eval("Boolean(window.scoreEditor?.ready && document.querySelector('.scoreTarget'))", editor)
         XCTAssertEqual(ready as? Bool, true)
         guard ready as? Bool == true else { return }
+        let warningLines = "#engraving svg rect[fill=\"#D3797E\" i]"
+        let originalLines = try await eval("document.querySelectorAll('\(warningLines)').length", editor)
+        XCTAssertEqual(originalLines as? Int, 0, "A complete measure keeps its original staff colour")
         let value = try await eval("""
             (()=>{const tapDigit=n=>[...document.querySelectorAll('#keypad button')].find(b=>b.textContent===String(n)).click();
             tapDigit(1);tapDigit(3);document.getElementById('stringDown').click();tapDigit(1);tapDigit(1);
@@ -60,6 +63,15 @@ final class GuitarDraftWebTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(50))
         }
         XCTAssertEqual(saved.bars[0].beats.count,6)
+        let showsWarning = try await eval("""
+            (() => {
+                const lines = [...document.querySelectorAll('\(warningLines)')];
+                return document.querySelector('#timing').textContent.includes('时值未齐') &&
+                    new Set(lines.map(line => line.getAttribute('y'))).size >= 11 &&
+                    lines.every(line => line.height.baseVal.value < 3);
+            })()
+            """, editor)
+        XCTAssertEqual(showsWarning as? Bool, true, "An overfull bar tints the staff and TAB lines on iPad")
         XCTAssertEqual(saved.bars[0].beats[2].notes.map(\.fret),[13,11])
         XCTAssertEqual(saved.bars[0].beats[2].notes[0].effects["isPalmMute"],1)
         host.view.layoutIfNeeded()

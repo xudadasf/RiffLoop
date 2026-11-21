@@ -7,6 +7,25 @@ async function capture(page,name){
   await fs.mkdir(process.env.RIFFLOOP_SCREENSHOT_DIR,{recursive:true});
   await page.screenshot({path:path.join(process.env.RIFFLOOP_SCREENSHOT_DIR,name)});
 }
+// Inspect the actual engraved SVG. TAB lines can be split around fret numbers.
+async function expectTimingLines(page,invalid){
+  await page.waitForFunction(expected=>{
+    const bars=scoreEditor.barRects;
+    if(!bars.length||bars.length!==session.draft.bars.length)return false;
+    const origin=document.getElementById('engraving').getBoundingClientRect();
+    const rows=bars.map(()=>new Set());
+    const marked=document.querySelectorAll('#engraving svg [fill="#D3797E" i]');
+    for(const element of marked){
+      const r=element.getBoundingClientRect();
+      if(element.tagName!=='rect'||r.height>3)return false;
+      const left=r.left-origin.left,right=r.right-origin.left,y=r.top-origin.top;
+      const i=bars.findIndex(({bounds:b})=>left>=b.x-0.5&&right<=b.x+b.w+0.5&&y>=b.y-0.5&&y<=b.y+b.h+0.5);
+      if(i<0)return false;
+      rows[i].add(Math.round(y*10));
+    }
+    return rows.every((lines,i)=>lines.size===(expected.includes(i)?11:0));
+  },invalid,{timeout:6000});
+}
 async function checkControls(page){
   const issues=await page.evaluate(()=>{
     const issues=[];
@@ -56,6 +75,27 @@ await reviewPage.locator('#next').click();
 assert.equal(await reviewPage.locator('#sourceLabel').textContent(),'此小节没有对应原图');
 await reviewPage.locator('#hideSource').click();
 assert.equal(await reviewPage.locator('#reference').isVisible(),false);
+await reviewPage.evaluate(()=>{
+  session.change(d=>{d.bars=[3,5,4].map(count=>({...GuitarEdit.bar(),beats:Array.from({length:count},
+    ()=>({...GuitarEdit.beat(),notes:[GuitarEdit.note(2,8)]}))}));});
+  render();
+});
+await expectTimingLines(reviewPage,[0,1]);
+await reviewPage.setViewportSize({width:1133,height:744});
+await expectTimingLines(reviewPage,[0,1]);
+await reviewPage.locator('#barChoice').selectOption('0');
+assert.match(await reviewPage.locator('#timing').textContent(),/3 \/ 4 拍 · 时值未齐/);
+await reviewPage.locator('#tab-beat').tap();
+await reviewPage.locator('#fill').tap();
+await expectTimingLines(reviewPage,[1]);
+await reviewPage.locator('#undo').tap();
+await expectTimingLines(reviewPage,[0,1]);
+await reviewPage.locator('#redo').tap();
+await expectTimingLines(reviewPage,[1]);
+await reviewPage.locator('#barChoice').selectOption('1');
+assert.match(await reviewPage.locator('#timing').textContent(),/5 \/ 4 拍 · 时值未齐/);
+await reviewPage.locator('#deleteBeat').tap();
+await expectTimingLines(reviewPage,[]);
 await reviewPage.close();
 // The native bridge loads the draft asynchronously. Static HTML controls must
 // not accept a tap before the draft and its final layout are available.
@@ -265,6 +305,11 @@ await gpPage.keyboard.press('Escape');
 await gpPage.waitForFunction(()=>messages.some(m=>m.action==='close'),{},{timeout:2000});
 await gpPage.evaluate(schema=>loadExistingGuitarGP(btoa(String.fromCharCode(...fixtureGP)),schema),schema);
 await gpPage.getByRole('button',{name:'Electric Guitar · 声部 1',exact:true}).tap();
+await gpPage.locator('#tab-beat').tap();
+await gpPage.locator('#insertRestBefore').tap();
+await expectTimingLines(gpPage,[0]);
+await gpPage.locator('#undo').tap();
+await expectTimingLines(gpPage,[]);
 await gpPage.locator('.scoreTarget[data-beat="1"][data-string="1"]').first().tap();
 await gpPage.locator('#keypad button').filter({hasText:/^7$/}).tap();
 await gpPage.locator('#tab-harmonic').tap();await gpPage.getByRole('button',{name:'自然泛音',exact:true}).tap();

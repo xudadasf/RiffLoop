@@ -1,10 +1,15 @@
 'use strict';
+const timingWarningInk=new alphaTab.model.Color(211,121,126);
 // The same score model drives engraving, hit targets and audition; selection
 // never changes the stored note/string and edits always stop the old MIDI first.
 class GuitarScoreSurface {
   constructor(element, overlay, onSelect, onState, onError, onRangeSelection) {
     this.element=element;this.overlay=overlay;this.onSelect=onSelect;this.onState=onState;this.onError=onError;
     this.serialized='';this.selection={bar:0,beat:0,string:1};this.ready=false;this.wantsPlay=false;this.scale=1.1;
+    const {BarStyle,BarSubElement}=alphaTab.model;
+    this.timingWarningStyle=new BarStyle();
+    this.timingWarningStyle.colors.set(BarSubElement.StandardNotationStaffLine,timingWarningInk);
+    this.timingWarningStyle.colors.set(BarSubElement.GuitarTabsStaffLine,timingWarningInk);
     this.api=new alphaTab.AlphaTabApi(element,{
       core:{scriptFile:new URL('../GpWeb/alphaTab.min.js',location.href).href,fontDirectory:'../GpWeb/font/',useWorkers:false,includeNoteBounds:true,enableLazyLoading:false},
       display:{layoutMode:alphaTab.LayoutMode.Page,staveProfile:alphaTab.StaveProfile.ScoreTab,scale:this.scale},
@@ -38,7 +43,17 @@ class GuitarScoreSurface {
     document.getElementById('paper').addEventListener('click',this.onPaperClick);
     this.onResize=()=>{const selected=this.overlay.querySelector('.selected');if(selected){const r=selected.getBoundingClientRect();if(r.bottom>0&&r.top<innerHeight)this.revealPending=true;}};
     window.addEventListener('resize',this.onResize);
-    this.api.renderFinished.on(()=>requestAnimationFrame(()=>this.drawTargets()));
+    this.api.renderFinished.on(()=>requestAnimationFrame(()=>{
+      // alphaTab also uses the first bar's staff ink on the vertical connector between staves.
+      const {resources,scale}=this.api.settings.display;
+      for(const rect of this.element.querySelectorAll(`svg rect[fill="${timingWarningInk.rgba}" i]`)){
+        const height = rect.height.baseVal.value;
+        if (height > resources.engravingSettings.oneStaffSpace * scale && height > rect.width.baseVal.value) {
+          rect.setAttribute('fill', resources.barSeparatorColor.rgba);
+        }
+      }
+      this.drawTargets();
+    }));
     this.api.playerReady.on(()=>{this.ready=true;this.configureOutput();this.onState({ready:true,playing:false});});
     this.api.playerStateChanged.on(e=>{
       if(e.state===1&&!this.wantsPlay){this.pause();return;}
@@ -134,6 +149,10 @@ class GuitarScoreSurface {
     if(encoded!==this.serialized){
       this.barRects=[];this.pause();this.serialized=encoded;this.ready=false;this.onState({ready:false,playing:false});
       this.score=GuitarDraftCore.makeScore(alphaTab,draft,schema,false,false,selection.sourceStaff);
+      // Mark the editor's engraving only. Playback and export build their own scores.
+      for(const bar of this.score.tracks[0].staves[0].bars){
+        if(GuitarDraftCore.barTiming(draft,bar.index,selection.sourceStaff).mismatch)bar.style=this.timingWarningStyle;
+      }
       this.api.renderScore(this.score,[0]);
     }else {this.highlight();this.finishReveal();}
   }

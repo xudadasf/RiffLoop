@@ -48,8 +48,10 @@ function render(reveal=false){if(!session)return;session.clamp();const d=session
   }
   choice.value=session.bar;
   $('selection').textContent=session.noteRange?noteRangeLabel():session.anchor?.wholeBars?barRangeLabel():`第 ${session.beat+1} 拍位 · 第 ${session.string} 弦`;
-  const actual=bar.beats.reduce((n,b)=>n+core.ticks(b),0),expected=(bar.numerator??d.numerator)*3840/(bar.denominator??d.denominator);
-  $('timing').textContent=`${bar.numerator??d.numerator}/${bar.denominator??d.denominator} · ${Number((actual/960).toFixed(3))} / ${expected/960} 拍${Math.abs(actual-expected)>.01?' · 时值未齐':''}`;
+  const {actual,expected,mismatch}=core.barTiming(d,session.bar,session.sourceStaff);
+  const beatCount=Number((actual/960).toFixed(3));
+  $('timing').textContent=expected===null?`自由拍 · ${beatCount} 拍`:
+    `${bar.numerator??d.numerator}/${bar.denominator??d.denominator} · ${beatCount} / ${Number((expected/960).toFixed(3))} 拍${mismatch?' · 时值未齐':''}`;
   $('source').disabled=!bar.source&&!reference.open;
   reference.follow(bar.source);
   const review=[...bar.review,...session.currentBeat.review,...session.currentBeat.notes.flatMap(n=>n.review)];status(review.length?review.join('；'):'长按音符拖选多个音，长按小节空白处拖选整段。');

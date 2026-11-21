@@ -11,6 +11,28 @@ assert.equal(reopen(input).tracks[0].playbackInfo.program,27);
 const alternate = {...draft([[beat(4,[note(6,3)]),beat(2)]]),numerator:3,denominator:4,tempo:70};
 assert.equal(reopen(alternate).masterBars[0].timeSignatureNumerator,3);
 assert.equal(reopen(alternate).tempo,70);
+{
+  const triplet=()=>beat(8,[],{tupletNumerator:3,tupletDenominator:2});
+  const grace=beat(16,[note(1,9)],{effects:{graceType:1}});
+  const mixed=draft([[beat(2),beat(4)],[beat(1),beat(4)],[beat(4,[],{dots:1}),beat(4,[],{dots:1})],
+    [grace,triplet(),triplet(),triplet(),beat(2),beat(4)]]);
+  mixed.bars[2].numerator=6;mixed.bars[2].denominator=8;
+  assert.deepEqual(mixed.bars.map((_,i)=>core.barTiming(mixed,i).mismatch),[true,true,false,false]);
+
+  const original=draft([[beat(4,[note(1,8)])],[beat(8,[note(1,7)])],[beat(1)]]);
+  original.bars[2].numerator=3;
+  const score=core.makeScore(a,original,schema,false);
+  score.masterBars[0].isAnacrusis=true;
+  score.masterBars[1].isFreeTime=true;
+  const bytes=new a.exporter.Gp7Exporter().export(score,new a.Settings());
+  const staff=a.importer.ScoreLoader.loadScoreFromBytes(bytes,new a.Settings()).tracks[0].staves[0];
+  assert.deepEqual(core.barTiming(original,0,staff),{actual:960,expected:960,mismatch:false});
+  assert.deepEqual(core.barTiming(original,1,staff),{actual:480,expected:null,mismatch:false});
+  assert.deepEqual(core.barTiming(original,2,staff),{actual:2880,expected:2880,mismatch:false});
+  original.bars[0].beats[0].duration=8;
+  assert.equal(core.barTiming(original,0,staff).mismatch,true,'Edited pickup is checked against its source length');
+  assert.equal(core.barTiming(original,2).mismatch,true,'Recognition drafts use their explicit rest durations');
+}
 const empty = draft([[beat(1,[note(1,null)])]]);
 assert.equal(reopen(empty).tracks[0].staves[0].bars[0].voices[0].beats[0].isRest,true);
 assert.equal(empty.bars[0].beats[0].notes[0].fret,null,'Unknowns remain unknown in the editor');
