@@ -17,6 +17,9 @@ struct FilePracticeSettingsStore {
         ReproductionStore.shared.record("state", "profile.saved", ["kind": kind.rawValue, "file": fileName, "profile": String(decoding: data, as: UTF8.self)])
         if Self.isPracticeProfile(Value.self) {
             var object = try Self.object(data)
+            if kind == .guitarPro, let tick = object.removeValue(forKey: "lastPositionTick") as? Double {
+                saveGpPosition(tick, fileName: fileName)
+            }
             let mode = object.filter { Self.modeFields(kind).contains($0.key) }
             defaults.set(try JSONSerialization.data(withJSONObject: mode), forKey: modeKey(kind))
             for field in Self.modeFields(kind) { object.removeValue(forKey: field) }
@@ -41,10 +44,12 @@ struct FilePracticeSettingsStore {
                 modeData = try JSONSerialization.data(withJSONObject: mode)
                 defaults.set(modeData, forKey: modeKey(kind))
             }
-            guard fileData != nil || modeData != nil else { return nil }
+            let resumeTick = kind == .guitarPro ? gpPosition(for: fileName) : 0
+            guard fileData != nil || modeData != nil || resumeTick > 0 else { return nil }
             var merged = try Self.defaultObject(kind)
             if let fileData { merged.merge(try Self.object(fileData)) { _, new in new } }
             if let modeData { merged.merge(try Self.object(modeData)) { _, new in new } }
+            if kind == .guitarPro { merged["lastPositionTick"] = resumeTick }
             Self.clearTransient(&merged, kind: kind)
             let data = try JSONSerialization.data(withJSONObject: merged)
             ReproductionStore.shared.record("state", "profile.restored", ["kind": kind.rawValue, "file": fileName,
@@ -53,6 +58,48 @@ struct FilePracticeSettingsStore {
         }
         guard let data = fileData else { return nil }
         return try JSONDecoder().decode(type, from: data)
+    }
+
+    private let gpBookmarkKey = "currentGPPosition.v1"
+
+    private func gpPosition(for fileName: String) -> Double {
+        guard let bookmark = defaults.dictionary(forKey: gpBookmarkKey), bookmark["file"] as? String == fileName else { return 0 }
+        return bookmark["tick"] as? Double ?? 0
+    }
+
+    func activateGpFile(_ fileName: String) {
+        if defaults.dictionary(forKey: gpBookmarkKey)?["file"] as? String != fileName {
+            defaults.set(["file": fileName, "tick": 0.0], forKey: gpBookmarkKey)
+        }
+    }
+
+    func saveGpPosition(_ tick: Double, fileName: String) {
+        guard tick.isFinite, tick >= 0,
+              let bookmark = defaults.dictionary(forKey: gpBookmarkKey),
+              bookmark["file"] as? String == fileName,
+              bookmark["tick"] as? Double != tick else { return }
+        defaults.set(["file": fileName, "tick": tick], forKey: gpBookmarkKey)
+    }
+
+    @MainActor func migrateGpPositions() {
+        let marker = "currentGPPosition.migrated.v1"
+        guard !defaults.bool(forKey: marker) else { return }
+        if defaults.dictionary(forKey: gpBookmarkKey) == nil,
+           let last = RecentProjectsStore(defaults: defaults).mostRecent(kind: .guitarPro)?.fileName {
+            activateGpFile(last)
+            if let data = defaults.data(forKey: key(kind: .guitarPro, fileName: last)),
+               let object = try? Self.object(data), let tick = object["lastPositionTick"] as? Double {
+                saveGpPosition(tick, fileName: last)
+            }
+        }
+        // Old keys are hashed. Only the GP profile owns the lastPositionTick field.
+        for (key, value) in defaults.dictionaryRepresentation() where key.hasPrefix("practiceSettings.v1.") {
+            guard let data = value as? Data, var object = try? Self.object(data),
+                  object.removeValue(forKey: "lastPositionTick") != nil,
+                  let updated = try? JSONSerialization.data(withJSONObject: object) else { continue }
+            defaults.set(updated, forKey: key)
+        }
+        defaults.set(true, forKey: marker)
     }
 
     private func modeKey(_ kind: PracticeKind) -> String { "practiceModeSettings.v2." + kind.rawValue }
@@ -110,6 +157,9 @@ struct FilePracticeSettingsStore {
 
     func remove(kind: PracticeKind, fileName: String) {
         defaults.removeObject(forKey: key(kind: kind, fileName: fileName))
+        if kind == .guitarPro, defaults.dictionary(forKey: gpBookmarkKey)?["file"] as? String == fileName {
+            defaults.removeObject(forKey: gpBookmarkKey)
+        }
     }
 
     private func key(kind: PracticeKind, fileName: String) -> String {

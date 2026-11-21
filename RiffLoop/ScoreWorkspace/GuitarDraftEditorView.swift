@@ -64,6 +64,7 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
     }
     func updateUIView(_ web: WKWebView, context: Context) { }
     static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
+        coordinator.cancelSource()
         web.configuration.userContentController.removeScriptMessageHandler(forName: "guitarEditor")
         web.evaluateJavaScript("window.disposeGuitarEditor?.()", completionHandler: nil)
         web.stopLoading()
@@ -78,6 +79,8 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
         private var originalGP: Data?
         private var publishedHash: String?
         private var working = false
+        private let sourceReader = ScoreReferenceReader()
+        private var sourceTask: Task<Void, Never>?
         private let interruption = AudioInterruptionRecovery()
         private var observers = Set<AnyCancellable>()
 
@@ -133,6 +136,26 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                 catch { pause(); reply(["message": "暂时无法播放：\(error.localizedDescription)"]) }
                 return
             }
+            if action == "cancelSource" { cancelSource(); return }
+            if action == "source", document.gpURL == nil, let token = body["token"] as? Int {
+                cancelSource()
+                sourceTask = Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        guard let value = body["source"] else { throw ScoreRegionsError.invalidPage }
+                        let data = try JSONSerialization.data(withJSONObject: value)
+                        let source = try JSONDecoder().decode(GuitarSource.self, from: data)
+                        guard source.isValid else { throw ScoreRegionsError.invalidPage }
+                        try await Task.sleep(for: .milliseconds(65))
+                        let result = try await sourceReader.image(for: source)
+                        try Task.checkCancellation()
+                        sendSource(["token": token, "image": result.image, "label": result.label])
+                    } catch {
+                        if !Task.isCancelled { sendSource(["token": token, "label": "原图无法显示：\(error.localizedDescription)"]) }
+                    }
+                }
+                return
+            }
             guard !working else { return }
             if action == "close" { close(); return }
             if action == "closeDirty" { closeDirty(); return }
@@ -147,22 +170,6 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                         self.originalGP = data
                         document.didSaveGP?()
                         reply(["saved": true, "message": "整份 GP 已保存。"])
-                        return
-                    }
-                    if action == "source", document.gpURL == nil, let value = body["source"] {
-                        let data = try JSONSerialization.data(withJSONObject: value)
-                        let source = try JSONDecoder().decode(GuitarSource.self, from: data)
-                        let files = try await ScoreWorkspaceStore().files()
-                        guard let url = files.first(where: { $0.lastPathComponent == source.name }),
-                              try await ScoreRegionsStore(source: url).snapshot().sourceDigest == source.digest else {
-                            throw ScoreRegionsError.sourceChanged
-                        }
-                        let preview = await Task.detached { ScorePageRenderer.render(source: url, index: source.page) }.value
-                        guard let image = preview.image?.cgImage else { throw ScoreRegionsError.unreadableSource }
-                        let r = source.region
-                        guard r.isValid, let cropped = image.cropping(to: CGRect(x: r.x * Double(image.width), y: r.y * Double(image.height), width: r.width * Double(image.width), height: r.height * Double(image.height))),
-                              let jpeg = UIImage(cgImage: cropped).jpegData(compressionQuality: 0.85) else { throw ScoreRegionsError.invalidPage }
-                        reply(["source": jpeg.base64EncodedString(), "message": "原图仅供对照，编辑不会改变素材。"])
                         return
                     }
                     guard action == "save", document.gpURL == nil, let value = body["draft"] else { throw GuitarDraftStoreError.invalidDraft }
@@ -181,6 +188,14 @@ private struct GuitarDraftWebEditor: UIViewRepresentable {
                 } catch { reply(["message": "操作未完成：\(error.localizedDescription)"]) }
             }
         }
+        func cancelSource() { sourceTask?.cancel(); sourceTask = nil }
+
+        private func sendSource(_ values: [String: Any]) {
+            guard let data = try? JSONSerialization.data(withJSONObject: values, options: .withoutEscapingSlashes) else { return }
+            let json = String(decoding: data, as: UTF8.self)
+            web?.evaluateJavaScript("window.guitarSourceReply(\(json))", completionHandler: nil)
+        }
+
         private func reply(_ values: [String: Any]) {
             guard let data = try? JSONSerialization.data(withJSONObject: values) else { return }
             web?.evaluateJavaScript("guitarReply(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob('\(data.base64EncodedString())'),c=>c.charCodeAt(0)))))", completionHandler: nil)

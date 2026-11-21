@@ -19,7 +19,8 @@ def verify(root, archive=None):
         if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
             raise ValueError(f'ONNX source checksum mismatch: {name}')
     package = (root / 'Package.swift').read_text(encoding='utf-8')
-    if metadata['binary_url'] not in package or metadata['binary_sha256'] not in package:
+    expected_path = f'.cache/onnxruntime-{metadata["version"]}.zip'
+    if f'.binaryTarget(name: "onnxruntime", path: "{expected_path}")' not in package:
         raise ValueError('ONNX binary is not pinned to the verified release')
     if archive:
         if hashlib.sha256(archive.read_bytes()).hexdigest() != metadata['source_sha256']:

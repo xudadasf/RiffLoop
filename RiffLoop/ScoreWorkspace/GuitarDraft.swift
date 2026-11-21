@@ -37,6 +37,12 @@ struct GuitarSource: Codable, Equatable, Sendable {
     var digest: String
     var page: Int
     var region: ScoreRegion
+    var referenceTop: Double? = nil
+
+    var isValid: Bool {
+        region.isValid && page >= 0 && name.count <= 512 && digest.count == 64 &&
+            (referenceTop.map { $0.isFinite && (0...region.y).contains($0) } ?? true)
+    }
 }
 
 struct GuitarBar: Codable, Equatable, Sendable {
@@ -88,7 +94,7 @@ struct GuitarDraft: Codable, Equatable, Sendable {
             (0...99).contains(bar.repeatCount) && (0...255).contains(bar.alternateEndings) &&
             (1...32).contains(bar.numerator ?? numerator) && denominators.contains(bar.denominator ?? denominator) &&
             (1...999).contains(bar.tempo ?? tempo) &&
-            (bar.source.map { $0.region.isValid && $0.page >= 0 && $0.name.count <= 512 && $0.digest.count == 64 } ?? true) &&
+            (bar.source?.isValid ?? true) &&
             bar.beats.allSatisfy { beat in
                 durations.contains(beat.duration) && (0...2).contains(beat.dots) &&
                 (1...16).contains(beat.tupletNumerator) && (1...16).contains(beat.tupletDenominator) &&

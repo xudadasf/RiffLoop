@@ -336,6 +336,11 @@ assert.doesNotMatch(
     };
     const { backingAudioMimeType, nativeBackingPayload } = execute(alphaTab);
 
+    const largeAudio = new Uint8Array(2 * 1024 * 1024);
+    largeAudio.set([0x52, 0x49, 0x46, 0x46]);
+    const descriptor = nativeBackingPayload({ backingTrack: { rawAudioFile: largeAudio } });
+    assert.equal(descriptor.byteLength, largeAudio.length);
+    assert.equal(descriptor.data, undefined, "Large backing must not pass through the JSON message");
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
     assert.equal(backingAudioMimeType(mp3), "audio/mpeg");
     assert.equal(backingAudioMimeType(new Uint8Array([0x52, 0x49, 0x46, 0x46])), "audio/wav");

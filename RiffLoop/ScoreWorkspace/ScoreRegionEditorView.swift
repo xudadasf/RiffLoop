@@ -386,7 +386,7 @@ struct ScoreRegionEditorView: View {
                     .accessibilityIdentifier("region.drawing")
             }
             .padding(.horizontal)
-            Text(resizingID == nil ? "点击选中，双击拖动四角调整区域；打开画框后拖动新增。按编号连接。" : "拖动四个角调整范围，松手自动保存；点“完成调整”退出。")
+            Text(resizingID == nil ? "每框圈住同一行的五线谱和下方 TAB；纯 TAB 只圈六线。双击拖角调整，按编号连接。" : "拖动四个角调整范围，松手自动保存；点“完成调整”退出。")
                 .font(.caption).foregroundStyle(.secondary)
             if !externalOpen.pending.isEmpty {
                 HStack {

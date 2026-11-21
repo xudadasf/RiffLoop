@@ -1,4 +1,27 @@
 const assert=require('node:assert/strict');
+{
+  const Reference=require('../RiffLoop/Resources/ScoreEditor/source-reference.js');
+  const requests=[],frames=[];
+  const ref=new Reference((action,payload)=>requests.push({action,...payload}),frame=>frames.push(frame));
+  const source={name:'sheet.pdf',digest:'a',page:0,region:{id:'one',x:.1,y:.3,width:.8,height:.12}};
+  ref.setOpen(true,source);
+  ref.follow(structuredClone(source));
+  assert.equal(requests.length,1);
+  ref.follow({...source,page:1});
+  const [first,second]=requests;
+  ref.receive({token:first.token,image:'stale'});
+  assert.equal(frames.at(-1).image,undefined);
+  ref.receive({token:second.token,label:'第 2 页',image:'new'});
+  assert.equal(frames.at(-1).image,'new');
+  ref.follow(null);
+  assert.equal(requests.at(-1).action,'cancelSource');
+  assert.equal(frames.at(-1).image,undefined);
+  ref.follow(source);
+  const pending=requests.at(-1);
+  ref.setOpen(false);
+  ref.receive({token:pending.token,image:'stale'});
+  assert.equal(frames.at(-1).open,false);
+}
 const edit=require('../RiffLoop/Resources/ScoreEditor/editor-state.js');
 const core=require('../RiffLoop/Resources/ScoreEditor/guitar-draft.js');
 const schema=require('../RiffLoop/Resources/ScoreEditor/techniques.json');

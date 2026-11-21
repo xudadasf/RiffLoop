@@ -8,6 +8,9 @@
     const POSITION_POST_INTERVAL_MILLISECONDS = 50;
     let reproductionGeneration = 0;
     let scoreLoadID = null;
+    let incomingScore = null;
+    let backingTransfer = null;
+    let backingRevision = 0;
     const post = (event, payload) => {
         const handler = window.webkit?.messageHandlers?.riffloop;
         if (handler) {
@@ -139,6 +142,7 @@
         return null;
     };
     const bytesToBase64 = (bytes) => {
+        if (typeof bytes.toBase64 === "function") return bytes.toBase64();
         let binary = "";
         const chunkSize = 0x8000;
         for (let offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -157,6 +161,7 @@
                 syncTime: Number(point.syncTime)
             })
         ).filter((point) => Number.isFinite(point.synthTime) && Number.isFinite(point.syncTime));
+        if (bytes.length > 1024 * 1024) return { mimeType, byteLength: bytes.length, syncPoints };
         return { mimeType, data: bytesToBase64(bytes), syncPoints };
     };
     const probeTypedBackingMetadata = (score) => {
@@ -980,7 +985,11 @@
         }
         if (usesNativeBacking) {
             const payload = nativeBackingPayload(score);
-            if (payload) post("backingAudioLoaded", payload);
+            if (payload?.byteLength) {
+                const revision = ++backingRevision;
+                backingTransfer = { id: scoreLoadID, revision, bytes: score.backingTrack.rawAudioFile };
+                post("backingStream", { ...payload, revision });
+            } else if (payload) post("backingAudioLoaded", payload);
         }
         post("scoreLoaded", {
             title: score.title || "未命名乐谱",
@@ -1403,6 +1412,7 @@
     scoreElement.addEventListener("pointercancel", (event) => pointerSelection.pointerCancel(event), true);
 
     const decodeBase64 = (base64) => {
+        if (typeof Uint8Array.fromBase64 === "function") return Uint8Array.fromBase64(base64);
         const binary = atob(base64);
         const bytes = new Uint8Array(binary.length);
         for (let index = 0; index < binary.length; index += 1) {
@@ -1427,13 +1437,43 @@
                 post("error", { message: `音色加载失败：${errorMessage(error)}` });
             }
         },
+        appendScoreChunk(loadID, total, offset, base64) {
+            if (offset === 0) incomingScore = { id: loadID, bytes: new Uint8Array(total), offset: 0 };
+            const input = incomingScore;
+            if (!input || input.id !== loadID || input.offset !== offset || input.bytes.length !== total) return -1;
+            const chunk = decodeBase64(base64);
+            if (!chunk.length || offset + chunk.length > total) return -1;
+            input.bytes.set(chunk, offset);
+            input.offset += chunk.length;
+            return input.offset;
+        },
+        finishScoreTransfer(loadID) {
+            const input = incomingScore;
+            if (!input || input.id !== loadID || input.offset !== input.bytes.length) return false;
+            this.loadScore(input.bytes, loadID);
+            return true;
+        },
+        discardScoreTransfer(loadID) {
+            if (incomingScore?.id === loadID) incomingScore = null;
+        },
+        readBackingChunk(loadID, revision, offset, count) {
+            const stream = backingTransfer;
+            if (stream?.id !== loadID || stream.revision !== revision || count < 1 || offset < 0 ||
+                offset + count > stream.bytes.length) return null;
+            return bytesToBase64(stream.bytes.subarray(offset, offset + count));
+        },
+        releaseBacking(loadID, revision) {
+            if (backingTransfer?.id === loadID && backingTransfer.revision === revision) backingTransfer = null;
+        },
         loadScore(base64, loadID) {
+            incomingScore = null;
+            backingTransfer = null;
             scoreLoadID = typeof loadID === "string" ? loadID : null;
             reproductionGeneration += 1;
             pendingPausedSeek = null;
             trackTimbres = preparedTrackTimbres;
             preparedTrackTimbres = [];
-            post("reproductionLoad", { base64Characters: base64.length });
+            post("reproductionLoad", typeof base64 === "string" ? { base64Characters: base64.length } : { transferredBytes: base64.byteLength });
             try {
                 zoomAnchor = null;
                 rangeCountInRestarter.cancel();
@@ -1447,7 +1487,7 @@
                 wholeSongLoopingEnabled = false;
                 rangeCompletionAwaitingReset = false;
                 restoreScoreScrollPolicy();
-                loadedScoreBytes = decodeBase64(base64);
+                loadedScoreBytes = typeof base64 === "string" ? decodeBase64(base64) : base64;
                 api.load(loadedScoreBytes.slice());
                 if (!usesNativeBacking) synthApi.load(loadedScoreBytes.slice());
             } catch (error) {
@@ -1530,11 +1570,13 @@
             const tracks = indices
                 .map((index) => api.score.tracks[index])
                 .filter(Boolean);
-            if (tracks.length > 0) {
-                api.settings.notation.rhythmHeight = window.RiffLoopLayout.rhythmHeight(tracks);
-                api.updateSettings();
-                api.renderTracks(tracks);
-            }
+            if (!tracks.length) return;
+            const height = window.RiffLoopLayout.rhythmHeight(tracks);
+            const sameTracks = tracks.length === api.tracks.length && tracks.every((track, index) => track === api.tracks[index]);
+            if (sameTracks && api.settings.notation.rhythmHeight === height) return;
+            api.settings.notation.rhythmHeight = height;
+            api.updateSettings();
+            api.renderTracks(tracks);
         },
         setScoreZoom(value) {
             const scale = 0.82 * window.RiffLoopLayout.zoom(value);

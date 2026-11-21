@@ -48,6 +48,21 @@ const gpView = readFileSync(
     "utf8"
 );
 
+// Opening a GP applies the saved track after the parser has already rendered the default track.
+{
+    const definition = script.slice(script.indexOf("        showTracks(indices)"), script.indexOf("        setScoreZoom(value)"));
+    const tracks = [{ index: 0 }, { index: 1 }];
+    const rendered = [];
+    const api = { score: { tracks }, tracks: [tracks[0]], settings: { notation: { rhythmHeight: 50 } },
+        updateSettings() {}, renderTracks(next) { this.tracks = next; rendered.push(next[0].index); } };
+    const select = new Function("api", "window", "return ({" + definition + "}).showTracks")(api, { RiffLoopLayout: { rhythmHeight: () => 50 } });
+    select([0]); select([1]); select([1]);
+    assert.deepEqual(rendered, [1]);
+    api.settings.notation.rhythmHeight = 20;
+    select([1]);
+    assert.deepEqual(rendered, [1, 1]);
+}
+
 const cssRule = (selector) => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const match = html.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));

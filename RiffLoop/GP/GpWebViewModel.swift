@@ -9,6 +9,7 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var rendererReady = false
     @Published private(set) var playerReady = false
     @Published private(set) var score: GpScoreMetadata?
+    @Published private(set) var loadPhase: GpLoadPhase?
     @Published private(set) var renderMetrics: GpRenderMetrics?
     @Published private(set) var position = GpPlaybackPosition(
         currentTime: 0,
@@ -188,6 +189,9 @@ final class GpWebViewModel: ObservableObject {
     private(set) var scoreLoadID: String?
     private weak var webView: WKWebView?
     private var pendingScoreData: Data?
+    private var scoreTransfer: Task<Void, Never>?
+    private var backingTransfer: Task<Void, Never>?
+    private var playerReadyAfterBacking = false
     private var didSendSoundFont = false
     private var loopSelection = GpLoopSelectionStateMachine()
     private let settingsStore: FilePracticeSettingsStore
@@ -196,6 +200,7 @@ final class GpWebViewModel: ObservableObject {
     private var didApplyPendingProfile = false
     private var playbackStartedAt: Date?
     private var pendingResumeTick: Double?
+    private var resumeAwaitingPosition: Double?
     private var lastProfileSaveDate = Date.distantPast
     private let nativeBackingPlayer = GpNativeBackingPlayer()
     private var nativeBackingPlaybackRequested = false
@@ -212,6 +217,7 @@ final class GpWebViewModel: ObservableObject {
 
     init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
         self.settingsStore = settingsStore
+        settingsStore.migrateGpPositions()
         interruptionRecovery.onBegan = { [weak self] in
             guard let self, self.isPlaying || self.isStandaloneMetronomePlaying else { return nil }
             let standalone = self.isStandaloneMetronomePlaying
@@ -245,6 +251,9 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func recoverWebContent() {
+        cancelTransfers()
+        scoreLoadID = nil
+        loadPhase = nil
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
         recoveryTask?.cancel()
@@ -285,6 +294,10 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        cancelTransfers()
+        pendingScoreData = nil
+        loadPhase = .waitingForRenderer
+        renderMetrics = nil
         scoreLoadID = UUID().uuidString
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
@@ -321,6 +334,7 @@ final class GpWebViewModel: ObservableObject {
         gapFirstMeasure = 0
         standaloneSchedule = nil
         currentFileName = fileName
+        resumeAwaitingPosition = nil
         pendingProfile = (try? settingsStore.load(
             GpPracticeProfile.self,
             kind: .guitarPro,
@@ -530,6 +544,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func leaveMode() {
+        cancelTransfers()
+        loadPhase = nil
         scoreLoadID = nil
         recoveryTask?.cancel()
         recoveryTask = nil
@@ -561,6 +577,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func stop() {
+        resumeAwaitingPosition = nil
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
         reproductionSnapshot()
@@ -579,6 +596,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func seek(to tick: Double, userInitiated: Bool = false) {
+        resumeAwaitingPosition = nil
         if userInitiated { interruptionRecovery.cancel() }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.seek", details: ["tick": String(describing: tick)])
@@ -1031,7 +1049,8 @@ final class GpWebViewModel: ObservableObject {
     func receiveWebMessage(_ body: Any) {
         let envelope = body as? [String: Any]
         let messageID = envelope?["scoreLoadID"] as? String
-        if let name = envelope?["event"] as? String, name == "scoreLoaded" || name == "backingAudioLoaded" {
+        if let messageID, messageID != scoreLoadID { return }
+        if let name = envelope?["event"] as? String, ["scoreLoaded", "backingAudioLoaded", "backingStream"].contains(name) {
             // Reject superseded scores before decoding potentially huge embedded audio.
             guard let messageID, messageID == scoreLoadID else { return }
         }
@@ -1043,8 +1062,9 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func receiveFromWeb(_ event: GpBridgeEvent, scoreLoadID messageID: String?) {
+        if let messageID, messageID != scoreLoadID { return }
         switch event {
-        case .scoreLoaded, .backingAudioLoaded:
+        case .scoreLoaded, .backingAudioLoaded, .backingStream:
             // These are emitted synchronously while parsing the particular score.
             // A delayed bridge message must not restore a previous file's audio.
             guard let messageID, messageID == scoreLoadID else { return }
@@ -1060,13 +1080,15 @@ final class GpWebViewModel: ObservableObject {
             webContentRequiresReloadOnNextScore = false
             rendererReady = true
             call("lifecycle", arguments: [sceneActive])
-            guard sendBundledSoundFont() else { return }
+            guard sendBundledSoundFont() else { loadPhase = nil; return }
             if let pendingScoreData {
                 self.pendingScoreData = nil
                 sendScore(pendingScoreData)
             }
         case let .scoreLoaded(metadata):
+            if !didApplyPendingProfile, let currentFileName { settingsStore.activateGpFile(currentFileName) }
             score = metadata
+            refreshLoadPhase()
             if didApplyPendingProfile {
                 applyCurrentSettings(to: metadata)
             } else {
@@ -1075,25 +1097,31 @@ final class GpWebViewModel: ObservableObject {
             }
         case let .renderFinished(metrics):
             renderMetrics = metrics
+            refreshLoadPhase()
         case .playerReady:
+            if backingTransfer != nil { playerReadyAfterBacking = true; return }
             if let operation = reproductionLoad { ReproductionRecorder.shared.end(operation, result: "player_ready_observed; correlate bridge generation") }
             reproductionLoad = nil
             playerReady = true
+            refreshLoadPhase()
             // MIDI/player replacement can reset settings after scoreLoaded.
             applyPlayerSettings()
             if let pendingResumeTick {
                 self.pendingResumeTick = nil
-                seek(
-                    to: gpResumeTick(
-                        savedTick: pendingResumeTick,
-                        loopRange: loopRange,
-                        rangeLoopingEnabled: rangeLoopingEnabled
-                    )
-                )
+                let target = gpResumeTick(savedTick: pendingResumeTick, loopRange: loopRange,
+                                          rangeLoopingEnabled: rangeLoopingEnabled)
+                seek(to: target)
+                resumeAwaitingPosition = target
             }
         case let .timbreReloadStarted(reload):
             if reload.tick.isFinite { pendingResumeTick = max(0, reload.tick) }
         case let .positionChanged(position):
+            if let target = resumeAwaitingPosition {
+                let expected = position.endTick > 0 ? min(target, position.endTick) : target
+                if abs(position.currentTick - expected) <= 2 || (isPlaying && position.currentTick > 0) {
+                    resumeAwaitingPosition = nil
+                }
+            }
             if let range = loopRange, abs(position.currentTick - range.startTick) <= 1,
                let tempo = position.originalTempo, tempo.isFinite, tempo > 0, gpRangeStartTempo != tempo {
                 gpRangeStartTempo = tempo
@@ -1103,11 +1131,13 @@ final class GpWebViewModel: ObservableObject {
             self.position = position
             synchronizeNativeBacking(to: position)
             if
-                pendingResumeTick == nil,
+                pendingResumeTick == nil, resumeAwaitingPosition == nil,
                 playerReady,
+                didApplyPendingProfile, let currentFileName,
                 Date().timeIntervalSince(lastProfileSaveDate) >= 2
             {
-                saveProfile()
+                settingsStore.saveGpPosition(position.currentTick, fileName: currentFileName)
+                lastProfileSaveDate = Date()
             }
         case let .playerStateChanged(state):
             if isStandaloneMetronomePlaying {
@@ -1140,6 +1170,8 @@ final class GpWebViewModel: ObservableObject {
             updatePracticeClock(isPlaying: false)
         case .rangeLoopCompleted:
             recordLoopCompletion()
+        case let .backingStream(stream):
+            startBackingTransfer(stream)
         case let .backingAudioLoaded(audio):
             do {
                 try nativeBackingPlayer.load(data: audio.data, mimeType: audio.mimeType)
@@ -1180,6 +1212,8 @@ final class GpWebViewModel: ObservableObject {
             // The bridge already journals this event off the main thread. Synchronous
             // NSLog blocked scene updates in the 0.25.59 MetricKit watchdog report.
         case let .error(message):
+            cancelTransfers()
+            loadPhase = nil
             ReproductionStore.shared.record("incident", "gp.error", ["message": message])
             if let operation = reproductionLoad { ReproductionRecorder.shared.end(operation, result: "error: " + message) }
             reproductionLoad = nil
@@ -1188,6 +1222,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func receiveBridgeFailure(_ error: Error) {
+        loadPhase = nil
         errorMessage = "GP 消息解析失败：\(error.localizedDescription)"
     }
 
@@ -1295,7 +1330,85 @@ final class GpWebViewModel: ObservableObject {
         call("prepareMetronomeSubdivision", arguments: [metronomeSubdivisionFactor])
         call("setBeatAccents", arguments: [beatAccents.map(\.rawValue)])
         call("prepareTrackTimbres", arguments: [pendingProfile.trackTimbres.map { [$0.key, $0.value] }])
-        call("loadScore", arguments: [data.base64EncodedString(), scoreLoadID])
+        guard data.count > GpScoreTransfer.blockSize else {
+            loadPhase = .parsing
+            call("loadScore", arguments: [data.base64EncodedString(), scoreLoadID])
+            return
+        }
+        guard let webView else {
+            receive(.error("谱面页面尚未就绪，请重新打开曲谱。"))
+            return
+        }
+        loadPhase = .sending(0, data.count)
+        scoreTransfer = Task { [weak self] in
+            do {
+                try await GpScoreTransfer.send(data, id: scoreLoadID, web: webView) { done in
+                    guard self?.scoreLoadID == scoreLoadID else { return }
+                    self?.loadPhase = done < data.count ? .sending(done, data.count) : .parsing
+                }
+                guard !Task.isCancelled, self?.scoreLoadID == scoreLoadID else { return }
+                self?.scoreTransfer = nil
+            } catch {
+                guard !Task.isCancelled, self?.scoreLoadID == scoreLoadID else { return }
+                self?.receive(.error("曲谱传输失败：\(error.localizedDescription)"))
+            }
+        }
+    }
+
+    private func refreshLoadPhase() {
+        guard loadPhase != nil, backingTransfer == nil, score != nil else { return }
+        if renderMetrics == nil { loadPhase = .drawing }
+        else if !playerReady { loadPhase = .preparingPlayer }
+        else { loadPhase = nil }
+    }
+
+    private func cancelTransfers() {
+        if scoreTransfer != nil, let scoreLoadID {
+            webView?.evaluateJavaScript("window.riffloop?.discardScoreTransfer?.('\(scoreLoadID)')", completionHandler: nil)
+        }
+        scoreTransfer?.cancel()
+        scoreTransfer = nil
+        backingTransfer?.cancel()
+        backingTransfer = nil
+        playerReadyAfterBacking = false
+    }
+
+    private func startBackingTransfer(_ stream: GpBackingStream) {
+        guard let id = scoreLoadID, let webView else { return }
+        backingTransfer?.cancel()
+        playerReadyAfterBacking = playerReadyAfterBacking || playerReady
+        playerReady = false
+        loadPhase = .backing(0, stream.byteLength)
+        backingTransfer = Task { [weak self] in
+            defer {
+                webView.evaluateJavaScript("window.riffloop?.releaseBacking?.('\(id)',\(stream.revision))", completionHandler: nil)
+            }
+            do {
+                let url = try await GpScoreTransfer.receive(stream, id: id, web: webView) { done in
+                    self?.loadPhase = .backing(done, stream.byteLength)
+                }
+                guard !Task.isCancelled, let self, self.scoreLoadID == id else {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
+                do { try self.nativeBackingPlayer.load(fileAt: url) }
+                catch { try? FileManager.default.removeItem(at: url); throw error }
+                self.nativeBackingSyncPoints = stream.syncPoints
+                self.nativeBackingPlayer.setRate(self.effectivePlaybackSpeed)
+                self.nativeBackingPlayer.setVolume(self.backingVolume)
+            } catch {
+                guard !Task.isCancelled, self?.scoreLoadID == id else { return }
+                self?.errorMessage = "内嵌伴奏加载失败：\(error.localizedDescription)"
+                ReproductionStore.shared.record("incident", "gp.backing_stream_failed", ["message": error.localizedDescription])
+            }
+            guard !Task.isCancelled, let self, self.scoreLoadID == id else { return }
+            self.backingTransfer = nil
+            if self.playerReadyAfterBacking {
+                self.playerReadyAfterBacking = false
+                self.receive(.playerReady)
+            }
+            self.refreshLoadPhase()
+        }
     }
 
     @discardableResult
@@ -1576,7 +1689,7 @@ final class GpWebViewModel: ObservableObject {
                 scoreZoom: scoreZoom,
                 playbackSpeed: playbackSpeed,
                 baseBpm: baseBpm,
-                lastPositionTick: pendingResumeTick ?? (position.currentTick.isFinite ? max(0, position.currentTick) : 0),
+                lastPositionTick: pendingResumeTick ?? resumeAwaitingPosition ?? (position.currentTick.isFinite ? max(0, position.currentTick) : 0),
                 displayedTrack: displayedTrack,
                 mutedTracks: mutedTracks,
                 soloTrack: soloTrack,
@@ -1624,6 +1737,7 @@ final class GpWebViewModel: ObservableObject {
             return
         }
 
+        let commandLoadID = scoreLoadID
         do {
             let data = try JSONSerialization.data(withJSONObject: arguments)
             guard let json = String(data: data, encoding: .utf8) else { return }
@@ -1654,12 +1768,13 @@ final class GpWebViewModel: ObservableObject {
             webView.evaluateJavaScript(script) { [weak self] result, error in
                 ReproductionRecorder.shared.end(operation, result: error?.localizedDescription ?? String(describing: result))
                 Task { @MainActor [weak self] in
+                    guard self?.scoreLoadID == commandLoadID else { return }
                     if let error {
                         ReproductionStore.shared.record("incident", "gp.command_failed", [
                             "command": function,
                             "message": error.localizedDescription,
                         ])
-                        self?.errorMessage = "GP 命令 \(function) 执行失败：\(error.localizedDescription)"
+                        self?.reportCommandFailure(function, message: error.localizedDescription)
                         return
                     }
                     guard
@@ -1671,7 +1786,7 @@ final class GpWebViewModel: ObservableObject {
                         "command": function,
                         "message": message,
                     ])
-                    self?.errorMessage = "GP 命令 \(function) 执行失败：\(message)"
+                    self?.reportCommandFailure(function, message: message)
                 }
             }
         } catch {
@@ -1680,9 +1795,18 @@ final class GpWebViewModel: ObservableObject {
                 "command": function,
                 "message": "编码失败：" + error.localizedDescription,
             ])
-            errorMessage = "GP 命令 \(function) 编码失败：\(error.localizedDescription)"
+            reportCommandFailure(function, message: error.localizedDescription)
         }
     }
+    private func reportCommandFailure(_ function: String, message: String) {
+        let detail = "GP 命令 \(function) 执行失败：\(message)"
+        if loadPhase != nil && (function == "loadScore" || function == "loadSoundFont") {
+            receive(.error(detail))
+        } else {
+            errorMessage = detail
+        }
+    }
+
     func reproductionSnapshot() {
         let store = ReproductionStore.shared
         var state: [String: String] = [:]

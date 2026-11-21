@@ -61,6 +61,35 @@ final class GpScoreSwitchIntegrationTests: XCTestCase {
         guard encoded.count == 2 else { return }
         let first = try XCTUnwrap(Data(base64Encoded: encoded[0]))
         let second = try XCTUnwrap(Data(base64Encoded: encoded[1]))
+        // Test the production chunk bridge in both directions with an independent byte oracle.
+        _ = try await webView.evaluateJavaScript("""
+            window.testOriginalParser = window.riffloop.loadScore;
+            window.riffloop.loadScore = (bytes) => { window.testTransferred = bytes; };
+            window.testOriginalBacking = window.riffloop.readBackingChunk;
+            window.riffloop.readBackingChunk = (_, __, offset, count) => {
+                const bytes = window.testTransferred.subarray(offset, offset + count);
+                let text = '';
+                for (let i = 0; i < bytes.length; i += 16384) text += String.fromCharCode(...bytes.subarray(i, i + 16384));
+                return btoa(text);
+            };
+            true
+            """)
+        var large = Data(repeating: 0x71, count: GpScoreTransfer.blockSize * 2 + 13)
+        large[GpScoreTransfer.blockSize] = 0x19
+        large[large.count - 1] = 0xfc
+        var sent: [Int] = [], received: [Int] = []
+        try await GpScoreTransfer.send(large, id: "transfer", web: webView) { sent.append($0) }
+        let output = try await GpScoreTransfer.receive(.init(mimeType: "audio/wav", byteLength: large.count, revision: 1, syncPoints: []),
+                                                       id: "transfer", web: webView) { received.append($0) }
+        defer { try? FileManager.default.removeItem(at: output) }
+        XCTAssertEqual(try Data(contentsOf: output), large)
+        XCTAssertEqual(sent, [GpScoreTransfer.blockSize, GpScoreTransfer.blockSize * 2, large.count])
+        XCTAssertEqual(received, sent)
+        _ = try await webView.evaluateJavaScript("""
+            window.riffloop.loadScore = window.testOriginalParser;
+            window.riffloop.readBackingChunk = window.testOriginalBacking;
+            window.testTransferred = null; true
+            """)
         try first.write(to: folder.appendingPathComponent(firstName))
         try second.write(to: folder.appendingPathComponent(secondName))
         model.loadScore(data: first, fileName: firstName)

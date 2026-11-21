@@ -3,6 +3,16 @@ let session,schema,busy=false,savedHere=false,existingGP,pendingFont,barMenuRevi
 const $=id=>document.getElementById(id),core=GuitarDraftCore;
 const send=(action,payload={})=>window.webkit?.messageHandlers.guitarEditor.postMessage({action,...payload});
 const status=text=>{$('status').textContent=text;};
+const reference = new GuitarSourceReference(send, ({open,label,image}) => {
+  document.body.classList.toggle('reference-open',open);
+  $('source').setAttribute('aria-pressed',String(open));
+  $('reference').hidden=!open;
+  $('sourceLabel').textContent=label||'';
+  const img=$('sourceImage');
+  img.hidden=!image;
+  if(image)img.src='data:image/jpeg;base64,'+image;else img.removeAttribute('src');
+});
+window.guitarSourceReply=result=>reference.receive(result);
 function perform(fn,keepDigits=false){if(busy)return;surface?.pause();if(!keepDigits)session?.endDigits();const before=session&&[session.revision,session.bar,session.beat,session.string].join(':');try{fn();render(!session.noteRange&&!session.anchor?.wholeBars&&before!==[session.revision,session.bar,session.beat,session.string].join(':'));}catch(e){status(e.message);if($('panel').open)$('panelError').textContent=e.message;}}
 function button(text,action,parent){const el=document.createElement('button');el.textContent=text;el.onclick=()=>perform(action,parent.id==='keypad'&&/^\d$/.test(text));parent.append(el);return el;}
 function field(label,value,change,options){const row=document.createElement('label');row.append(document.createTextNode(label));const input=document.createElement(options?'select':'input');input.setAttribute('aria-label',label);if(options){for(const [name,val] of options){const o=document.createElement('option');o.value=val;o.textContent=name;input.append(o);}}else input.type=typeof value==='number'?'number':'text';input.value=value;input.onchange=()=>perform(()=>change(options||input.type==='number'?Number(input.value):input.value));row.append(input);$('panelBody').append(row);return input;}
@@ -40,7 +50,8 @@ function render(reveal=false){if(!session)return;session.clamp();const d=session
   $('selection').textContent=session.noteRange?noteRangeLabel():session.anchor?.wholeBars?barRangeLabel():`第 ${session.beat+1} 拍位 · 第 ${session.string} 弦`;
   const actual=bar.beats.reduce((n,b)=>n+core.ticks(b),0),expected=(bar.numerator??d.numerator)*3840/(bar.denominator??d.denominator);
   $('timing').textContent=`${bar.numerator??d.numerator}/${bar.denominator??d.denominator} · ${Number((actual/960).toFixed(3))} / ${expected/960} 拍${Math.abs(actual-expected)>.01?' · 时值未齐':''}`;
-  $('source').disabled=!bar.source;
+  $('source').disabled=!bar.source&&!reference.open;
+  reference.follow(bar.source);
   const review=[...bar.review,...session.currentBeat.review,...session.currentBeat.notes.flatMap(n=>n.review)];status(review.length?review.join('；'):'长按音符拖选多个音，长按小节空白处拖选整段。');
   refreshTools();
   surface.update(d,session,schema,reveal);if(!playing)surface.seekSelection();
@@ -55,6 +66,7 @@ function noteRangeLabel(){return `已选 ${session.targets('note').length} 个�
 function previewRange(first,last){
   if(typeof first==='number')session.selectBars(first,last);
   else session.selectNotes(first,last);
+  reference.follow(session.currentBar.source);
   surface.paintBarRange();
   surface.paintNoteRange();
   $('selection').textContent=session.noteRange?noteRangeLabel():barRangeLabel();
@@ -101,7 +113,7 @@ window.loadExistingGuitarGP=(encoded,techniques)=>{
 };
 window.pauseGuitarEditor=()=>surface?.pause();
 window.disposeGuitarEditor=()=>surface?.destroy();
-window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved&&session){session.saved=session.serializedDraft;savedHere=true;render();}if(result.source){$('sourceImage').src='data:image/jpeg;base64,'+result.source;$('reference').hidden=false;}status(result.message||'');};
+window.guitarReply=(result)=>{busy=false;document.body.inert=false;if(result.saved&&session){session.saved=session.serializedDraft;savedHere=true;render();}status(result.message||'');};
 window.guitarRequestClose=()=>{surface?.pause();if(session?.dirty)send('closeDirty');else send('close');};
 $('close').onclick=()=>window.guitarRequestClose();
 
@@ -115,7 +127,14 @@ $('save').onclick=()=>{if(busy)return;surface.pause();
     }catch(e){busy=false;document.body.inert=false;status(e.message);}
   }else{busy=true;document.body.inert=true;send('save',{draft:session.draft});}};
 $('prev').onclick=()=>perform(()=>{session.clearSelection();session.bar--;session.beat=0;});$('next').onclick=()=>perform(()=>{session.clearSelection();session.bar++;session.beat=0;});$('barChoice').onchange=e=>perform(()=>{session.clearSelection();session.bar=Number(e.target.value);session.beat=0;});
-$('source').onclick=()=>{if(!busy&&session.currentBar.source){busy=true;document.body.inert=true;send('source',{source:session.currentBar.source});}};$('hideSource').onclick=()=>{$('reference').hidden=true;};
+function toggleReference(open){
+  if(!session)return;
+  reference.setOpen(open,session.currentBar.source);
+  $('source').disabled=!session.currentBar.source&&!open;
+  if(open)requestAnimationFrame(()=>surface?.revealSelection());
+}
+$('source').onclick=()=>toggleReference(!reference.open);
+$('hideSource').onclick=()=>toggleReference(false);
 $('preview').onclick=()=>{document.body.classList.toggle('reading');$('preview').textContent=document.body.classList.contains('reading')?'编辑':'阅读';surface.api.render();};
 $('play').onclick=()=>{if(playing)surface.pause();else{send('activateAudio');surface.play();}};$('stop').onclick=()=>surface.stop();
 $('loop').onclick=()=>{const enabled=$('loop').getAttribute('aria-pressed')!=='true';$('loop').setAttribute('aria-pressed',String(enabled));surface.loop(enabled);};

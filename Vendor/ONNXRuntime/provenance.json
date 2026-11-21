@@ -4,6 +4,10 @@
   "source_sha256": "ab102b30f15c44b08dc6fc32683abeafd216ff6bcabdf74fbac37fbb19d80eed",
   "binary_url": "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.24.2.zip",
   "binary_sha256": "f7100a992d2a8135168c8afd831e6a58b465349101982aa58b3e11d36e600b54",
+  "nuget_url": "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.24.2/microsoft.ml.onnxruntime.1.24.2.nupkg",
+  "nuget_sha512": "drZ8ja/CPE8grQljcFfCAh9KhzcBgmzsnidKBKIBetEUM4eSdaCR+aHVmXqa6n+7dYm0nQNgKLGTthaPmdn0YA==",
+  "framework_member": "runtimes/ios/native/onnxruntime.xcframework.zip",
+  "framework_sha256": "a161fe8628ed3bf8d97915bd34063fe115f58a1b9b0f4f0baec78c62487ac3ee",
   "files": {
     "LICENSE": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
     "objectivec/ort_value_internal.h": "1440dc2e2f5645da8302fa28643691cba92410e18b8787caf561edd8c735b074",

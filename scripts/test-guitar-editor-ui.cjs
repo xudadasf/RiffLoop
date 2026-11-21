@@ -30,6 +30,33 @@ async function checkControls(page){
 (async()=>{const server=http.createServer(async(req,res)=>{try{const name=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));if(!name.startsWith(root+path.sep))throw Error();const data=await fs.readFile(name);res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.svg')?'image/svg+xml':name.endsWith('.html')?'text/html':'application/octet-stream');res.end(data);}catch{res.statusCode=404;res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;try{
 browser=await pw.chromium.launch({headless:true,executablePath:process.env.RIFFLOOP_BROWSER});const page=await browser.newPage({viewport:{width:1133,height:744},deviceScaleFactor:2,hasTouch:true});const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack)});await page.addInitScript(()=>{window.messages=[];window.webkit={messageHandlers:{guitarEditor:{postMessage:m=>window.messages.push(m)}}};});
 await page.goto(`http://127.0.0.1:${server.address().port}/ScoreEditor/editor.html`);await page.waitForFunction(()=>window.messages.some(m=>m.action==='ready'));
+// While the reference is open editing stays live, and stale images cannot cover the current selection.
+const reviewPage=await browser.newPage({viewport:{width:1133,height:744},hasTouch:true});
+await reviewPage.addInitScript(()=>{window.requests=[];window.webkit={messageHandlers:{guitarEditor:{postMessage:m=>requests.push(m)}}};});
+await reviewPage.goto(page.url());
+const frame=(id,n)=>({name:'review.pdf',digest:'a'.repeat(64),page:n,region:{id,x:.05,y:.1,width:.9,height:.2}});
+const reviewDraft={...fixture,bars:[{...fixture.bars[0],source:frame('one',0)},{...fixture.bars[0],source:frame('two',1)},fixture.bars[0]]};
+await reviewPage.evaluate(({draft,schema})=>loadGuitarDraft(draft,schema),{draft:reviewDraft,schema});
+await reviewPage.locator('#source').click();
+const currentToken=()=>reviewPage.evaluate(()=>requests.filter(m=>m.action==='source').at(-1).token);
+const firstToken=await currentToken();
+await reviewPage.locator('#next').click();
+const secondToken=await currentToken();
+assert.ok(secondToken>firstToken);
+await reviewPage.evaluate(token=>guitarSourceReply({token,image:'stale',label:'wrong frame'}),firstToken);
+assert.equal(await reviewPage.locator('#sourceImage').isVisible(),false);
+await reviewPage.evaluate(token=>guitarSourceReply({token,image:'AA==',label:'第 2 页 · 识别框 2'}),secondToken);
+assert.equal(await reviewPage.locator('#sourceLabel').textContent(),'第 2 页 · 识别框 2');
+for(const [width,height] of [[1133,744],[744,1133]]){
+  await reviewPage.setViewportSize({width,height});
+  const bounds=await reviewPage.evaluate(()=>[document.querySelector('#reference').getBoundingClientRect().bottom,document.querySelector('#scoreViewport').getBoundingClientRect().top]);
+  assert.ok(bounds[0]<=bounds[1]+1,'Reference must leave a separate editable viewport');
+}
+await reviewPage.locator('#next').click();
+assert.equal(await reviewPage.locator('#sourceLabel').textContent(),'此小节没有对应原图');
+await reviewPage.locator('#hideSource').click();
+assert.equal(await reviewPage.locator('#reference').isVisible(),false);
+await reviewPage.close();
 // The native bridge loads the draft asynchronously. Static HTML controls must
 // not accept a tap before the draft and its final layout are available.
 assert.equal(await page.locator('#bars').isVisible(),false,'Editing controls wait for the draft');

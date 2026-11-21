@@ -7,6 +7,36 @@ import XCTest
 
 @MainActor
 final class ScorePageRendererTests: XCTestCase {
+    func testReviewCropFindsPairedFiveLineStaffAndLeavesOtherTABSystemsAlone() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        func page(_ rows: [Int]) throws -> CGImage {
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 480, height: 300), format: format).image { ctx in
+                ctx.cgContext.setFillColor(UIColor.white.cgColor)
+                ctx.fill(CGRect(x: 0, y: 0, width: 480, height: 300))
+                ctx.cgContext.setFillColor(UIColor.black.cgColor)
+                for y in rows { ctx.fill(CGRect(x: 24, y: y, width: 430, height: 1)) }
+            }
+            return try XCTUnwrap(image.cgImage)
+        }
+        let source = GuitarSource(name: "score.png", digest: String(repeating: "a", count: 64), page: 0,
+                                  region: .init(x: 0.04, y: 0.58, width: 0.92, height: 0.23))
+        let staff = [110, 119, 128, 137, 146], tab = [180, 190, 200, 210, 220, 230]
+        let full = try page([87] + staff + tab)
+        let result = ScoreReferenceCrop.includingStaff(source, in: full)
+        let top = try XCTUnwrap(result.referenceTop)
+        XCTAssertLessThan(top * 300, 87, "Keep high notes and beams above the staff")
+        XCTAssertGreaterThan(top * 300, 30)
+        XCTAssertEqual(result.region, source.region)
+        let rect = ScoreReferenceCrop.rect(for: result, in: full)
+        XCTAssertEqual(rect.maxY, 243, accuracy: 1)
+        let priorTAB = [50, 58, 66, 74, 82, 90]
+        let guarded = ScoreReferenceCrop.includingStaff(source, in: try page(priorTAB + staff + tab))
+        XCTAssertGreaterThan(try XCTUnwrap(guarded.referenceTop) * 300, 90)
+        XCTAssertNil(ScoreReferenceCrop.includingStaff(source, in: try page(tab)).referenceTop)
+        XCTAssertNil(ScoreReferenceCrop.includingStaff(source, in: try page([101] + staff + tab)).referenceTop)
+    }
+
     func testPhotoPreviewMatchesOriginalDrawingForEveryExifOrientation() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

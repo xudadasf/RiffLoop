@@ -25,6 +25,7 @@ final class GpPracticeProfileTests: XCTestCase {
             )
         )
 
+        store.activateGpFile("此生不换.gp")
         try store.save(profile, kind: .guitarPro, fileName: "此生不换.gp")
         var expected = profile
         expected.loopRange = nil

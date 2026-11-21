@@ -30,6 +30,32 @@ private enum GpControlPanel: String, Identifiable {
     }
 }
 
+private struct GpLoadingIndicator: View {
+    let phase: GpLoadPhase
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(phase.title).font(.headline)
+            if let bytes = phase.bytes, bytes.total > 0 {
+                ProgressView(value: Double(bytes.done), total: Double(bytes.total))
+                Text("\(size(bytes.done)) / \(size(bytes.total))").font(.caption.monospacedDigit())
+            } else {
+                ProgressView()
+            }
+        }
+        .frame(width: 215)
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("gp.load.progress")
+        .allowsHitTesting(false)
+    }
+
+    private func size(_ bytes: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+}
+
 struct GpPracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var displayNames: DocumentDisplayNameStore
@@ -58,10 +84,8 @@ struct GpPracticeView: View {
                 TapGesture().onEnded { activePanel = nil }
             )
             .overlay {
-                if isReadingScore {
-                    ProgressView("正在读取乐谱…")
-                        .padding()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                if let phase = isReadingScore ? GpLoadPhase.reading : viewModel.loadPhase {
+                    GpLoadingIndicator(phase: phase)
                 } else if viewModel.score == nil {
                     emptyScoreView
                 }
@@ -810,7 +834,7 @@ struct GpPracticeView: View {
                 }
             }
             do {
-                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
+                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url, options: .mappedIfSafe) }.value
                 guard !Task.isCancelled else { return }
                 currentFileName = url.lastPathComponent
                 viewModel.loadScore(data: data, fileName: url.lastPathComponent)

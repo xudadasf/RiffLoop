@@ -45,6 +45,7 @@ final class GpLoadingStateTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = FilePracticeSettingsStore(defaults: defaults)
         let name = "loading-test.gp"
+        store.activateGpFile(name)
         for leave in [false, true] {
             let expected = GpPracticeProfile(baseBpm: 70, lastPositionTick: 9121,
                 totalPracticeMilliseconds: 3420776, totalCompletedLoops: 123)
@@ -66,6 +67,7 @@ final class GpLoadingStateTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = FilePracticeSettingsStore(defaults: defaults)
+        store.activateGpFile("first.gp")
         try store.save(GpPracticeProfile(baseBpm: 70, lastPositionTick: 9121), kind: .guitarPro, fileName: "first.gp")
         try store.save(GpPracticeProfile(baseBpm: 80, lastPositionTick: 3840), kind: .guitarPro, fileName: "second.gp")
         let model = GpWebViewModel(settingsStore: store)
@@ -77,7 +79,36 @@ final class GpLoadingStateTests: XCTestCase {
         XCTAssertEqual(first.baseBpm, 70)
         XCTAssertEqual(first.lastPositionTick, 9121)
         XCTAssertEqual(second.baseBpm, 80)
-        XCTAssertEqual(second.lastPositionTick, 3840)
+        XCTAssertEqual(second.lastPositionTick, 0, "An unfinished switch cannot steal the active bookmark")
+    }
+
+    func testProgressWaitsForDrawingAndPlayerAndIgnoresSupersededSignals() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = GpWebViewModel(settingsStore: FilePracticeSettingsStore(defaults: defaults))
+        let metadata = GpScoreMetadata(title: "Test", artist: "", bars: 2, hasBackingTrack: false, tracks: [])
+        for renderFirst in [false, true] {
+            model.loadScore(data: Data(), fileName: "progress.gp")
+            model.receiveFromWeb(.playerReady, scoreLoadID: "superseded")
+            XCTAssertFalse(model.playerReady)
+            model.receive(.scoreLoaded(metadata))
+            XCTAssertEqual(model.loadPhase, .drawing)
+            if renderFirst {
+                model.receive(.renderFinished(.init(width: 100, height: 100)))
+                XCTAssertEqual(model.loadPhase, .preparingPlayer)
+                model.receive(.playerReady)
+            } else {
+                model.receive(.playerReady)
+                XCTAssertEqual(model.loadPhase, .drawing)
+                model.receive(.renderFinished(.init(width: 100, height: 100)))
+            }
+            XCTAssertNil(model.loadPhase)
+        }
+        model.loadScore(data: Data(), fileName: "error.gp")
+        model.receive(.error("Invalid score"))
+        XCTAssertNil(model.loadPhase)
+        model.leaveMode()
     }
 
     func testLeavingAnUnavailableWebPageDoesNotDispatchCleanupCommands() async throws {
@@ -102,6 +133,7 @@ final class GpLoadingStateTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = FilePracticeSettingsStore(defaults: defaults)
+        store.activateGpFile("resume.gp")
         try store.save(GpPracticeProfile(baseBpm: 70, lastPositionTick: 9121), kind: .guitarPro, fileName: "resume.gp")
         let model = GpWebViewModel(settingsStore: store)
         model.loadScore(data: Data(), fileName: "resume.gp")
@@ -112,6 +144,10 @@ final class GpLoadingStateTests: XCTestCase {
         let saved = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "resume.gp"))
         XCTAssertEqual(saved.baseBpm, 80, "User edits after profile application must still persist")
         XCTAssertEqual(saved.lastPositionTick, 9121, "Metadata readiness is earlier than the resume seek")
+        model.receive(.playerReady)
+        model.setSceneActive(false)
+        XCTAssertEqual(try store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "resume.gp")?.lastPositionTick, 9121,
+                       "A background event before the asynchronous seek confirmation must not save zero")
         model.leaveMode()
     }
 }

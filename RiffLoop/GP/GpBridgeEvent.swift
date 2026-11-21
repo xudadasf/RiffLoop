@@ -133,6 +133,7 @@ enum GpBridgeEvent: Equatable, Sendable {
     case playerFinished
     case rangeLoopCompleted
     case backingAudioLoaded(GpBackingAudio)
+    case backingStream(GpBackingStream)
     case barHit(GpBarHit)
     case pointerDown(GpBarHit)
     case pointerMove(GpBarHit)
@@ -169,6 +170,8 @@ enum GpBridgeEvent: Equatable, Sendable {
             return .playerFinished
         case "rangeLoopCompleted":
             return .rangeLoopCompleted
+        case "backingStream":
+            return .backingStream(try decoder.decode(GpBackingStream.self, from: envelope.payloadData))
         case "backingAudioLoaded":
             return .backingAudioLoaded(
                 try decoder.decode(GpBackingAudio.self, from: envelope.payloadData)

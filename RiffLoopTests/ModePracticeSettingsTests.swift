@@ -87,6 +87,7 @@ final class ModePracticeSettingsTests: XCTestCase {
         first.standaloneBeatsPerMeasure = 7
         first.standaloneVolume = 0.6
         first.countInAccents = [.strong, .subAccent, .normal, .muted]
+        store.activateGpFile("first.gp")
         first.lastPositionTick = 4321
         first.displayedTrack = 2
         first.wholeSongLoopingEnabled = true
@@ -103,12 +104,61 @@ final class ModePracticeSettingsTests: XCTestCase {
         XCTAssertFalse(second.wholeSongLoopingEnabled)
         XCTAssertFalse(second.speedLadderEnabled)
         second.masterVolume = 4
+        store.activateGpFile("second.gp")
         second.lastPositionTick = 999
         try store.save(second, kind: .guitarPro, fileName: "second.gp")
         let reopened = try XCTUnwrap(store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "first.gp"))
         XCTAssertEqual(reopened.masterVolume, 4)
-        XCTAssertEqual(reopened.lastPositionTick, 4321)
+        XCTAssertEqual(reopened.lastPositionTick, 0)
+        XCTAssertEqual(try store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "second.gp")?.lastPositionTick, 999)
         XCTAssertEqual(reopened.displayedTrack, 2)
+    }
+
+    func testFirstPlaybackBookmarkRestoresBeforeAnyOtherPreferenceIsSaved() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FilePracticeSettingsStore(defaults: defaults)
+        store.activateGpFile("first.gp")
+        store.saveGpPosition(1920, fileName: "first.gp")
+        XCTAssertFalse(store.containsFileSettings(kind: .guitarPro, fileName: "first.gp"))
+        XCTAssertEqual(try store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "first.gp")?.lastPositionTick, 1920)
+        XCTAssertNil(try store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: "another.gp"))
+    }
+
+    @MainActor
+    func testUpgradeMigratesOnlyTheLastGPAndRejectsInactiveWrites() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        func legacyKey(_ name: String) -> String {
+            "practiceSettings.v1." + SHA256.hash(data: Data("guitarPro:\(name)".utf8)).map { String(format: "%02x", $0) }.joined()
+        }
+        for (i, name) in ["A.gp", "B.gp"].enumerated() {
+            let profile = GpPracticeProfile(baseBpm: 80, lastPositionTick: Double(200 + i))
+            defaults.set(try JSONEncoder().encode(profile), forKey: legacyKey(name))
+        }
+        RecentProjectsStore(defaults: defaults).opened(kind: .guitarPro, fileName: "B.gp")
+        let store = FilePracticeSettingsStore(defaults: defaults)
+        store.migrateGpPositions()
+        func tick(_ name: String) throws -> Double? { try store.load(GpPracticeProfile.self, kind: .guitarPro, fileName: name)?.lastPositionTick }
+        XCTAssertEqual(try tick("B.gp"), 201)
+        XCTAssertEqual(try tick("A.gp"), 0)
+        for name in ["A.gp", "B.gp"] {
+            let raw = try XCTUnwrap(defaults.data(forKey: legacyKey(name)))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: raw) as? [String: Any])
+            XCTAssertNil(json["lastPositionTick"])
+            XCTAssertEqual(json["baseBpm"] as? Double, 80)
+        }
+        store.activateGpFile("A.gp")
+        store.saveGpPosition(1234, fileName: "A.gp")
+        store.saveGpPosition(99, fileName: "B.gp")
+        store.migrateGpPositions()
+        XCTAssertEqual(try tick("A.gp"), 1234)
+        XCTAssertEqual(try tick("B.gp"), 0)
+        store.activateGpFile("B.gp")
+        XCTAssertEqual(try tick("B.gp"), 0)
+        XCTAssertEqual(try tick("A.gp"), 0)
     }
 
     func testLegacyFileSeedsModeOnlyOnceAndNeverRestoresItsLoop() throws {

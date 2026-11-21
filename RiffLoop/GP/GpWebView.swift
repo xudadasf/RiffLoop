@@ -45,7 +45,7 @@ struct GpWebView: UIViewRepresentable {
         webView.navigationDelegate = nil
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         private let viewModel: GpWebViewModel
         private var lastPositionRecord = 0.0
 
@@ -74,10 +74,8 @@ struct GpWebView: UIViewRepresentable {
                 }
                 if name.hasPrefix("reproduction") { return }
             }
-            let body = message.body
-            Task { @MainActor [viewModel] in
-                viewModel.receiveWebMessage(body)
-            }
+            // Preserve WebKit delivery order: a backing descriptor must gate its subsequent playerReady.
+            viewModel.receiveWebMessage(message.body)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

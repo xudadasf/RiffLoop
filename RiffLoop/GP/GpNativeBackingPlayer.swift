@@ -82,17 +82,27 @@ final class GpNativeBackingPlayer {
         return Double(audioFile.length) / audioFile.processingFormat.sampleRate * 1_000
     }
 
+    static func temporaryFile(for mimeType: String) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("riffloop-gp-backing-\(UUID().uuidString)")
+            .appendingPathExtension(fileExtension(for: mimeType))
+    }
+
     func load(data: Data, mimeType: String) throws {
+        let url = Self.temporaryFile(for: mimeType)
+        try data.write(to: url, options: .atomic)
+        do { try load(fileAt: url) }
+        catch { try? FileManager.default.removeItem(at: url); throw error }
+    }
+
+    // On success reset() owns removal of this file.
+    func load(fileAt url: URL) throws {
         reset()
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try session.setActive(true)
 
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("riffloop-gp-backing-\(UUID().uuidString)")
-            .appendingPathExtension(fileExtension(for: mimeType))
         do {
-            try data.write(to: url, options: .atomic)
             let file = try AVAudioFile(forReading: url)
             audioFile = file
             temporaryURL = url
@@ -192,7 +202,7 @@ final class GpNativeBackingPlayer {
         )
     }
 
-    private func fileExtension(for mimeType: String) -> String {
+    private static func fileExtension(for mimeType: String) -> String {
         switch mimeType.lowercased() {
         case "audio/wav", "audio/x-wav": "wav"
         case "audio/ogg": "ogg"

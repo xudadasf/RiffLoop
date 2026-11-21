@@ -54,7 +54,8 @@ actor TabRecognitionPipeline {
                     let r = input.source.region
                     guard let crop = image.cropping(to: CGRect(x: r.x * Double(image.width), y: r.y * Double(image.height), width: r.width * Double(image.width), height: r.height * Double(image.height))) else { throw TabRecognitionError.invalidImage }
                     let raster = try TabRaster(image: crop).deskewed()
-                    return try transcribe(raster, model: model.get(), settings: settings, source: input.source)
+                    let reference = ScoreReferenceCrop.includingStaff(input.source, in: image)
+                    return try transcribe(raster, model: model.get(), settings: settings, source: reference)
                 }
                 draft.bars.append(contentsOf: bars)
             } catch {
