@@ -14,7 +14,7 @@ def verify(app: Path):
         relative = path.relative_to(source)
         if path.is_file() and (app / "ScoreEditor" / relative).read_bytes() != path.read_bytes():
             raise ValueError(f"Packaged editor resource differs: {relative}")
-    for relative in ["GpWeb/alphaTab.min.js", "ScoreDraft.html", "draft-core.js", "draft-v2.cjs"]:
+    for relative in ["GpWeb/alphaTab.min.js", "GpWeb/riffloop-sync-monitor.js", "ScoreDraft.html", "draft-core.js", "draft-v2.cjs"]:
         if not (app / relative).is_file():
             raise ValueError(f"Missing existing score resource: {relative}")
     if (app / 'LICENSE').read_bytes() != (repo / 'Vendor/ONNXRuntime/LICENSE').read_bytes():

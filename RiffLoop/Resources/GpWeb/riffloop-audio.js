@@ -30,31 +30,94 @@
         // alphaTab advances the cursor when a block is rendered, before the audio
         // device presents it. Delay that receipt, not MIDI/audio generation itself.
         let pending = [], timer, epoch = 0, lastReport = -Infinity, playbackAllowed = true;
+        let pendingSamples = 0, receivedSamples = 0, deliveredSamples = 0, discardedSamples = 0;
+        let lastResetReason = null, lastReceiptTime = null, lastReceiptInterval = null;
+        let lastDeliveryTime = null, lastDeliveryLateness = null, maxDeliveryLateness = 0;
+        const synth = window.alphaTab?.synth;
+        const outputType = synth?.AlphaSynthAudioWorkletOutput && output instanceof synth.AlphaSynthAudioWorkletOutput
+            ? "audio-worklet"
+            : synth?.AlphaSynthScriptProcessorOutput && output instanceof synth.AlphaSynthScriptProcessorOutput
+                ? "script-processor" : "unknown";
+        const nonnegative = value => Number.isFinite(value) && value >= 0 ? value : null;
+        output.riffloopAudioSnapshot = () => {
+            const time = now(), native = nativeLatency();
+            let outputTimestamp = null, timestampStatus = "unsupported";
+            if (typeof context.getOutputTimestamp === "function") {
+                try {
+                    const value = context.getOutputTimestamp();
+                    if (nonnegative(value?.contextTime) !== null && nonnegative(value?.performanceTime) !== null) {
+                        timestampStatus = value.performanceTime > 0 ? "available" : "unavailable";
+                        if (timestampStatus === "available") {
+                            outputTimestamp = { contextTime: value.contextTime, performanceTime: value.performanceTime };
+                        }
+                    } else timestampStatus = "invalid";
+                } catch { timestampStatus = "error"; }
+            }
+            // These clocks have different origins. Preserve the timestamp pair for
+            // diagnostics without treating their raw difference as output latency.
+            return {
+                state: context.state, time: nonnegative(context.currentTime), performanceTime: time,
+                sampleRate: nonnegative(context.sampleRate), outputType,
+                latency: latency(context, native), nativeLatency: nonnegative(native),
+                outputLatency: nonnegative(context.outputLatency), baseLatency: nonnegative(context.baseLatency),
+                outputTimestamp, timestampStatus, playbackAllowed,
+                pendingBlocks: pending.length, pendingSamples, receivedSamples, deliveredSamples, discardedSamples,
+                resetGeneration: epoch, lastResetReason,
+                lastReceiptAgeMilliseconds: lastReceiptTime === null ? null : Math.max(0, time - lastReceiptTime),
+                lastReceiptIntervalMilliseconds: lastReceiptInterval,
+                lastDeliveryAgeMilliseconds: lastDeliveryTime === null ? null : Math.max(0, time - lastDeliveryTime),
+                lastDeliveryLatenessMilliseconds: lastDeliveryLateness,
+                maxDeliveryLatenessMilliseconds: maxDeliveryLateness,
+                pendingLatenessMilliseconds: pending.length ? Math.max(0, time - pending[0].due) : 0
+            };
+        };
+        const reportSnapshot = event => {
+            // A diagnostics failure must not interrupt audio delivery.
+            try { report({ ...output.riffloopAudioSnapshot(), ...(event ? { event } : {}) }); } catch {}
+        };
         const delivered = output.onSamplesPlayed.bind(output);
-        const clear = () => { epoch++; unschedule(timer); timer = undefined; pending = []; };
+        const clear = reason => {
+            epoch++; unschedule(timer); timer = undefined;
+            discardedSamples += pendingSamples;
+            pending = []; pendingSamples = 0;
+            lastResetReason = reason;
+            lastReceiptTime = null; lastReceiptInterval = null;
+            lastDeliveryTime = null; lastDeliveryLateness = null; maxDeliveryLateness = 0;
+        };
         const flush = () => {
             timer = undefined;
             const generation = epoch, time = now();
             let samples = 0;
+            const lateness = pending.length ? Math.max(0, time - pending[0].due) : 0;
             while (pending.length && pending[0].due <= time + 1) samples += pending.shift().samples;
-            if (samples) delivered(samples);
+            if (samples) {
+                pendingSamples -= samples;
+                deliveredSamples += samples;
+                lastDeliveryTime = time;
+                lastDeliveryLateness = lateness;
+                maxDeliveryLateness = Math.max(maxDeliveryLateness, lateness);
+                delivered(samples);
+            }
             if (generation === epoch && pending.length) timer = schedule(flush, Math.max(1, pending[0].due - now()));
         };
         output.onSamplesPlayed = samples => {
             if (!playbackAllowed || !(samples > 0)) return;
             const time = now(), delay = latency(context, nativeLatency());
+            receivedSamples += samples;
+            lastReceiptInterval = lastReceiptTime === null ? null : Math.max(0, time - lastReceiptTime);
+            lastReceiptTime = time;
+            pending.push({ due: Math.max(time + delay * 1000, pending.at(-1)?.due || 0), samples });
+            pendingSamples += samples;
             if (time - lastReport >= 1000) {
                 lastReport = time;
-                report({ state: context.state, time: context.currentTime, sampleRate: context.sampleRate,
-                    latency: delay, nativeLatency: nativeLatency(), pendingBlocks: pending.length });
+                reportSnapshot();
             }
-            pending.push({ due: Math.max(time + delay * 1000, pending.at(-1)?.due || 0), samples });
             if (timer === undefined) timer = schedule(flush, delay * 1000);
         };
         for (const method of ["pause", "resetSamples", "destroy"]) {
             const original = output[method].bind(output);
             output[method] = (...args) => {
-                clear();
+                clear(method);
                 if (method === "destroy") { input.disconnect(); shaper.disconnect(); }
                 return original(...args);
             };
@@ -68,8 +131,7 @@
             input.gain.value = playbackAllowed ? 1 / 32 : 0;
             if (!playbackAllowed) output.pause();
         };
-        context.addEventListener?.("statechange", () => report({ event: "statechange", state: context.state,
-            time: context.currentTime, sampleRate: context.sampleRate }));
+        context.addEventListener?.("statechange", () => reportSnapshot("statechange"));
     };
     function applyPedals(file, score, lookup, at) {
         for (const track of score?.tracks || []) {

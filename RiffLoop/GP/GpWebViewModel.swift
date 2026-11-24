@@ -214,6 +214,7 @@ final class GpWebViewModel: ObservableObject {
     private var recoveryTask: Task<Void, Never>?
     private var webContentRequiresReloadOnNextScore = false
     private var sceneActive = true
+    private var lastSyncProblemMark: Double?
 
     init(settingsStore: FilePracticeSettingsStore = FilePracticeSettingsStore()) {
         self.settingsStore = settingsStore
@@ -233,8 +234,54 @@ final class GpWebViewModel: ObservableObject {
         }
         NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.recoverWebContent() }
+            .sink { [weak self] _ in
+                self?.reportAudioOutputInfo(reason: "media_services_reset")
+                self?.recoverWebContent()
+            }
             .store(in: &audioObservers)
+        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue
+                self?.reportAudioOutputInfo(reason: "route_change", detail: reason)
+            }
+            .store(in: &audioObservers)
+        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                let type = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue
+                self?.reportAudioOutputInfo(reason: "interruption", detail: type)
+            }
+            .store(in: &audioObservers)
+    }
+
+    private func reportAudioOutputInfo(reason: String, detail: UInt? = nil) {
+        let session = AVAudioSession.sharedInstance()
+        let finite = { (value: Double) in value.isFinite && value >= 0 ? value : 0 }
+        var info: [String: Any] = [
+            "reason": reason,
+            "route": session.currentRoute.outputs.map { "\($0.portType.rawValue):\($0.portName)" }.joined(separator: ","),
+            "sampleRate": finite(session.sampleRate),
+            "outputLatency": finite(session.outputLatency),
+            "ioBufferDuration": finite(session.ioBufferDuration)
+        ]
+        if let detail { info["detail"] = detail }
+        ReproductionStore.shared.record("environment", "gp.audio_output", info.mapValues { String(describing: $0) })
+        call("setAudioOutputInfo", arguments: [info], diagnosticOnly: true)
+    }
+
+    @discardableResult
+    func markSyncProblem(now: Double = ProcessInfo.processInfo.systemUptime) -> Bool {
+        guard score != nil, now.isFinite else { return false }
+        if let last = lastSyncProblemMark, now - last < 3 { return false }
+        lastSyncProblemMark = now
+        reproductionSnapshot()
+        reportAudioOutputInfo(reason: "user_sync_mark")
+        ReproductionStore.shared.record("incident", "gp.sync_user_mark", [
+            "source": "practice_button",
+            "playing": String(isPlaying)
+        ])
+        return true
     }
 
     func handleAudioRouteChange(reason: UInt) {
@@ -398,6 +445,7 @@ final class GpWebViewModel: ObservableObject {
                 let session = AVAudioSession.sharedInstance()
                 try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
                 try session.setActive(true)
+                reportAudioOutputInfo(reason: "playback_activated")
                 call("setOutputLatency", arguments: [session.outputLatency + session.ioBufferDuration])
             } catch {
                 errorMessage = "音频输出暂不可用：\(error.localizedDescription)"
@@ -1022,6 +1070,7 @@ final class GpWebViewModel: ObservableObject {
             saveProfile()
         }
         sceneActive = isActive
+        reportAudioOutputInfo(reason: isActive ? "scene_active" : "scene_inactive")
         guard rendererReady else { return }
         call("lifecycle", arguments: [isActive])
     }
@@ -1079,6 +1128,7 @@ final class GpWebViewModel: ObservableObject {
         case .ready:
             webContentRequiresReloadOnNextScore = false
             rendererReady = true
+            reportAudioOutputInfo(reason: "renderer_ready")
             call("lifecycle", arguments: [sceneActive])
             guard sendBundledSoundFont() else { loadPhase = nil; return }
             if let pendingScoreData {
@@ -1724,7 +1774,7 @@ final class GpWebViewModel: ObservableObject {
         lastProfileSaveDate = Date()
     }
 
-    private func call(_ function: String, arguments: [Any] = []) {
+    private func call(_ function: String, arguments: [Any] = [], diagnosticOnly: Bool = false) {
         // Native cleanup still runs while WebContent is unavailable. Settings are
         // sent again by the ready/scoreLoaded flow once the replacement page exists.
         guard rendererReady else { return }
@@ -1767,6 +1817,7 @@ final class GpWebViewModel: ObservableObject {
                 """
             webView.evaluateJavaScript(script) { [weak self] result, error in
                 ReproductionRecorder.shared.end(operation, result: error?.localizedDescription ?? String(describing: result))
+                guard !diagnosticOnly else { return }
                 Task { @MainActor [weak self] in
                     guard self?.scoreLoadID == commandLoadID else { return }
                     if let error {
@@ -1791,6 +1842,7 @@ final class GpWebViewModel: ObservableObject {
             }
         } catch {
             ReproductionRecorder.shared.end(operation, result: "encoding_failed: " + error.localizedDescription)
+            guard !diagnosticOnly else { return }
             ReproductionStore.shared.record("incident", "gp.command_failed", [
                 "command": function,
                 "message": "编码失败：" + error.localizedDescription,

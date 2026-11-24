@@ -17,6 +17,9 @@
             handler.postMessage({ event, ...(payload === undefined ? {} : { payload }), scoreLoadID, observedLoadGeneration: reproductionGeneration, javascriptMilliseconds: performance.now() });
         }
     };
+    const syncMonitor = window.RiffLoopSyncMonitor.create({ report: post });
+    // Transport helpers are also exercised in isolation by the playback tests.
+    globalThis.riffloopSyncMonitor = syncMonitor;
     window.addEventListener("error", (event) => {
         post("reproductionError", { type: "error", message: String(event.message), file: event.filename, line: event.lineno, stack: String(event.error?.stack || "") });
     });
@@ -803,6 +806,7 @@
     let pendingPausedSeek = null;
     const seekBoth = (tick, options = {}) => {
         const position = Number(tick);
+        globalThis.riffloopSyncMonitor?.transition("seek_requested", { tick: position });
         // alphaTab snaps to its last beat when the asynchronous Paused receipt
         // arrives. Preserve an explicit seek issued before that receipt.
         pendingPausedSeek = !transport.isPlayingIntent()
@@ -822,6 +826,7 @@
     let rangeCompletionAwaitingReset = false;
     const completeCommittedRangeLoop = () => {
         if (!rangeLoopingEnabled || !committedRange || rangeCompletionAwaitingReset) return false;
+        globalThis.riffloopSyncMonitor?.transition("range_loop_completed");
         rangeCompletionAwaitingReset = true;
         post("rangeLoopCompleted");
         return true;
@@ -1104,6 +1109,7 @@
         }
     });
     api.playerStateChanged.on(state => {
+        globalThis.riffloopSyncMonitor?.transition("player_state", { state: state.state });
         if (state.state === 1) playbackProgressAt = performance.now();
         if (state.state !== alphaTab.synth.PlayerState.Paused || !pendingPausedSeek) return;
         const { position, options } = pendingPausedSeek;
@@ -1124,7 +1130,53 @@
         if (event.target !== backingMediaElement()) return;
         transport.markBackingStarted(api.timePosition);
     }, true);
+    let syncFrameRequest = null, syncFrameRequestedAt = 0, syncFrameDelay = null;
+    let syncWasPlaying = false;
+    const captureSyncSample = () => {
+        try {
+            const playing = transport.isPlayingIntent();
+            const visible = document.visibilityState === "visible";
+            const rectangle = selector => {
+                const element = scoreElement.querySelector(selector);
+                if (!element) return null;
+                const rect = element.getBoundingClientRect();
+                return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            };
+            return syncMonitor.sample({
+                audio: api.player?.output?.riffloopAudioSnapshot?.(), playing, visible,
+                transitioning: countIn.active || loopTransitioning,
+                frameDelayMilliseconds: syncFrameRequest === null ? syncFrameDelay
+                    : performance.now() - syncFrameRequestedAt,
+                visual: visible ? { beatCursor: rectangle(".at-cursor-beat"),
+                    barCursor: rectangle(".at-cursor-bar"), scrollTop: viewportElement.scrollTop,
+                    width: viewportElement.clientWidth, height: viewportElement.clientHeight } : null
+            });
+        } catch { /* A diagnostic sample must never affect playback. */ }
+    };
+    window.setInterval(() => {
+        const playing = transport.isPlayingIntent();
+        if (playing || syncWasPlaying) captureSyncSample();
+        syncWasPlaying = playing;
+        if (playing && document.visibilityState === "visible") {
+            if (syncFrameRequest === null) {
+                syncFrameRequestedAt = performance.now();
+                syncFrameRequest = window.requestAnimationFrame(() => {
+                    syncFrameDelay = performance.now() - syncFrameRequestedAt;
+                    syncFrameRequest = null;
+                });
+            }
+        } else {
+            if (syncFrameRequest !== null) window.cancelAnimationFrame(syncFrameRequest);
+            syncFrameRequest = null;
+            syncFrameDelay = null;
+        }
+    }, 1000);
+    document.addEventListener("visibilitychange", () => {
+        syncMonitor.transition("visibility", { state: document.visibilityState });
+        captureSyncSample();
+    });
     api.playerPositionChanged.on((position) => {
+        syncMonitor.observePosition(position);
         if (!position.isSeek) playbackProgressAt = performance.now();
         if (!position.isSeek) transport.startDeferredBacking(position.currentTime);
         rangeCountInRestarter.handlePlayerPosition(position);
@@ -1494,12 +1546,19 @@
                 post("error", { message: `乐谱加载失败：${errorMessage(error)}` });
             }
         },
+        setAudioOutputInfo(info) {
+            syncMonitor.setOutputInfo(info);
+            if (info?.reason === "user_sync_mark") post("reproductionSyncMark", captureSyncSample());
+        },
         setOutputLatency(seconds) { nativeOutputLatency = Math.max(0, Math.min(0.5, Number(seconds) || 0)); },
         playPause() { configureAudioOutput(); playPauseBoth(); },
         pause() { rangeCountInRestarter.cancel(); transport.pause(true); },
         stop() { rangeCountInRestarter.cancel(); transport.stop(); seekBoth(stopTick()); },
         seekTick(tick, user = false) { seekBoth(tick, { user }); },
-        setPlaybackSpeed(speed) { api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed); },
+        setPlaybackSpeed(speed) {
+            globalThis.riffloopSyncMonitor?.transition("speed_requested", { speed: Number(speed) });
+            api.playbackSpeed = Number(speed); synthApi.playbackSpeed = Number(speed);
+        },
         setMasterVolume(volume) {
             synthOutput.setMasterVolume(volume);
         },

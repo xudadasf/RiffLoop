@@ -1,6 +1,22 @@
 import SwiftUI
 import WebKit
 
+struct GpDiagnosticBridgePolicy {
+    private var lastSampleTimes: [String: Double] = [:]
+
+    mutating func kind(for name: String, now: Double) -> String? {
+        if name == "positionChanged" || name == "reproductionSync" {
+            if let last = lastSampleTimes[name], now - last < 1 { return nil }
+            lastSampleTimes[name] = now
+            return "sample"
+        }
+        if name == "error" || name == "reproductionError" || name == "reproductionSyncAnomaly" {
+            return "incident"
+        }
+        return "event"
+    }
+}
+
 struct GpWebView: UIViewRepresentable {
     @ObservedObject var viewModel: GpWebViewModel
 
@@ -47,7 +63,7 @@ struct GpWebView: UIViewRepresentable {
 
     @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         private let viewModel: GpWebViewModel
-        private var lastPositionRecord = 0.0
+        private var diagnosticPolicy = GpDiagnosticBridgePolicy()
 
         init(viewModel: GpWebViewModel) {
             self.viewModel = viewModel
@@ -59,16 +75,14 @@ struct GpWebView: UIViewRepresentable {
         ) {
             if var body = message.body as? [String: Any], let name = body["event"] as? String {
                 let now = ProcessInfo.processInfo.systemUptime
-                let sampled = name == "positionChanged"
-                if !sampled || now - lastPositionRecord >= 1 {
-                    if sampled { lastPositionRecord = now }
+                if let kind = diagnosticPolicy.kind(for: name, now: now) {
                     if name == "backingAudioLoaded", var payload = body["payload"] as? [String: Any] {
                         let binary = payload.removeValue(forKey: "data") as? String
                         payload["base64Characters"] = binary?.count ?? 0
                         body["payload"] = payload
                     }
                     if let json = try? JSONSerialization.data(withJSONObject: body) {
-                        ReproductionStore.shared.record(sampled ? "sample" : (name == "error" || name == "reproductionError" ? "incident" : "event"), "gp.bridge." + name,
+                        ReproductionStore.shared.record(kind, "gp.bridge." + name,
                             ["body": String(decoding: json, as: UTF8.self)])
                     }
                 }

@@ -68,6 +68,7 @@ struct GpPracticeView: View {
     @State private var currentFileName: String?
     @State private var scoreReadTask: Task<Void, Never>?
     @State private var isReadingScore = false
+    @State private var syncMarkFeedback = false
 
     let initialURL: URL?
 
@@ -92,8 +93,30 @@ struct GpPracticeView: View {
             }
             .overlay(alignment: .topTrailing) {
                 if viewModel.score != nil {
-                    playbackStateBadge
-                        .padding()
+                    VStack(alignment: .trailing, spacing: 6) {
+                        playbackStateBadge
+                        Button {
+                            if viewModel.markSyncProblem() { syncMarkFeedback = true }
+                        } label: {
+                            Label(syncMarkFeedback ? "已标记" : "标记不同步",
+                                  systemImage: syncMarkFeedback ? "checkmark.circle.fill" : "exclamationmark.bubble")
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 44)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(syncMarkFeedback)
+                        .accessibilityIdentifier("gp.sync.mark")
+                        .task(id: syncMarkFeedback) {
+                            guard syncMarkFeedback else { return }
+                            try? await Task.sleep(for: .seconds(3))
+                            guard !Task.isCancelled else { return }
+                            syncMarkFeedback = false
+                        }
+                    }
+                    .padding()
                 }
             }
             .overlay(alignment: .bottomLeading) {

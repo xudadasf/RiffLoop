@@ -1,4 +1,5 @@
 import './test-gp-audio.mjs';
+import './test-gp-sync-monitor.mjs';
 import './test-gp-timbre.mjs';
 import './test-gp-transport-recovery.mjs';
 import './test-gp-count-in.mjs';
@@ -146,11 +147,17 @@ assert.doesNotMatch(
     ]);
 }
 
-assert.match(
-    source,
-    /setPlaybackSpeed\(speed\) \{ api\.playbackSpeed = Number\(speed\); synthApi\.playbackSpeed = Number\(speed\); \}/,
-    "score synth and embedded backing must always use the same playback speed"
-);
+{
+    const method = source.slice(source.indexOf("        setPlaybackSpeed(speed) {"),
+        source.indexOf("        setMasterVolume(volume) {"));
+    const api = {}, synthApi = {};
+    const setSpeed = new Function("api", "synthApi", `return ({${method}}).setPlaybackSpeed`)(api, synthApi);
+    for (const speed of [0.6, 1, 1.5, 2]) {
+        setSpeed(speed);
+        assert.equal(api.playbackSpeed, speed);
+        assert.equal(synthApi.playbackSpeed, speed, "Synth and backing must use the same speed with diagnostics enabled");
+    }
+}
 assert.doesNotMatch(
     source,
     /midiEventsPlayed[\s\S]*?pdfClickMetronome\.play/,

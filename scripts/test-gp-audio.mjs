@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 const at = createRequire(import.meta.url)('../RiffLoop/Resources/GpWeb/alphaTab.min.js');
 const read = name => readFileSync(new URL(`../RiffLoop/Resources/GpWeb/${name}`, import.meta.url), 'utf8');
 const window = {};
+window.alphaTab = at;
 new Function('window', read('riffloop-audio.js'))(window);
 new Function('window', read('riffloop-count-in.js'))(window);
 const { limit, latency, install } = window.RiffLoopAudio;
@@ -36,6 +37,109 @@ output.onSamplesPlayed(256); output.pause();
 assert.equal(timers.size, 0, 'Pause must invalidate outstanding cursor receipts');
 output.onSamplesPlayed(128); output.resetSamples();
 assert.equal(timers.size, 0, 'Seek must invalidate the previous audio position');
+
+// Read-only synchronization probes must survive unsupported iOS timestamps and
+// diagnostic callbacks, while preserving the output's existing receipt timing.
+{
+    let clock = 5200, timestamp = { contextTime: 53, performanceTime: 5000 };
+    let contextChanged, reportFails = false, timerID = 0;
+    const queue = new Map(), reports = [], receipts = [];
+    const probeContext = {
+        ...context, currentTime: 53.2, outputLatency: 0.02, baseLatency: 0.01,
+        getOutputTimestamp: () => timestamp,
+        addEventListener: (_, callback) => { contextChanged = callback; }
+    };
+    const probeOutput = Object.assign(Object.create(at.synth.AlphaSynthAudioWorkletOutput.prototype), {
+        context: probeContext, onSamplesPlayed: count => receipts.push(count),
+        pause() {}, resetSamples() {}, destroy() {}
+    });
+    install(probeOutput, {
+        nativeLatency: () => 0.12, now: () => clock,
+        schedule: callback => { queue.set(++timerID, callback); return timerID; },
+        unschedule: id => queue.delete(id),
+        report: snapshot => {
+            if (reportFails) throw Error('Diagnostic receiver unavailable');
+            reports.push(snapshot);
+        }
+    });
+    const snapshot = () => probeOutput.riffloopAudioSnapshot();
+    const deliver = () => {
+        const callbacks = [...queue.values()];
+        queue.clear();
+        for (const callback of callbacks) callback();
+    };
+    assert.equal(snapshot().outputType, 'audio-worklet');
+    assert.equal(snapshot().timestampStatus, 'available');
+    assert.deepEqual(snapshot().outputTimestamp, timestamp);
+    assert.equal(snapshot().performanceTime, 5200);
+    assert.equal(snapshot().latency, 0.03, 'Timestamp origins must not change latency compensation');
+    assert.equal(snapshot().lastReceiptAgeMilliseconds, null);
+    probeOutput.onSamplesPlayed(128);
+    assert.equal(snapshot().pendingSamples, 128);
+    assert.equal(snapshot().receivedSamples, 128);
+    assert.equal(snapshot().deliveredSamples, 0);
+    assert.equal(reports[0].pendingBlocks, 1);
+    assert.deepEqual(snapshot(), snapshot(), 'Reading diagnostics must not consume a receipt or reset counters');
+    assert.equal(queue.size, 1);
+    assert.deepEqual(receipts, []);
+    clock = 5260;
+    assert.equal(snapshot().pendingLatenessMilliseconds, 30);
+    deliver();
+    assert.deepEqual(receipts, [128]);
+    assert.equal(snapshot().pendingSamples, 0);
+    assert.equal(snapshot().deliveredSamples, 128);
+    assert.equal(snapshot().lastReceiptAgeMilliseconds, 60);
+    assert.equal(snapshot().lastDeliveryLatenessMilliseconds, 30);
+    probeOutput.onSamplesPlayed(256);
+    assert.equal(snapshot().lastReceiptIntervalMilliseconds, 60);
+    probeOutput.resetSamples();
+    assert.equal(queue.size, 0);
+    assert.equal(snapshot().pendingSamples, 0);
+    assert.equal(snapshot().receivedSamples, 384);
+    assert.equal(snapshot().discardedSamples, 256);
+    assert.equal(snapshot().resetGeneration, 1);
+    assert.equal(snapshot().lastResetReason, 'resetSamples');
+    assert.equal(snapshot().lastReceiptAgeMilliseconds, null);
+    assert.equal(snapshot().maxDeliveryLatenessMilliseconds, 0);
+
+    timestamp = { contextTime: NaN, performanceTime: Infinity };
+    assert.equal(snapshot().timestampStatus, 'invalid');
+    assert.equal(snapshot().outputTimestamp, null);
+    timestamp = { contextTime: 0, performanceTime: 0 };
+    assert.equal(snapshot().timestampStatus, 'unavailable');
+    probeContext.getOutputTimestamp = undefined;
+    assert.equal(snapshot().timestampStatus, 'unsupported');
+    probeContext.getOutputTimestamp = () => { throw Error('Timestamp unavailable after interruption'); };
+    assert.equal(snapshot().timestampStatus, 'error');
+    assert.equal(snapshot().latency, 0.03);
+    reportFails = true;
+    clock = 6300;
+    assert.doesNotThrow(() => probeOutput.onSamplesPlayed(128));
+    clock = 6330;
+    deliver();
+    assert.deepEqual(receipts, [128, 128], 'Diagnostic failure must not drop audible-position receipts');
+    assert.doesNotThrow(() => contextChanged());
+    reportFails = false;
+    probeContext.state = 'suspended';
+    contextChanged();
+    assert.equal(reports.at(-1).event, 'statechange');
+    assert.equal(reports.at(-1).state, 'suspended');
+    probeOutput.riffloopSetPlaybackAllowed(false);
+    const paused = snapshot();
+    probeOutput.onSamplesPlayed(128);
+    assert.equal(snapshot().receivedSamples, paused.receivedSamples);
+    assert.equal(snapshot().lastResetReason, 'pause');
+    assert.equal(snapshot().playbackAllowed, false);
+    assert.equal(queue.size, 0);
+    probeOutput.destroy();
+    assert.equal(snapshot().lastResetReason, 'destroy');
+
+    const fallback = Object.assign(Object.create(at.synth.AlphaSynthScriptProcessorOutput.prototype), {
+        context: probeContext, onSamplesPlayed() {}, pause() {}, resetSamples() {}, destroy() {}
+    });
+    install(fallback);
+    assert.equal(fallback.riffloopAudioSnapshot().outputType, 'script-processor');
+}
 
 // Reproduce the shipped worklet's async play -> immediate pause/file switch race.
 const vendor = read('alphaTab.min.js');
@@ -97,4 +201,4 @@ const old = energy(4), boosted = energy(16);
 assert.ok(boosted.raw > old.raw * 3.9);
 assert.ok(boosted.protected > old.protected * 1.3);
 assert.ok(boosted.peak < 1);
-console.log('GP audio: interrupted count-in, async worklet race, device latency and real 1600% synth gain passed');
+console.log('GP audio: read-only sync probes, interrupted count-in, async worklet race, device latency and real 1600% synth gain passed');
