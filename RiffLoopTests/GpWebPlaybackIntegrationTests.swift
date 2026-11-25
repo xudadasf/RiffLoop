@@ -230,6 +230,22 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         XCTAssertTrue(model.gpProgress.clockRunning, "Real score playback must start the stage clock")
         model.pause()
         XCTAssertFalse(model.gpProgress.clockRunning)
+        try await Task.sleep(for: .milliseconds(300))
+        model.selectStage(1, for: .gp)
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 2)
+        try await waitUntil("Choosing a GP stage must return to A while paused") {
+            abs(model.position.currentTick - firstBeat.startTick) < 2
+        }
+        model.togglePlayback()
+        XCTAssertFalse(model.canSelectStage(for: .gp), "Disable selection before the asynchronous Play acknowledgement")
+        model.selectStage(0, for: .gp)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        try await waitUntil("The selected stage must actually play from A") {
+            model.isPlaying && model.position.currentTick > firstBeat.startTick + 150
+        }
+        XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
+        model.pause()
+        try await Task.sleep(for: .milliseconds(300))
         model.clearLoop()
         model.seek(to: 0)
         try await Task.sleep(for: .milliseconds(300))
@@ -253,6 +269,17 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         try await waitUntil("Resuming continues the same countdown") { model.stageReadout(for: .standalone).remaining < paused.remaining }
         XCTAssertEqual(model.position.currentTick, stationaryTick, "Standalone beats must not advance the score")
         XCTAssertFalse(model.isPlaying)
+        model.selectStage(0, for: .standalone)
+        XCTAssertEqual(model.playingStandaloneBpm, 100, "An active metronome must reject stage selection")
+        model.toggleStandaloneMetronome()
+        model.selectStage(1, for: .standalone)
+        model.setStandaloneBeats(7)
+        model.setStandaloneSubdivision(4)
+        model.toggleStandaloneMetronome()
+        XCTAssertTrue(model.isStandaloneMetronomePlaying)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 1)
+        XCTAssertEqual(model.stageReadout(for: .standalone).remaining, 10)
+        XCTAssertEqual(model.playingStandaloneBpm, 100)
         model.togglePlayback()
         XCTAssertFalse(model.isStandaloneMetronomePlaying)
         try await waitUntil("Normal playback must resume exclusively after standalone practice") {
