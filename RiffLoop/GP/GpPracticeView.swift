@@ -354,13 +354,18 @@ struct GpPracticeView: View {
             .controlSize(.small)
 
             if let transport = viewModel.deckStageTransport {
-                Button { activePanel = transport == .gp ? .loop : .standalone } label: {
-                    TempoStageStatus(viewModel: viewModel, transport: transport, identifyStandalone: true)
-                        .font(.caption.weight(.semibold))
+                HStack(spacing: 8) {
+                    Button { activePanel = transport == .gp ? .loop : .standalone } label: {
+                        TempoStageStatus(viewModel: viewModel, transport: transport, identifyStandalone: true)
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("打开当前阶梯设置")
+                    .accessibilityIdentifier("gp.deck.stage")
+                    TempoStageStartMenu(viewModel: viewModel, transport: transport,
+                                        identifier: "gp.deck.stage.select")
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("打开当前阶梯设置")
-                .accessibilityIdentifier("gp.deck.stage")
             } else {
                 Button { activePanel = .loop } label: { Text(tempoSummary).underline() }
                     .buttonStyle(.plain)
@@ -505,10 +510,15 @@ struct GpPracticeView: View {
                 TempoStageEditorButton(plan: viewModel.gpStages, bpmRange: viewModel.stageBpmRange,
                                        timedOnly: false, apply: viewModel.setGpStages)
                 if viewModel.gpStagesEnabled {
-                    TempoStageStatus(viewModel: viewModel, transport: .gp).font(.subheadline)
+                    HStack(spacing: 8) {
+                        TempoStageStatus(viewModel: viewModel, transport: .gp)
+                            .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
+                        TempoStageStartMenu(viewModel: viewModel, transport: .gp,
+                                            identifier: "gp.loop.stage.select")
+                    }
                 }
             } header: { Text("自定义阶梯") } footer: {
-                Text("选好 A/B 区间后即可启用。每个阶段都从区间起点开始。")
+                Text("选好 A/B 区间后即可启用。暂停时可选起始阶段，下次播放从区间起点重新计时或计轮；不重新选择则继续原进度。")
             }
 
             Section("固定步长提速") {

@@ -73,6 +73,15 @@ struct LoopStageProgress {
 
     var clockRunning: Bool { started != nil }
 
+    /// Prepare a fresh occurrence. The score-playing acknowledgement starts its clock.
+    @discardableResult
+    mutating func start(at index: Int, in plan: TempoStagePlan) -> Bool {
+        guard plan.stages.indices.contains(index) else { return false }
+        self = LoopStageProgress()
+        self.index = index
+        return true
+    }
+
     private func secondsPlayed(at now: TimeInterval) -> Double {
         elapsed + (started.map { max(0, now - $0) } ?? 0)
     }
@@ -145,6 +154,11 @@ struct MetronomeStageSchedule {
         let local = event % cycleEvents
         let segment = segments.last { $0.firstEvent <= local }!
         return Double(event / cycleEvents) * cycleDuration + segment.start + Double(local - segment.firstEvent) * segment.interval
+    }
+
+    /// The first occurrence is always on the outward leg of a bouncing plan.
+    func start(of stage: Int) -> Segment? {
+        segments.first { $0.index == stage }
     }
 
     func position(at time: Double) -> (stage: Int, nextEvent: Int64, elapsedInStage: Double) {

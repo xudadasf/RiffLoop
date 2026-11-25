@@ -41,5 +41,22 @@ final class TempoStageEntryTests: XCTestCase {
         XCTAssertTrue(deck.waitForExistence(timeout: 5))
         XCTAssertTrue(deck.label.contains("87 BPM"), deck.label)
         XCTAssertTrue(deck.label.contains("0:45"), deck.label)
+        let select = app.buttons["gp.deck.stage.select"]
+        XCTAssertTrue(select.isHittable)
+        XCTAssertGreaterThanOrEqual(select.frame.height, 44)
+        XCTAssertLessThanOrEqual(select.frame.maxX, app.frame.maxX)
+        XCTAssertLessThanOrEqual(deck.frame.maxX, select.frame.minX + 1)
+        select.tap()
+        let second = app.buttons["stages.select.standalone.2"]
+        XCTAssertTrue(second.waitForExistence(timeout: 5)); second.tap()
+        XCTAssertTrue(deck.label.contains("阶段 2/"), deck.label)
+        XCTAssertTrue(deck.label.contains("92 BPM"), deck.label)
+        XCTAssertEqual(select.value as? String, "阶段 2")
+        let selectionShot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        selectionShot.name = "Stage-selector-iPad-mini"; selectionShot.lifetime = .keepAlways; add(selectionShot)
+        select.tap()
+        app.buttons["stages.select.standalone.1"].tap()
+        XCTAssertTrue(deck.label.contains("87 BPM"), deck.label)
+        XCTAssertTrue(deck.label.contains("0:45"), deck.label)
     }
 }

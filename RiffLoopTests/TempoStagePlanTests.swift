@@ -2,6 +2,198 @@ import XCTest
 @testable import RiffLoop
 
 final class TempoStagePlanTests: XCTestCase {
+    func testSelectingGpStageResetsItsClockAndRejectsInvalidIndices() {
+        let plan = TempoStagePlan(stages: [.init(bpm: 75, unit: .seconds, length: 8),
+                                          .init(bpm: 90, unit: .loops, length: 3)])
+        var progress = LoopStageProgress()
+        progress.setPlaying(true, now: 10)
+        progress.setPlaying(false, now: 13)
+        XCTAssertEqual(progress.readout(in: plan, now: 100).remaining, 5)
+        let paused = progress.readout(in: plan, now: 100)
+        XCTAssertFalse(progress.start(at: -1, in: plan))
+        XCTAssertFalse(progress.start(at: plan.stages.count, in: plan))
+        XCTAssertEqual(progress.readout(in: plan, now: 200), paused)
+
+        XCTAssertTrue(progress.start(at: 1, in: plan))
+        XCTAssertEqual(progress.readout(in: plan, now: 200).remaining, 3)
+        XCTAssertFalse(progress.clockRunning, "Selecting a stage must not start its clock")
+        progress.setPlaying(true, now: 200)
+        progress.finishLoop(in: plan, now: 201)
+        progress.setPlaying(false, now: 201)
+        XCTAssertEqual(progress.readout(in: plan, now: 900).remaining, 2)
+        progress.setPlaying(true, now: 900)
+        XCTAssertEqual(progress.readout(in: plan, now: 901).remaining, 2,
+                       "Ordinary resume must preserve the unfinished stage")
+        progress.setPlaying(false, now: 901)
+        XCTAssertTrue(progress.start(at: 1, in: plan))
+        XCTAssertEqual(progress.rounds, 0, "Explicitly selecting the current stage restarts it")
+        XCTAssertEqual(progress.readout(in: plan, now: 999).remaining, 3)
+        XCTAssertTrue(progress.start(at: 0, in: plan))
+        XCTAssertEqual(progress.readout(in: plan, now: 999).remaining, 8)
+        XCTAssertFalse(progress.clockRunning)
+    }
+
+    func testSelectingGpStageStartsForwardAndRetainsWrapOrBounceOrder() {
+        for order in [TempoStageOrder.wrap, .bounce] {
+            let plan = TempoStagePlan(stages: [70, 85, 100, 115].map {
+                TempoStage(bpm: $0, unit: .loops, length: 1)
+            }, order: order)
+            var progress = LoopStageProgress()
+            XCTAssertTrue(progress.start(at: 3, in: plan))
+            progress.finishLoop(in: plan, now: 1)
+            XCTAssertEqual(progress.index, order == .bounce ? 2 : 0)
+            // In bounce mode the previous traversal is now descending.
+            XCTAssertTrue(progress.start(at: 2, in: plan))
+            progress.finishLoop(in: plan, now: 2)
+            XCTAssertEqual(progress.index, 3, "A newly chosen middle stage starts towards the end")
+            progress.finishLoop(in: plan, now: 3)
+            XCTAssertEqual(progress.index, order == .bounce ? 2 : 0)
+        }
+        let single = TempoStagePlan(stages: [.init(bpm: 80, unit: .loops, length: 1)], order: .bounce)
+        var progress = LoopStageProgress()
+        XCTAssertTrue(progress.start(at: 0, in: single))
+        progress.finishLoop(in: single, now: 1)
+        XCTAssertEqual(progress.index, 0)
+        XCTAssertFalse(progress.start(at: 0, in: TempoStagePlan(stages: [])))
+    }
+
+    func testStandaloneStageStartUsesForwardOccurrenceAndAnAudibleDownbeat() throws {
+        for order in [TempoStageOrder.wrap, .bounce] {
+            let plan = TempoStagePlan(stages: [
+                .init(bpm: 60, unit: .seconds, length: 4),
+                .init(bpm: 120, unit: .seconds, length: 2),
+                .init(bpm: 90, unit: .seconds, length: 1)
+            ], order: order)
+            let schedule = MetronomeStageSchedule(plan: plan, beats: 4, subdivisions: 4)
+            let chosen = try XCTUnwrap(schedule.start(of: 1))
+            XCTAssertEqual(chosen.start, 4, accuracy: 1e-8)
+            XCTAssertEqual(chosen.firstEvent, 16)
+            let position = schedule.position(at: chosen.start)
+            XCTAssertEqual(position.stage, 1)
+            XCTAssertEqual(position.elapsedInStage, 0, accuracy: 1e-8)
+            XCTAssertEqual(position.nextEvent, chosen.firstEvent)
+            XCTAssertEqual(schedule.time(of: position.nextEvent), chosen.start, accuracy: 1e-8)
+            XCTAssertEqual(schedule.position(at: chosen.start + 2).stage, 2,
+                           "Selecting a repeated bounce stage uses the forward occurrence")
+            let gap = MetronomeGapPattern(enabled: true, soundBars: 1, silentBars: 2)
+            let firstMeasure = chosen.firstEvent / 16
+            XCTAssertFalse(gap.sounds(in: firstMeasure), "The original absolute phase would be silent")
+            XCTAssertTrue(gap.sounds(in: firstMeasure, startingAt: firstMeasure))
+            XCTAssertFalse(gap.sounds(in: firstMeasure + 1, startingAt: firstMeasure))
+            XCTAssertNil(schedule.start(of: -1))
+            XCTAssertNil(schedule.start(of: plan.stages.count))
+        }
+    }
+
+    @MainActor
+    func testGpStageSelectionRequiresPausedRangeAndPreservesOrdinaryResume() {
+        let model = GpWebViewModel()
+        let plan = TempoStagePlan(stages: [.init(bpm: 70, unit: .loops, length: 1),
+                                          .init(bpm: 95, unit: .loops, length: 3),
+                                          .init(bpm: 115, unit: .seconds, length: 7)])
+        model.setGpStages(plan)
+        XCTAssertFalse(model.canSelectStage(for: .gp))
+        model.selectStage(1, for: .gp)
+        XCTAssertEqual(model.gpProgress.index, 0)
+        model.receive(.pointerDown(.init(index: 0, startTick: 0, endTick: 960)))
+        model.receive(.pointerUp)
+        model.setGpStagesEnabled(true)
+        XCTAssertTrue(model.canSelectStage(for: .gp))
+        model.selectStage(1, for: .gp)
+        XCTAssertEqual(model.currentBpm, 95, accuracy: 0.001)
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 3)
+        model.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
+        model.receive(.rangeLoopCompleted)
+        XCTAssertFalse(model.canSelectStage(for: .gp))
+        model.selectStage(0, for: .gp)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        model.pause()
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 2)
+        model.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 2)
+        model.receive(.rangeLoopCompleted)
+        model.pause()
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 1)
+        let completedLoops = model.totalCompletedLoops
+        model.selectStage(1, for: .gp)
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 3)
+        XCTAssertEqual(model.totalCompletedLoops, completedLoops, "Selection does not erase practice totals")
+
+        model.selectStage(2, for: .gp)
+        XCTAssertEqual(model.currentBpm, 115, accuracy: 0.001)
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 7)
+        model.receive(.playerStateChanged(.init(state: 0, stopped: false, transitioning: true)))
+        XCTAssertFalse(model.canSelectStage(for: .gp), "Count-in is part of active playback")
+        XCTAssertFalse(model.gpProgress.clockRunning)
+        model.selectStage(0, for: .gp)
+        XCTAssertEqual(model.gpProgress.index, 2)
+        model.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: false)))
+        XCTAssertFalse(model.gpProgress.clockRunning)
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 7)
+        model.pause()
+        model.stop()
+        XCTAssertEqual(model.gpProgress.index, 0)
+        XCTAssertEqual(model.currentBpm, 70, accuracy: 0.001)
+        model.clearLoop()
+        XCTAssertFalse(model.canSelectStage(for: .gp))
+    }
+
+    @MainActor
+    func testStageSelectionKeepsTransportsIndependentAndRejectsStaleIndices() {
+        let model = GpWebViewModel()
+        model.setGpStages(.init(stages: [.init(bpm: 75, unit: .loops, length: 2),
+                                        .init(bpm: 95, unit: .loops, length: 3)]))
+        model.receive(.pointerDown(.init(index: 0, startTick: 0, endTick: 960)))
+        model.receive(.pointerUp)
+        model.setGpStagesEnabled(true)
+        model.setStandaloneStages(.init(stages: [.init(bpm: 60, unit: .seconds, length: 4),
+                                                .init(bpm: 87, unit: .seconds, length: 8),
+                                                .init(bpm: 113, unit: .seconds, length: 13)], order: .bounce))
+        model.setStandaloneStagesEnabled(true)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 0)
+        model.selectStage(2, for: .standalone)
+        XCTAssertEqual(model.playingStandaloneBpm, 113)
+        XCTAssertEqual(model.stageReadout(for: .standalone).remaining, 13)
+        XCTAssertEqual(model.gpProgress.index, 0)
+        model.selectStage(1, for: .gp)
+        XCTAssertEqual(model.currentBpm, 95, accuracy: 0.001)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 2)
+        for index in [-1, 99] {
+            model.selectStage(index, for: .gp)
+            model.selectStage(index, for: .standalone)
+        }
+        XCTAssertEqual(model.gpProgress.index, 1)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 2)
+
+        model.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
+        XCTAssertFalse(model.canSelectStage(for: .standalone))
+        model.selectStage(0, for: .standalone)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 2)
+        model.pause()
+        model.setStandaloneBeats(7)
+        model.setStandaloneSubdivision(8)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 2)
+        XCTAssertEqual(model.stageReadout(for: .standalone).remaining, 13,
+                       "Changing the meter before Play keeps the selected stage at its first beat")
+        XCTAssertFalse(model.isStandaloneMetronomePlaying)
+
+        model.setGpStages(.init(stages: [.init(bpm: 80, unit: .loops, length: 2)]))
+        model.setStandaloneStages(.init(stages: [.init(bpm: 90, unit: .seconds, length: 9)]))
+        XCTAssertEqual(model.gpProgress.index, 0)
+        XCTAssertEqual(model.stageReadout(for: .gp).remaining, 2)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 0)
+        XCTAssertEqual(model.stageReadout(for: .standalone).remaining, 9)
+        model.selectStage(2, for: .standalone)
+        model.selectStage(1, for: .gp)
+        XCTAssertEqual(model.gpProgress.index, 0)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 0)
+        model.setStandaloneStagesEnabled(false)
+        XCTAssertFalse(model.canSelectStage(for: .standalone))
+        model.setStandaloneStagesEnabled(true)
+        XCTAssertEqual(model.stageReadout(for: .standalone).index, 0)
+    }
+
     func testTimedGpStageWaitsForLoopEndAndExcludesPausesAndCountIn() {
         let plan = TempoStagePlan(stages: [
             TempoStage(bpm: 80, unit: .seconds, length: 5),

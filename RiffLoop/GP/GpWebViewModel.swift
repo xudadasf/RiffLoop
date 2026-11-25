@@ -31,6 +31,8 @@ final class GpWebViewModel: ObservableObject {
     @Published private(set) var gpStagesEnabled = false
     @Published private(set) var standaloneStagesEnabled = false
     @Published private(set) var gpProgress = LoopStageProgress()
+    // Disable stage selection between a Play command and WebKit's state acknowledgement.
+    @Published private var gpPlayRequestPending = false
     @Published private(set) var standaloneGap = MetronomeGapPattern()
     // When both ladders are armed, a pause keeps the last transport's readout on the deck.
     private var lastStageTransport: TempoStageTransport = .gp
@@ -41,6 +43,8 @@ final class GpWebViewModel: ObservableObject {
     private var standaloneStageOffset = 0.0
     private var standaloneStageAnchor: TransportAnchor?
     private var standaloneSchedule: MetronomeStageSchedule?
+    // A pending selection is resolved again at Play if meter/subdivision changed while paused.
+    private var standalonePreparedStage: Int?
     private let standaloneMetronome = MetronomeEngine()
     @Published private(set) var selectedBar: GpBarHit?
     @Published private(set) var loopRange: GpLoopBarRange?
@@ -136,6 +140,44 @@ final class GpWebViewModel: ObservableObject {
     }
 
     var gpStageSummary: String { stageReadout(for: .gp).stageLabel }
+
+    func canSelectStage(for transport: TempoStageTransport) -> Bool {
+        guard !isPlaying, !isStandaloneMetronomePlaying, !gpPlayRequestPending else { return false }
+        switch transport {
+        case .gp: return gpStagesEnabled && rangeLoopingEnabled && loopRange != nil
+        case .standalone: return standaloneStagesEnabled
+        }
+    }
+
+    /// Selecting prepares a full stage without starting audio or the countdown.
+    /// An ordinary pause/resume, with no selection, keeps its existing progress.
+    func selectStage(_ index: Int, for transport: TempoStageTransport) {
+        guard canSelectStage(for: transport) else { return }
+        switch transport {
+        case .gp:
+            guard gpProgress.start(at: index, in: gpStages), let range = loopRange else { return }
+            interruptionRecovery.cancel()
+            lastStageTransport = .gp
+            seek(to: range.startTick, userInitiated: true)
+            applyEffectivePlaybackSpeed()
+        case .standalone:
+            guard standaloneStages.stages.indices.contains(index) else { return }
+            let schedule = MetronomeStageSchedule(plan: standaloneStages,
+                beats: standaloneBeatsPerMeasure, subdivisions: standaloneSubdivisionFactor)
+            guard let start = schedule.start(of: index) else { return }
+            objectWillChange.send()
+            interruptionRecovery.cancel()
+            standalonePreparedStage = index
+            standaloneSchedule = schedule
+            standaloneStageAnchor = nil
+            standaloneStageOffset = start.start
+            gapFirstMeasure = start.firstEvent / Int64(standaloneBeatsPerMeasure * standaloneSubdivisionFactor)
+            lastStageTransport = .standalone
+        }
+        ReproductionStore.shared.record("action", "gp.select_stage", [
+            "transport": transport == .gp ? "gp" : "standalone", "stage": String(index + 1)
+        ])
+    }
 
     func setGpStagesEnabled(_ enabled: Bool) {
         guard enabled != gpStagesEnabled, !enabled || (rangeLoopingEnabled && loopRange != nil) else { return }
@@ -298,6 +340,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func recoverWebContent() {
+        gpPlayRequestPending = false
         cancelTransfers()
         scoreLoadID = nil
         loadPhase = nil
@@ -341,6 +384,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        gpPlayRequestPending = false
         cancelTransfers()
         pendingScoreData = nil
         loadPhase = .waitingForRenderer
@@ -380,6 +424,7 @@ final class GpWebViewModel: ObservableObject {
         standaloneStageOffset = 0
         gapFirstMeasure = 0
         standaloneSchedule = nil
+        standalonePreparedStage = nil
         currentFileName = fileName
         resumeAwaitingPosition = nil
         pendingProfile = (try? settingsStore.load(
@@ -452,6 +497,7 @@ final class GpWebViewModel: ObservableObject {
                 return
             }
         }
+        gpPlayRequestPending = true
         call("playPause")
     }
 
@@ -476,6 +522,7 @@ final class GpWebViewModel: ObservableObject {
         guard plan.valid(in: 30...300, timedOnly: true), plan != standaloneStages else { return }
         if standaloneStagesEnabled { stopStandaloneMetronome() }
         standaloneSchedule = nil
+        standalonePreparedStage = nil
         standaloneStageOffset = 0
         gapFirstMeasure = 0
         standaloneStages = plan
@@ -489,6 +536,7 @@ final class GpWebViewModel: ObservableObject {
         standaloneStageOffset = 0
         gapFirstMeasure = 0
         standaloneSchedule = nil
+        standalonePreparedStage = nil
         standaloneStagesEnabled = enabled
         if enabled { hasStandalonePlan = true; lastStageTransport = .standalone }
         saveProfile()
@@ -522,15 +570,21 @@ final class GpWebViewModel: ObservableObject {
             }
             let schedule = standaloneStagesEnabled ? MetronomeStageSchedule(plan: standaloneStages,
                 beats: standaloneBeatsPerMeasure, subdivisions: standaloneSubdivisionFactor) : nil
-            let offset = schedule != nil || standaloneGap.enabled ? standaloneElapsed : 0
+            let selectedStart = standalonePreparedStage.flatMap { schedule?.start(of: $0) }
+            let offset = selectedStart?.start ?? (schedule != nil || standaloneGap.enabled ? standaloneElapsed : 0)
+            let firstGapMeasure = selectedStart.map {
+                $0.firstEvent / Int64(standaloneBeatsPerMeasure * standaloneSubdivisionFactor)
+            } ?? gapFirstMeasure
             let anchor = TransportAnchor(mediaTime: offset, hostTime: CACurrentMediaTime() + 0.1, mediaRate: 1)
             try standaloneMetronome.synchronize(
                 timeline: BeatTimeline(bpm: standaloneBpm, beatOffset: 0, subdivision: subdivision,
                     quarterNotesPerMeasure: standaloneBeatsPerMeasure, beatAccents: accents),
-                anchor: anchor, volume: Float(standaloneVolume), stageSchedule: schedule, gap: standaloneGap, gapFirstMeasure: gapFirstMeasure)
+                anchor: anchor, volume: Float(standaloneVolume), stageSchedule: schedule, gap: standaloneGap, gapFirstMeasure: firstGapMeasure)
             standaloneSchedule = schedule
             standaloneStageOffset = offset
             standaloneStageAnchor = anchor
+            standalonePreparedStage = nil
+            gapFirstMeasure = firstGapMeasure
             lastStageTransport = .standalone
             isStandaloneMetronomePlaying = true
             updatePracticeClock(isPlaying: true)
@@ -608,6 +662,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func pause() {
+        gpPlayRequestPending = false
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
         reproductionSnapshot()
@@ -625,6 +680,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func stop() {
+        gpPlayRequestPending = false
         resumeAwaitingPosition = nil
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
@@ -1190,6 +1246,7 @@ final class GpWebViewModel: ObservableObject {
                 lastProfileSaveDate = Date()
             }
         case let .playerStateChanged(state):
+            gpPlayRequestPending = false
             if isStandaloneMetronomePlaying {
                 if state.state == 1 { call("pause") }
                 return
@@ -1213,6 +1270,7 @@ final class GpWebViewModel: ObservableObject {
             }
             updatePracticeClock(isPlaying: isPlaying)
         case .playerFinished:
+            gpPlayRequestPending = false
             isPlaying = false
             nativeBackingPlaybackRequested = false
             nativeBackingStarted = false
@@ -1262,6 +1320,7 @@ final class GpWebViewModel: ObservableObject {
             // The bridge already journals this event off the main thread. Synchronous
             // NSLog blocked scene updates in the 0.25.59 MetricKit watchdog report.
         case let .error(message):
+            gpPlayRequestPending = false
             cancelTransfers()
             loadPhase = nil
             ReproductionStore.shared.record("incident", "gp.error", ["message": message])
@@ -1272,6 +1331,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func receiveBridgeFailure(_ error: Error) {
+        gpPlayRequestPending = false
         loadPhase = nil
         errorMessage = "GP 消息解析失败：\(error.localizedDescription)"
     }
@@ -1777,12 +1837,16 @@ final class GpWebViewModel: ObservableObject {
     private func call(_ function: String, arguments: [Any] = [], diagnosticOnly: Bool = false) {
         // Native cleanup still runs while WebContent is unavailable. Settings are
         // sent again by the ready/scoreLoaded flow once the replacement page exists.
-        guard rendererReady else { return }
+        guard rendererReady else {
+            if function == "playPause" { gpPlayRequestPending = false }
+            return
+        }
         // Binary load arguments are already preserved as material snapshots; never duplicate base64 in the journal.
         let safeArguments = function == "loadScore" || function == "loadSoundFont"
             ? "binary omitted; see materials" : String(describing: arguments)
         let operation = ReproductionRecorder.shared.begin("gp.command." + function, details: ["arguments": safeArguments, "loadID": reproductionLoad ?? "none"])
         guard let webView else {
+            if function == "playPause" { gpPlayRequestPending = false }
             ReproductionRecorder.shared.end(operation, result: "not_dispatched: webview_missing")
             return
         }
@@ -1851,6 +1915,7 @@ final class GpWebViewModel: ObservableObject {
         }
     }
     private func reportCommandFailure(_ function: String, message: String) {
+        if function == "playPause" { gpPlayRequestPending = false }
         let detail = "GP 命令 \(function) 执行失败：\(message)"
         if loadPhase != nil && (function == "loadScore" || function == "loadSoundFont") {
             receive(.error(detail))

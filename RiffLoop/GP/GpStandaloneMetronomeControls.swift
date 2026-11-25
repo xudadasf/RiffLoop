@@ -22,7 +22,12 @@ struct GpStandaloneMetronomeControls: View {
                 TempoStageEditorButton(plan: viewModel.standaloneStages, bpmRange: 30...300,
                                        timedOnly: true, apply: viewModel.setStandaloneStages)
                 if viewModel.standaloneStagesEnabled {
-                    TempoStageStatus(viewModel: viewModel, transport: .standalone).font(.subheadline)
+                    HStack(spacing: 8) {
+                        TempoStageStatus(viewModel: viewModel, transport: .standalone)
+                            .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
+                        TempoStageStartMenu(viewModel: viewModel, transport: .standalone,
+                                            identifier: "gp.standalone.stage.select")
+                    }
                 }
                 TempoInputControl(bpm: Binding(
                     get: { viewModel.standaloneBpm }, set: { viewModel.setStandaloneBpm($0) }
