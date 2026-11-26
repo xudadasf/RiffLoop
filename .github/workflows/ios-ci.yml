@@ -98,7 +98,7 @@ jobs:
 
   build-and-test:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -303,6 +303,18 @@ jobs:
             mkdir -p "$destination"
             xcrun xcresulttool export attachments --path "$result" --output-path "$destination" || true
           done
+
+      - name: Upload practice screenshots for quick review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RiffLoop-practice-screenshots
+          path: |
+            TestArtifacts/PracticeScreenshots/**/*.png
+            TestArtifacts/PracticeScreenshots/**/*.jpg
+            TestArtifacts/PracticeScreenshots/**/*.jpeg
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload iPad mini screenshot and test result
         if: always()

@@ -193,7 +193,8 @@ struct GpPracticeView: View {
 
     private var settingsOverlay: some View {
         GeometryReader { geometry in
-            // This is the score viewport after the navigation bar and control deck.
+            // Respect this container's local safe area; WKWebView may extend
+            // beneath navigation bars or the control deck without shrinking bounds.
             // Keep status and settings in one column: the scrollable panel receives
             // only the remaining height, including when the stage footer is taller.
             // Opening a panel must not resize or animate the underlying WKWebView.
@@ -205,7 +206,8 @@ struct GpPracticeView: View {
                 }
                 if let panel = activePanel {
                     panelContent(panel)
-                        .frame(width: min(panel == .standalone ? 340 : 420, max(0, geometry.size.width - 32)))
+                        .frame(width: min(panel == .standalone ? 340 : 420,
+                            max(0, geometry.size.width - geometry.safeAreaInsets.leading - geometry.safeAreaInsets.trailing - 32)))
                         .frame(maxHeight: panel == .standalone ? 400 : 540)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
@@ -217,6 +219,7 @@ struct GpPracticeView: View {
                 }
             }
             .padding(16)
+            .padding(geometry.safeAreaInsets)
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .trailing)
         }
     }

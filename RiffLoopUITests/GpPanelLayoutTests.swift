@@ -89,7 +89,12 @@ final class GpPanelLayoutTests: XCTestCase {
         let enable = app.switches["启用自定义阶梯"]
         reveal(enable, in: "loop")
         XCTAssertTrue(enable.isEnabled, "The touch-selected A/B range must enable stages")
-        if enable.value as? String != "1" { enable.tap() }
+        if enable.value as? String != "1" {
+            // The SwiftUI form exposes the whole row as a switch. Activate its
+            // trailing thumb, after scrolling the entire row below the heading.
+            enable.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        }
+        wait("Custom stages are enabled") { enable.value as? String == "1" }
         assertPanelFits("loop")
         capture("GP-panel-loop-stages-paused-mini")
         closePanel()
@@ -165,6 +170,8 @@ final class GpPanelLayoutTests: XCTestCase {
             XCTAssertTrue(element(id).exists, "Loaded GP must keep \(id)", file: file, line: line)
             assertInside(element(id).frame, viewport.frame, id, file: file, line: line)
             assertDisjoint(container.frame, element(id).frame, "\(panel) / \(id)", file: file, line: line)
+            assertDisjoint(element(id).frame, app.navigationBars.firstMatch.frame, "\(id) / navigation", file: file, line: line)
+            assertDisjoint(element(id).frame, deck.frame, "\(id) / transport deck", file: file, line: line)
         }
         for other in panels where other != panel {
             XCTAssertFalse(element("gp.panel.\(other)").exists, "Only the current panel should remain", file: file, line: line)
@@ -192,12 +199,21 @@ final class GpPanelLayoutTests: XCTestCase {
 
     private func reveal(_ control: XCUIElement, in panel: String) {
         let container = element("gp.panel.\(panel)")
-        for _ in 0..<7 where !control.isHittable {
-            // Drag only inside the form, leaving its fixed heading/close button.
-            container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-                .press(forDuration: 0.05, thenDragTo: container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
+        func fullyVisible() -> Bool {
+            guard control.exists, control.isHittable else { return false }
+            return control.frame.minY >= app.buttons["gp.panel.close"].frame.maxY + 12
+                && control.frame.maxY <= container.frame.maxY - 8
         }
-        XCTAssertTrue(control.isHittable, "The panel must scroll to \(control.identifier)")
+        for _ in 0..<10 where !fullyVisible() {
+            // isHittable alone accepts a partially clipped row. Keep the whole
+            // control inside the form before tapping, clear of its fixed header.
+            let above = control.exists && !control.frame.isEmpty && control.frame.midY < container.frame.midY
+            let startY = above ? 0.4 : 0.85
+            let endY = above ? 0.85 : 0.4
+            container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
+                .press(forDuration: 0.05, thenDragTo: container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY)))
+        }
+        XCTAssertTrue(fullyVisible(), "The panel must scroll to the whole \(control.identifier) control")
     }
 
     private func selectVisibleTabRange() throws {
