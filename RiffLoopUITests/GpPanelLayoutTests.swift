@@ -204,12 +204,38 @@ final class GpPanelLayoutTests: XCTestCase {
 
     private func reveal(_ control: XCUIElement, in panel: String) {
         let container = element("gp.panel.\(panel)")
-        for _ in 0..<7 where !control.isHittable {
-            // Drag inside the scrollable form, leaving its fixed heading alone.
-            container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-                .press(forDuration: 0.05, thenDragTo: container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
+        let form = container.descendants(matching: .collectionView).firstMatch
+        guard form.waitForExistence(timeout: 5) else {
+            XCTFail("The \(panel) panel must contain its scrollable form")
+            return
         }
-        XCTAssertTrue(control.isHittable, "The panel must scroll to \(control.identifier)")
+        for attempt in 0...10 {
+            let formFrame = form.frame
+            let visible = formFrame.intersection(container.frame).intersection(app.frame)
+            guard !visible.isNull && !visible.isEmpty else {
+                XCTFail("The \(panel) form must have a visible scrolling area")
+                return
+            }
+            let target = control.exists ? control.frame : CGRect.null
+            if !target.isNull && !target.isEmpty && visible.contains(target) { return }
+            guard attempt < 10 else { break }
+
+            // A SwiftUI Toggle can have an invalid XCTest activation point even
+            // when its entire row is visible. Use geometry, never isHittable.
+            // Virtualized rows not yet present are sought farther down the form.
+            let above = !target.isNull && !target.isEmpty && target.minY < visible.minY
+            let maximumStep = min(120, visible.height * 0.35)
+            let missing = target.isNull || target.isEmpty ? maximumStep
+                : above ? visible.minY - target.minY : target.maxY - visible.maxY
+            let distance = min(maximumStep, max(40, missing + 8))
+            let startY = visible.midY + (above ? -distance / 2 : distance / 2)
+            let endY = visible.midY + (above ? distance / 2 : -distance / 2)
+            let origin = form.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: visible.midX - formFrame.minX, dy: startY - formFrame.minY))
+            let end = origin.withOffset(CGVector(dx: visible.midX - formFrame.minX, dy: endY - formFrame.minY))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTFail("The \(panel) form must fully reveal \(control.identifier) after bounded scrolling")
     }
 
     private func selectVisibleTabRange() throws {
