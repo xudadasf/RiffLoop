@@ -313,6 +313,8 @@ jobs:
             TestArtifacts/PracticeScreenshots/**/*.png
             TestArtifacts/PracticeScreenshots/**/*.jpg
             TestArtifacts/PracticeScreenshots/**/*.jpeg
+            TestArtifacts/PracticeScreenshots/**/*.txt
+            TestArtifacts/PracticeScreenshots/**/manifest.json
           if-no-files-found: ignore
           retention-days: 30
 

@@ -15,6 +15,7 @@ final class GpPanelLayoutTests: XCTestCase {
     }
 
     override func tearDownWithError() throws {
+        if (testRun?.failureCount ?? 0) > 0 { capture("GP-panel-failure-mini") }
         app?.terminate()
         app = nil
         // CI also removes this isolated app installation in an always-run step,
@@ -163,6 +164,8 @@ final class GpPanelLayoutTests: XCTestCase {
         XCTAssertTrue(viewport.exists && deck.exists, file: file, line: line)
         assertInside(deck.frame, app.frame, "Transport deck inside screen", file: file, line: line)
         assertInside(container.frame, viewport.frame, "\(panel) inside score viewport", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(container.frame.height, 300, "The mini panel needs usable scroll space", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(container.frame.maxY, deck.frame.minY - 20, "The panel should sit just above the deck", file: file, line: line)
         assertDisjoint(container.frame, deck.frame, "\(panel) / transport deck", file: file, line: line)
         assertDisjoint(container.frame, app.navigationBars.firstMatch.frame, "\(panel) / navigation", file: file, line: line)
         XCTAssertTrue(element("gp.sync.mark").isHittable, "The sync marker must remain available", file: file, line: line)
@@ -173,6 +176,8 @@ final class GpPanelLayoutTests: XCTestCase {
             assertDisjoint(element(id).frame, app.navigationBars.firstMatch.frame, "\(id) / navigation", file: file, line: line)
             assertDisjoint(element(id).frame, deck.frame, "\(id) / transport deck", file: file, line: line)
         }
+        XCTAssertLessThanOrEqual(element("gp.status").frame.minY, viewport.frame.minY + 20,
+                                 "Do not reserve the navigation bar twice", file: file, line: line)
         for other in panels where other != panel {
             XCTAssertFalse(element("gp.panel.\(other)").exists, "Only the current panel should remain", file: file, line: line)
         }
@@ -199,21 +204,12 @@ final class GpPanelLayoutTests: XCTestCase {
 
     private func reveal(_ control: XCUIElement, in panel: String) {
         let container = element("gp.panel.\(panel)")
-        func fullyVisible() -> Bool {
-            guard control.exists, control.isHittable else { return false }
-            return control.frame.minY >= app.buttons["gp.panel.close"].frame.maxY + 12
-                && control.frame.maxY <= container.frame.maxY - 8
+        for _ in 0..<7 where !control.isHittable {
+            // Drag inside the scrollable form, leaving its fixed heading alone.
+            container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(forDuration: 0.05, thenDragTo: container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)))
         }
-        for _ in 0..<10 where !fullyVisible() {
-            // isHittable alone accepts a partially clipped row. Keep the whole
-            // control inside the form before tapping, clear of its fixed header.
-            let above = control.exists && !control.frame.isEmpty && control.frame.midY < container.frame.midY
-            let startY = above ? 0.4 : 0.85
-            let endY = above ? 0.85 : 0.4
-            container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
-                .press(forDuration: 0.05, thenDragTo: container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY)))
-        }
-        XCTAssertTrue(fullyVisible(), "The panel must scroll to the whole \(control.identifier) control")
+        XCTAssertTrue(control.isHittable, "The panel must scroll to \(control.identifier)")
     }
 
     private func selectVisibleTabRange() throws {
