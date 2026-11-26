@@ -29,7 +29,7 @@ final class GpPanelLayoutTests: XCTestCase {
         let files = app.buttons["选择文件"]
         XCTAssertTrue(files.waitForExistence(timeout: 15))
         files.tap()
-        let file = app.buttons.containing(.staticText, identifier: fixtureName).firstMatch
+        let file = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT label BEGINSWITH %@", fixtureName, "更多：")).firstMatch
         XCTAssertTrue(file.waitForExistence(timeout: 10), "CI must install the fixture in Documents/GP")
         file.tap()
         let play = app.buttons["gp.play"]
@@ -67,10 +67,11 @@ final class GpPanelLayoutTests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         let firstBpm = app.buttons["stages.1.bpm"]
         XCTAssertTrue(firstBpm.isHittable)
-        let originalBpm = firstBpm.value as? String
+        let originalBpm = try XCTUnwrap(firstBpm.value as? String)
         firstBpm.tap()
         app.buttons["stages.key.9"].tap()
         app.buttons["stages.key.0"].tap()
+        XCTAssertEqual(firstBpm.value as? String, "90")
         XCTAssertFalse(app.keyboards.firstMatch.exists)
         XCTAssertTrue(app.buttons["取消"].isHittable)
         assertInside(save.frame, app.frame, "Stage editor Save")
@@ -101,7 +102,8 @@ final class GpPanelLayoutTests: XCTestCase {
         assertInside(selector.frame, element("gp.deck").frame, "Stage selector")
         capture("GP-panel-stages-enabled-mini")
 
-        // Opening/changing controls must neither pause audio nor reset its clock.
+        // Keep the transport playing while opening/changing controls. The real
+        // player integration tests separately cover audio and loop timing.
         play.tap()
         wait("Playback starts") { play.label.contains("暂停") }
         let elapsed = element("gp.elapsed")
@@ -117,7 +119,7 @@ final class GpPanelLayoutTests: XCTestCase {
         wait("Playback continues after panel switches", timeout: 8) { elapsed.label != afterSwitchTime }
         capture("GP-panel-switching-during-playback-mini")
         play.tap()
-        wait("Pause remains immediate") { play.label.contains("播放") }
+        wait("Pause remains available") { play.label.contains("播放") }
         closePanel()
         app.buttons["gp.stop"].tap()
         removeFixtureThroughLibrary()
@@ -154,6 +156,7 @@ final class GpPanelLayoutTests: XCTestCase {
         let viewport = element("gp.viewport")
         let deck = element("gp.deck")
         XCTAssertTrue(viewport.exists && deck.exists, file: file, line: line)
+        assertInside(deck.frame, app.frame, "Transport deck inside screen", file: file, line: line)
         assertInside(container.frame, viewport.frame, "\(panel) inside score viewport", file: file, line: line)
         assertDisjoint(container.frame, deck.frame, "\(panel) / transport deck", file: file, line: line)
         assertDisjoint(container.frame, app.navigationBars.firstMatch.frame, "\(panel) / navigation", file: file, line: line)
@@ -199,11 +202,15 @@ final class GpPanelLayoutTests: XCTestCase {
 
     private func selectVisibleTabRange() throws {
         // Match frets on one TAB line, excluding a bar-number 3 above the staff.
-        let starts = app.webViews.staticTexts["3"].allElementsBoundByIndex.filter(\.isHittable)
-        let ends = app.webViews.staticTexts["8"].allElementsBoundByIndex.filter(\.isHittable)
-        let pairs = starts.flatMap { start in ends.compactMap { end -> (XCUIElement, XCUIElement)? in
-            abs(start.frame.midY - end.frame.midY) < 4 && end.frame.midX > start.frame.midX + 40 ? (start, end) : nil
-        }}.sorted {
+        let starts = app.webViews.staticTexts.matching(identifier: "3").allElementsBoundByIndex.filter(\.isHittable)
+        let ends = app.webViews.staticTexts.matching(identifier: "8").allElementsBoundByIndex.filter(\.isHittable)
+        var pairs: [(XCUIElement, XCUIElement)] = []
+        for start in starts {
+            for end in ends where abs(start.frame.midY - end.frame.midY) < 4 && end.frame.midX > start.frame.midX + 40 {
+                pairs.append((start, end))
+            }
+        }
+        pairs.sort {
             abs($0.0.frame.midY - $1.0.frame.midY) > 4 ? $0.0.frame.midY < $1.0.frame.midY : $0.0.frame.midX < $1.0.frame.midX
         }
         let pair = try XCTUnwrap(pairs.first, "The imported GP must expose a visible TAB range")
