@@ -81,6 +81,8 @@ struct GpPracticeView: View {
 
     var body: some View {
         GpWebView(viewModel: viewModel)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("gp.viewport")
             .simultaneousGesture(
                 TapGesture().onEnded { activePanel = nil }
             )
@@ -89,34 +91,6 @@ struct GpPracticeView: View {
                     GpLoadingIndicator(phase: phase)
                 } else if viewModel.score == nil {
                     emptyScoreView
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if viewModel.score != nil {
-                    VStack(alignment: .trailing, spacing: 6) {
-                        playbackStateBadge
-                        Button {
-                            if viewModel.markSyncProblem() { syncMarkFeedback = true }
-                        } label: {
-                            Label(syncMarkFeedback ? "已标记" : "标记不同步",
-                                  systemImage: syncMarkFeedback ? "checkmark.circle.fill" : "exclamationmark.bubble")
-                                .font(.caption.weight(.semibold))
-                                .lineLimit(1)
-                                .padding(.horizontal, 12)
-                                .frame(minHeight: 44)
-                                .background(.regularMaterial, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(syncMarkFeedback)
-                        .accessibilityIdentifier("gp.sync.mark")
-                        .task(id: syncMarkFeedback) {
-                            guard syncMarkFeedback else { return }
-                            try? await Task.sleep(for: .seconds(3))
-                            guard !Task.isCancelled else { return }
-                            syncMarkFeedback = false
-                        }
-                    }
-                    .padding()
                 }
             }
             .overlay(alignment: .bottomLeading) {
@@ -129,20 +103,10 @@ struct GpPracticeView: View {
                     .padding()
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                if let panel = activePanel {
-                    panelContent(panel)
-                        .frame(width: panel == .standalone ? 340 : 420, height: panel == .standalone ? 400 : 540)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
-                        .padding(16)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
+            .overlay { settingsOverlay }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 controlDeck
             }
-            .animation(.snappy, value: activePanel)
             .modifier(ReproductionScreenModifier(mode: "gp", panel: activePanel?.rawValue ?? "none",
                 libraries: ["isLibraryPresented": isLibraryPresented], snapshot: viewModel.reproductionSnapshot))
             .modifier(PracticeSessionLifecycle(clock: practiceClock))
@@ -227,6 +191,64 @@ struct GpPracticeView: View {
             .keepPracticeScreenAwake(hasFile: viewModel.score != nil)
     }
 
+    private var settingsOverlay: some View {
+        GeometryReader { geometry in
+            // This is the score viewport after the navigation bar and control deck.
+            // Keep status and settings in one column: the scrollable panel receives
+            // only the remaining height, including when the stage footer is taller.
+            // Opening a panel must not resize or animate the underlying WKWebView.
+            VStack(alignment: .trailing, spacing: 12) {
+                if viewModel.score != nil {
+                    statusControls
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
+                }
+                if let panel = activePanel {
+                    panelContent(panel)
+                        .frame(width: min(panel == .standalone ? 340 : 420, max(0, geometry.size.width - 32)))
+                        .frame(maxHeight: panel == .standalone ? 400 : 540)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("gp.panel.\(panel.rawValue)")
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                } else {
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(16)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .trailing)
+        }
+    }
+
+    private var statusControls: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            playbackStateBadge
+            Button {
+                if viewModel.markSyncProblem() { syncMarkFeedback = true }
+            } label: {
+                Label(syncMarkFeedback ? "已标记" : "标记不同步",
+                      systemImage: syncMarkFeedback ? "checkmark.circle.fill" : "exclamationmark.bubble")
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(.regularMaterial, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(syncMarkFeedback)
+            .accessibilityIdentifier("gp.sync.mark")
+            .task(id: syncMarkFeedback) {
+                guard syncMarkFeedback else { return }
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
+                syncMarkFeedback = false
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("gp.status")
+    }
+
     private var emptyScoreView: some View {
         ContentUnavailableView(
             "导入 Guitar Pro 乐谱",
@@ -299,6 +321,8 @@ struct GpPracticeView: View {
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .overlay(alignment: .top) { Divider() }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("gp.deck")
     }
 
     private var transportControls: some View {
@@ -313,6 +337,7 @@ struct GpPracticeView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(!viewModel.playerReady)
+            .accessibilityIdentifier("gp.play")
 
             Button(action: viewModel.stop) {
                 Label("停止", systemImage: "stop.fill")
@@ -322,6 +347,7 @@ struct GpPracticeView: View {
             .buttonStyle(.bordered)
             .buttonBorderShape(.roundedRectangle)
             .disabled(!viewModel.playerReady)
+            .accessibilityIdentifier("gp.stop")
         }
     }
 
@@ -330,6 +356,7 @@ struct GpPracticeView: View {
             HStack {
                 Text(format(viewModel.position.currentTime))
                     .font(.caption.monospacedDigit().weight(.semibold))
+                    .accessibilityIdentifier("gp.elapsed")
                 ProgressView(
                     value: min(viewModel.position.currentTime, max(1, viewModel.position.totalTime)),
                     total: max(1, viewModel.position.totalTime)
@@ -411,6 +438,7 @@ struct GpPracticeView: View {
         .buttonStyle(.plain)
         .accessibilityValue(detail)
         .accessibilityHint("打开\(panel.title)设置")
+        .accessibilityIdentifier("gp.tool.\(panel.rawValue)")
     }
 
     @ViewBuilder
@@ -420,8 +448,11 @@ struct GpPracticeView: View {
                 Label(panel.title, systemImage: panel.systemImage)
                     .font(.title2.bold())
                 Spacer()
-                Button("完成") { activePanel = nil }
+                Button { activePanel = nil } label: {
+                    Text("完成").frame(minWidth: 44, minHeight: 44)
+                }
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier("gp.panel.close")
             }
             .padding()
 

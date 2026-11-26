@@ -45,17 +45,18 @@ struct GpStandaloneMetronomeControls: View {
                     Text("⅛ 拍").tag(8)
                 }
                 .pickerStyle(.segmented)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: min(8, viewModel.standaloneBeatsPerMeasure)), spacing: 4) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 4)], spacing: 4) {
                     ForEach(viewModel.standaloneBeatAccents.indices, id: \.self) { index in
                         Button { viewModel.cycleStandaloneAccent(at: index) } label: {
                             VStack(spacing: 2) {
                                 Text("\(index + 1)").font(.caption.monospacedDigit())
                                 Text(viewModel.standaloneBeatAccents[index].label).font(.caption2)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44)
                             .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("gp.standalone.accent.\(index + 1)")
                         .accessibilityLabel("独立节拍器第 \(index + 1) 拍，\(viewModel.standaloneBeatAccents[index].label)，点按切换强度")
                     }
                 }

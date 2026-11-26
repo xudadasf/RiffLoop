@@ -180,9 +180,59 @@ jobs:
           python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
             xcrun simctl bootstatus "$DEVICE_ID" -b
 
+      - name: Build iPad mini tests
+        run: >-
+          xcodebuild build-for-testing
+          -project RiffLoop.xcodeproj
+          -scheme RiffLoop
+          -sdk iphonesimulator
+          -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
+          -derivedDataPath DerivedData
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Prepare GP panel fixture in the ordinary library
+        id: gp_panel_fixture
+        run: |
+          set -euo pipefail
+          APP="$PWD/DerivedData/Build/Products/Debug-iphonesimulator/RiffLoop.app"
+          test -d "$APP"
+          xcrun simctl install "$IPAD_DEVICE_ID" "$APP"
+          CONTAINER="$(xcrun simctl get_app_container "$IPAD_DEVICE_ID" com.riffloop.prototype data)"
+          test -n "$CONTAINER"
+          mkdir -p "$CONTAINER/Documents/GP"
+          cp RiffLoopTests/Fixtures/transport.gp "$CONTAINER/Documents/GP/gp-panel-layout-fixture.gp"
+
+      - name: Test loaded GP panels on iPad mini
+        run: >-
+          xcodebuild test-without-building
+          -project RiffLoop.xcodeproj
+          -scheme RiffLoop
+          -sdk iphonesimulator
+          -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID"
+          -derivedDataPath DerivedData
+          -parallel-testing-enabled NO
+          -only-testing:RiffLoopUITests/GpPanelLayoutTests
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Remove GP fixture and restore a clean UI-test app
+        if: always() && steps.gp_panel_fixture.outcome == 'success'
+        run: |
+          set -euo pipefail
+          # This is the CI-only simulator installation. Reinstall it cleanly even
+          # after a failed UI assertion, removing the fixture and its practice
+          # settings before the existing suites run. No user device is targeted.
+          xcrun simctl terminate "$IPAD_DEVICE_ID" com.riffloop.prototype 2>/dev/null || true
+          xcrun simctl uninstall "$IPAD_DEVICE_ID" com.riffloop.prototype
+          # Discard WebKit processes still holding the removed bundle URL.
+          xcrun simctl shutdown "$IPAD_DEVICE_ID"
+          xcrun simctl boot "$IPAD_DEVICE_ID"
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
+            xcrun simctl bootstatus "$IPAD_DEVICE_ID" -b
+          xcrun simctl install "$IPAD_DEVICE_ID" "$PWD/DerivedData/Build/Products/Debug-iphonesimulator/RiffLoop.app"
+
       - name: Test region selection on iPad mini
         run: >-
-          xcodebuild test
+          xcodebuild test-without-building
           -project RiffLoop.xcodeproj
           -scheme RiffLoop
           -sdk iphonesimulator
@@ -191,6 +241,7 @@ jobs:
           -only-testing:RiffLoopTests/ScoreRegionLayoutTests
           -only-testing:RiffLoopTests/ScoreSequenceInteractionRegressionTests
           -only-testing:RiffLoopUITests
+          -skip-testing:RiffLoopUITests/GpPanelLayoutTests
           CODE_SIGNING_ALLOWED=NO
 
       - name: Restart simulator between UI and hosted unit tests
