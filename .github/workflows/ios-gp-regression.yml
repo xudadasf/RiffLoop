@@ -8,6 +8,7 @@ on:
       - ".github/workflows/ios-gp-regression.yml"
       - "RiffLoopTests/GpStageInteractionTests.swift"
       - "RiffLoopTests/GpRecoveryStageTests.swift"
+      - "RiffLoopTests/GpWebPlaybackIntegrationTests.swift"
       - "RiffLoop/GP/**"
   workflow_dispatch:
 
@@ -86,6 +87,7 @@ jobs:
             -parallel-testing-enabled NO \
             -only-testing:RiffLoopTests/GpStageInteractionTests \
             -only-testing:RiffLoopTests/GpRecoveryStageTests \
+            -only-testing:RiffLoopTests/GpWebPlaybackIntegrationTests \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee TestArtifacts/GpStage-build-test.log
 
       - name: Extract concise test results
