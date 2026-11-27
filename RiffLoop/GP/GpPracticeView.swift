@@ -338,7 +338,7 @@ struct GpPracticeView: View {
                 .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!viewModel.playerReady)
+            .disabled(!viewModel.playerReady || viewModel.loopPreview != nil)
             .accessibilityIdentifier("gp.play")
 
             Button(action: viewModel.stop) {
@@ -501,7 +501,7 @@ struct GpPracticeView: View {
             } header: {
                 Text("循环范围")
             } footer: {
-                Text("轻点谱面跳转；长按音符并拖动选择 A/B，松手确认。")
+                Text("轻点谱面跳转；阶梯中仅在区间内跳转。长按拖动重选 A/B，松手确认。")
             }
 
             Section("速度") {
@@ -602,6 +602,7 @@ struct GpPracticeView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .disabled(viewModel.isRecoveringPractice)
     }
 
     private var metronomePanel: some View {

@@ -1208,6 +1208,23 @@ assert.doesNotMatch(
             scheduleLongPress,
             cancelLongPress
         );
+        const clearMethod = source.slice(source.indexOf("        clearPlaybackRange() {"),
+            source.indexOf("        previewRange(firstBar, lastBar, startTick, endTick) {"));
+        const modeMethods = source.slice(source.indexOf("        setRangeLoopingEnabled(enabled) {"),
+            source.indexOf("        restartRangeWithCountIn() {"));
+        const loopCommands = new Function("pointerSelection", `
+            let committedRange = { firstBar: 2, lastBar: 5 };
+            let pendingRangeHighlight = {}, rangeLoopingEnabled = true;
+            let rangeCompletionAwaitingReset = false, wholeSongLoopingEnabled = false;
+            const rangeCountInRestarter = { cancel() {} };
+            const cancelRangeTransition = () => rangeCountInRestarter.cancel();
+            const window = { riffloopCommittedBars: [2, 5, 1920, 5760] };
+            const api = { clearPlaybackRangeHighlight() {} };
+            const applyLoopMode = () => {};
+            const restoreScoreScrollPolicy = () => {};
+            const applyRangeScrollPolicy = () => {};
+            return { ${clearMethod} ${modeMethods} };
+        `)(selection);
         const event = (type, x, y) => ({
             type,
             isPrimary: true,
@@ -1221,6 +1238,7 @@ assert.doesNotMatch(
             posted,
             viewport,
             interactionClasses,
+            loopCommands,
             fireLongPress() {
                 const fns = timerFns.splice(0);
                 fns.forEach((fn) => fn());
@@ -1231,6 +1249,51 @@ assert.doesNotMatch(
             pointerUp(x, y) { selection.pointerUp(event("pointerup", x, y)); },
             pointerCancel(x, y) { selection.pointerCancel(event("pointercancel", x, y)); },
         };
+    }
+
+    for (const [command, argument] of [
+        ["clearPlaybackRange", undefined],
+        ["setRangeLoopingEnabled", false],
+        ["setWholeSongLoopingEnabled", true],
+    ]) {
+        for (const selecting of [false, true]) {
+            const h = makeHarness((x, y) => bar(y < 200 ? 2 : 5));
+            h.pointerDown(100, 100);
+            if (selecting) {
+                h.fireLongPress();
+                h.pointerMove(100, 300);
+            }
+            const before = h.posted.slice();
+            h.loopCommands[command](argument);
+            const expected = selecting ? [...before, ["pointerCancel"]] : before;
+            assert.equal(h.pendingTimers(), 0, `${command} cancels a pending long press`);
+            assert.equal(h.interactionClasses.size, 0, `${command} removes selection feedback`);
+            assert.deepEqual(h.posted, expected,
+                `${command} cancels an already posted selection without committing it`);
+            h.fireLongPress();
+            h.pointerMove(100, 300);
+            h.pointerUp(100, 300);
+            h.pointerCancel(100, 300);
+            assert.deepEqual(h.posted, expected,
+                `${command} must ignore the old gesture's late timer, move and release`);
+
+            h.pointerDown(100, 100);
+            h.fireLongPress();
+            h.pointerUp(100, 100);
+            assert.deepEqual(h.posted.slice(expected.length).map(([event]) => event),
+                ["pointerDown", "pointerMove", "pointerUp"],
+                `${command} must still allow a fresh deliberate selection`);
+        }
+    }
+
+    for (const [command, argument] of [["setRangeLoopingEnabled", true], ["setWholeSongLoopingEnabled", false]]) {
+        const h = makeHarness(() => bar(2));
+        h.pointerDown(100, 100);
+        h.loopCommands[command](argument);
+        h.fireLongPress();
+        h.pointerUp(100, 100);
+        assert.deepEqual(h.posted.map(([event]) => event), ["pointerDown", "pointerMove", "pointerUp"],
+            `${command}(${argument}) must not discard an unrelated pending selection`);
     }
 
     {

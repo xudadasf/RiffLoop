@@ -941,6 +941,13 @@
             || api.playerState === alphaTab.synth.PlayerState.Paused
         )
     });
+    const cancelRangeTransition = () => {
+        const transitioning = loopTransitioning || countIn.active;
+        rangeCountInRestarter.cancel();
+        // A cancelled A/B handshake may already have paused the players.
+        // Publish a settled pause and cancel clicks; only an explicit Play resumes.
+        if (transitioning) transport.pause(true);
+    };
     const playPauseBoth = () => {
         const transitioning = loopTransitioning || countIn.active;
         rangeCountInRestarter.cancel();
@@ -1345,6 +1352,14 @@
         const clearInteractionFeedback = () => {
             element.classList.remove("range-press-pending", "range-selecting");
         };
+        const cancel = () => {
+            const wasSelecting = pointer?.mode === "select";
+            clearLongPress();
+            pointer = null;
+            clearInteractionFeedback();
+            // Also retire a selection whose start is still queued on the native bridge.
+            if (wasSelecting) post("pointerCancel");
+        };
         const scrollToward = (clientY) => {
             const rect = viewport.getBoundingClientRect();
             const topDistance = clientY - rect.top;
@@ -1359,6 +1374,7 @@
         };
 
         return {
+            cancel,
             pointerDown(event) {
                 if (!event.isPrimary) return;
                 const hit = hitScorePosition(event.clientX, event.clientY);
@@ -1432,11 +1448,7 @@
             },
             pointerCancel(event) {
                 if (!pointer || pointer.id !== event.pointerId) return;
-                clearLongPress();
-                const mode = pointer.mode;
-                pointer = null;
-                clearInteractionFeedback();
-                if (mode === "select") post("pointerCancel");
+                cancel();
             }
         };
     };
@@ -1620,8 +1632,12 @@
             synthApi.countInVolume = 0;
         },
         setLoopCountInEnabled(enabled) {
+            const disabling = loopCountInEnabled && !Boolean(enabled);
             loopCountInEnabled = Boolean(enabled);
-            if (!loopCountInEnabled) rangeCountInRestarter.cancel();
+            if (!loopCountInEnabled) {
+                if (disabling) cancelRangeTransition();
+                else rangeCountInRestarter.cancel();
+            }
             applyLoopMode();
         },
         showTracks(indices) {
@@ -1697,7 +1713,8 @@
             };
         },
         clearPlaybackRange() {
-            rangeCountInRestarter.cancel();
+            pointerSelection.cancel();
+            cancelRangeTransition();
             pendingRangeHighlight = null;
             committedRange = null;
             rangeLoopingEnabled = false;
@@ -1742,8 +1759,9 @@
         setRangeLoopingEnabled(enabled) {
             rangeLoopingEnabled = Boolean(enabled) && Boolean(committedRange);
             if (!rangeLoopingEnabled) {
+                pointerSelection.cancel();
                 rangeCompletionAwaitingReset = false;
-                rangeCountInRestarter.cancel();
+                cancelRangeTransition();
             }
             if (rangeLoopingEnabled) wholeSongLoopingEnabled = false;
             applyLoopMode();
@@ -1756,8 +1774,9 @@
         setWholeSongLoopingEnabled(enabled) {
             wholeSongLoopingEnabled = Boolean(enabled);
             if (wholeSongLoopingEnabled) {
+                pointerSelection.cancel();
                 rangeLoopingEnabled = false;
-                rangeCountInRestarter.cancel();
+                cancelRangeTransition();
             }
             applyLoopMode();
             if (wholeSongLoopingEnabled) restoreScoreScrollPolicy();

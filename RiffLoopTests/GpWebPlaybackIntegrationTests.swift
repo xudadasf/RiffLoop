@@ -246,6 +246,108 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
         model.pause()
         try await Task.sleep(for: .milliseconds(300))
+
+        // Keep this interaction check independent of the two-second stage above.
+        // The fixture is 120 BPM, with four 960-tick quarter notes in each bar.
+        model.setGpStages(.init(stages: [.init(bpm: 160, unit: .loops, length: 20),
+                                         .init(bpm: 90, unit: .loops, length: 20)]))
+        model.selectStage(1, for: .gp)
+        let stageWebView = try XCTUnwrap(findWebView(controller.view))
+        let originalRange = try XCTUnwrap(model.loopRange)
+        XCTAssertEqual(originalRange, GpLoopBarRange(firstBar: 0, lastBar: 0, startTick: 0, endTick: 960))
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        try await waitUntil("Prepare stage two at the original A before interacting") {
+            abs(model.position.currentTick - originalRange.startTick) < 2
+        }
+        let replacementBeat = GpBarHit(index: 2, startTick: 7680, endTick: 11520,
+                                       seekTick: 8640, seekEndTick: 9600)
+        model.receive(.barHit(replacementBeat))
+        XCTAssertTrue(model.gpStagesEnabled, "An out-of-range tap must not exit stage practice")
+        XCTAssertTrue(model.rangeLoopingEnabled)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        XCTAssertEqual(model.loopRange, originalRange)
+
+        model.receive(.pointerDown(replacementBeat))
+        model.receive(.pointerMove(GpBarHit(index: 2, startTick: 7680, endTick: 11520,
+                                          seekTick: 9600, seekEndTick: 10560)))
+        XCTAssertNotNil(model.loopPreview)
+        model.receive(.pointerCancel)
+        XCTAssertNil(model.loopPreview)
+        XCTAssertTrue(model.gpStagesEnabled, "Cancelling a range preview must retain stage practice")
+        XCTAssertTrue(model.rangeLoopingEnabled)
+        XCTAssertEqual(model.loopRange, originalRange)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        XCTAssertFalse(model.isPlaying)
+        try await waitForJavaScript(stageWebView, "JSON.stringify(window.riffloopCommittedBars) === '[0,0,0,960]'")
+        let loopsBeforeCancelResume = model.completedLoops
+        model.togglePlayback()
+        try await waitUntil("After cancelling a preview, the real player must loop the original A/B") {
+            model.isPlaying && model.completedLoops > loopsBeforeCancelResume &&
+                model.position.currentTick > originalRange.startTick + 150 &&
+                model.position.currentTick < originalRange.endTick
+        }
+        XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        model.pause()
+        try await Task.sleep(for: .milliseconds(300))
+
+        model.receive(.pointerDown(replacementBeat))
+        model.receive(.pointerUp)
+        let replacementRange = GpLoopBarRange(firstBar: 2, lastBar: 2, startTick: 8640, endTick: 9600)
+        XCTAssertEqual(model.loopRange, replacementRange)
+        XCTAssertTrue(model.rangeLoopingEnabled)
+        XCTAssertTrue(model.gpStagesEnabled, "Committing a new range must retain the selected stage")
+        XCTAssertEqual(model.gpProgress.index, 1)
+        XCTAssertFalse(model.isPlaying, "Changing A/B must await an explicit resume")
+        try await waitForJavaScript(stageWebView, "JSON.stringify(window.riffloopCommittedBars) === '[2,2,8640,9600]'")
+        try await waitUntil("Committing the replacement must seek to its new A while paused") {
+            abs(model.position.currentTick - replacementRange.startTick) < 2
+        }
+        let loopsBeforeCommitResume = model.completedLoops
+        model.togglePlayback()
+        try await waitUntil("After committing, the real player must loop the replacement one-beat range") {
+            model.isPlaying && model.completedLoops > loopsBeforeCommitResume &&
+                model.position.currentTick > replacementRange.startTick + 150 &&
+                model.position.currentTick < replacementRange.endTick
+        }
+        XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        XCTAssertNil(model.errorMessage)
+        model.pause()
+        try await Task.sleep(for: .milliseconds(300))
+
+        let beforeRecovery = model.stageReadout(for: .gp)
+        let loopsBeforeRecovery = model.completedLoops
+        let errorsBeforeRecovery = try await stageWebView.evaluateJavaScript("window.testPlaybackErrors")
+        XCTAssertEqual(errorsBeforeRecovery as? [String], [])
+        _ = try await stageWebView.evaluateJavaScript("window.riffloop = undefined")
+        model.recoverWebContent()
+        try await waitUntil("Automatic recovery must reload the staged score") { model.playerReady }
+        XCTAssertTrue(model.gpStagesEnabled)
+        XCTAssertTrue(model.rangeLoopingEnabled)
+        XCTAssertEqual(model.loopRange, replacementRange)
+        XCTAssertEqual(model.stageReadout(for: .gp), beforeRecovery)
+        XCTAssertEqual(model.completedLoops, loopsBeforeRecovery)
+        XCTAssertFalse(model.isPlaying, "Recovery must never resume audio automatically")
+        XCTAssertFalse(model.gpProgress.clockRunning)
+        try await waitForJavaScript(stageWebView, "JSON.stringify(window.riffloopCommittedBars) === '[2,2,8640,9600]'")
+        _ = try await stageWebView.evaluateJavaScript("""
+            window.testPlaybackErrors = [];
+            window.addEventListener('error', event => window.testPlaybackErrors.push(String(event.message)));
+            window.addEventListener('unhandledrejection', event => window.testPlaybackErrors.push(String(event.reason)));
+            """)
+        model.togglePlayback()
+        try await waitUntil("Recovered stage practice must actually resume and loop the retained range") {
+            model.isPlaying && model.completedLoops > loopsBeforeRecovery &&
+                model.position.currentTick > replacementRange.startTick + 150 &&
+                model.position.currentTick < replacementRange.endTick
+        }
+        XCTAssertEqual(model.currentBpm, 90, accuracy: 0.1)
+        XCTAssertEqual(model.gpProgress.index, 1)
+        XCTAssertNil(model.errorMessage)
+        model.pause()
+        try await Task.sleep(for: .milliseconds(300))
         model.clearLoop()
         model.seek(to: 0)
         try await Task.sleep(for: .milliseconds(300))

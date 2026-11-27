@@ -82,6 +82,14 @@ struct LoopStageProgress {
         return true
     }
 
+    /// A new A/B range restarts this stage, retaining its place on a bouncing plan.
+    /// Playback acknowledgement, rather than selection, starts the new clock.
+    mutating func restartCurrentStage() {
+        rounds = 0
+        elapsed = 0
+        started = nil
+    }
+
     private func secondsPlayed(at now: TimeInterval) -> Double {
         elapsed + (started.map { max(0, now - $0) } ?? 0)
     }

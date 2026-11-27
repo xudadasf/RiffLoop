@@ -303,6 +303,7 @@ final class GpBridgeEventTests: XCTestCase {
     @MainActor
     func testCountsOnlyExplicitRangeLoopCompletions() {
         let viewModel = GpWebViewModel()
+        defer { viewModel.pause() }
         let rangeHit = GpBarHit(
             index: 0,
             startTick: 0,
@@ -312,6 +313,7 @@ final class GpBridgeEventTests: XCTestCase {
         )
         viewModel.receive(.pointerDown(rangeHit))
         viewModel.receive(.pointerUp)
+        viewModel.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
 
         viewModel.receive(.positionChanged(GpPlaybackPosition(
             currentTime: 900,
@@ -336,6 +338,7 @@ final class GpBridgeEventTests: XCTestCase {
     @MainActor
     func testLadderRoundAdvancesOncePerPhysicalLoopAndResetsAfterSpeedIncrease() {
         let viewModel = GpWebViewModel()
+        defer { viewModel.pause() }
         let rangeHit = GpBarHit(
             index: 0,
             startTick: 0,
@@ -347,6 +350,7 @@ final class GpBridgeEventTests: XCTestCase {
         viewModel.receive(.pointerUp)
         viewModel.setPlaybackSpeed(0.75)
         viewModel.setSpeedLadderEnabled(true)
+        viewModel.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
 
         XCTAssertEqual(viewModel.currentSpeedLadderRound, 1)
         XCTAssertEqual(viewModel.playbackSpeed, 0.75)
@@ -367,6 +371,7 @@ final class GpBridgeEventTests: XCTestCase {
     @MainActor
     func testLeavingRangeLoopRestoresTheSpeedFromBeforeTheLadder() {
         let viewModel = GpWebViewModel()
+        defer { viewModel.pause() }
         let rangeHit = GpBarHit(
             index: 0,
             startTick: 0,
@@ -378,6 +383,7 @@ final class GpBridgeEventTests: XCTestCase {
         viewModel.receive(.pointerUp)
         viewModel.setPlaybackSpeed(0.75)
         viewModel.setSpeedLadderEnabled(true)
+        viewModel.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
 
         for _ in 0..<3 {
             viewModel.receive(.rangeLoopCompleted)
@@ -393,6 +399,7 @@ final class GpBridgeEventTests: XCTestCase {
     @MainActor
     func testDisablingTheLadderRestoresItsManualStartingSpeed() {
         let viewModel = GpWebViewModel()
+        defer { viewModel.pause() }
         let rangeHit = GpBarHit(
             index: 0,
             startTick: 0,
@@ -404,6 +411,7 @@ final class GpBridgeEventTests: XCTestCase {
         viewModel.receive(.pointerUp)
         viewModel.setPlaybackSpeed(0.75)
         viewModel.setSpeedLadderEnabled(true)
+        viewModel.receive(.playerStateChanged(.init(state: 1, stopped: false, scorePlaying: true)))
 
         for _ in 0..<3 {
             viewModel.receive(.rangeLoopCompleted)

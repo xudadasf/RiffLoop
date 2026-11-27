@@ -1,4 +1,5 @@
 import Combine
+import CryptoKit
 import Foundation
 import AVFoundation
 import UIKit
@@ -108,6 +109,7 @@ final class GpWebViewModel: ObservableObject {
     var practiceStartBpm: Double { baseBpm * playbackSpeed }
 
     func setPracticeStartBpm(_ bpm: Double) {
+        guard !isRecoveringPractice else { return }
         guard bpm.isFinite else { return }
         playbackSpeed = 1
         setBaseBpm(bpm)
@@ -140,9 +142,11 @@ final class GpWebViewModel: ObservableObject {
     }
 
     var gpStageSummary: String { stageReadout(for: .gp).stageLabel }
+    var isRecoveringPractice: Bool { recoveryTask != nil || pendingGpRecovery != nil }
 
     func canSelectStage(for transport: TempoStageTransport) -> Bool {
-        guard !isPlaying, !isStandaloneMetronomePlaying, !gpPlayRequestPending else { return false }
+        guard !isPlaying, !isStandaloneMetronomePlaying, !gpPlayRequestPending,
+              !loopSelection.isDragging, !isRecoveringPractice else { return false }
         switch transport {
         case .gp: return gpStagesEnabled && rangeLoopingEnabled && loopRange != nil
         case .standalone: return standaloneStagesEnabled
@@ -180,8 +184,15 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setGpStagesEnabled(_ enabled: Bool) {
+        if pendingGpRecovery?.snapshot.stagesEnabled != enabled { pendingGpRecovery = nil }
         guard enabled != gpStagesEnabled, !enabled || (rangeLoopingEnabled && loopRange != nil) else { return }
-        if enabled && speedLadderEnabled { restoreSpeedBeforeLadder() }
+        reproductionSnapshot()
+        let operation = ReproductionRecorder.shared.begin("gp.setGpStagesEnabled", details: ["enabled": String(enabled)])
+        defer {
+            reproductionSnapshot()
+            ReproductionRecorder.shared.end(operation, result: "applied")
+        }
+        if enabled && speedLadderEnabled { restoreSpeedBeforeLadder(reason: "custom_stages_enabled") }
         if enabled { hasGpPlan = true; lastStageTransport = .gp }
         gpStagesEnabled = enabled
         restartGpStages()
@@ -190,6 +201,7 @@ final class GpWebViewModel: ObservableObject {
 
     func setGpStages(_ plan: TempoStagePlan) {
         guard plan.valid(in: stageBpmRange, timedOnly: false), plan != gpStages else { return }
+        pendingGpRecovery = nil
         gpProgress = LoopStageProgress()
         gpStages = plan
         hasGpPlan = true
@@ -254,6 +266,31 @@ final class GpWebViewModel: ObservableObject {
     private var audioObservers = Set<AnyCancellable>()
     private var recoveryAttempts = 0
     private var recoveryTask: Task<Void, Never>?
+    private var currentScoreDigest: SHA256.Digest?
+    // Automatic recovery may retain transient practice state; opening a file never does.
+    private struct GpRecoverySnapshot {
+        let fileName: String
+        let metadata: GpScoreMetadata
+        let scoreDigest: SHA256.Digest
+        let endTick: Double
+        let range: GpLoopBarRange?
+        let rangeEnabled: Bool
+        let wholeSongEnabled: Bool
+        let plan: TempoStagePlan
+        let stagesEnabled: Bool
+        let progress: LoopStageProgress
+        let rangeStartTempo: Double?
+        let playbackSpeed: Double
+        let legacyEnabled: Bool
+        let legacyBaseSpeed: Double?
+        let completedLoops: Int
+    }
+    private struct PendingGpRecovery {
+        // nil while reading the file, then bound to exactly one replacement load.
+        let loadID: String?
+        let snapshot: GpRecoverySnapshot
+    }
+    private var pendingGpRecovery: PendingGpRecovery?
     private var webContentRequiresReloadOnNextScore = false
     private var sceneActive = true
     private var lastSyncProblemMark: Double?
@@ -340,6 +377,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func recoverWebContent() {
+        pendingGpRecovery = nil
         gpPlayRequestPending = false
         cancelTransfers()
         scoreLoadID = nil
@@ -363,17 +401,29 @@ final class GpWebViewModel: ObservableObject {
         }
         recoveryAttempts += 1
         guard let currentFileName, webView != nil else { return }
+        if didApplyPendingProfile, let score, let currentScoreDigest {
+            // isPlaying was cleared above, so the copied stage clock is already frozen.
+            pendingGpRecovery = PendingGpRecovery(loadID: nil, snapshot: GpRecoverySnapshot(
+                fileName: currentFileName, metadata: score, scoreDigest: currentScoreDigest, endTick: position.endTick,
+                range: loopRange, rangeEnabled: rangeLoopingEnabled, wholeSongEnabled: wholeSongLoopingEnabled,
+                plan: gpStages, stagesEnabled: gpStagesEnabled, progress: gpProgress,
+                rangeStartTempo: gpRangeStartTempo, playbackSpeed: playbackSpeed,
+                legacyEnabled: speedLadderEnabled, legacyBaseSpeed: speedLadderBaseSpeed,
+                completedLoops: completedLoops))
+        }
         let url = RiffLoopDocumentStore().folderURL(for: .guitarPro).appendingPathComponent(currentFileName)
         recoveryTask = Task { [weak self] in
             do {
                 let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
                 guard !Task.isCancelled, let self, self.currentFileName == currentFileName else { return }
                 self.recoveryTask = nil
-                self.loadScore(data: data, fileName: currentFileName)
+                let snapshot = self.pendingGpRecovery?.snapshot
+                self.loadScore(data: data, fileName: currentFileName, recovering: snapshot)
                 self.recoveryAttempts = 1
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.recoveryTask = nil
+                self?.pendingGpRecovery = nil
                 self?.errorMessage = "谱面进程已中断，重新读取失败：\(error.localizedDescription)"
             }
         }
@@ -384,12 +434,21 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func loadScore(data: Data, fileName: String) {
+        loadScore(data: data, fileName: fileName, recovering: nil)
+    }
+
+    private func loadScore(data: Data, fileName: String, recovering snapshot: GpRecoverySnapshot?) {
+        pendingGpRecovery = nil
+        currentScoreDigest = SHA256.hash(data: data)
         gpPlayRequestPending = false
         cancelTransfers()
         pendingScoreData = nil
         loadPhase = .waitingForRenderer
         renderMetrics = nil
         scoreLoadID = UUID().uuidString
+        if let snapshot, snapshot.fileName == fileName {
+            pendingGpRecovery = PendingGpRecovery(loadID: scoreLoadID, snapshot: snapshot)
+        }
         interruptionRecovery.cancel()
         stopStandaloneMetronome()
         recoveryTask?.cancel()
@@ -479,7 +538,7 @@ final class GpWebViewModel: ObservableObject {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        guard playerReady else { return }
+        guard playerReady, !loopSelection.isDragging else { return }
         if isPlaying {
             // Silence native accompaniment at the tap, without waiting for WebKit.
             pause()
@@ -646,6 +705,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func leaveMode() {
+        pendingGpRecovery = nil
         cancelTransfers()
         loadPhase = nil
         scoreLoadID = nil
@@ -717,6 +777,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setPlaybackSpeed(_ speed: Double) {
+        guard !isRecoveringPractice else { return }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setPlaybackSpeed", details: ["speed": String(describing: speed)])
         defer {
@@ -749,6 +810,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setBaseBpm(_ bpm: Double) {
+        guard !isRecoveringPractice else { return }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setBaseBpm", details: ["bpm": String(describing: bpm)])
         defer {
@@ -769,6 +831,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func resetBaseBpm() {
+        guard !isRecoveringPractice else { return }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.resetBaseBpm", details: [:])
         defer {
@@ -984,6 +1047,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setRangeLoopingEnabled(_ enabled: Bool) {
+        if pendingGpRecovery?.snapshot.rangeEnabled != enabled { pendingGpRecovery = nil }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setRangeLoopingEnabled", details: ["enabled": String(describing: enabled)])
         defer {
@@ -991,7 +1055,10 @@ final class GpWebViewModel: ObservableObject {
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
         guard loopRange != nil else { return }
-        if !enabled { restoreSpeedBeforeLadder() }
+        if !enabled {
+            handle(loopSelection.dragCancel())
+            restoreSpeedBeforeLadder(reason: "range_loop_disabled")
+        }
         rangeLoopingEnabled = enabled
         if enabled { wholeSongLoopingEnabled = false }
         completedLoops = 0
@@ -1002,13 +1069,17 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setWholeSongLoopingEnabled(_ enabled: Bool) {
+        if pendingGpRecovery?.snapshot.wholeSongEnabled != enabled { pendingGpRecovery = nil }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setWholeSongLoopingEnabled", details: ["enabled": String(describing: enabled)])
         defer {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        if enabled { restoreSpeedBeforeLadder() }
+        if enabled {
+            handle(loopSelection.dragCancel())
+            restoreSpeedBeforeLadder(reason: "whole_song_enabled")
+        }
         wholeSongLoopingEnabled = enabled
         if enabled { rangeLoopingEnabled = false }
         completedLoops = 0
@@ -1034,6 +1105,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSpeedLadderEnabled(_ enabled: Bool) {
+        if pendingGpRecovery?.snapshot.legacyEnabled != enabled { pendingGpRecovery = nil }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSpeedLadderEnabled", details: ["enabled": String(describing: enabled)])
         defer {
@@ -1047,13 +1119,14 @@ final class GpWebViewModel: ObservableObject {
             speedLadderTarget = max(speedLadderTarget, playbackSpeed)
             speedLadderEnabled = true
         } else {
-            restoreSpeedBeforeLadder()
+            restoreSpeedBeforeLadder(reason: "legacy_ladder_disabled")
         }
         completedLoops = 0
         saveProfile()
     }
 
     func setSpeedLadderTarget(_ target: Double) {
+        guard !isRecoveringPractice else { return }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSpeedLadderTarget", details: ["target": String(describing: target)])
         defer {
@@ -1066,6 +1139,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setLoopsPerSpeedStep(_ loops: Int) {
+        guard !isRecoveringPractice else { return }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setLoopsPerSpeedStep", details: ["loops": String(describing: loops)])
         defer {
@@ -1078,6 +1152,7 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func setSpeedLadderStep(_ step: Double) {
+        guard !isRecoveringPractice else { return }
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.setSpeedLadderStep", details: ["step": String(describing: step)])
         defer {
@@ -1090,13 +1165,15 @@ final class GpWebViewModel: ObservableObject {
     }
 
     func clearLoop() {
+        pendingGpRecovery = nil
         reproductionSnapshot()
         let reproductionOperation = ReproductionRecorder.shared.begin("gp.clearLoop", details: [:])
         defer {
             reproductionSnapshot()
             ReproductionRecorder.shared.end(reproductionOperation, result: "method_returned; check subsequent state/async events")
         }
-        restoreSpeedBeforeLadder()
+        restoreSpeedBeforeLadder(reason: "loop_cleared")
+        loopSelection = GpLoopSelectionStateMachine()
         gpRangeStartTempo = nil
         loopRange = nil
         loopPreview = nil
@@ -1249,6 +1326,11 @@ final class GpWebViewModel: ObservableObject {
             gpPlayRequestPending = false
             if isStandaloneMetronomePlaying {
                 if state.state == 1 { call("pause") }
+                return
+            }
+            if loopSelection.isDragging && (state.state == 1 || state.transitioning == true) {
+                // A queued pre-preview acknowledgement must not restart audio or the stage clock.
+                pause()
                 return
             }
             isPlaying = state.state == 1 || state.transitioning == true
@@ -1542,26 +1624,28 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func handle(_ action: GpLoopSelectionAction) {
+        defer { if action != .none { reproductionSnapshot() } }
         switch action {
         case .none:
             break
         case let .seek(bar):
-            selectedBar = bar
             let tick = bar.seekTick ?? bar.startTick
             if rangeLoopingEnabled, let range = loopRange,
                !(range.startTick ..< range.endTick).contains(tick) {
+                // A tap (including dismissing a panel over the score) cannot disarm stage practice.
+                if gpStagesEnabled || speedLadderEnabled {
+                    ReproductionStore.shared.record("action", "gp.stage_outside_tap_ignored", ["tick": String(tick)])
+                    return
+                }
                 setRangeLoopingEnabled(false)
             }
+            selectedBar = bar
             seek(to: tick, userInitiated: true)
         case let .selectStart(range):
-            gpRangeStartTempo = nil
             pause()
-            restoreSpeedBeforeLadder()
-            loopRange = nil
+            // Keep the committed state, matching WebKit's previewRange/cancelRangePreview.
+            // Only a completed gesture replaces A/B or resets the stage's budget.
             loopPreview = range
-            rangeLoopingEnabled = false
-            wholeSongLoopingEnabled = false
-            completedLoops = 0
             loopSelectionMessage = "已选起始音符 · 拖动选择终止音符，松手确认"
             call(
                 "previewRange",
@@ -1577,9 +1661,17 @@ final class GpWebViewModel: ObservableObject {
         case let .commit(range):
             loopPreview = nil
             loopRange = range
+            gpRangeStartTempo = nil
             rangeLoopingEnabled = true
             wholeSongLoopingEnabled = false
             completedLoops = 0
+            if gpStagesEnabled {
+                gpProgress.restartCurrentStage()
+                applyEffectivePlaybackSpeed()
+            } else {
+                // Preserve the legacy ladder's committed-reselection behavior, not its early preview reset.
+                restoreSpeedBeforeLadder(reason: "range_reselected")
+            }
             call(
                 "commitRange",
                 arguments: [range.firstBar, range.lastBar, range.startTick, range.endTick]
@@ -1676,7 +1768,56 @@ final class GpWebViewModel: ObservableObject {
             speedLadderBaseSpeed = nil
         }
 
+        restoreGpRecoveryIfCompatible(with: metadata)
         applyCurrentSettings(to: metadata)
+    }
+
+    private func restoreGpRecoveryIfCompatible(with metadata: GpScoreMetadata) {
+        guard let pending = pendingGpRecovery else { return }
+        pendingGpRecovery = nil
+        let saved = pending.snapshot
+        let rangeTempo = saved.rangeStartTempo.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        let stageBounds = gpCustomBaseBpmRange(originalBpm: rangeTempo ?? originalBaseBpm)
+        let recoveredStageRange = Int(stageBounds.lowerBound)...Int(stageBounds.upperBound)
+        guard pending.loadID == scoreLoadID, pending.loadID != nil, saved.fileName == currentFileName,
+              currentScoreDigest == saved.scoreDigest,
+              saved.metadata.bars == metadata.bars,
+              saved.metadata.initialBpm == metadata.initialBpm,
+              saved.metadata.beatsPerMeasure == metadata.beatsPerMeasure,
+              saved.metadata.beatUnit == metadata.beatUnit,
+              saved.playbackSpeed.isFinite, practiceSpeedRange.contains(saved.playbackSpeed),
+              !saved.rangeEnabled || (saved.range != nil && !saved.wholeSongEnabled),
+              !saved.stagesEnabled || (saved.rangeEnabled && !saved.legacyEnabled && pendingProfile.gpStages == saved.plan &&
+                  saved.plan.valid(in: recoveredStageRange, timedOnly: false) && saved.plan.stages.indices.contains(saved.progress.index)),
+              !saved.legacyEnabled || (saved.rangeEnabled && saved.legacyBaseSpeed.map {
+                  $0.isFinite && practiceSpeedRange.contains($0)
+              } == true)
+        else { return }
+        if let range = saved.range {
+            guard range.firstBar >= 0, range.lastBar >= range.firstBar, range.lastBar < metadata.bars,
+                  range.startTick.isFinite, range.endTick.isFinite, range.startTick >= 0,
+                  range.endTick > range.startTick, saved.endTick.isFinite, saved.endTick > 0,
+                  range.endTick <= saved.endTick else { return }
+        }
+        loopRange = saved.range
+        rangeLoopingEnabled = saved.rangeEnabled
+        wholeSongLoopingEnabled = saved.wholeSongEnabled
+        playbackSpeed = saved.playbackSpeed
+        speedLadderEnabled = saved.legacyEnabled
+        speedLadderBaseSpeed = saved.legacyBaseSpeed
+        completedLoops = max(0, saved.completedLoops)
+        if saved.stagesEnabled {
+            gpStages = saved.plan
+            gpProgress = saved.progress
+            gpProgress.setPlaying(false, now: ProcessInfo.processInfo.systemUptime)
+            gpRangeStartTempo = rangeTempo
+        }
+        gpStagesEnabled = saved.stagesEnabled
+        // applyCurrentSettings restores A/B and tempo. Playback still requires a user tap.
+        ReproductionStore.shared.record("action", "gp.recovery_practice_restored", [
+            "stages": String(gpStagesEnabled), "stage": String(gpProgress.index + 1),
+            "range": String(rangeLoopingEnabled), "legacy": String(speedLadderEnabled)
+        ])
     }
 
     private func applyCurrentSettings(to metadata: GpScoreMetadata) {
@@ -1726,8 +1867,12 @@ final class GpWebViewModel: ObservableObject {
         call("setPlaybackSpeed", arguments: [speed])
     }
 
-    private func restoreSpeedBeforeLadder() {
+    private func restoreSpeedBeforeLadder(reason: String) {
         let hadCustomStages = gpStagesEnabled
+        if hadCustomStages {
+            reproductionSnapshot()
+            ReproductionStore.shared.record("action", "gp.stages_disabled", ["reason": reason])
+        }
         gpStagesEnabled = false
         gpProgress = LoopStageProgress()
         let restoredSpeed = min(max(speedLadderBaseSpeed ?? playbackSpeed,
@@ -1740,8 +1885,8 @@ final class GpWebViewModel: ObservableObject {
     }
 
     private func recordLoopCompletion() {
-        guard rangeLoopingEnabled, loopRange != nil else { return }
-        if gpStagesEnabled && (!isPlaying || isStandaloneMetronomePlaying) { return }
+        guard rangeLoopingEnabled, loopRange != nil, isPlaying,
+              !isStandaloneMetronomePlaying, !loopSelection.isDragging else { return }
         totalCompletedLoops += 1
         if gpStagesEnabled {
             let previous = gpProgress.index
@@ -1955,6 +2100,18 @@ final class GpWebViewModel: ObservableObject {
         state["gp.wholeSongLoopingEnabled"] = store.encoded(wholeSongLoopingEnabled)
         state["gp.loopCountInEnabled"] = store.encoded(loopCountInEnabled)
         state["gp.speedLadderEnabled"] = store.encoded(speedLadderEnabled)
+        let stage = stageReadout(for: .gp)
+        state["gp.stagesEnabled"] = store.encoded(gpStagesEnabled)
+        state["gp.stageIndex"] = store.encoded(stage.index)
+        state["gp.stageCount"] = store.encoded(stage.count)
+        state["gp.stageBpm"] = store.encoded(stage.bpm)
+        state["gp.stageUnit"] = store.encoded(stage.unit)
+        state["gp.stageRemaining"] = store.encoded(stage.remaining)
+        state["gp.stageRounds"] = store.encoded(gpProgress.rounds)
+        state["gp.stageClockRunning"] = store.encoded(gpProgress.clockRunning)
+        state["gp.stageOrder"] = store.encoded(gpStages.order)
+        state["gp.rangeStartTempo"] = store.encoded(gpRangeStartTempo)
+        state["gp.rangeSelectionDragging"] = store.encoded(loopSelection.isDragging)
         state["gp.speedLadderTarget"] = store.encoded(speedLadderTarget)
         state["gp.loopsPerSpeedStep"] = store.encoded(loopsPerSpeedStep)
         state["gp.speedLadderStep"] = store.encoded(speedLadderStep)

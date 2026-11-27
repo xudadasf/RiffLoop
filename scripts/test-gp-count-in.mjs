@@ -93,4 +93,132 @@ assert.equal(transitions.at(-1), true, 'Logical playback remains active while wa
 callbacks.shift()(); assert.equal(playing, true); assert.equal(transitions.at(-1), false);
 restarter.prepare(960); restarter.resume(); restarter.handlePlayerPosition({ currentTick: 960, isSeek: true });
 playing = false; restarter.cancel(); callbacks.shift()(); assert.equal(playing, false);
+
+// Exercise the shipped public setting against the actual transport and range handshake.
+// The audio clock and player receipts are controlled so every transition edge is reachable.
+const transportFactory = new Function('alphaTab', source.slice(
+    source.indexOf('    const createTransportController ='), source.indexOf('    const backingAligner ='))
+    + '; return createTransportController;')({ synth: { PlayerState: { Playing: 1 } } });
+const restarterFactory = extract('createRangeCountInRestarter', 'scheduleAfterCursorPaint');
+const loopCountInMethod = source.slice(source.indexOf('        setLoopCountInEnabled(enabled) {'),
+    source.indexOf('        showTracks(indices) {'));
+const clearRangeMethod = source.slice(source.indexOf('        clearPlaybackRange() {'),
+    source.indexOf('        previewRange(firstBar, lastBar, startTick, endTick) {'));
+const loopModeMethods = source.slice(source.indexOf('        setRangeLoopingEnabled(enabled) {'),
+    source.indexOf('        restartRangeWithCountIn() {'));
+const applyLoopModeImplementation = source.slice(source.indexOf('    const applyLoopMode ='),
+    source.indexOf('    const loopScrollPlan ='));
+const cancelTransitionStart = source.indexOf('    const cancelRangeTransition =');
+const cancelTransitionImplementation = cancelTransitionStart < 0 ? '' : source.slice(cancelTransitionStart,
+    source.indexOf('    const playPauseBoth =', cancelTransitionStart));
+const makeToggleHarness = new Function('createTransport', 'createRestarter', 'createClicks', `
+    let loopCountInEnabled = true, loopTransitioning = false;
+    let rangeLoopingEnabled = true, wholeSongLoopingEnabled = false, rangeCompletionAwaitingReset = false;
+    let committedRange = { firstBar: 0, lastBar: 0, startTick: 960, endTick: 1920 };
+    let pendingRangeHighlight = committedRange;
+    const window = { riffloopCommittedBars: [0, 0, 960, 1920] };
+    const pointerSelection = { cancel() {} };
+    const restoreScoreScrollPolicy = () => {}, applyRangeScrollPolicy = () => {};
+    const reports = [], restarts = [], pauseRetries = [], nodes = [];
+    const player = () => ({
+        playerState: 0, timePosition: 0, tickPosition: 0, starts: 0,
+        play() { this.starts++; this.playerState = 1; return true; },
+        pause() { this.playerState = 0; }, stop() { this.playerState = 0; }
+    });
+    const api = player(), synthApi = player();
+    api.clearPlaybackRangeHighlight = () => {};
+    const countIn = createClicks({
+        makeContext: () => ({ currentTime: 0, destination: {}, resume: () => Promise.resolve(),
+            createOscillator() {
+                const node = { frequency: {}, connect() {}, disconnect() {}, start() {}, stop() {} };
+                nodes.push(node); return node;
+            },
+            createGain: () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+                connect() {}, disconnect() {} })
+        }),
+        settings: () => ({ volume: loopCountInEnabled ? 1 : 0, bpm: 120 }),
+        schedule: () => 1, unschedule() {}, onError(error) { throw error; }
+    });
+    const transport = createTransport({ api, synthApi, canUseBacking: () => false,
+        schedule: callback => pauseRetries.push(callback),
+        startCountIn: callback => countIn.start(callback), cancelCountIn: () => countIn.cancel(),
+        reportState(playing, stopped) {
+            reports.push({ playing, stopped, transitioning: loopTransitioning || countIn.active });
+        }
+    });
+    const rangeCountInRestarter = createRestarter({ transport,
+        onTransition: active => { loopTransitioning = active; },
+        seekBoth: tick => { api.tickPosition = tick; },
+        schedule: callback => restarts.push(callback), isPaused: state => state === 'paused'
+    });
+    ${applyLoopModeImplementation}
+    ${cancelTransitionImplementation}
+    const controls = { ${loopCountInMethod} ${clearRangeMethod} ${loopModeMethods} };
+    applyLoopMode();
+    return { api, countIn, transport, rangeCountInRestarter, controls, reports, nodes,
+        mode: () => ({ rangeLoopingEnabled, wholeSongLoopingEnabled, committedRange,
+            playbackRange: api.playbackRange, synthRange: synthApi.playbackRange,
+            isLooping: api.isLooping, committedBars: window.riffloopCommittedBars }),
+        advancePause: () => rangeCountInRestarter.handlePlayerState('paused'),
+        advanceSeek: () => rangeCountInRestarter.handlePlayerPosition({ currentTick: 960, isSeek: true }),
+        flushRestarts: () => restarts.splice(0).forEach(callback => callback()),
+        flushPauseRetries: () => pauseRetries.splice(0).forEach(callback => callback())
+    };
+`);
+const exitCommands = [
+    ['setLoopCountInEnabled', false], ['clearPlaybackRange', undefined],
+    ['setRangeLoopingEnabled', false], ['setWholeSongLoopingEnabled', true]
+];
+function assertLoopMode(h, command) {
+    const retainsRange = command !== 'clearPlaybackRange';
+    const rangeEnabled = command === 'setLoopCountInEnabled';
+    const wholeEnabled = command === 'setWholeSongLoopingEnabled';
+    const storedRange = { firstBar: 0, lastBar: 0, startTick: 960, endTick: 1920 };
+    const playbackRange = rangeEnabled ? { startTick: 960, endTick: 1920 } : null;
+    assert.deepEqual(h.mode(), { rangeLoopingEnabled: rangeEnabled, wholeSongLoopingEnabled: wholeEnabled,
+        committedRange: retainsRange ? storedRange : null,
+        playbackRange, synthRange: playbackRange, isLooping: rangeEnabled || wholeEnabled,
+        committedBars: retainsRange ? [0, 0, 960, 1920] : null },
+    `${command} must keep its intended range and whole-song semantics`);
+}
+for (const [command, argument] of exitCommands) {
+for (const phase of ['waitingForPause', 'waitingForSeek', 'waitingForResume', 'scheduled', 'clicks']) {
+    const h = makeToggleHarness(transportFactory, restarterFactory, create);
+    h.transport.play(true);
+    h.rangeCountInRestarter.prepare(960);
+    if (phase !== 'waitingForPause') h.advancePause();
+    if (['waitingForResume', 'scheduled', 'clicks'].includes(phase)) h.advanceSeek();
+    if (['scheduled', 'clicks'].includes(phase)) h.rangeCountInRestarter.resume();
+    if (phase === 'clicks') { h.flushRestarts(); await Promise.resolve(); }
+    const lateClickCompletion = h.nodes.at(-1)?.onended;
+    const startsBeforeDisable = h.api.starts;
+    assert.equal(h.reports.at(-1).transitioning, true, `${phase} must first expose the real transition`);
+
+    h.controls[command](argument);
+
+    assert.deepEqual(h.reports.at(-1), { playing: false, stopped: false, transitioning: false },
+        `${command}/${phase}: exiting a transition must publish a settled pause, so native stage time stays frozen`);
+    assertLoopMode(h, command);
+    assert.equal(h.transport.isPlayingIntent(), false);
+    assert.equal(h.countIn.active, false);
+    h.advancePause(); h.advanceSeek(); h.rangeCountInRestarter.resume();
+    h.flushRestarts(); lateClickCompletion?.(); h.flushPauseRetries();
+    assert.equal(h.api.starts, startsBeforeDisable, `${phase}: stale work must not resume automatically`);
+
+    h.transport.play(command !== 'setLoopCountInEnabled');
+    assert.equal(h.api.starts, startsBeforeDisable + 1, `${command}/${phase}: explicit Play must resume`);
+    assert.equal(h.transport.isPlayingIntent(), true);
+    h.transport.pause(true);
+}
+    const h = makeToggleHarness(transportFactory, restarterFactory, create);
+    h.transport.play(true);
+    h.controls[command](argument);
+    assertLoopMode(h, command);
+    assert.equal(h.transport.isPlayingIntent(), true, `${command} during score audio must keep playing`);
+    assert.equal(h.api.playerState, 1);
+    assert.equal(h.reports.at(-1).playing, true);
+    h.controls.setLoopCountInEnabled(true);
+    assert.equal(h.transport.isPlayingIntent(), true, 'Arming count-in must not interrupt the current score loop');
+    h.transport.pause(true);
+}
 console.log('GP count-in cancellation, accented timing, 400% output, loop transition and visibility passed');

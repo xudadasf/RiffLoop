@@ -7,7 +7,8 @@ on:
     paths:
       - ".github/workflows/ios-gp-regression.yml"
       - "RiffLoopTests/GpStageInteractionTests.swift"
-      - "RiffLoop/GP/GpWebViewModel.swift"
+      - "RiffLoopTests/GpRecoveryStageTests.swift"
+      - "RiffLoop/GP/**"
   workflow_dispatch:
 
 permissions:
@@ -84,6 +85,7 @@ jobs:
             -resultBundlePath TestArtifacts/GpStage.xcresult \
             -parallel-testing-enabled NO \
             -only-testing:RiffLoopTests/GpStageInteractionTests \
+            -only-testing:RiffLoopTests/GpRecoveryStageTests \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee TestArtifacts/GpStage-build-test.log
 
       - name: Extract concise test results
