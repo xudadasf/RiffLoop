@@ -286,6 +286,7 @@ final class GpWebViewModel: ObservableObject {
         let legacyEnabled: Bool
         let legacyBaseSpeed: Double?
         let completedLoops: Int
+        let lastStageTransport: TempoStageTransport
     }
     private struct PendingGpRecovery {
         // nil while reading the file, then bound to exactly one replacement load.
@@ -411,7 +412,7 @@ final class GpWebViewModel: ObservableObject {
                 plan: gpStages, stagesEnabled: gpStagesEnabled, progress: gpProgress,
                 rangeStartTempo: gpRangeStartTempo, playbackSpeed: playbackSpeed,
                 legacyEnabled: speedLadderEnabled, legacyBaseSpeed: speedLadderBaseSpeed,
-                completedLoops: completedLoops))
+                completedLoops: completedLoops, lastStageTransport: lastStageTransport))
         }
         let url = RiffLoopDocumentStore().folderURL(for: .guitarPro).appendingPathComponent(currentFileName)
         recoveryTask = Task { [weak self] in
@@ -1815,6 +1816,7 @@ final class GpWebViewModel: ObservableObject {
             gpRangeStartTempo = rangeTempo
         }
         gpStagesEnabled = saved.stagesEnabled
+        lastStageTransport = saved.lastStageTransport
         // applyCurrentSettings restores A/B and tempo. Playback still requires a user tap.
         ReproductionStore.shared.record("action", "gp.recovery_practice_restored", [
             "stages": String(gpStagesEnabled), "stage": String(gpProgress.index + 1),

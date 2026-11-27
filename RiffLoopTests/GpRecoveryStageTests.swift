@@ -4,6 +4,28 @@ import XCTest
 
 @MainActor
 final class GpRecoveryStageTests: XCTestCase {
+    func testRecoveryPreservesLastStageDisplayWhenBothPlansAreEnabled() async throws {
+        for transport in [TempoStageTransport.gp, .standalone] {
+            try await withModel { model, _, _, metadata in
+                self.prepareStages(model)
+                model.pause()
+                model.setStandaloneStages(.init(stages: [.init(bpm: 80, unit: .seconds, length: 30)]))
+                model.setStandaloneStagesEnabled(true)
+                model.selectStage(0, for: transport)
+                XCTAssertEqual(model.deckStageTransport, transport)
+
+                let loadID = try await self.beginRecovery(model)
+                self.finishLoad(model, id: loadID, metadata: metadata)
+
+                XCTAssertTrue(model.gpStagesEnabled)
+                XCTAssertTrue(model.standaloneStagesEnabled)
+                XCTAssertEqual(model.deckStageTransport, transport)
+                XCTAssertFalse(model.isPlaying)
+                XCTAssertFalse(model.isStandaloneMetronomePlaying)
+            }
+        }
+    }
+
     func testAutomaticRecoveryKeepsPausedStageProgressDirectionAndTempoAnchor() async throws {
         try await withModel { model, _, _, metadata in
             self.prepareStages(model)
