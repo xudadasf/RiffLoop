@@ -219,6 +219,35 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         let firstBeat = GpBarHit(index: 0, startTick: 0, endTick: 3840, seekTick: 0, seekEndTick: 960)
         model.receive(.pointerDown(firstBeat))
         model.receive(.pointerUp)
+        model.setLoopCountInEnabled(true)
+        model.setGpStages(.init(stages: [.init(bpm: 240, unit: .loops, length: 1),
+                                         .init(bpm: 180, unit: .loops, length: 3)]))
+        model.setGpStagesEnabled(true)
+        let countInRange = model.loopRange
+        model.togglePlayback()
+        try await waitUntil("Custom stages with per-loop count-in must complete two real loops") {
+            model.completedLoops >= 2 && model.gpProgress.index == 1 &&
+                model.isPlaying && !model.gpProgress.clockRunning
+        }
+        XCTAssertTrue(model.gpStagesEnabled)
+        XCTAssertTrue(model.rangeLoopingEnabled)
+        XCTAssertEqual(model.loopRange, countInRange)
+        XCTAssertEqual(model.currentBpm, 180, accuracy: 0.1)
+        XCTAssertGreaterThanOrEqual(model.gpProgress.rounds, 1)
+        let countInReadout = model.stageReadout(for: .gp)
+        XCTAssertGreaterThan(countInReadout.remaining, 0)
+        XCTAssertLessThan(countInReadout.remaining, 3)
+        try await waitUntil("The next count-in must restart actual score playback at the new stage BPM") {
+            model.isPlaying && model.gpProgress.index == 1 && model.gpProgress.clockRunning &&
+                model.position.currentTick > firstBeat.startTick + 150 &&
+                model.position.currentTick < 960
+        }
+        XCTAssertEqual(model.currentBpm, 180, accuracy: 0.1)
+        XCTAssertEqual(model.loopRange, countInRange)
+        XCTAssertNil(model.errorMessage)
+        model.pause()
+        try await Task.sleep(for: .milliseconds(300))
+
         model.setLoopCountInEnabled(false)
         model.setGpStages(.init(stages: [.init(bpm: 160, unit: .loops, length: 1),
                                          .init(bpm: 90, unit: .seconds, length: 2)]))
@@ -576,6 +605,59 @@ final class GpWebPlaybackIntegrationTests: XCTestCase {
         try await waitUntil("Original timbre must be restored") { model.playerReady && model.trackTimbres[0] == nil }
         let original = try await webView.evaluateJavaScript("window.testTimbrePrograms.at(-1)") as? [Int]
         XCTAssertEqual(original, [25, 25])
+        XCTAssertNil(model.errorMessage)
+
+        // The ordinary A/B checks above stay independent of custom-stage recovery.
+        // Change timbre only after the real player has completed part of stage two.
+        model.setCountInEnabled(false)
+        model.setLoopCountInEnabled(false)
+        model.receive(.pointerDown(GpBarHit(index: 1, startTick: 3840, endTick: 7680)))
+        model.receive(.pointerUp)
+        let stagePlan = TempoStagePlan(stages: [.init(bpm: 140, unit: .loops, length: 8),
+                                               .init(bpm: 180, unit: .loops, length: 8)])
+        model.setGpStages(stagePlan)
+        model.setGpStagesEnabled(true)
+        model.selectStage(1, for: .gp)
+        try await waitUntil("Prepare stage two at A before testing a timbre reload") {
+            abs(model.position.currentTick - range.startTick) < 2
+        }
+        model.togglePlayback()
+        try await waitUntil("Stage two must complete a real loop before its timbre changes") {
+            model.isPlaying && model.gpProgress.index == 1 && model.gpProgress.rounds >= 1 &&
+                model.position.currentTick > range.startTick + 200 && model.position.currentTick < range.endTick
+        }
+        let stagedReadout = model.stageReadout(for: .gp)
+        let stagedLoops = model.completedLoops
+        let stagedTick = model.position.currentTick
+        XCTAssertGreaterThan(stagedReadout.remaining, 0)
+        XCTAssertLessThan(stagedReadout.remaining, 8)
+        model.setTrackTimbre(index: 0, program: 30)
+        XCTAssertFalse(model.isPlaying)
+        try await waitUntil("Timbre replacement must finish with stage two and its position retained") {
+            model.playerReady && abs(model.position.currentTick - stagedTick) < 400
+        }
+        XCTAssertTrue(model.gpStagesEnabled)
+        XCTAssertTrue(model.rangeLoopingEnabled)
+        XCTAssertEqual(model.loopRange, range)
+        XCTAssertEqual(model.gpStages, stagePlan)
+        XCTAssertEqual(model.stageReadout(for: .gp), stagedReadout)
+        XCTAssertEqual(model.completedLoops, stagedLoops)
+        XCTAssertEqual(model.currentBpm, 180, accuracy: 0.1)
+        XCTAssertFalse(model.isPlaying)
+        XCTAssertFalse(model.gpProgress.clockRunning)
+        let stagedProgram = try await webView.evaluateJavaScript("window.testTimbrePrograms.at(-1)") as? [Int]
+        XCTAssertEqual(stagedProgram, [30, 30])
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent(name)), data)
+
+        model.togglePlayback()
+        try await waitUntil("Stage two must resume and complete another real loop after its timbre changes") {
+            model.isPlaying && model.gpProgress.index == 1 && model.completedLoops > stagedLoops &&
+                model.position.currentTick > range.startTick + 150 && model.position.currentTick < range.endTick
+        }
+        XCTAssertTrue(model.gpStagesEnabled)
+        XCTAssertEqual(model.loopRange, range)
+        XCTAssertEqual(model.currentBpm, 180, accuracy: 0.1)
+        XCTAssertLessThan(model.stageReadout(for: .gp).remaining, stagedReadout.remaining)
         XCTAssertNil(model.errorMessage)
     }
 
