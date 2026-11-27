@@ -281,6 +281,59 @@ final class GpRecoveryStageTests: XCTestCase {
         }
     }
 
+    func testRecoveryStaysLockedBetweenMetadataAndPlayerReadiness() async throws {
+        for legacy in [false, true] {
+            try await withModel { model, _, _, metadata in
+                self.prepareStages(model)
+                model.pause()
+                if legacy {
+                    model.setGpStagesEnabled(false)
+                    model.setPlaybackSpeed(0.8)
+                    model.setSpeedLadderTarget(1.2)
+                    model.setSpeedLadderStep(0.1)
+                    model.setLoopsPerSpeedStep(2)
+                    model.setSpeedLadderEnabled(true)
+                }
+                let newID = try await self.beginRecovery(model)
+                // Metadata consumes the recovery snapshot before the MIDI player
+                // is ready to apply the saved midpoint (4320), not the A point (3840).
+                model.receiveFromWeb(.scoreLoaded(metadata), scoreLoadID: newID)
+                XCTAssertFalse(model.playerReady)
+                XCTAssertTrue(model.isRecoveringPractice, "The loop settings must stay disabled until playerReady")
+                XCTAssertFalse(model.canSelectStage(for: .gp))
+                let index = model.gpProgress.index
+                model.selectStage(2, for: .gp)
+                XCTAssertEqual(model.gpProgress.index, index, "A new stage must not be selected before the pending resume seek")
+                let before = [model.baseBpm, model.playbackSpeed, model.speedLadderTarget,
+                              model.speedLadderStep, Double(model.loopsPerSpeedStep), Double(model.completedLoops)]
+                model.setPlaybackSpeed(0.7)
+                model.setPracticeStartBpm(93)
+                model.setBaseBpm(100)
+                model.resetBaseBpm()
+                model.setSpeedLadderTarget(1.9)
+                model.setSpeedLadderStep(0.2)
+                model.setLoopsPerSpeedStep(8)
+                XCTAssertEqual([model.baseBpm, model.playbackSpeed, model.speedLadderTarget,
+                                model.speedLadderStep, Double(model.loopsPerSpeedStep), Double(model.completedLoops)], before)
+
+                model.receiveFromWeb(.playerReady, scoreLoadID: newID)
+                XCTAssertTrue(model.playerReady)
+                XCTAssertFalse(model.isRecoveringPractice)
+                XCTAssertFalse(model.isPlaying)
+                XCTAssertEqual(model.gpProgress.index, index)
+                if legacy {
+                    model.setPlaybackSpeed(0.9)
+                    XCTAssertEqual(model.playbackSpeed, 0.9, accuracy: 0.001)
+                } else {
+                    XCTAssertTrue(model.canSelectStage(for: .gp))
+                    model.selectStage(2, for: .gp)
+                    XCTAssertEqual(model.gpProgress.index, 2)
+                    XCTAssertFalse(model.gpProgress.clockRunning)
+                }
+            }
+        }
+    }
+
     private func prepareStages(_ model: GpWebViewModel) {
         model.receive(.pointerDown(.init(index: 1, startTick: 3840, endTick: 7680)))
         model.receive(.pointerUp)

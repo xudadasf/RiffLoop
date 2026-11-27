@@ -142,7 +142,9 @@ final class GpWebViewModel: ObservableObject {
     }
 
     var gpStageSummary: String { stageReadout(for: .gp).stageLabel }
-    var isRecoveringPractice: Bool { recoveryTask != nil || pendingGpRecovery != nil }
+    var isRecoveringPractice: Bool {
+        recoveryTask != nil || pendingGpRecovery != nil || (recoveryAttempts > 0 && !playerReady)
+    }
 
     func canSelectStage(for transport: TempoStageTransport) -> Bool {
         guard !isPlaying, !isStandaloneMetronomePlaying, !gpPlayRequestPending,
