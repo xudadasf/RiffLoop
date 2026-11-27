@@ -1,0 +1,116 @@
+name: GP stage interaction regression
+
+# A focused diagnostic loop, never a substitute for the complete ios-ci.yml gate.
+on:
+  push:
+    branches: ["codex/ipad-score-workspace"]
+    paths:
+      - ".github/workflows/ios-gp-regression.yml"
+      - "RiffLoopTests/GpStageInteractionTests.swift"
+      - "RiffLoop/GP/GpWebViewModel.swift"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-gp-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gp-stage-interactions:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode and install XcodeGen
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          brew install xcodegen
+
+      - name: Prepare the ordinary application project
+        run: |
+          set -euo pipefail
+          python3 scripts/test-onnx-package.py
+          python3 scripts/prepare-score-ocr.py
+          xcodegen generate
+          mkdir -p TestArtifacts
+
+      - name: Prepare iPad mini simulator
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(python3 - <<'PY'
+          import json
+          import subprocess
+          import time
+
+          for _ in range(15):
+              data = json.loads(subprocess.check_output(
+                  ["xcrun", "simctl", "list", "devices", "available", "-j"], text=True))
+              for runtime, devices in data["devices"].items():
+                  for device in devices:
+                      if runtime.endswith("iOS-18-5") and device["name"] == "iPad mini (A17 Pro)":
+                          print(device["udid"])
+                          raise SystemExit(0)
+              time.sleep(2)
+
+          runtimes = json.loads(subprocess.check_output(
+              ["xcrun", "simctl", "list", "runtimes", "available", "-j"], text=True))["runtimes"]
+          types = json.loads(subprocess.check_output(
+              ["xcrun", "simctl", "list", "devicetypes", "-j"], text=True))["devicetypes"]
+          runtime = next(item for item in runtimes if item["name"] == "iOS 18.5")
+          device_type = next(item for item in types if item["name"] == "iPad mini (A17 Pro)")
+          print(subprocess.check_output([
+              "xcrun", "simctl", "create", "RiffLoop GP stage regression",
+              device_type["identifier"], runtime["identifier"],
+          ], text=True).strip())
+          PY
+          )"
+          echo "IPAD_DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          python3 -c 'import subprocess,sys; subprocess.run(sys.argv[1:], check=True, timeout=180)' \
+            xcrun simctl bootstatus "$DEVICE_ID" -b
+
+      - name: Run GP stage interaction tests in the real app
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project RiffLoop.xcodeproj -scheme RiffLoop \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$IPAD_DEVICE_ID" \
+            -derivedDataPath "$RUNNER_TEMP/GpStageDerivedData" \
+            -resultBundlePath TestArtifacts/GpStage.xcresult \
+            -parallel-testing-enabled NO \
+            -only-testing:RiffLoopTests/GpStageInteractionTests \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee TestArtifacts/GpStage-build-test.log
+
+      - name: Extract concise test results
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          folder = Path("TestArtifacts")
+          folder.mkdir(exist_ok=True)
+          log = folder / "GpStage-build-test.log"
+          lines = log.read_text(encoding="utf-8", errors="replace").splitlines() if log.exists() else []
+          pattern = re.compile(r"error:|Test Case.*(?:started|passed|failed)|Executed \d+ tests?|\*\* TEST|Testing failed:", re.I)
+          selected = [line for line in lines if pattern.search(line)]
+          summary = "\n".join(selected) if selected else "No test result lines were produced; inspect the preceding workflow step."
+          (folder / "GpStage-summary.log").write_text(summary + "\n", encoding="utf-8")
+          print(summary)
+          PY
+
+      - name: Upload focused test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RiffLoop-GP-stage-regression
+          path: |
+            TestArtifacts/GpStage.xcresult
+            TestArtifacts/GpStage-summary.log
+          if-no-files-found: warn
+          retention-days: 14
