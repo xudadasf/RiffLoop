@@ -91,9 +91,21 @@ final class GpPanelLayoutTests: XCTestCase {
         reveal(enable, in: "loop")
         XCTAssertTrue(enable.isEnabled, "The touch-selected A/B range must enable stages")
         if enable.value as? String != "1" {
-            // The SwiftUI form exposes the whole row as a switch. Activate its
-            // trailing thumb, after scrolling the entire row below the heading.
-            enable.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+            // SwiftUI exposes the whole row as a switch. XCTest can relocate a
+            // switch-relative coordinate to the row's top-left during hit
+            // testing (confirmed by the recorded synthesized touch). Anchor the
+            // visible thumb's point to the app instead, without retrying a tap
+            // that could toggle a successfully enabled stage back off.
+            let row = enable.frame
+            let screen = app.frame
+            let point = CGPoint(x: row.maxX - 27, y: row.midY)
+            assertInside(row, element("gp.panel.loop").frame, "Visible stage switch row")
+            let evidence = XCTAttachment(string: "row=\(row), app=\(screen), tap=\(point)")
+            evidence.name = "GP-stage-switch-touch"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: point.x - screen.minX, dy: point.y - screen.minY)).tap()
         }
         wait("Custom stages are enabled") { enable.value as? String == "1" }
         assertPanelFits("loop")
