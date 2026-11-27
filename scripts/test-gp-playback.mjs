@@ -1152,6 +1152,9 @@ assert.doesNotMatch(
     assert.notEqual(end, -1, "createPointerSelection boundary is missing");
     const implementation = source.slice(start, end);
 
+    const longPressMatch = source.match(/const LONG_PRESS_MILLISECONDS = (\d+);/);
+    assert.ok(longPressMatch, "the production long-press threshold is missing");
+    const longPressMilliseconds = Number(longPressMatch[1]);
     const bar = (index) => ({ index, startTick: index * 960, endTick: (index + 1) * 960 });
     const scoreHit = (index, seekTick = index * 960, seekEndTick = seekTick + 240) => ({
         bar: bar(index),
@@ -1193,6 +1196,7 @@ assert.doesNotMatch(
             "element",
             "scheduleLongPress",
             "cancelLongPress",
+            "LONG_PRESS_MILLISECONDS",
             `${implementation}\nreturn createPointerSelection({ element, viewport, hitScorePosition, post, scheduleLongPress, cancelLongPress });`
         );
         const selection = execute(
@@ -1206,7 +1210,8 @@ assert.doesNotMatch(
             viewport,
             element,
             scheduleLongPress,
-            cancelLongPress
+            cancelLongPress,
+            longPressMilliseconds
         );
         const clearMethod = source.slice(source.indexOf("        clearPlaybackRange() {"),
             source.indexOf("        previewRange(firstBar, lastBar, startTick, endTick) {"));
@@ -1225,8 +1230,9 @@ assert.doesNotMatch(
             const applyRangeScrollPolicy = () => {};
             return { ${clearMethod} ${modeMethods} };
         `)(selection);
-        const event = (type, x, y) => ({
+        const event = (type, x, y, timeStamp) => ({
             type,
+            timeStamp,
             isPrimary: true,
             pointerId: 1,
             clientX: x,
@@ -1244,10 +1250,15 @@ assert.doesNotMatch(
                 fns.forEach((fn) => fn());
             },
             pendingTimers() { return timerFns.length; },
-            pointerDown(x, y) { selection.pointerDown(event("pointerdown", x, y)); },
-            pointerMove(x, y) { selection.pointerMove(event("pointermove", x, y)); },
-            pointerUp(x, y) { selection.pointerUp(event("pointerup", x, y)); },
-            pointerCancel(x, y) { selection.pointerCancel(event("pointercancel", x, y)); },
+            pointerDown(x, y, timeStamp) { selection.pointerDown(event("pointerdown", x, y, timeStamp)); },
+            pointerMove(x, y, timeStamp, coalesced) {
+                const input = event("pointermove", x, y, timeStamp);
+                if (coalesced) input.getCoalescedEvents = () => coalesced.map(([sx, sy, stamp]) =>
+                    event("pointermove", sx, sy, stamp));
+                selection.pointerMove(input);
+            },
+            pointerUp(x, y, timeStamp) { selection.pointerUp(event("pointerup", x, y, timeStamp)); },
+            pointerCancel(x, y, timeStamp) { selection.pointerCancel(event("pointercancel", x, y, timeStamp)); },
         };
     }
 
@@ -1294,6 +1305,102 @@ assert.doesNotMatch(
         h.pointerUp(100, 100);
         assert.deepEqual(h.posted.map(([event]) => event), ["pointerDown", "pointerMove", "pointerUp"],
             `${command}(${argument}) must not discard an unrelated pending selection`);
+    }
+
+    for (const firstMoveTime of [1100, 1000 + longPressMilliseconds - 1]) {
+        const h = makeHarness(x => scoreHit(x < 200 ? 2 : 5));
+        h.pointerDown(100, 100, 1000);
+        h.pointerMove(300, 100, firstMoveTime);
+        h.pointerMove(400, 100, 1800);
+        h.pointerUp(400, 100, 1980);
+        h.fireLongPress();
+        assert.deepEqual(h.posted, [],
+            'Movement before the 600 ms hold becomes scrolling, even if the finger stays down much longer');
+    }
+    {
+        const h = makeHarness(() => scoreHit(2));
+        h.pointerDown(100, 100, 1000);
+        h.pointerUp(100, 100, 1500);
+        assert.deepEqual(h.posted, [["barHit", payload(scoreHit(2))]],
+            'A press shorter than 600 ms remains a tap when the timer has not fired');
+    }
+    for (const [down, move] of [[undefined, 1800], [1000, undefined], [NaN, 1800],
+        [1000, Infinity], [1000, 999], [-1000, 1800]]) {
+        const h = makeHarness(x => scoreHit(x < 200 ? 2 : 5));
+        h.pointerDown(100, 100, down);
+        h.pointerMove(300, 100, move);
+        h.pointerUp(300, 100, 1980);
+        assert.deepEqual(h.posted, [], 'Missing, nonfinite or backwards timestamps cannot promote a drag');
+    }
+    {
+        const h = makeHarness(() => scoreHit(2));
+        h.pointerDown(100, 100, 1000);
+        h.pointerCancel(100, 100, 1200);
+        h.pointerMove(100, 100, 1800);
+        h.pointerUp(100, 100, 1980);
+        h.fireLongPress();
+        assert.deepEqual(h.posted, [], 'A cancelled pending hold cannot be revived by later timestamps');
+        assert.equal(h.pendingTimers(), 0);
+    }
+    {
+        const first = scoreHit(2), last = scoreHit(5);
+        const h = makeHarness(x => x < 200 ? first : last);
+        h.pointerDown(100, 100, 1000);
+        // The finger stayed still for 800 ms, but WebKit has not dispatched the timer.
+        assert.equal(h.pendingTimers(), 1);
+        h.pointerMove(300, 100, 1800);
+        h.pointerUp(300, 100, 1980);
+        assert.deepEqual(h.posted, [["pointerDown", payload(first)], ["pointerMove", payload(last)],
+            ["pointerMove", payload(last)], ["pointerUp"]],
+        'A delayed timer must not turn a completed 800 ms hold and drag into scrolling');
+        assert.equal(h.viewport.horizontalScrolls.length, 0);
+        assert.equal(h.pendingTimers(), 0);
+        h.fireLongPress();
+        assert.equal(h.posted.length, 4, 'A late timer must not start the completed gesture again');
+    }
+    {
+        const hit = scoreHit(2);
+        const h = makeHarness(() => hit);
+        h.pointerDown(100, 100, 1000);
+        h.pointerUp(100, 100, 1800);
+        assert.deepEqual(h.posted, [["pointerDown", payload(hit)], ["pointerMove", payload(hit)], ["pointerUp"]],
+            'An 800 ms stationary hold released before its delayed timer still selects a single beat');
+        assert.equal(h.pendingTimers(), 0);
+        h.fireLongPress();
+        assert.equal(h.posted.length, 3);
+    }
+    {
+        const first = scoreHit(2), last = scoreHit(5);
+        const h = makeHarness(x => x < 200 ? first : last);
+        h.pointerDown(100, 100, 0);
+        h.pointerMove(300, 100, longPressMilliseconds);
+        h.pointerUp(300, 100, longPressMilliseconds + 20);
+        assert.deepEqual(h.posted, [["pointerDown", payload(first)], ["pointerMove", payload(last)],
+            ["pointerMove", payload(last)], ["pointerUp"]],
+        'A zero-origin timestamp and the exact production hold threshold are valid');
+    }
+    {
+        const h = makeHarness(x => scoreHit(x < 200 ? 2 : 5));
+        h.pointerDown(100, 100, 1000);
+        h.pointerMove(300, 100, 1800, [[120, 100, 1100], [200, 100, 1700]]);
+        h.pointerUp(300, 100, 1980);
+        h.fireLongPress();
+        assert.deepEqual(h.posted, [],
+            'An early swipe batched with late samples remains scrolling');
+        assert.equal(h.viewport.horizontalScrolls.length, 1);
+        assert.equal(h.pendingTimers(), 0);
+    }
+    {
+        const first = scoreHit(2), last = scoreHit(5);
+        const h = makeHarness(x => x < 200 ? first : last);
+        h.pointerDown(100, 100, 1000);
+        h.pointerMove(300, 100, 1800, [[103, 100, 1100], [105, 101, 1500], [200, 100, 1700]]);
+        h.pointerUp(300, 100, 1980);
+        assert.deepEqual(h.posted, [["pointerDown", payload(first)], ["pointerMove", payload(last)],
+            ["pointerMove", payload(last)], ["pointerUp"]],
+        'Small pre-hold jitter in coalesced samples does not discard a subsequent long press');
+        assert.equal(h.viewport.horizontalScrolls.length, 0);
+        assert.equal(h.pendingTimers(), 0);
     }
 
     {

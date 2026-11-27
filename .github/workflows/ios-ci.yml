@@ -216,6 +216,42 @@ jobs:
           -resultBundlePath TestArtifacts/GpPanels.xcresult
           CODE_SIGNING_ALLOWED=NO
 
+      - name: Preserve GP panel diagnostics before fixture cleanup
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+
+          destination = Path("TestArtifacts/GpPanelDiagnostics")
+          destination.mkdir(parents=True, exist_ok=True)
+
+          def capture():
+              device_id = os.environ.get("IPAD_DEVICE_ID")
+              if not device_id:
+                  return "Diagnostics unavailable: the CI simulator was not prepared."
+              result = subprocess.run([
+                  "xcrun", "simctl", "get_app_container", device_id,
+                  "com.riffloop.prototype", "data",
+              ], capture_output=True, text=True, timeout=30)
+              if result.returncode or not result.stdout.strip():
+                  return "Diagnostics unavailable: " + (result.stderr.strip() or "no CI app container found")
+              source = Path(result.stdout.strip()) / "Library/Application Support/Reproduction"
+              if not source.is_dir():
+                  return "Diagnostics unavailable: the CI app has no Reproduction directory."
+              shutil.copytree(source, destination / "Reproduction", dirs_exist_ok=True)
+              return "Copied CI GP panel Reproduction diagnostics before app cleanup."
+
+          try:
+              status = capture()
+          except (OSError, subprocess.SubprocessError) as error:
+              status = "Diagnostics capture failed: " + str(error)
+          print(status)
+          (destination / "capture-status.txt").write_text(status + "\n", encoding="utf-8")
+          PY
+
       - name: Remove GP fixture and restore a clean UI-test app
         if: always() && steps.gp_panel_fixture.outcome == 'success'
         run: |
@@ -319,6 +355,7 @@ jobs:
             TestArtifacts/PracticeScreenshots/**/*.jpeg
             TestArtifacts/PracticeScreenshots/**/*.txt
             TestArtifacts/PracticeScreenshots/**/manifest.json
+            TestArtifacts/GpPanelDiagnostics/
           if-no-files-found: ignore
           retention-days: 30
 

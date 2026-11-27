@@ -1349,6 +1349,16 @@
             element.classList.add("range-selecting");
             post("pointerDown", bridgeHitPayload(pointer.hit));
         };
+        const recognizeElapsedPress = (event) => {
+            if (pointer?.mode !== "pending" || !Number.isFinite(pointer.pressedAt)
+                || pointer.pressedAt < 0 || !Number.isFinite(event.timeStamp)
+                || event.timeStamp - pointer.pressedAt < LONG_PRESS_MILLISECONDS) return;
+            // Input can arrive before an overdue timer on a busy WebKit thread.
+            // Use the event's occurrence time, not its delivery time, so an
+            // early scroll never becomes a long press merely because JS was busy.
+            clearLongPress();
+            startSelection();
+        };
         const clearInteractionFeedback = () => {
             element.classList.remove("range-press-pending", "range-selecting");
         };
@@ -1388,6 +1398,7 @@
                     startY: event.clientY,
                     previousX: event.clientX,
                     previousY: event.clientY,
+                    pressedAt: event.timeStamp,
                     hit,
                     mode: "pending"
                 };
@@ -1400,14 +1411,20 @@
             pointerMove(event) {
                 if (!pointer || pointer.id !== event.pointerId) return;
                 if (pointer.mode === "pending") {
-                    const distance = Math.hypot(
-                        event.clientX - pointer.startX,
-                        event.clientY - pointer.startY
-                    );
-                    if (distance > DRAG_SLOP_PIXELS) {
-                        clearLongPress();
-                        pointer.mode = "scroll";
-                        clearInteractionFeedback();
+                    // Preserve an early movement even when the browser batches
+                    // it with a later sample beyond the long-press threshold.
+                    const samples = typeof event.getCoalescedEvents === "function"
+                        ? event.getCoalescedEvents() : [];
+                    for (const sample of [...samples, event]) {
+                        if (pointer.mode !== "pending") break;
+                        recognizeElapsedPress(sample);
+                        if (pointer.mode === "pending" && Math.hypot(
+                            sample.clientX - pointer.startX, sample.clientY - pointer.startY
+                        ) > DRAG_SLOP_PIXELS) {
+                            clearLongPress();
+                            pointer.mode = "scroll";
+                            clearInteractionFeedback();
+                        }
                     }
                 }
                 if (pointer.mode === "scroll") {
@@ -1431,6 +1448,7 @@
                 if (!pointer || pointer.id !== event.pointerId) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
+                recognizeElapsedPress(event);
                 clearLongPress();
                 const mode = pointer.mode;
                 const lastHit = pointer.hit;
